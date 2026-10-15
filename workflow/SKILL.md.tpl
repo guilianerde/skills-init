@@ -59,6 +59,8 @@ dev（需求 → 方案 → 实现 → 测试 → 自审）
 | `data_review` | 上线前是否需要数据团队评审库表（`true` / `false`） | 技术方案模块 7、上线方案 2.3 |
 | `notes` | 其他项目约定，一条一句（如「启动需要本地 Redis」） | 全部 |
 
+其他 skill 读画像统一用 `node <skills>/workflow/scripts/resolve.mjs profile`：输出 `profile`（文件内容）、`empty`（空字段）、`complete`（`main_branch` / `build` / `test` 都已填写）。
+
 ### 填写与更新
 
 由 `/workflow profile` 触发，或其他 skill 首次需要某个字段但它为空时触发：
@@ -81,6 +83,8 @@ dev（需求 → 方案 → 实现 → 测试 → 自审）
 
 ### `/workflow status` 输出
 
+先运行 `node <skills>/workflow/scripts/resolve.mjs status`，它按上表判定画像、wiki 配置、DocNexus（含缺失模板）、数据库连接（只给连接名、driver、是否只读，不含凭据），再据此填写下表。wiki MCP 脚本探测不到，需你自己看当前环境有没有 wiki 相关工具。
+
 ```
 # Workflow 状态
 
@@ -88,7 +92,7 @@ dev（需求 → 方案 → 实现 → 测试 → 自审）
 |---|---|---|
 | 项目画像 | ✅ / ⚠️ 部分字段为空 | <空字段>；运行 /workflow profile |
 | wiki | ✅ / ❌ | 填写 md-to-wiki/wiki-config.json 或接入 wiki MCP |
-| DocNexus | ✅ / ❌ | 重跑 skills-init 并加 --with-docnexus；已接入但缺模板时列出缺的模板并提示 --seed-templates |
+| DocNexus | ✅ / ❌ | 重跑 skills-init 并加 --with-docnexus；已接入但缺模板时列出缺的模板并提示 `skills-init seed-templates` |
 | 数据库 | ✅ / ❌ | 重跑 init-skills 补配 |
 ```
 
@@ -96,28 +100,21 @@ dev（需求 → 方案 → 实现 → 测试 → 自审）
 
 ## 模板来源（文档类 skill 共用）
 
-技术方案、上线方案、开发方案、审查清单的模板来源取决于项目是否接入了 DocNexus（判定见上方「增强能力探测」），并在产出中注明「模板来源」：
+技术方案、上线方案、开发方案、审查清单的模板由脚本判定，各 skill 不自行查找：
 
-**已接入 DocNexus：只用 DocNexus 里的模板**
+```
+node <skills>/workflow/scripts/resolve.mjs template <skill> <文件名>
+```
 
-- 读取 `docnexus/library/templates/<skill>/<文件名>`（分类 `doc-template`）。它是普通 Markdown，直接读文件即可，你手工改过的内容也会立即生效；需要确认版本时用 `./node_modules/.bin/docnexus document query --category doc-template`。
-- **不再使用** skill 自带的默认模板，也不使用 `docs/skills/templates/` 下的项目文件——知识库是唯一来源，避免几份模板各自演化。
-- 库里没有需要的模板 → **停下这一步**，告诉用户缺哪份模板，提供两个选择：在项目根重跑 skills-init 加 `--seed-templates` 导入默认模板；或者由你现在把模板导入 DocNexus（项目里有 `docs/skills/templates/` 的同名文件时导入它，否则导入 skill 自带的默认模板），用户确认后按 DocNexus 的 capture 流程写入 `templates/<skill>/<文件名>`，分类 `doc-template`。导入完成后再继续生成。
-- 发现 `docs/skills/templates/` 下还有模板文件 → 提醒用户它们已不再生效，建议导入 DocNexus 后删除。
+`<skills>` 是本 skill 所在的 skills 目录（如 `.agents/skills`），在项目根执行。输出 JSON：`path` 是要读的模板，`source` 是 `docnexus` / `project` / `default`，写进产出的「模板来源」。判定规则（实现在脚本里，这里只是说明）：
 
-**未接入 DocNexus：按顺序取第一个存在的**
+- **已接入 DocNexus**：只用 `docnexus/library/templates/<skill>/<文件名>`（分类 `doc-template`，普通 Markdown，手工改动立即生效）。不使用 skill 默认模板，也不使用 `docs/skills/templates/`——知识库是唯一来源，避免几份模板各自演化。
+  - 缺模板时退出码 2，输出 `expected`（应在的位置）、`import_from`（可导入的来源）和 `hint`。**停下这一步**，告诉用户缺哪份模板，给两个选择：在项目根运行 `skills-init seed-templates`（或重跑安装加 `--seed-templates`）；或者由你在用户确认后按 DocNexus 的 capture 流程把 `import_from` 写入 `expected`，分类 `doc-template`。导入后再继续。
+  - 输出里 `stale_project_file` 非空：提醒用户 `docs/skills/templates/` 下的这份已不再生效，建议导入后删除。
+- **未接入 DocNexus**：先取项目文件 `docs/skills/templates/<skill>/<文件名>`，没有就用 skill 默认模板。
 
-1. 项目文件 `docs/skills/templates/<skill>/<文件名>`
-2. skill 自带默认模板
+`resolve.mjs templates` 列出所有登记模板的来源；登记表在各 skill 的 `skill.json`（`templates` 字段）。`--with-docnexus` 接入时会自动导入默认模板，之后可运行 `skills-init seed-templates` 补导入（已存在的不覆盖）。
 
-| skill | 文件名 | 自带默认位置 |
-|---|---|---|
-| create-tech-md-doc | `template.md` | `create-tech-md-doc/template.md` |
-| create-release-md-doc | `template.md` | `create-release-md-doc/template.md` |
-| dev | `plan-template.md` | `dev/references/plan-template.md` |
-| project-review | `checklist.md` | `project-review/references/checklist.md` |
-
-- 把默认模板导入 DocNexus：`--with-docnexus` 接入时会自动导入；之后补导入可重跑 skills-init 并加 `--seed-templates`（已存在的不覆盖）。
 - **模板随知识库更新**：用户在生成的文档里做了结构性调整（新增 / 删除 / 重排章节、改表格列、改必填项），且项目已接入 DocNexus 时，交付后列出这些调整，**询问**是否同步回模板；同意后按 DocNexus 的 capture 流程更新同一路径（先 `document get --include document,metadata,timeline` 取 `record_version`，以 `--base-version <record_version>` 封存，用户确认后 `document add --draft <id> --replace`），DocNexus 会在 timeline 中记录每次变更。只改结构，不把某次需求的具体内容写进模板。用户也可以直接编辑库里的模板文件，再用 `docnexus document sync --id <id>` 采纳。
 - 模板里的 `{{...}}` 是给 agent 看的填写提示，不是模板引擎语法；不要写成单独一行的 `{{fact:...}}`（那是 DocNexus 的事实引用语法）。
 

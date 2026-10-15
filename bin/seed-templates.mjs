@@ -5,14 +5,12 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+import { loadSkills, deriveMeta, TEMPLATE_CATEGORY } from './skills.mjs';
 
-export const TEMPLATE_CATEGORY = 'doc-template';
-export const TEMPLATES = [
-  { skill: 'create-tech-md-doc', src: 'create-tech-md-doc/template.md', file: 'templates/create-tech-md-doc/template.md', title: '技术方案模板', summary: 'create-tech-md-doc 生成技术方案时使用的 8 模块 Markdown 模板。' },
-  { skill: 'create-release-md-doc', src: 'create-release-md-doc/template.md', file: 'templates/create-release-md-doc/template.md', title: '上线方案模板', summary: 'create-release-md-doc 生成上线方案时使用的 6 模块 Markdown 模板。' },
-  { skill: 'dev', src: 'dev/references/plan-template.md', file: 'templates/dev/plan-template.md', title: '开发方案模板', summary: 'dev skill 在 M / L 规模需求中使用的开发方案模板。' },
-  { skill: 'project-review', src: 'project-review/references/checklist.md.tpl', file: 'templates/project-review/checklist.md', title: '代码审查清单', summary: 'project-review 逐项审查时使用的 10 维度检查清单。' },
-];
+// 模板清单来自各 skill 的 skill.json（templates 字段）
+export const TEMPLATES = deriveMeta(loadSkills(path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'))).templates;
+export { TEMPLATE_CATEGORY };
 
 const IS_WIN = process.platform === 'win32';
 

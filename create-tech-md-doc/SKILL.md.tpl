@@ -35,7 +35,7 @@ wiki GATE：读 `md-to-wiki/wiki-config.json`，`enabled` 非 `true` 或 `wiki.b
 
 ### Step 3 — 选模板并填充
 
-- 模板：按 `workflow` skill「模板来源」取 `create-tech-md-doc` 的 `template.md`。已接入 DocNexus 时**只用** `docnexus/library/templates/create-tech-md-doc/template.md`，库里没有就停下并按该节提示导入，不回退到默认模板；未接入时依次取 `docs/skills/templates/create-tech-md-doc/template.md`、本 skill 目录的 `template.md`。
+- 模板：在项目根运行 `node <skills>/workflow/scripts/resolve.mjs template create-tech-md-doc template.md`（`<skills>` 是本 skill 所在的 skills 目录，如 `.agents/skills`），读输出的 `path`，并把 `source` 写进元数据行。退出码 2 表示已接入 DocNexus 但知识库缺这份模板：**停下这一步**，按输出的 `hint` 处理，不要回退到默认模板。规则说明见 `workflow` skill「模板来源」。
 - 填充来源：
 
 | 模块 | 填充 | 来源 |

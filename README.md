@@ -54,6 +54,23 @@ npx @rowansenne/skills-init
 ./skills-init/init-skills.sh --uninstall                             # 按安装清单卸载（PowerShell：-Uninstall）
 ```
 
+### 子命令
+
+| 命令 | 作用 |
+| --- | --- |
+| `init`（默认，可省略） | 安装或重装 |
+| `upgrade` | 读安装清单里记录的环境与模式，非交互升级到当前版本：保留数据库配置，手改过的文件另存 `.new` |
+| `doctor` | 自检：已装版本与当前包对比、手改 / 缺失 / 待合并的文件、软链接是否断开、项目画像、DocNexus 模板是否齐全、各数据库连接能否只读 `SELECT 1`（`--offline` 跳过）、`.gitignore` 是否忽略了凭据。有错误时退出码 1 |
+| `uninstall` | 等价于 `--uninstall` |
+| `seed-templates` | 只把默认文档模板导入 DocNexus，不重装 skills |
+
+```
+npx @rowansenne/skills-init upgrade      # 拿最新版升级
+npx @rowansenne/skills-init doctor
+./skills-init/init-skills.sh doctor --offline
+.\skills-init\init-skills.ps1 doctor -Offline
+```
+
 ## 安装路径与启用方式
 
 
@@ -84,6 +101,7 @@ npx @rowansenne/skills-init
 <env-dir>/
 ├── workflow/                         # 入口：路由到各 skill、能力探测、维护共用项目画像
 │   ├── SKILL.md
+│   ├── scripts/resolve.mjs           # 模板来源 / 画像 / 能力探测的判定脚本
 │   └── profile.json                  # 项目画像：主分支、构建 / 测试命令、配置中心、发布平台等（无凭据，可提交；重跑不覆盖）
 ├── project-review/                      # 代码审查
 │   ├── SKILL.md                      # 触发描述 + 审查工作流 + 输出模板
@@ -91,6 +109,7 @@ npx @rowansenne/skills-init
 ├── database-query/                   # 数据库查询
 │   ├── SKILL.md                      # 触发描述 + 查询工作流 + 只读/安全规则
 │   ├── config.json                   # 数据库连接（init 生成，已加入 .gitignore）
+│   ├── scripts/query.mjs             # 执行查询：会话只读、写语句拦截、自动 LIMIT、脱敏
 │   └── references/schema.md          # 表结构速查（初始为空，建议补齐后提交）
 ├── md-to-wiki/                       # 发布 md 到 Confluence wiki
 │   ├── SKILL.md                      # GATE：wiki 未配置则禁止启动
@@ -167,6 +186,7 @@ npx @rowansenne/skills-init
 | `-Copy` / `--copy`      | 不建软链接，各环境独立拷贝一份完整 skills                                  |
 | `-SeedTemplates` / `--seed-templates` | 把自带的文档模板导入 DocNexus（已有的不覆盖）；接入 DocNexus 后文档类 skill 只从知识库取模板。`--with-docnexus` 会自动执行 |
 | `-Uninstall` / `--uninstall` | 按安装清单卸载本项目装的 skills 与链接，见下方「卸载」 |
+| `-Offline` / `--offline` | `doctor` 不测试数据库连通性 |
 | `-Yes` / `--yes`        | 非交互：自动使用已有数据库配置（依次查找 `.codex/database-query/config.json` 与各环境已安装的 `database-query/config.json`）；都没有且未 `-SkipDb` 时报错退出 |
 | `--project-root`        | 项目根目录；直接调用 `bin/skills-init.mjs` 时默认当前目录，两个封装脚本自动传上级目录 |
 | `-v` / `--version`      | 显示版本                                                                |
@@ -201,7 +221,7 @@ npx @rowansenne/skills-init
 
 ## 重跑与升级
 
-可以放心重复执行 init 来升级模板：
+可以放心重复执行 init 来升级模板；只想按原来的环境升级时用 `skills-init upgrade`，不用再选一遍：
 
 * `SKILL.md`、`references/checklist.md`、`template.md`、脚本等**模板文件会被更新**；但被你**手动改过**的模板文件不会被静默覆盖（见下方「安装清单」）；
 * 新版本模板里已删除的文件会被清理；你改过的不删，保留并在结尾提示；
@@ -209,6 +229,7 @@ npx @rowansenne/skills-init
 * `database-query/config.json` 只在本次确认或填写了数据库配置时写入；`--skip-db` 时保留已有文件；
 * `.gitignore` 规则无论是否配置数据库都会补齐（只追加缺失的行）；
 * 安装器按 skill 目录自动发现文件（`*.tpl` 去掉后缀），新增 `references/` 文件不需要改安装器。
+* skill 的元数据只写在各目录的 `skill.json` 里（见下方「skill.json」），安装器、`seed-templates` 和 `resolve.mjs` 都从它读取。
 * `code-review` 已改名为 `project-review`（避免与 Claude Code 内置的 `/code-review` 撞名）：重跑时自动移除旧名的目录和链接；只删能确认是本项目装的那份，你自己的同名 skill 不动。
 * 设置环境变量 `SKILLS_INIT_NO_SYMLINK=1` 可强制不建软链接（各环境独立拷贝）；无法建链接时会先探测，旧目录原样保留、只更新模板。
 
@@ -238,9 +259,50 @@ npx @rowansenne/skills-init
 * `.gitignore` 里追加的规则和 DocNexus 不处理；没有清单时什么也不做。
 * 用户级 `~/.codex/skills` 不在卸载范围内。
 
+### skill.json
+
+每个 skill 目录下有一份 `skill.json`，是这个 skill 元数据的唯一来源：
+
+```json
+{
+  "name": "create-tech-md-doc",
+  "order": 6,
+  "userFiles": {},
+  "templates": [{ "id": "template.md", "src": "template.md", "title": "技术方案模板", "summary": "..." }],
+  "renamedFrom": {}
+}
+```
+
+| 字段 | 含义 |
+| --- | --- |
+| `name` / `order` | 与目录名一致；安装和展示顺序 |
+| `userFiles` | 用户配置（安装后的相对路径 → 对应空模板的源路径或 `null`），重跑不覆盖，卸载时备份 |
+| `templates` | 可由 DocNexus 接管的文档模板，知识库路径为 `templates/<skill>/<id>` |
+| `renamedFrom` | 旧名 → SKILL.md 签名正则；升级时只清理能确认是本项目装的旧目录 |
+
+新增一个 skill 就是新建目录、写 `SKILL.md.tpl` 和 `skill.json`，再加进 `package.json` 的 `files`。`tests/test-skills-meta.mjs` 会检查它们是否一致。
+
+## 脚本化的规则
+
+能写成确定规则的判断都放在脚本里，SKILL.md 只说明什么时候调用，不再让 agent 按文字描述自己判断：
+
+| 脚本（安装后在 `<skills>/` 下） | 作用 |
+| --- | --- |
+| `workflow/scripts/resolve.mjs template <skill> <文件名>` | 判定用哪份模板：已接入 DocNexus 只用知识库，缺失时退出码 2 并给出导入来源；未接入时项目文件优先，其次默认模板 |
+| `workflow/scripts/resolve.mjs profile` | 读项目画像，列出空字段 |
+| `workflow/scripts/resolve.mjs status` | `/workflow status` 的能力探测（不输出任何凭据） |
+| `database-query/scripts/query.mjs` | 执行 SQL：选连接、取密码（只通过环境变量传给客户端）、会话层只读、拦截写语句和多语句、自动补 LIMIT、超时、脱敏敏感列；支持 mysql / psql 客户端，其他 driver 退回 JDBC |
+
 ## 测试
 
-`tests/` 下是两个安装脚本的黑盒测试：每个用例在临时目录放一份 skills-init 副本，执行安装后检查生成的目录、软链接和配置文件。
+```bash
+npm test                                  # bash 黑盒测试 + 全部 node 测试
+node --test "tests/*.mjs"                 # 只跑 node 测试（三个平台都能跑）
+```
+
+node 测试覆盖：skill.json 一致性、子命令（upgrade / doctor / seed-templates / uninstall）、`resolve.mjs`、`query.mjs`（用假的 mysql / psql 客户端）、md-to-wiki 转换、DocNexus 模板导入（用假的 docnexus CLI）。
+
+`tests/test-init-skills.*` 是两个安装脚本的黑盒测试：每个用例在临时目录放一份 skills-init 副本，执行安装后检查生成的目录、软链接和配置文件。
 
 ```bash
 bash tests/test-init-skills.sh            # bash 版（兼容 macOS 自带的 /bin/bash 3.2）
@@ -255,7 +317,7 @@ pwsh -NoProfile -File tests/test-init-skills.ps1   # PowerShell 版（Windows，
 
 依赖：bash 版需要 `python3` 校验 JSON；升级用例需要完整 git 历史（浅克隆时先 `git fetch --unshallow`）。
 
-CI（`.github/workflows/test.yml`）在 push 到 main 和每个 PR 上运行：macOS 用 `/bin/bash`、Ubuntu 用 bash 跑 bash 版，Windows 用 pwsh 跑 PowerShell 版。
+CI（`.github/workflows/test.yml`）在 push 到 main 和每个 PR 上运行：macOS 用 `/bin/bash`、Ubuntu 用 bash 跑 bash 版，Windows 用 pwsh 跑 PowerShell 版；三个平台都跑 node 测试。
 
 ## 凭据安全
 
@@ -338,38 +400,43 @@ CI（`.github/workflows/test.yml`）在 push 到 main 和每个 PR 上运行：m
 
 ```
 skills-init/
-├── bin/skills-init.mjs                # 安装器（唯一实现，Node >= 18）
+├── bin/
+│   ├── skills-init.mjs                # 安装器（唯一实现，Node >= 18）：init / upgrade / doctor / uninstall / seed-templates
+│   ├── skills.mjs                     # 读取各 skill 的 skill.json
+│   └── seed-templates.mjs             # 把文档模板导入 DocNexus
 ├── init-skills.sh / init-skills.ps1   # 薄封装：以上级目录为项目根调用安装器
 ├── package.json                       # npm 包信息（bin: skills-init）
+├── tests/                             # 黑盒测试（bash / pwsh）+ node 测试
 ├── evals/trigger-cases.json           # 多 skill 分流评估用例
 ├── scripts/eval-triggers.mjs          # 分流评估脚本
 ├── README.md                          # 本说明
-├── database-query/
-│   ├── SKILL.md.tpl
-│   ├── config.json.tpl
-│   └── references/schema.md.tpl
+├── workflow/
+│   ├── SKILL.md.tpl · skill.json
+│   ├── scripts/resolve.mjs            # 模板来源 / 画像 / 能力探测
+│   └── profile.json.tpl               # 空画像，首次使用时由 agent 推断并经确认后填写
+├── dev/
+│   ├── SKILL.md.tpl · skill.json
+│   └── references/                    # plan-template.md（方案模板）、delivery-template.md（交付模板）
 ├── project-review/
-│   ├── SKILL.md.tpl
+│   ├── SKILL.md.tpl · skill.json
 │   └── references/checklist.md.tpl
+├── database-query/
+│   ├── SKILL.md.tpl · skill.json
+│   ├── scripts/query.mjs              # 只读查询执行脚本
+│   └── references/                    # config.example.json、schema.md.tpl
 ├── md-to-wiki/
-│   ├── SKILL.md.tpl
+│   ├── SKILL.md.tpl · skill.json
 │   ├── wiki-config.json.tpl
 │   ├── references/                    # upload.md（上传通道）、troubleshooting.md（脚本与排错）
 │   └── scripts/md-to-wiki.mjs
 ├── create-tech-md-doc/
-│   ├── SKILL.md.tpl
+│   ├── SKILL.md.tpl · skill.json
 │   ├── references/                    # diff-collection.md（分层采集）、prd.md（PRD 拉取）
 │   └── template.md                    # 8 模块文档模板
-├── create-release-md-doc/
-│   ├── SKILL.md.tpl
-│   ├── references/                    # diff-collection.md、prd.md
-│   └── template.md                    # 6 模块文档模板
-├── dev/
-│   ├── SKILL.md.tpl
-│   └── references/                    # plan-template.md（方案模板）、delivery-template.md（交付模板）
-└── workflow/
-    ├── SKILL.md.tpl
-    └── profile.json.tpl               # 空画像，首次使用时由 agent 推断并经确认后填写
+└── create-release-md-doc/
+    ├── SKILL.md.tpl · skill.json
+    ├── references/                    # diff-collection.md、prd.md
+    └── template.md                    # 6 模块文档模板
 ```
 
 
@@ -402,7 +469,7 @@ skills-init/
 
 ```
 ./skills-init/init-skills.sh --envs claude --skip-db --with-docnexus   # 接入时自动导入默认模板
-./skills-init/init-skills.sh --envs claude --skip-db --seed-templates  # 已接入的项目补导入缺的模板
+./skills-init/init-skills.sh seed-templates                      # 已接入的项目补导入缺的模板
 ```
 
 * 只导入 DocNexus 里还没有的模板，已有的不覆盖；项目已接入但缺模板时，安装结束会列出缺哪几份。

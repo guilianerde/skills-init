@@ -9,6 +9,7 @@
 #   ./skills-init/init-skills.sh --envs claude,qwen --with-docnexus
 #   ./skills-init/init-skills.sh --envs all --copy                 # 不用软链接
 #   ./skills-init/init-skills.sh --uninstall                       # 按安装清单卸载
+#   ./skills-init/init-skills.sh upgrade                           # 子命令：upgrade / doctor / uninstall / seed-templates
 # 完整参数：./skills-init/init-skills.sh --help
 # =====================================================================
 set -eu

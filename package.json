@@ -1,6 +1,6 @@
 {
   "name": "@rowansenne/skills-init",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "项目级 Agent Skills 一键初始化：workflow / dev / project-review / database-query / md-to-wiki / 技术与上线方案生成",
   "keywords": [
     "agent-skills",
@@ -33,7 +33,7 @@
     "README.md"
   ],
   "scripts": {
-    "test": "bash tests/test-init-skills.sh && node --test tests/test-md-to-wiki.mjs tests/test-seed-templates.mjs",
+    "test": "bash tests/test-init-skills.sh && node --test \"tests/*.mjs\"",
     "eval:triggers": "node scripts/eval-triggers.mjs"
   },
   "publishConfig": {

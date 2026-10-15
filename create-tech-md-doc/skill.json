@@ -1,0 +1,7 @@
+{
+  "name": "create-tech-md-doc",
+  "order": 6,
+  "templates": [
+    { "id": "template.md", "src": "template.md", "title": "技术方案模板", "summary": "create-tech-md-doc 生成技术方案时使用的 8 模块 Markdown 模板。" }
+  ]
+}

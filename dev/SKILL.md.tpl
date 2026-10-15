@@ -26,7 +26,7 @@ description: "Implement a feature or fix a bug in this project end to end: under
 
 ## Step 0 — 前置检查（两种模式共用）
 
-1. **项目画像**：读同项目 `workflow` skill 目录下的 `profile.json`（字段含义见 `workflow` skill）。本 skill 用到 `main_branch`、`build`、`test`、`test_single`（`{target}` 替换为测试类或文件）、`lint`、`config_center`、`notes`。
+1. **项目画像**：运行 `node <skills>/workflow/scripts/resolve.mjs profile`，读输出的 `profile` 与 `empty`（空字段列表；字段含义见 `workflow` skill）。本 skill 用到 `main_branch`、`build`、`test`、`test_single`（`{target}` 替换为测试类或文件）、`lint`、`config_center`、`notes`。
    - 需要的字段为空 → 按 `workflow` skill「填写与更新」的步骤推断，经用户确认后写回；用户不确认就只在本次使用，不落盘。
 2. **工作区状态**：`git status --short` 与当前分支。
    - 有与本需求无关的未提交改动 → 告知用户，不要混进本次改动，也不要替用户 stash / 丢弃。
@@ -56,7 +56,7 @@ description: "Implement a feature or fix a bug in this project end to end: under
 | **M** | 新增或修改接口、配置项、少量表字段 | 在对话中给出简要方案（方案模板的精简版），**等用户确认后再写代码** |
 | **L** | 新模块、跨服务、表结构较大变更、数据迁移 | 按方案模板写方案文档落盘（见 Artifact Location），用户确认后再写代码；完成后建议用 `create-tech-md-doc` 生成正式技术方案 |
 
-规模拿不准时按大一级处理。方案模板按 `workflow` skill「模板来源」取 `dev` 的 `plan-template.md`：已接入 DocNexus 时只用 `docnexus/library/templates/dev/plan-template.md`（缺失就停下并提示导入）；未接入时依次取 `docs/skills/templates/dev/plan-template.md`、本 skill 的 `references/plan-template.md`。
+规模拿不准时按大一级处理。方案模板：在项目根运行 `node <skills>/workflow/scripts/resolve.mjs template dev plan-template.md`，读输出的 `path`；退出码 2（已接入 DocNexus 但缺模板）时停下并按 `hint` 处理。
 
 ### F4 — 实现
 

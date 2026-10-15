@@ -20,7 +20,8 @@ import path from 'node:path';
 import readline from 'node:readline';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { seedTemplates, TEMPLATES } from './seed-templates.mjs';
+import { seedTemplates } from './seed-templates.mjs';
+import { loadSkills, deriveMeta } from './skills.mjs';
 
 const TPL_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const PKG = JSON.parse(fs.readFileSync(path.join(TPL_DIR, 'package.json'), 'utf8'));
@@ -28,16 +29,14 @@ const IS_WIN = process.platform === 'win32';
 
 const ENV_NAMES = ['codex', 'claude', 'doubao', 'qwen'];
 const CANON_DIR = path.join('.agents', 'skills'); // 单一来源目录
-const SKILLS = ['workflow', 'dev', 'project-review', 'database-query', 'md-to-wiki', 'create-tech-md-doc', 'create-release-md-doc'];
+// skill 列表、用户配置、改名清理、文档模板都来自各 skill 目录的 skill.json（见 bin/skills.mjs）
+const META = deriveMeta(loadSkills(TPL_DIR));
+const SKILLS = META.skills;
 // 用户配置：重跑不覆盖；值为对应空模板（用于判断单一来源中的文件是否还没被填写过）
-const USER_FILES = {
-  'database-query/config.json': null,
-  'database-query/references/schema.md': null,
-  'md-to-wiki/wiki-config.json': 'md-to-wiki/wiki-config.json.tpl',
-  'workflow/profile.json': 'workflow/profile.json.tpl',
-};
+const USER_FILES = META.userFiles;
 // 改过名的 skill：旧名 -> 新名。升级时只清理能确认是本项目安装的旧目录 / 链接（按 SKILL.md 签名判断）
-const RENAMED = { 'code-review': { to: 'project-review', signature: /^name:\s*code-review\s*$[\s\S]*?description:\s*"Review source code \(/m } };
+const RENAMED = META.renamed;
+const TEMPLATES = META.templates;
 const DOCNEXUS_PKG = process.env.DOCNEXUS_PKG || '@rowansenne/docnexus';
 const MANIFEST = '.skills-init.json'; // 安装清单，位于每个安装目录（单一来源时只有 .agents/skills 一份）
 
@@ -49,22 +48,34 @@ class CliError extends Error {}
 const fail = (m) => { throw new CliError(m); };
 
 // ---------------------------------------------------------------- 参数
-const HELP = `用法: skills-init [选项]
+const COMMANDS = ['init', 'upgrade', 'doctor', 'uninstall', 'seed-templates'];
+const HELP = `用法: skills-init [命令] [选项]
 
+命令：
+  init（默认）         安装或重装 skills
+  upgrade              按安装清单里的环境与模式非交互升级到当前版本（保留数据库配置；手改过的文件另存 .new）
+  doctor               自检：版本、手改 / 缺失文件、软链接、项目画像、DocNexus 模板、数据库连通性、.gitignore
+  uninstall            按安装清单卸载本项目装的 skills 与链接（用户配置备份到 tmp/skills/uninstall-backup/）
+  seed-templates       只把自带的文档模板导入 DocNexus（docnexus/library/templates/，已有的不覆盖）
+
+init 选项：
   --envs <列表>        环境，逗号分隔：codex,claude,doubao,qwen；all = 全部（不传则交互选择）
   --skip-db            跳过数据库连接配置
   --yes                非交互：使用已有数据库配置；都没有且未 --skip-db 时报错退出
-  --with-docnexus      同时接入 DocNexus 文档库（需 Node >= 22.13 与 npm）
+  --with-docnexus      同时接入 DocNexus 文档库（需 Node >= 22.13 与 npm），并导入文档模板
   --copy               不用软链接，各环境独立拷贝
-  --seed-templates     把自带的文档模板导入 DocNexus（docnexus/library/templates/，已有的不覆盖）；
-                       接入 DocNexus 后文档类 skill 只从知识库取模板。--with-docnexus 会自动执行这一步
-  --uninstall          按安装清单卸载本项目装的 skills 与链接（用户配置备份到 tmp/skills/uninstall-backup/）
+  --seed-templates     安装后把文档模板导入 DocNexus；接入 DocNexus 后文档类 skill 只从知识库取模板
+  --uninstall          同 uninstall 命令
+doctor 选项：
+  --offline            不测试数据库连通性
+通用：
   --project-root <dir> 项目根目录（默认当前目录）
   -v, --version        显示版本
   -h, --help           显示帮助`;
 
 function parseArgs(argv) {
-  const o = { envs: '', skipDb: false, yes: false, withDocNexus: false, copy: false, seedTemplates: false, uninstall: false, root: process.cwd() };
+  const o = { cmd: 'init', envs: '', skipDb: false, yes: false, withDocNexus: false, copy: false, seedTemplates: false, offline: false, root: process.cwd() };
+  let cmdGiven = false; // 命令可以出现在选项之间（封装脚本会先传 --project-root）
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     const val = () => { if (i + 1 >= argv.length) fail(`${a} 需要一个值`); return argv[++i]; };
@@ -75,11 +86,14 @@ function parseArgs(argv) {
       case '--with-docnexus': o.withDocNexus = true; break;
       case '--copy': o.copy = true; break;
       case '--seed-templates': o.seedTemplates = true; break;
-      case '--uninstall': o.uninstall = true; break;
+      case '--uninstall': o.cmd = 'uninstall'; cmdGiven = true; break;
+      case '--offline': o.offline = true; break;
       case '--project-root': o.root = path.resolve(val()); break;
       case '-v': case '--version': console.log(PKG.version); process.exit(0); break;
       case '-h': case '--help': console.log(HELP); process.exit(0); break;
-      default: fail(`未知参数: ${a}\n${HELP}`);
+      default:
+        if (!cmdGiven && COMMANDS.includes(a)) { o.cmd = a; cmdGiven = true; break; }
+        fail(`未知参数: ${a}\n${HELP}`);
     }
   }
   if (!fs.existsSync(o.root) || !fs.statSync(o.root).isDirectory()) fail(`项目根目录不存在: ${o.root}`);
@@ -610,10 +624,140 @@ function setupDocNexus(root, sel) {
   return 'ok';
 }
 
+// ---------------------------------------------------------------- 6. upgrade / doctor
+const INSTALL_BASES = [CANON_DIR, path.join('.claude', 'skills'), path.join('.qwen', 'skills')];
+// 找到本项目的安装清单（单一来源优先；--copy 安装时各目录各有一份）
+function findManifests(root) {
+  return INSTALL_BASES.map((rel) => ({ rel, base: path.join(root, rel), m: readManifest(path.join(root, rel)) })).filter((x) => x.m);
+}
+function cmpVersion(a, b) {
+  const pa = String(a).split(/[.-]/).map((x) => parseInt(x, 10) || 0);
+  const pb = String(b).split(/[.-]/).map((x) => parseInt(x, 10) || 0);
+  for (let i = 0; i < 3; i++) if (pa[i] !== pb[i]) return pa[i] > pb[i] ? 1 : -1;
+  return 0;
+}
+
+// upgrade = 用清单里记录的环境与模式非交互重装；数据库配置原样保留
+function upgradeOptions(o) {
+  const found = findManifests(o.root);
+  if (!found.length) fail('未找到安装清单（.agents/skills/.skills-init.json 等），无法判断装过哪些环境。请先运行 init。');
+  const m = found[0].m;
+  const from = m.version ?? '未知';
+  if (cmpVersion(from, PKG.version) > 0) warn(`已安装的是 ${from}，比当前包 ${PKG.version} 新；继续会降级。`);
+  step(`升级：${from} -> ${PKG.version}（环境 ${(m.envs ?? []).join(',') || '未记录'}，模式 ${m.mode ?? 'symlink'}）`);
+  const envs = Array.isArray(m.envs) && m.envs.length ? m.envs.join(',') : '';
+  if (!envs) fail('安装清单里没有记录环境，请用 init --envs <列表> 重装。');
+  return { ...o, cmd: 'init', envs, copy: m.mode === 'copy', yes: true, skipDb: true };
+}
+
+function doctor(root, offline) {
+  const errors = [];
+  const warns = [];
+  const bad = (m) => { errors.push(m); console.log(`    XX  ${m}`); };
+  const meh = (m) => { warns.push(m); warn(m); };
+  step(`skills-init doctor（${PKG.version}）  ${root}`);
+
+  const [maj] = process.versions.node.split('.').map(Number);
+  if (maj < 18) bad(`Node v${process.versions.node} 低于 18`); else ok(`Node v${process.versions.node}`);
+
+  const found = findManifests(root);
+  if (!found.length) { bad('未找到安装清单：本项目还没用 skills-init 安装过（或是清单功能之前的旧版本安装，重跑 init 即可生成）'); return 1; }
+  const m = found[0].m;
+  const c = cmpVersion(m.version ?? '0', PKG.version);
+  if (c < 0) meh(`已安装 ${m.version}，当前包是 ${PKG.version}：运行 skills-init upgrade 升级`);
+  else if (c > 0) meh(`已安装 ${m.version}，比当前包 ${PKG.version} 新（当前包版本过旧）`);
+  else ok(`已安装版本 ${m.version}（环境 ${(m.envs ?? []).join(',')}，模式 ${m.mode}）`);
+
+  step('文件完整性');
+  for (const { rel, base, m: man } of found) {
+    let modified = 0, missing = 0;
+    for (const [skill, entry] of Object.entries(man.skills)) {
+      const dir = path.join(base, skill);
+      if (!fs.existsSync(dir)) { bad(`${toPosix(path.join(rel, skill))} 不存在：运行 skills-init upgrade 恢复`); continue; }
+      for (const [f, h] of Object.entries(entry.files ?? {})) {
+        const file = path.join(dir, f);
+        const label = toPosix(path.join(rel, skill, f));
+        if (!fs.existsSync(file)) { missing++; meh(`缺少 ${label}：运行 skills-init upgrade 恢复`); }
+        else if (fileHash(file) !== h) { modified++; meh(`${label} 被手动修改过（升级时不会被覆盖，新模板另存 .new）`); }
+      }
+      for (const f of entry.pending ?? []) if (fs.existsSync(path.join(dir, f))) meh(`${toPosix(path.join(rel, skill, f))} 待合并：对比后删除`);
+    }
+    if (!modified && !missing) ok(`${toPosix(rel)}：${Object.keys(man.skills).length} 个 skill 的模板文件与安装时一致`);
+  }
+
+  const canon = found.find((x) => x.rel === CANON_DIR);
+  if (canon && m.mode !== 'copy') {
+    step('软链接');
+    for (const env of ['claude', 'qwen']) {
+      if (!(m.envs ?? []).includes(env)) continue;
+      const dir = path.join(root, `.${env}`, 'skills');
+      let good = 0;
+      for (const skill of Object.keys(canon.m.skills)) {
+        const link = path.join(dir, skill);
+        const st = lstat(link);
+        if (!st) bad(`.${env}/skills/${skill} 不存在：运行 skills-init upgrade 重建`);
+        else if (!st.isSymbolicLink()) { if (!readManifest(dir)) meh(`.${env}/skills/${skill} 是普通目录而非软链接（可能是建链接失败后的独立拷贝）`); else good++; }
+        else if (!fs.existsSync(link)) bad(`.${env}/skills/${skill} 是断开的软链接`);
+        else good++;
+      }
+      if (good === Object.keys(canon.m.skills).length) ok(`.${env}/skills 全部指向 ${toPosix(CANON_DIR)}`);
+    }
+  }
+
+  // 画像 / DocNexus / 数据库：调用已安装的 resolve.mjs，与 skill 运行时的判定完全一致
+  const skillsBase = (canon ?? found[0]).base;
+  const resolveJs = path.join(skillsBase, 'workflow', 'scripts', 'resolve.mjs');
+  step('项目画像与增强能力');
+  let st = null;
+  if (fs.existsSync(resolveJs)) {
+    const r = spawnSync(process.execPath, [resolveJs, '--root', root, 'status'], { encoding: 'utf8' });
+    try { st = JSON.parse(r.stdout); } catch { bad(`resolve.mjs status 执行失败：${(r.stderr || '').trim().split('\n')[0]}`); }
+  } else bad('缺少 workflow/scripts/resolve.mjs：运行 skills-init upgrade');
+  if (st) {
+    if (st.profile.ok) ok('项目画像已填写'); else meh(`项目画像未完成（空字段：${st.profile.empty.join('、')}）：运行 /workflow profile`);
+    if (st.wiki.ok) ok('wiki 已配置'); else console.log('    --  wiki 未配置（可选；也可能通过 wiki MCP 提供）');
+    if (st.docnexus.ok) {
+      if (st.docnexus.missing_templates.length) meh(`DocNexus 缺模板：${st.docnexus.missing_templates.join('、')}：运行 skills-init seed-templates`);
+      else ok('DocNexus 已接入，文档模板齐全');
+      for (const f of st.docnexus.stale_project_templates) meh(`${f} 在接入 DocNexus 后已不再生效，建议删除`);
+    } else console.log('    --  DocNexus 未接入（可选）');
+    if (!st.database.ok) console.log('    --  数据库未配置（可选）');
+  }
+
+  if (st?.database.ok) {
+    step(offline ? '数据库（--offline，跳过连通性测试）' : '数据库连通性（只读 SELECT 1）');
+    const queryJs = path.join(skillsBase, 'database-query', 'scripts', 'query.mjs');
+    for (const [name, info] of Object.entries(st.database.connections)) {
+      if (offline) { ok(`${name}：${info.driver}，${info.readonly ? '只读' : '可写'}`); continue; }
+      const r = spawnSync(process.execPath, [queryJs, '--conn', name, '--timeout', '10', '--format', 'tsv', 'SELECT 1'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+      const msg = (r.stderr || '').trim().split('\n')[0];
+      if (r.status === 0) ok(`${name}：连接正常（${info.readonly ? '只读' : '可写'}）`);
+      else if (r.status === 3) console.log(`    --  ${name}：${msg}`);
+      else meh(`${name}：${msg || '连接失败'}`);
+    }
+  }
+
+  step('.gitignore');
+  const gi = path.join(root, '.gitignore');
+  const lines = fs.existsSync(gi) ? fs.readFileSync(gi, 'utf8').split(/\r?\n/).map((l) => l.trim()) : [];
+  const need = ['**/database-query/config.json', '**/wiki-config.json'];
+  const lack = need.filter((r) => !lines.includes(r));
+  if (lack.length) bad(`.gitignore 缺少 ${lack.join(' ')}：凭据可能被提交，重跑 skills-init upgrade 补齐`); else ok('凭据文件已被忽略');
+
+  console.log(`\n${errors.length} 个错误，${warns.length} 个警告`);
+  return errors.length ? 1 : 0;
+}
+
 // ================================================================= main
 async function main() {
-  const o = parseArgs(process.argv.slice(2));
-  if (o.uninstall) { step(`按安装清单卸载 ${o.root} 中的 skills`); return uninstall(o.root); }
+  let o = parseArgs(process.argv.slice(2));
+  if (o.cmd === 'uninstall') { step(`按安装清单卸载 ${o.root} 中的 skills`); return uninstall(o.root); }
+  if (o.cmd === 'doctor') return doctor(o.root, o.offline);
+  if (o.cmd === 'seed-templates') {
+    step('导入文档模板到 DocNexus');
+    try { return seedTemplates(o.root, TPL_DIR, { ok, warn }).failed.length ? 1 : 0; } catch (e) { warn(e.message); return 1; }
+  }
+  if (o.cmd === 'upgrade') o = upgradeOptions(o);
   if (o.withDocNexus) { step('检查 DocNexus 依赖'); checkNodeForDocNexus(); }
 
   const sel = await resolveEnvs(o);
@@ -675,6 +819,7 @@ async function main() {
   console.log('  doubao    : 豆包办公自动发现 .agents/skills（新会话生效）');
   console.log('  qwen      : Qwen Code 自动发现 .qwen/skills；/skills 面板可查看与切换');
   if (db) ok('database-query 连接已生成并写入；凭据已加入 .gitignore，请勿提交。');
+  else if (fs.existsSync(path.join(o.root, CANON_DIR, 'database-query', 'config.json'))) ok('database-query/config.json 已存在，保留不动。');
   else warn('注意：本次未写入数据库连接。可重跑补配，或手动放置 database-query/config.json（已有的保留不动）。');
   warn('注意：md-to-wiki 的 wiki 连接（wiki-config.json）默认留空（enabled=false），未配置前 md-to-wiki 与 create-*-md-doc 的 --prd 增强不启动。');
   warn('        启用方法：填写 .agents/skills/md-to-wiki/wiki-config.json（enabled: true + base_url + api_token），或接入对应环境的 wiki MCP。重跑不会覆盖已填写的配置。');
@@ -682,7 +827,7 @@ async function main() {
   // 已接入 DocNexus 但知识库缺模板时，文档类 skill 会停下来要求导入，这里提前提示
   if (fs.existsSync(path.join(o.root, 'docnexus', 'project.json'))) {
     const missing = TEMPLATES.filter((t) => !fs.existsSync(path.join(o.root, 'docnexus', 'library', t.file))).map((t) => t.file);
-    if (missing.length) warn(`注意：DocNexus 中缺少模板 ${missing.join('、')}；接入 DocNexus 后不再使用默认模板，请重跑并加 --seed-templates 导入。`);
+    if (missing.length) warn(`注意：DocNexus 中缺少模板 ${missing.join('、')}；接入 DocNexus 后不再使用默认模板，运行 skills-init seed-templates 导入。`);
   }
   if (docnexus === 'failed') warn('注意：DocNexus 接入失败（见上方输出），其他 skills 不受影响；修复后可重跑（加 --with-docnexus）。');
   if (report.asNew.length) {

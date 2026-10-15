@@ -1,0 +1,5 @@
+{
+  "name": "workflow",
+  "order": 1,
+  "userFiles": { "profile.json": "profile.json.tpl" }
+}
