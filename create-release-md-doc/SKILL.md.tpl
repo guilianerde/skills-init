@@ -155,3 +155,12 @@ description: "Generate a Markdown release/deployment plan (上线方案) from th
 
 - **create-tech-md-doc**：技术方案生成。本 skill 可用 `--tech <path>` 复用其结构化事实。
 - **md-to-wiki**：本 skill 生成上线方案 md 后，用 md-to-wiki 发布到 Confluence wiki。wiki 连接配置共用 md-to-wiki 的 `wiki-config.json`。
+
+## 沉淀到 DocNexus（可选，需用户授权）
+
+文档生成并输出摘要后，若项目根存在 `docnexus/project.json` 且 `./node_modules/.bin/docnexus` 可执行：
+
+- 从本次上线方案中挑出值得长期记住的内容（关键决策及原因、新约定、配置 / 依赖变化、已知风险与坑），列成简短清单，**询问用户是否沉淀到 DocNexus**。
+- 用户明确同意后，按 DocNexus 的 capture 流程（入口 skill `docnexus`）写入，并回报写入位置 `docnexus/library/<path>`；用户未回复或拒绝 → 不写入。
+- 只沉淀从 diff / PRD 确认过的事实；标注「待补充」「待人工确认」的推断内容不沉淀。
+- 未检测到 DocNexus → 跳过本节，不提示安装。

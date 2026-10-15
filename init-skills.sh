@@ -14,6 +14,7 @@
 #   ./skills-init/init-skills.sh                                   # 交互式：选择环境、配置数据库
 #   ./skills-init/init-skills.sh --envs codex,claude,doubao,qwen   # 指定环境（仍会交互确认数据库）
 #   ./skills-init/init-skills.sh --envs all --yes --skip-db        # 全环境、非交互、跳过数据库
+#   ./skills-init/init-skills.sh --envs claude,qwen --with-docnexus  # 同时接入 DocNexus 文档库（需 Node >= 22.13）
 #
 # 重跑安全：SKILL.md / references 模板会更新；用户已填写的 wiki-config.json、
 #           schema.md、dev/profile.json 保留不覆盖；database-query/config.json 仅在本次提供了数据库配置时写入。
@@ -27,6 +28,9 @@ TPL_DIR="$SCRIPT_DIR"
 ENVS_ARG=""
 SKIP_DB=0
 YES=0
+WITH_DOCNEXUS=0
+# DocNexus 安装来源：默认 npm 包；可用环境变量指向本地 tarball / 目录（离线或测试用）
+DOCNEXUS_PKG="${DOCNEXUS_PKG:-@rowansenne/docnexus}"
 
 # ---------------- 参数解析
 while [[ $# -gt 0 ]]; do
@@ -34,8 +38,9 @@ while [[ $# -gt 0 ]]; do
     --envs)   ENVS_ARG="${2:-}"; shift 2 ;;
     --skip-db) SKIP_DB=1; shift ;;
     --yes)    YES=1; shift ;;
+    --with-docnexus) WITH_DOCNEXUS=1; shift ;;
     -h|--help)
-      echo "用法: ./init-skills.sh [--envs codex,claude,doubao,qwen|all] [--skip-db] [--yes]"; exit 0 ;;
+      echo "用法: ./init-skills.sh [--envs codex,claude,doubao,qwen|all] [--skip-db] [--yes] [--with-docnexus]"; exit 0 ;;
     *) echo "未知参数: $1"; exit 1 ;;
   esac
 done
@@ -215,8 +220,9 @@ install_skills() { # $1=目标目录  $2=是否有数据库配置(1/0)
 # ---------------- 4. .gitignore 保护（无论是否配置数据库都执行：wiki 凭据与 tmp 产物同样需要忽略）
 update_gitignore() {
   local gi="$ROOT_DIR/.gitignore" rule
-  local missing=()
-  for rule in '**/database-query/config.json' '**/wiki-config.json' '/tmp/'; do
+  local missing=() rules=('**/database-query/config.json' '**/wiki-config.json' '/tmp/')
+  [[ "$WITH_DOCNEXUS" == "1" ]] && rules+=('node_modules/')
+  for rule in "${rules[@]}"; do
     if [[ -f "$gi" ]] && grep -qxF "$rule" "$gi"; then continue; fi
     missing+=("$rule")
   done
@@ -228,7 +234,86 @@ update_gitignore() {
   ok ".gitignore 已追加：${missing[*]}"
 }
 
+# ---------------- 5. DocNexus 文档库（可选，--with-docnexus）
+check_node() { # Node >= 22.13
+  local v major minor
+  if ! command -v node >/dev/null 2>&1 || ! command -v npm >/dev/null 2>&1; then
+    echo "错误: --with-docnexus 需要 Node >= 22.13 与 npm，但未找到 node/npm。请安装后重试，或去掉 --with-docnexus。" >&2
+    exit 1
+  fi
+  v="$(node -v)"; v="${v#v}"
+  major="${v%%.*}"; minor="${v#*.}"; minor="${minor%%.*}"
+  if [[ ! "$major" =~ ^[0-9]+$ || ! "$minor" =~ ^[0-9]+$ ]] || (( major < 22 || (major == 22 && minor < 13) )); then
+    echo "错误: --with-docnexus 需要 Node >= 22.13，当前为 v$v。请升级 Node 后重试，或去掉 --with-docnexus。" >&2
+    exit 1
+  fi
+  ok "Node v$v"
+}
+
+docnexus_agent() { # 所选环境 -> docnexus init --agent 取值（doubao 与 codex 共用 .agents；qwen 不受 docnexus 支持）
+  local c=0 x=0
+  [[ " ${SEL[*]} " == *" claude "* ]] && c=1
+  [[ " ${SEL[*]} " == *" codex "* || " ${SEL[*]} " == *" doubao "* ]] && x=1
+  if   [[ "$c$x" == "11" ]]; then echo all
+  elif [[ "$c" == "1" ]]; then echo claude
+  elif [[ "$x" == "1" ]]; then echo codex
+  else echo none
+  fi
+}
+
+link_qwen_docnexus() { # docnexus 不支持 qwen：把 docnexus/skills/* 软链接到 .qwen/skills/
+  local src_root="$ROOT_DIR/docnexus/skills" dst="$ROOT_DIR/.qwen/skills" d name link n=0
+  mkdir -p "$dst"
+  for d in "$src_root"/*/; do
+    [[ -d "$d" ]] || continue
+    name="$(basename "$d")"; link="$dst/$name"
+    if [[ -e "$link" && ! -L "$link" ]]; then
+      warn "$link 已存在且不是软链接，跳过（如需改用 DocNexus 版本请先移除）"; continue
+    fi
+    rm -f "$link"
+    ln -s "../../docnexus/skills/$name" "$link"   # 相对路径，与 docnexus 对 .claude/.agents 的链接方式一致
+    n=$((n + 1))
+  done
+  ok "qwen：已链接 $n 个 DocNexus skill -> .qwen/skills（docnexus 本身不支持 qwen，由本脚本补链）"
+}
+
+setup_docnexus() {
+  local agent
+  agent="$(docnexus_agent)"
+  step "接入 DocNexus（npm i -D $DOCNEXUS_PKG；docnexus init --agent $agent）"
+  [[ -f "$ROOT_DIR/package.json" ]] || warn "项目根没有 package.json，npm 会新建一个（仅记录 devDependency）"
+  if ! (cd "$ROOT_DIR" && npm i -D "$DOCNEXUS_PKG"); then
+    warn "npm 安装 DocNexus 失败，已跳过 DocNexus 接入（skills 已正常安装）"; DOCNEXUS_RESULT=failed; return
+  fi
+  if [[ ! -x "$ROOT_DIR/node_modules/.bin/docnexus" ]]; then
+    warn "未找到 ./node_modules/.bin/docnexus，已跳过 DocNexus 接入"; DOCNEXUS_RESULT=failed; return
+  fi
+  if ! (cd "$ROOT_DIR" && ./node_modules/.bin/docnexus init --agent "$agent" >/dev/null); then
+    warn "docnexus init 失败，已跳过 DocNexus 接入（可在项目根手动执行 ./node_modules/.bin/docnexus init --agent $agent）"
+    DOCNEXUS_RESULT=failed; return
+  fi
+  ok "docnexus init 完成：docnexus/ 工作区 + skills（docnexus/skills）"
+  case "$agent" in
+    all)    ok "已链接到 .claude/skills 与 .agents/skills，并写入 CLAUDE.md / AGENTS.md 的 DocNexus 段落" ;;
+    claude) ok "已链接到 .claude/skills，并写入 CLAUDE.md 的 DocNexus 段落" ;;
+    codex)  ok "已链接到 .agents/skills，并写入 AGENTS.md 的 DocNexus 段落" ;;
+  esac
+  [[ " ${SEL[*]} " == *" doubao "* ]] && ok "doubao 与 codex 共用 .agents/skills，按 codex 接入"
+  if [[ " ${SEL[*]} " == *" qwen "* ]]; then
+    link_qwen_docnexus
+    if [[ "$agent" == "codex" || "$agent" == "all" ]]; then
+      warn "qwen：docnexus 不会写 QWEN.md；需要自动召回时可在 QWEN.md 引用 AGENTS.md 中的 DocNexus 段落，或在 .qwen/settings.json 的 context.fileName 加入 AGENTS.md"
+    else
+      warn "qwen：docnexus 不会写 QWEN.md；需要自动召回时可执行 ./node_modules/.bin/docnexus init --agent codex 生成 AGENTS.md 的 DocNexus 段落，再在 QWEN.md 引用它或在 .qwen/settings.json 的 context.fileName 加入 AGENTS.md（会同时链接到 .agents/skills）"
+    fi
+  fi
+  DOCNEXUS_RESULT=ok
+}
+
 # ================================================================= main
+DOCNEXUS_RESULT=skipped
+[[ "$WITH_DOCNEXUS" == "1" ]] && { step "检查 DocNexus 依赖"; check_node; }
+
 SEL=()
 while IFS= read -r line; do [[ -n "$line" ]] && SEL+=("$line"); done < <(resolve_env)  # bash 3.2 无 mapfile
 step "目标环境：${SEL[*]}"
@@ -272,6 +357,8 @@ done
 
 update_gitignore
 
+[[ "$WITH_DOCNEXUS" == "1" ]] && setup_docnexus
+
 step "安装完成，启用方式"
 echo '  codex     : 重启 codex 后自动发现项目级 skills（.agents/skills）；也可 /use code-review 手动加载'
 echo '  claude    : Claude Code 自动发现 .claude/skills，无需额外配置'
@@ -284,4 +371,10 @@ else
 fi
 warn '注意：md-to-wiki 的 wiki 连接（wiki-config.json）默认留空（enabled=false），未配置前 md-to-wiki 与 create-*-md-doc 的 --prd 增强不启动。'
 warn '        启用方法：填写各环境 md-to-wiki/wiki-config.json（enabled: true + base_url + api_token），或接入对应环境的 wiki MCP。重跑本脚本不会覆盖已填写的配置。'
+case "$DOCNEXUS_RESULT" in
+  ok)     ok 'DocNexus 已接入：dev / code-review 会按 docnexus-recall 查项目约定；任何写入 DocNexus 的操作都需你授权。' ;;
+  failed) warn '注意：DocNexus 接入失败（见上方输出），其他 skills 不受影响；修复后可重跑本脚本（加 --with-docnexus）。' ;;
+esac
 echo '模板与说明：skills-init/README.md'
+[[ "$DOCNEXUS_RESULT" == "failed" ]] && exit 1   # skills 已装好，但显式要求的 DocNexus 未接入：返回非 0 便于自动化感知
+exit 0

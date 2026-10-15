@@ -47,6 +47,7 @@
 ```
 ./skills-init/init-skills.sh --envs all --yes                        # bash 版等价
 ./skills-init/init-skills.sh --envs codex,qwen --skip-db
+./skills-init/init-skills.sh --envs claude,qwen --skip-db --with-docnexus   # 同时接入 DocNexus 文档库
 ```
 
 ## 安装路径与启用方式
@@ -113,8 +114,36 @@
 | ----------------------- | --------------------------------------------------------------------- |
 | `-Envs` / `--envs`      | 环境列表，逗号分隔：`codex,claude,doubao,qwen`；`all` = 全部                       |
 | `-SkipDb` / `--skip-db` | 跳过数据库连接配置（database-query 不生成 config.json）                             |
+| `-WithDocNexus` / `--with-docnexus` | 可选：接入 [DocNexus](https://www.npmjs.com/package/@rowansenne/docnexus) 项目文档库（需 Node >= 22.13），见下方「DocNexus 文档库（可选）」 |
 | `-Yes` / `--yes`        | 非交互：自动使用已有数据库配置（依次查找 `.codex/database-query/config.json` 与各环境已安装的 `database-query/config.json`）；都没有且未 `-SkipDb` 时报错退出 |
 | `-h` / `--help`         | 帮助                                                                    |
+
+## DocNexus 文档库（可选）
+
+加 `--with-docnexus`（PowerShell：`-WithDocNexus`）时，脚本在装完本仓库的 skills 后额外执行：
+
+1. 检查 Node >= 22.13 与 npm（不满足时**在安装任何文件之前**报错退出）；
+2. 在项目根执行 `npm i -D @rowansenne/docnexus`（项目根没有 `package.json` 时 npm 会新建一个）；
+3. 执行 `./node_modules/.bin/docnexus init --agent <claude|codex|all>`：创建 `docnexus/` 工作区，把 DocNexus 的 skills 同步到 `docnexus/skills/`，并软链接到对应环境目录、写入 `CLAUDE.md` / `AGENTS.md` 的 DocNexus 段落；
+4. `.gitignore` 追加 `node_modules/`。
+
+环境映射：
+
+| 所选环境 | `--agent` | 说明 |
+| --- | --- | --- |
+| claude | `claude` | 链接到 `.claude/skills/`，写 `CLAUDE.md` |
+| codex / doubao | `codex` | 两者共用 `.agents/skills/`，写 `AGENTS.md` |
+| claude + (codex 或 doubao) | `all` | 以上两者 |
+| qwen | —（仅 qwen 时为 `none`） | docnexus 不支持 qwen：由本脚本把 `docnexus/skills/*` 软链接到 `.qwen/skills/`；不写 `QWEN.md`，需要自动召回时可在 `QWEN.md` 引用 `AGENTS.md` 的 DocNexus 段落，或在 `.qwen/settings.json` 的 `context.fileName` 加入 `AGENTS.md` |
+
+说明：
+
+* DocNexus 的 skills 不在本仓库中，始终以安装的 npm 包为准；重跑脚本会按包版本重新同步与链接（`docnexus init` 可重复执行，不影响已有记忆）。
+* `.qwen/skills/` 下已存在的同名**真实目录**不会被替换，脚本会提示跳过。
+* npm 安装或 `docnexus init` 失败时只跳过 DocNexus，本仓库的 skills 照常安装，脚本最后以退出码 1 结束；修好后重跑即可。
+* 安装后 `dev`、`code-review` 会先按 `docnexus-recall` 查项目约定；`dev`、`create-tech-md-doc`、`create-release-md-doc` 结束时只会**提议**沉淀，**任何写入 DocNexus 的操作都必须经你授权**。
+* 离线或测试时可用环境变量指定安装来源，例如 `DOCNEXUS_PKG=/path/to/rowansenne-docnexus-0.13.0.tgz ./skills-init/init-skills.sh --with-docnexus`（PowerShell：`$env:DOCNEXUS_PKG=...`）。
+* Windows 上 qwen 的链接使用目录 junction（与 docnexus 的做法一致）；Git Bash 下 `ln -s` 是否生成真正的链接取决于 MSYS 设置，建议 Windows 用 PowerShell 版。
 
 ## 重跑与升级
 
