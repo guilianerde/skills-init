@@ -407,7 +407,8 @@ CI（`.github/workflows/test.yml`）在 push 到 main 和每个 PR 上运行：m
 ```
 skills-init/
 ├── bin/
-│   ├── skills-init.mjs                # 安装器（唯一实现，Node >= 18）：init / upgrade / doctor / uninstall / seed-templates
+│   ├── skills-init.mjs                # 安装器入口（唯一实现，Node >= 18）：参数解析与 init / upgrade / doctor / uninstall / seed-templates 调度
+│   ├── lib/                           # core / prompt / db / install / uninstall / docnexus / doctor
 │   ├── skills.mjs                     # 读取各 skill 的 skill.json
 │   └── seed-templates.mjs             # 把文档模板导入 DocNexus
 ├── init-skills.sh / init-skills.ps1   # 薄封装：以上级目录为项目根调用安装器
@@ -418,7 +419,9 @@ skills-init/
 ├── README.md                          # 本说明
 ├── workflow/
 │   ├── SKILL.md.tpl · skill.json
-│   ├── scripts/resolve.mjs            # 模板来源 / 画像 / 能力探测
+│   ├── scripts/resolve.mjs            # 模板来源 / 画像 / 画像推断 / 能力探测
+│   ├── scripts/lint-doc.mjs           # 对照模板检查生成的文档
+│   ├── scripts/infer-profile.mjs      # 画像推断规则（resolve.mjs infer-profile 调用）
 │   └── profile.json.tpl               # 空画像，首次使用时由 agent 推断并经确认后填写
 ├── dev/
 │   ├── SKILL.md.tpl · skill.json
