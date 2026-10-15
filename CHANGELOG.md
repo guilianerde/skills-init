@@ -10,6 +10,7 @@
 - `query.mjs --schema [--tables] [--write]`：导出表结构为 Markdown，写入 schema.md 的 begin/end 标记之间（标记外的补充说明保留）。
 - `md-to-wiki/scripts/upload.mjs`：REST 上传通道脚本，`info` 读取页面供确认，`put --expect-version` 校验良构与版本后上传并核对版本 +1；支持 Basic（Cloud）与 Bearer（Server / DC）。
 - 安装器拆分为 `bin/lib/` 下的模块。
+- 安装器黑盒测试迁到 `tests/test-install.mjs`（三个平台共用一份），bash / PowerShell 测试精简为封装脚本冒烟测试。
 - DocNexus 模板版本跟踪：导入记录（版本 + sha256）保存在安装清单；`doctor` / `upgrade` 区分「默认模板有新版且库中未改动」与「团队改过」；`seed-templates --update` 只更新前者。
 
 ## [0.3.0] - 2026-10-15

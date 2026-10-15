@@ -300,28 +300,22 @@ npx @rowansenne/skills-init doctor
 ## 测试
 
 ```bash
-npm test                                  # bash 黑盒测试 + 全部 node 测试
+npm test                                  # bash 冒烟测试 + 全部 node 测试
 node --test "tests/*.mjs"                 # 只跑 node 测试（三个平台都能跑）
 ```
 
 node 测试覆盖：skill.json 一致性、子命令（upgrade / doctor / seed-templates / uninstall）、`resolve.mjs` 与画像推断、`lint-doc.mjs`、`query.mjs` 与表结构导出（用假的 mysql / psql 客户端）、md-to-wiki 转换与上传（用本地假 Confluence 服务）、DocNexus 模板导入与版本跟踪（用假的 docnexus CLI）。
 
-`tests/test-init-skills.*` 是两个安装脚本的黑盒测试：每个用例在临时目录放一份 skills-init 副本，执行安装后检查生成的目录、软链接和配置文件。
+安装器的黑盒场景都在 `tests/test-install.mjs`，三个平台共用：每个用例在临时目录放一份 skills-init 副本，执行安装后检查目录、软链接和配置。覆盖全新安装（单一来源 + 相对软链接）、`SKILLS_INIT_NO_SYMLINK=1` 退回独立拷贝、`--copy`、`--yes` 无数据库配置时退出码 1、含 `/ & | " \` 的密码、重跑保留用户配置、安装清单、手改模板另存 `.new`（含交互选覆盖 / 保留）、删除模板文件后的清理、卸载与备份、从旧版各环境独立拷贝升级（用 git 历史中 `71a23c8` 的旧脚本生成旧布局，浅克隆时先 `git fetch --unshallow`）、两边配置冲突、`.gitignore` 只追加缺失规则。
+
+`tests/test-init-skills.sh` / `.ps1` 只是封装脚本的冒烟测试：确认以上级目录为项目根、参数与子命令原样透传、stdin 交互可用。
 
 ```bash
-bash tests/test-init-skills.sh            # bash 版（兼容 macOS 自带的 /bin/bash 3.2）
-bash tests/test-init-skills.sh upgrade    # 只跑名字含 upgrade 的用例
+bash tests/test-init-skills.sh                     # bash 版（兼容 macOS 自带的 /bin/bash 3.2，需要 python3）
+pwsh -NoProfile -File tests/test-init-skills.ps1   # PowerShell 版
 ```
 
-```powershell
-pwsh -NoProfile -File tests/test-init-skills.ps1   # PowerShell 版（Windows，PowerShell 7）
-```
-
-覆盖的场景：全新安装（`.agents/skills` 完整文件 + `.claude` / `.qwen` 相对软链接）、`--copy`、`--yes` 无数据库配置时退出码 1、交互输入含 `/ & | " \` 的密码后 `config.json` 仍是合法 JSON 且值一致、重跑保留用户配置、从旧版各环境独立拷贝升级（用 git 历史中 `71a23c8` 的脚本生成旧布局）、两边配置冲突时保留旧目录、`.gitignore` 只追加缺失规则、安装清单内容（版本 / 环境 / sha256，`--copy` 各目录一份）、手改 `SKILL.md` 后重跑保留并生成 `.new`（含交互选覆盖 / 保留）、模板删除的文件重跑后被清理（改过的保留）、`--uninstall` 后目录与链接消失、用户配置被备份、用户自己的 skill 不受影响。PowerShell 版另外覆盖软链接不可用时退回独立拷贝（用环境变量 `SKILLS_INIT_NO_SYMLINK=1` 模拟）。
-
-依赖：bash 版需要 `python3` 校验 JSON；升级用例需要完整 git 历史（浅克隆时先 `git fetch --unshallow`）。
-
-CI（`.github/workflows/test.yml`）在 push 到 main 和每个 PR 上运行：macOS 用 `/bin/bash`、Ubuntu 用 bash 跑 bash 版，Windows 用 pwsh 跑 PowerShell 版；三个平台都跑 node 测试。
+CI（`.github/workflows/test.yml`）在 push 到 main 和每个 PR 上运行：三个平台都跑全部 node 测试；另外 macOS 用 `/bin/bash`、Ubuntu 用 bash 跑 bash 冒烟测试，Windows 用 pwsh 跑 PowerShell 冒烟测试。
 
 ## 发布
 

@@ -21,7 +21,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0   # 升级用例要从 git 历史取旧版脚本
+          fetch-depth: 0   # test-install.mjs 的升级用例要从 git 历史取旧版脚本
       - uses: actions/setup-node@v4
         with:
           node-version: 22
