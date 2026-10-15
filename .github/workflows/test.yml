@@ -27,6 +27,8 @@ jobs:
           node-version: 22
       - name: Run bash tests
         run: ${{ matrix.shell }} tests/test-init-skills.sh
+      - name: Run node tests
+        run: node --test tests/test-md-to-wiki.mjs
 
   pwsh:
     name: pwsh (windows-latest)
@@ -41,3 +43,5 @@ jobs:
       - name: Run PowerShell tests
         shell: pwsh
         run: pwsh -NoProfile -File tests/test-init-skills.ps1
+      - name: Run node tests
+        run: node --test tests/test-md-to-wiki.mjs

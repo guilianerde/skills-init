@@ -21,7 +21,7 @@
 
 ## 通道 B — Confluence REST API
 
-环境没有 wiki MCP 工具、但 `wiki-config.json` 已填 `base_url` / `api_token` 时，用 Python（`urllib` 或 `requests`）调用：
+环境没有 wiki MCP 工具、但 `wiki-config.json` 已填 `base_url` / `api_token` 时，用 Node（≥ 18 自带 `fetch`）写一个临时脚本调用，token 在脚本里从 `wiki-config.json` 读取：
 
 ```
 GET {base_url}/rest/api/content/{pageId}?expand=version,space

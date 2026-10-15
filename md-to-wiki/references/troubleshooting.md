@@ -1,18 +1,21 @@
 # 转换脚本与排错
 
-## scripts/md_to_wiki.py
+## scripts/md-to-wiki.mjs
 
 ```
-python md_to_wiki.py <inputMd> <outputHtml> [--banner <bannerMdPath>] [--no-banner]
+node md-to-wiki.mjs <inputMd> <outputHtml> [--banner <bannerMdPath>] [--no-banner]
+node md-to-wiki.mjs --check <html>      # 只做良构校验
 ```
 
-脚本只做本地转换，不调用 wiki API：
+只用 Node 内置能力，不依赖第三方库，也不调用 wiki API：
 
-1. 提取 fenced code block 换成占位符，避免 markdown 库破坏代码内容；
-2. 用 `markdown` 库（`tables`、`sane_lists`、`nl2br` 扩展）转 HTML；
-3. 占位符还原为 `<ac:structured-macro ac:name="code">` 宏，代码放进 `<![CDATA[...]]>`；
-4. 修复 XHTML 良构（见下表）；
-5. 可选：banner 片段包进 `<ac:structured-macro ac:name="info">` 放到正文前。
+1. 自带 Markdown 解析：ATX 标题、段落（单换行转 `<br/>`）、引用、有序 / 无序列表（可嵌套、任务列表）、GFM 表格（含对齐）、分隔线、行内代码 / 粗体 / 斜体 / 删除线 / 链接 / 图片 / 自动链接；
+2. 围栏代码块转 `<ac:structured-macro ac:name="code">` 宏，代码放进 `<![CDATA[...]]>`；
+3. 原始 HTML 一律转义成文本，HTML 注释直接丢弃，保证输出良构；
+4. 可选 banner：`--banner` 文件，或把正文第一个引用块移进 `<ac:structured-macro ac:name="info">`；
+5. 写出文件后自动做良构校验，不良构时退出码为 1 并给出行号。
+
+不支持的语法（如 setext 标题、脚注、内嵌 HTML 排版）会按普通文本输出；需要时改用 Markdown 等价写法。
 
 ## XHTML 良构规则（脚本已处理）
 
@@ -26,26 +29,20 @@ python md_to_wiki.py <inputMd> <outputHtml> [--banner <bannerMdPath>] [--no-bann
 | `&` | 文本中的 `&` 需为 `&amp;` | 表格等场景库会自动转；CDATA 内不转 |
 | CDATA 嵌套 | 代码含 `]]>` | 拆成 `]]]]><![CDATA[>` |
 
-## 良构校验命令
+## 良构校验
 
 ```bash
-python -c "
-import xml.etree.ElementTree as ET
-c = open(r'<tmpHtmlPath>', encoding='utf-8').read()
-try:
-    ET.fromstring('<root xmlns:ac=\"http://atlassian.com/ac\">' + c + '</root>')
-    print('XML well-formed: OK')
-except ET.ParseError as e:
-    print('XML parse error:', e)
-"
+node <skillDir>/scripts/md-to-wiki.mjs --check <tmpHtmlPath>
 ```
+
+输出 `XML well-formed: OK` 即通过；否则会指出第几行、是未转义的 `&` / `<` 还是标签不匹配。
 
 ## 常见错误
 
 | 错误 | 后果 | 正解 |
 |---|---|---|
 | 直接把 Markdown 粘进 Confluence | 代码块丢失、表格错位 | 转成 Storage Format 再上传 |
-| 普通 HTML 转换器（不处理自闭合） | `Error parsing xhtml: Unexpected close tag </p>; expected </br>` | 用本脚本 |
+| 普通 HTML 转换器（不处理自闭合） | `Error parsing xhtml: Unexpected close tag </p>; expected </br>` | 用本脚本（输出均为自闭合标签） |
 | 不做良构校验就上传 | 400，错误难定位 | 校验通过再上传 |
 | 代码块不包 CDATA | `<` `>` `&` 破坏 XML | 脚本已处理，含 `]]>` 嵌套 |
 | 不传 `version` | 并发编辑时覆盖他人改动 | 先读当前 version 再更新 |

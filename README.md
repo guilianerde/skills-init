@@ -29,7 +29,7 @@
 .\skills-init\init-skills.ps1         # Windows PowerShell
 node skills-init/bin/skills-init.mjs --project-root .   # 直接调用，等价
 
-# 发布到 npm 后（package.json 目前为 private，尚未发布），可在任意项目根执行
+# 或者不拷贝仓库，直接在任意项目根执行（npm 包）
 npx @rowansenne/skills-init
 ```
 
@@ -94,7 +94,7 @@ npx @rowansenne/skills-init
 ├── md-to-wiki/                       # 发布 md 到 Confluence wiki
 │   ├── SKILL.md                      # GATE：wiki 未配置则禁止启动
 │   ├── wiki-config.json              # wiki 连接（init 生成，默认 enabled=false，已 gitignore）
-│   └── scripts/md_to_wiki.py         # md → Confluence Storage Format XHTML 转换脚本
+│   └── scripts/md-to-wiki.mjs        # md → Confluence Storage Format XHTML 转换 + 良构校验（Node，无依赖）
 ├── create-tech-md-doc/               # 从分支 diff 生成技术方案 md（8 模块）
 │   ├── SKILL.md
 │   └── template.md
@@ -124,10 +124,10 @@ npx @rowansenne/skills-init
   "test_single": "mvn -q test -Dtest={target}",
   "lint": "",
   "config_center": "nacos",
-  "deploy": { "platform": "Diamond", "regions": ["阿里云", "华为云", "阿里云墨西哥", "华为云-墨西哥", "华为云-菲律宾"] },
-  "job_annotation": "@MyJobHandle",
+  "deploy": { "platform": "内部发布平台", "regions": ["华东-生产", "华南-生产", "海外-生产"] },
+  "job_annotation": "@XxlJob",
   "data_review": true,
-  "notes": ["需求单走 TAPD，技术方案「上线服务」与「数据链路」为必填"]
+  "notes": ["技术方案的「上线服务」与「数据链路」为必填"]
 }
 ```
 
@@ -325,7 +325,7 @@ skills-init/
 │   ├── SKILL.md.tpl
 │   ├── wiki-config.json.tpl
 │   ├── references/                    # upload.md（上传通道）、troubleshooting.md（脚本与排错）
-│   └── scripts/md_to_wiki.py
+│   └── scripts/md-to-wiki.mjs
 ├── create-tech-md-doc/
 │   ├── SKILL.md.tpl
 │   ├── references/                    # diff-collection.md（分层采集）、prd.md（PRD 拉取）

@@ -26,7 +26,7 @@ description: "Publish a local Markdown document to an existing Confluence wiki p
 | `<mdPath>` | 本地 Markdown 路径（必填） |
 | `<pageId\|url>` | 纯数字 pageId，或含 `pageId=` 的 URL（用 `[?&]pageId=(\d+)` 提取）（必填） |
 | `--title` | 更新后的页面标题；不传保留原标题 |
-| `--banner` | 顶部 info 宏的内容来源（小 md 片段）；不传且没有 `--no-banner` 时，取正文第一个 `>` 引用块 |
+| `--banner` | 顶部 info 宏的内容来源（小 md 片段）；不传且没有 `--no-banner` 时，把正文第一个 `>` 引用块移到顶部 info 宏 |
 | `--no-banner` | 不加顶部 info 宏 |
 | `--validate-only` | 只转换并校验，不上传 |
 
@@ -41,15 +41,15 @@ description: "Publish a local Markdown document to an existing Confluence wiki p
 3. 解析 pageId；URL 中提取不出 → 请用户重新提供，**不要猜**。
 4. 选择上传通道：环境有 wiki MCP 工具 → 通道 A；否则用 `wiki-config.json` 的 REST 参数 → 通道 B；都不可用 → 停。
 5. 读取目标页面当前的标题、版本号（细节见 `references/upload.md`）；页面不存在或无权限 → 停。
-6. Python ≥ 3.6 且可 `import markdown`；缺库时提示 `pip install markdown`，安装须经用户同意。
+6. 本机有 Node.js（≥ 18）；转换脚本不依赖任何第三方库。
 
 ### Step 1 — 转换并校验
 
 ```bash
-python <skillDir>/scripts/md_to_wiki.py <mdPath> tmp/skills/md-to-wiki/_wiki_upload_<timestamp>.html [--banner <path>] [--no-banner]
+node <skillDir>/scripts/md-to-wiki.mjs <mdPath> tmp/skills/md-to-wiki/_wiki_upload_<timestamp>.html [--banner <path>] [--no-banner]
 ```
 
-再做 XML 良构校验（命令见 `references/troubleshooting.md`）。不良构 → 停，把错误行号和片段告诉用户；不要把不良构的内容传给 Confluence。`--validate-only` 到此结束并报告结果。
+脚本转换后会自动做 XML 良构校验，退出码非 0 表示不良构（单独校验：`node <skillDir>/scripts/md-to-wiki.mjs --check <html>`）。不良构 → 停，把报错的行号和原因告诉用户；不要把不良构的内容传给 Confluence。`--validate-only` 到此结束并报告结果。
 
 ### Step 2 — 确认后上传
 

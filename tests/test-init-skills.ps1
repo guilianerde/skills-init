@@ -138,7 +138,7 @@ function Test-FreshInstallLinks {
   Assert-EnvLinked '.claude\skills'
   Assert-EnvLinked '.qwen\skills'
   Assert-Same '.agents\skills\project-review\references\checklist.md' (Join-Path $Repo 'project-review\references\checklist.md.tpl')
-  Assert-Same '.agents\skills\md-to-wiki\scripts\md_to_wiki.py' (Join-Path $Repo 'md-to-wiki\scripts\md_to_wiki.py')
+  Assert-Same '.agents\skills\md-to-wiki\scripts\md-to-wiki.mjs' (Join-Path $Repo 'md-to-wiki\scripts\md-to-wiki.mjs')
   Assert-Same '.agents\skills\md-to-wiki\wiki-config.json' (Join-Path $Repo 'md-to-wiki\wiki-config.json.tpl')
   Assert-Same '.agents\skills\workflow\profile.json' (Join-Path $Repo 'workflow\profile.json.tpl')
   Assert-Missing '.agents\skills\database-query\config.json'

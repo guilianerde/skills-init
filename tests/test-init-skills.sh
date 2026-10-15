@@ -93,7 +93,7 @@ test_fresh_install_links() {
   all_linked .claude/skills
   all_linked .qwen/skills
   assert_same .agents/skills/project-review/references/checklist.md "$REPO/project-review/references/checklist.md.tpl"
-  assert_same .agents/skills/md-to-wiki/scripts/md_to_wiki.py "$REPO/md-to-wiki/scripts/md_to_wiki.py"
+  assert_same .agents/skills/md-to-wiki/scripts/md-to-wiki.mjs "$REPO/md-to-wiki/scripts/md-to-wiki.mjs"
   assert_same .agents/skills/md-to-wiki/wiki-config.json "$REPO/md-to-wiki/wiki-config.json.tpl"
   assert_same .agents/skills/workflow/profile.json "$REPO/workflow/profile.json.tpl"
   assert_missing .agents/skills/database-query/config.json

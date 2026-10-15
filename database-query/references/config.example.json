@@ -1,0 +1,32 @@
+{
+  "default_connection": "dev",
+  "connections": {
+    "dev": {
+      "driver": "mysql",
+      "host": "127.0.0.1",
+      "port": 3306,
+      "database": "app",
+      "user": "app_ro",
+      "password_env": "APP_DEV_DB_PASSWORD",
+      "readonly": true
+    },
+    "test": {
+      "driver": "postgresql",
+      "host": "test-db.internal",
+      "port": 5432,
+      "database": "app",
+      "user": "app_ro",
+      "password_env": "APP_TEST_DB_PASSWORD",
+      "readonly": true
+    },
+    "dev-write": {
+      "driver": "mysql",
+      "host": "127.0.0.1",
+      "port": 3306,
+      "database": "app",
+      "user": "app_rw",
+      "password_env": "APP_DEV_DB_RW_PASSWORD",
+      "readonly": false
+    }
+  }
+}

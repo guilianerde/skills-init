@@ -6,7 +6,7 @@
 ## 连接
 
 - 库：{{database}}（{{host}}:{{port}}，驱动 {{driver}}）
-- 常用连接名：default
+- 连接名：见同 skill 目录下的 config.json（`default_connection` 为默认连接）
 
 ## 表清单
 

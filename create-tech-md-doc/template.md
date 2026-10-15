@@ -41,8 +41,8 @@
 
 {{从 diff 各层命中的模块/包名汇总，列出受影响的功能域}}
 示例格式：
-- APP 首页 / 贷超列表 / 风控回调 / CMS 配置
-- 涉及包路径：`com.indonesia.loan.controller.xxx`、`com.indonesia.loan.service.xxx`
+- 首页 / 列表接口 / 回调处理 / 后台配置
+- 涉及包路径：`com.example.app.controller.xxx`、`com.example.app.service.xxx`
 
 ## 3. 详细方案 *
 
