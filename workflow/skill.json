@@ -1,5 +1,16 @@
 {
   "name": "workflow",
   "order": 1,
-  "userFiles": { "profile.json": "profile.json.tpl" }
+  "requires": [],
+  "optional": [
+    "dev",
+    "project-review",
+    "database-query",
+    "md-to-wiki",
+    "create-tech-md-doc",
+    "create-release-md-doc"
+  ],
+  "userFiles": {
+    "profile.json": "profile.json.tpl"
+  }
 }

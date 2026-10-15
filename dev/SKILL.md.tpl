@@ -9,10 +9,10 @@ description: "Implement a feature or fix a bug in this project end to end: under
 
 | 环节 | 复用 | 不可用时 |
 |---|---|---|
-| 需求背景 | `md-to-wiki` 的 wiki 连接（读 PRD） | 只用对话中的需求描述 |
+| 需求背景 | wiki 中的 PRD（按 `references/prd-fetch.md` 拉取） | 只用对话中的需求描述 |
 | 项目约定 / 历史决策 | DocNexus（`docnexus-recall` skill） | 读 `CLAUDE.md` / `AGENTS.md` 与代码 |
 | 数据核对 | `database-query`（只读） | 给出 SQL 让用户执行 |
-| 自审 | `project-review` | 按其 `references/checklist.md` 手动过 |
+| 自审 | `project-review` | 按审查清单手动过（`node <skills>/workflow/scripts/resolve.mjs template project-review checklist.md` 给出路径） |
 | 交付文档 | `create-tech-md-doc` / `create-release-md-doc` | 只在对话中汇总 |
 
 ## Command Format
@@ -37,7 +37,7 @@ description: "Implement a feature or fix a bug in this project end to end: under
 
 ### F1 — 理解需求
 
-- 需求来源是 PRD pageId/URL 且 wiki 可用 → 按 `create-tech-md-doc/references/prd.md` 的方式拉取并提炼；wiki 不可用 → 请用户贴出关键内容。
+- 需求来源是 PRD pageId/URL → 按 `references/prd-fetch.md` 拉取并提炼；wiki 不可用 → 请用户贴出关键内容。
 - DocNexus 可用 → 按 `docnexus-recall` 用需求里的业务名词 `search` / `recall`，找相关约定与历史决策，引用 `docnexus/library/<path>`。
 - 输出 **需求要点 + 验收标准**（可验证的行为，而不是实现手段）。
 - 存在歧义（边界、异常分支、兼容性、权限）→ **一次性**列出问题问用户，不要边做边问，也不要自行假设后继续。
@@ -62,7 +62,7 @@ description: "Implement a feature or fix a bug in this project end to end: under
 
 - **小步推进**：每完成一个可编译的单元，就运行 `profile.build`（没有则用对应构建工具的编译命令）确认通过，再进入下一步。
 - **贴合现有代码**：沿用参照实现的写法；不顺手重构、不改无关代码、不升级依赖。看到范围外的问题记进交付说明，不在本次修。
-- **配置**：新增配置项记入配置清单（key、位置、用途、建议默认值、上线前需下发的环境），按 `profile.config_center` 与 `project-review/references/checklist.md` 第 10 维度处理。
+- **配置**：新增配置项记入配置清单（key、位置、用途、建议默认值、上线前需下发的环境），按 `profile.config_center` 与审查清单的配置维度处理（清单路径用 `node <skills>/workflow/scripts/resolve.mjs template project-review checklist.md` 取，接入 DocNexus 时是团队维护的版本）。
 - **数据库变更**：DDL / 数据修正写成 SQL 脚本放进项目约定的目录（没有约定则放进交付说明），**不在任何环境直接执行**。
 - **敏感信息**：不硬编码密钥、密码、内网地址；日志不打印敏感字段。
 

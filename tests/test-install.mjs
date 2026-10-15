@@ -232,7 +232,10 @@ test('新版本删掉的模板文件：未改过的清理，改过的保留并�
   const r = p.install(['--envs', 'claude,qwen', '--yes', '--skip-db']); ok(r);
   assert.ok(!p.exists(`${c}/dev/references/plan-template.md`));
   assert.equal(p.read(`${c}/dev/references/delivery-template.md`), edited);
-  assert.ok(!p.exists(`${c}/create-tech-md-doc/references`));
+  // skill 自带的 references 被清理；skill.json 声明的共享文件仍然装在 references/ 下
+  assert.ok(!p.exists(`${c}/create-tech-md-doc/references/diff-collection.md`));
+  assert.ok(!p.exists(`${c}/create-tech-md-doc/references/prd.md`));
+  assert.ok(p.isFile(`${c}/create-tech-md-doc/references/prd-fetch.md`));
   assert.ok(p.isFile(`${c}/create-tech-md-doc/SKILL.md`));
   assert.ok(r.log.includes(`${c}/dev/references/delivery-template.md`));
   assert.ok(!('references/plan-template.md' in p.json(`${c}/.skills-init.json`).skills.dev.files));
@@ -346,4 +349,38 @@ test('.gitignore 只追加缺失的规则，重跑不重复', () => {
   const after = p.read('.gitignore');
   ok(p.install(['--envs', 'claude', '--yes', '--skip-db']));
   assert.equal(p.read('.gitignore'), after);
+});
+
+test('--skills 子集：自动带上 requires 依赖；不装 database-query 时不问数据库；之后补装合并清单', () => {
+  const p = project('subset');
+  let r = p.install(['--envs', 'claude', '--yes', '--skills', 'project-review']); ok(r);
+  assert.match(r.log, /安装的 skill：workflow project-review/);
+  assert.deepEqual(fs.readdirSync(p.at('.agents/skills')).filter((f) => !f.startsWith('.')).sort(), ['project-review', 'workflow']);
+  assertLinked(p, '.claude/skills', ['workflow', 'project-review']);
+  assert.ok(!p.exists('.claude/skills/dev'));
+  r = p.install(['--envs', 'claude', '--yes', '--skip-db', '--skills', 'md-to-wiki']); ok(r);
+  assert.deepEqual(Object.keys(p.json('.agents/skills/.skills-init.json').skills).sort(), ['md-to-wiki', 'project-review', 'workflow']);
+  assertLinked(p, '.claude/skills', ['workflow', 'project-review', 'md-to-wiki']);
+  r = p.install(['upgrade']); ok(r);
+  assert.match(r.log, /安装的 skill：workflow project-review md-to-wiki/);
+  assert.ok(!p.exists('.agents/skills/dev'), 'upgrade 只升级装过的 skill');
+  const status = JSON.parse(spawnSync(process.execPath, [p.at('.agents/skills/workflow/scripts/resolve.mjs'), 'status'], { cwd: p.P, encoding: 'utf8' }).stdout);
+  assert.deepEqual(status.skills.sort(), ['md-to-wiki', 'project-review', 'workflow']);
+  assert.deepEqual(status.templates.map((t) => t.skill), ['project-review']);
+  r = p.install(['--envs', 'claude', '--yes', '--skip-db', '--skills', 'nope']);
+  assert.equal(r.status, 1); assert.match(r.log, /未知的 skill：nope/);
+});
+
+test('共享参考文件：仓库只有一份，装进每个声明它的 skill；改源文件后重跑全部更新', () => {
+  const p = project('shared');
+  ok(p.install(['--envs', 'codex', '--yes', '--skip-db']));
+  const users = ['dev', 'create-tech-md-doc', 'create-release-md-doc'];
+  for (const s of users) assert.equal(p.read(`.agents/skills/${s}/references/prd-fetch.md`), repoFile('shared/prd-fetch.md'), s);
+  assert.ok(!p.exists('.agents/skills/project-review/references/prd-fetch.md'));
+  fs.appendFileSync(p.at('skills-init/shared/prd-fetch.md'), '\n<!-- 新版 -->\n');
+  ok(p.install(['--envs', 'codex', '--yes', '--skip-db']));
+  for (const s of users) assert.match(p.read(`.agents/skills/${s}/references/prd-fetch.md`), /新版/, s);
+  ok(p.install(['--envs', 'codex', '--yes', '--skip-db', '--skills', 'database-query']));
+  ok(p.install(['uninstall']));
+  for (const s of users) assert.ok(!p.exists(`.agents/skills/${s}`), s);
 });

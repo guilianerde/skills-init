@@ -3,7 +3,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { PKG, CANON_DIR, step, ok, warn, fail, toPosix, fileHash, readManifest, lstat, findManifests, cmpVersion } from './core.mjs';
+import { PKG, CANON_DIR, SKILLS, step, ok, warn, fail, toPosix, fileHash, readManifest, lstat, findManifests, cmpVersion } from './core.mjs';
 import { reportTemplateStatus } from './docnexus.mjs';
 
 // upgrade = 用清单里记录的环境与模式非交互重装；数据库配置原样保留
@@ -16,7 +16,9 @@ export function upgradeOptions(o) {
   step(`升级：${from} -> ${PKG.version}（环境 ${(m.envs ?? []).join(',') || '未记录'}，模式 ${m.mode ?? 'symlink'}）`);
   const envs = Array.isArray(m.envs) && m.envs.length ? m.envs.join(',') : '';
   if (!envs) fail('安装清单里没有记录环境，请用 init --envs <列表> 重装。');
-  return { ...o, cmd: 'init', envs, copy: m.mode === 'copy', yes: true, skipDb: true };
+  // 只升级装过的 skill（--skills 子集安装时清单里只有这些）
+  const skills = Object.keys(m.skills ?? {}).filter((s) => SKILLS.includes(s)).join(',');
+  return { ...o, cmd: 'init', envs, copy: m.mode === 'copy', yes: true, skipDb: true, skills: o.skills || skills };
 }
 
 export function doctor(root, offline) {

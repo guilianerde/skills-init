@@ -2,7 +2,7 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { TPL_DIR, PKG, CANON_DIR, SKILLS, USER_FILES, RENAMED, MANIFEST, ok, warn, readJson, walk, toPosix, sameFile, writeFile, render, sha256, fileHash, readManifest, removeEmptyDirs, lstat, timestamp } from './core.mjs';
+import { TPL_DIR, PKG, CANON_DIR, SKILLS, SKILL_LIST, USER_FILES, RENAMED, MANIFEST, ok, warn, readJson, walk, toPosix, sameFile, writeFile, render, sha256, fileHash, readManifest, removeEmptyDirs, lstat, timestamp } from './core.mjs';
 import { ask } from './prompt.mjs';
 import { writeDbConfig } from './db.mjs';
 
@@ -55,20 +55,25 @@ export function pruneSkill(base, skill, prevSkill, entry, root) {
   }
 }
 
-// ctx: { root, yes, envs, mode }
+// ctx: { root, yes, envs, mode, skills }；skills 为本次要装的 skill（--skills 子集加依赖，缺省为全部）
 export async function installSkills(base, db, ctx) {
+  const selected = ctx.skills ?? SKILLS;
   const prev = readManifest(base);
   const manifest = { installer: PKG.name, version: PKG.version, installedAt: new Date().toISOString(), envs: ctx.envs, mode: ctx.mode, skills: {}, templates: prev?.templates ?? {} };
-  for (const skill of SKILLS) {
+  for (const skill of selected) {
     const srcDir = path.join(TPL_DIR, skill);
     const dstDir = path.join(base, skill);
     const prevSkill = prev?.skills?.[skill];
     const entry = { files: {}, userFiles: {}, pending: [] };
     const notes = [];
-    for (const rel of walk(srcDir)) {
+    // skill 自己的文件 + skill.json 中 shared 声明的共享文件（源在仓库 shared/，装到 references/ 下）
+    const sources = walk(srcDir).map((rel) => ({ rel, src: path.join(srcDir, rel) }));
+    for (const name of SKILL_LIST.find((x) => x.name === skill)?.shared ?? []) {
+      sources.push({ rel: path.join('references', name), src: path.join(TPL_DIR, 'shared', name) });
+    }
+    for (const { rel, src } of sources) {
       const outRel = rel.endsWith('.tpl') ? rel.slice(0, -4) : rel;
       const key = `${skill}/${toPosix(outRel)}`;
-      const src = path.join(srcDir, rel);
       const dst = path.join(dstDir, outRel);
       if (!(key in USER_FILES)) {
         const content = fs.readFileSync(src);
@@ -108,9 +113,12 @@ export async function installSkills(base, db, ctx) {
     manifest.skills[skill] = entry;
     ok(`${skill} -> ${dstDir}${notes.length ? `（${notes.join('；')}）` : ''}`);
   }
-  // 清单里有、本版本已不再提供的 skill：按同样规则清理
   for (const [skill, prevSkill] of Object.entries(prev?.skills ?? {})) {
-    if (!SKILLS.includes(skill)) pruneSkill(base, skill, prevSkill, null, ctx.root);
+    if (selected.includes(skill)) continue;
+    // 之前装过、这次没选中的 skill：原样保留（卸载请用 uninstall），清单记录沿用
+    if (SKILLS.includes(skill)) manifest.skills[skill] = prevSkill;
+    // 清单里有、本版本已不再提供的 skill：按同样规则清理
+    else pruneSkill(base, skill, prevSkill, null, ctx.root);
   }
   writeFile(path.join(base, MANIFEST), JSON.stringify(manifest, null, 2) + '\n');
 }
@@ -174,7 +182,7 @@ export function symlinkSupported(dir) {
 }
 
 // 返回 false 表示不能建软链接（调用方退回独立拷贝）
-export function linkSkills(root, envName, rel) {
+export function linkSkills(root, envName, rel, skills = SKILLS) {
   const dir = path.join(root, rel);
   fs.mkdirSync(dir, { recursive: true });
   if (!symlinkSupported(dir)) {
@@ -182,7 +190,7 @@ export function linkSkills(root, envName, rel) {
     return false;
   }
   let skipped = 0;
-  for (const skill of SKILLS) {
+  for (const skill of skills) {
     const link = path.join(dir, skill);
     const target = path.join('..', '..', CANON_DIR, skill);
     const st = lstat(link);

@@ -20,12 +20,12 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { seedTemplates, updateTemplates } from './seed-templates.mjs';
-import { TPL_DIR, PKG, ENV_NAMES, CANON_DIR, step, ok, warn, CliError, fail } from './lib/core.mjs';
+import { TPL_DIR, PKG, ENV_NAMES, CANON_DIR, SKILLS, resolveSkillSelection, step, ok, warn, CliError, fail } from './lib/core.mjs';
 import { ask, closePrompt } from './lib/prompt.mjs';
 import { findExistingDbConfig, getDb } from './lib/db.mjs';
 import { report, installSkills, linkSkills, removeRenamed, updateGitignore } from './lib/install.mjs';
 import { uninstall } from './lib/uninstall.mjs';
-import { checkNodeForDocNexus, setupDocNexus, templateRecords, saveTemplateRecords, reportTemplateStatus } from './lib/docnexus.mjs';
+import { checkNodeForDocNexus, setupDocNexus, templateRecords, saveTemplateRecords, reportTemplateStatus, installedSkills } from './lib/docnexus.mjs';
 import { upgradeOptions, doctor } from './lib/doctor.mjs';
 
 // ---------------------------------------------------------------- 参数
@@ -45,6 +45,7 @@ init 选项：
   --yes                非交互：使用已有数据库配置；都没有且未 --skip-db 时报错退出
   --with-docnexus      同时接入 DocNexus 文档库（需 Node >= 22.13 与 npm），并导入文档模板
   --copy               不用软链接，各环境独立拷贝
+  --skills <列表>      只装这些 skill（逗号分隔），自动带上 skill.json 里 requires 声明的依赖；缺省为全部
   --seed-templates     安装后把文档模板导入 DocNexus；接入 DocNexus 后文档类 skill 只从知识库取模板
   --uninstall          同 uninstall 命令
 seed-templates 选项：
@@ -57,7 +58,7 @@ doctor 选项：
   -h, --help           显示帮助`;
 
 function parseArgs(argv) {
-  const o = { cmd: 'init', envs: '', skipDb: false, yes: false, withDocNexus: false, copy: false, seedTemplates: false, update: false, offline: false, root: process.cwd() };
+  const o = { cmd: 'init', envs: '', skipDb: false, yes: false, withDocNexus: false, copy: false, seedTemplates: false, update: false, skills: '', offline: false, root: process.cwd() };
   let cmdGiven = false; // 命令可以出现在选项之间（封装脚本会先传 --project-root）
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
@@ -68,6 +69,7 @@ function parseArgs(argv) {
       case '--yes': o.yes = true; break;
       case '--with-docnexus': o.withDocNexus = true; break;
       case '--copy': o.copy = true; break;
+      case '--skills': o.skills = val(); break;
       case '--seed-templates': o.seedTemplates = true; break;
       case '--uninstall': o.cmd = 'uninstall'; cmdGiven = true; break;
       case '--offline': o.offline = true; break;
@@ -114,12 +116,12 @@ async function main() {
   if (o.cmd === 'seed-templates') {
     step('导入文档模板到 DocNexus');
     try {
-      const r = seedTemplates(o.root, TPL_DIR, { ok, warn, version: PKG.version });
+      const r = seedTemplates(o.root, TPL_DIR, { ok, warn, version: PKG.version, skills: installedSkills(o.root) });
       saveTemplateRecords(o.root, r.records);
       let failed = r.failed.length;
       if (o.update) {
         step('更新导入后未改动的模板（--update）');
-        const u = updateTemplates(o.root, TPL_DIR, templateRecords(o.root), { ok, warn, version: PKG.version });
+        const u = updateTemplates(o.root, TPL_DIR, templateRecords(o.root), { ok, warn, version: PKG.version, skills: installedSkills(o.root) });
         saveTemplateRecords(o.root, u.records);
         failed += u.failed.length;
       }
@@ -132,6 +134,11 @@ async function main() {
 
   const sel = await resolveEnvs(o);
   step(`目标环境：${sel.join(' ')}`);
+  let skills;
+  try { skills = o.skills ? resolveSkillSelection(o.skills.split(/[,，\s]+/).filter(Boolean)) : SKILLS; } catch (e) { fail(e.message); }
+  if (o.skills) step(`安装的 skill：${skills.join(' ')}（含 requires 依赖）`);
+  // 不装 database-query 时不必询问数据库连接
+  if (!skills.includes('database-query')) o.skipDb = true;
 
   let db = null;
   if (!o.skipDb) {
@@ -159,7 +166,7 @@ async function main() {
   }
 
   removeRenamed(o.root);
-  const ctx = { root: o.root, yes: o.yes, envs: sel, mode: o.copy ? 'copy' : 'symlink' };
+  const ctx = { root: o.root, yes: o.yes, envs: sel, mode: o.copy ? 'copy' : 'symlink', skills };
   for (const [name, dir] of targets) {
     const abs = path.resolve(o.root, dir);
     step(`安装到 ${name}  ->  ${abs}`);
@@ -167,7 +174,7 @@ async function main() {
   }
   for (const [name, dir] of links) {
     step(`链接 ${name}  ->  ${path.join(o.root, dir)}`);
-    if (!linkSkills(o.root, name, dir)) await installSkills(path.join(o.root, dir), db, { ...ctx, mode: 'copy-fallback' });
+    if (!linkSkills(o.root, name, dir, skills)) await installSkills(path.join(o.root, dir), db, { ...ctx, mode: 'copy-fallback' });
   }
   closePrompt(); // 模板冲突时可能还要询问，装完再关
 
@@ -178,7 +185,7 @@ async function main() {
   if ((o.seedTemplates || o.withDocNexus) && docnexus !== 'failed') {
     step('导入文档模板到 DocNexus（--seed-templates）');
     try {
-      const r = seedTemplates(o.root, TPL_DIR, { ok, warn, version: PKG.version });
+      const r = seedTemplates(o.root, TPL_DIR, { ok, warn, version: PKG.version, skills: installedSkills(o.root) });
       saveTemplateRecords(o.root, r.records);
       seedFailed = r.failed.length > 0;
     } catch (e) { warn(e.message); seedFailed = true; }

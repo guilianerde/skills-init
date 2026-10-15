@@ -1,6 +1,13 @@
 {
   "name": "create-tech-md-doc",
   "order": 6,
+  "requires": [
+    "workflow"
+  ],
+  "optional": [
+    "md-to-wiki",
+    "create-release-md-doc"
+  ],
   "templates": [
     {
       "id": "template.md",
@@ -16,5 +23,9 @@
         ]
       }
     }
+  ],
+  "shared": [
+    "diff-collection-common.md",
+    "prd-fetch.md"
   ]
 }

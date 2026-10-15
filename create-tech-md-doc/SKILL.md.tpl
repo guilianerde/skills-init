@@ -27,7 +27,7 @@ description: "Generate a Markdown technical design doc (技术方案) from the d
 
 ### Step 1 — PRD（仅传入 `--prd` 时）
 
-wiki GATE：读 `md-to-wiki/wiki-config.json`，`enabled` 非 `true` 或 `wiki.base_url` 为空，且环境没有 wiki MCP 工具 → 告知「wiki 连接未配置，PRD 增强已跳过」，继续纯 diff 流程。GATE 通过 → 按 `references/prd.md` 拉取并抽取 `prd_context`。PRD 任何环节失败都只回退，不中止。
+按 `references/prd-fetch.md` 判断 wiki 是否可用并拉取 PRD（不可用 → 告知「wiki 连接未配置，PRD 增强已跳过」，继续纯 diff 流程），再按 `references/prd.md` 抽取本文档需要的字段并做对齐校验。PRD 任何环节失败都只回退，不中止。
 
 ### Step 2 — 分层采集 diff 并抽取事实
 

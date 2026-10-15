@@ -62,6 +62,8 @@ export function setupDocNexus(root, sel) {
 }
 
 export function templateRecords(root) { return findManifests(root)[0]?.m.templates ?? {}; }
+// 已安装的 skill（有安装清单时以清单为准），模板导入与状态只针对它们
+export function installedSkills(root) { const m = findManifests(root)[0]?.m; return m ? Object.keys(m.skills ?? {}) : undefined; }
 export function saveTemplateRecords(root, recs) {
   if (!Object.keys(recs).length) return;
   const found = findManifests(root)[0];
@@ -71,7 +73,7 @@ export function saveTemplateRecords(root, recs) {
 }
 // 打印需要关注的模板状态，返回是否有需要处理的
 export function reportTemplateStatus(root, say = warn) {
-  const list = templateStatus(root, TPL_DIR, templateRecords(root)).filter((s) => !['current', 'edited'].includes(s.status));
+  const list = templateStatus(root, TPL_DIR, templateRecords(root), installedSkills(root)).filter((s) => !['current', 'edited'].includes(s.status));
   for (const s of list) say(`DocNexus 模板 ${s.file}：${STATUS_TEXT[s.status]}${s.status === 'customized' || s.status === 'untracked' ? `（默认模板：${s.defaultPath}）` : ''}`);
   return list.length > 0;
 }

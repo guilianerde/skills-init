@@ -1,6 +1,16 @@
 {
   "name": "dev",
   "order": 2,
+  "requires": [
+    "workflow"
+  ],
+  "optional": [
+    "project-review",
+    "database-query",
+    "md-to-wiki",
+    "create-tech-md-doc",
+    "create-release-md-doc"
+  ],
   "templates": [
     {
       "id": "plan-template.md",
@@ -9,5 +19,8 @@
       "summary": "dev skill 在 M / L 规模需求中使用的开发方案模板。",
       "lint": {}
     }
+  ],
+  "shared": [
+    "prd-fetch.md"
   ]
 }

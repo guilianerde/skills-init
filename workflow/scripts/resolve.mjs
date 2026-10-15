@@ -77,6 +77,8 @@ export function status(root) {
   const dn = docnexusConnected(root);
   const templates = skillMetas().flatMap((m) => m.templates.map((t) => resolveTemplate(root, m.name, t.id)));
   return {
+    // 已安装的 skill（--skills 子集安装时只有一部分），路由前据此判断目标 skill 是否可用
+    skills: skillMetas().map((m) => m.name),
     profile: { ok: p.complete, empty: p.empty, how: p.complete ? null : '运行 /workflow profile' },
     wiki: {
       ok: wikiCfg?.enabled === true && !!wikiCfg?.wiki?.base_url,

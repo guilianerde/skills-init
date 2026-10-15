@@ -67,10 +67,13 @@ const newMetadata = (t) => ({
 });
 
 // 导入缺失的模板。返回 { seeded, skipped, failed: [{ file, error }], records }；records 为本次导入的记录
-export function seedTemplates(root, tplDir, { ok = console.log, warn = console.error, version = '' } = {}) {
+// skills：只处理这些 skill 的模板（缺省为全部），--skills 子集安装时不导入没装的 skill 的模板
+const pick = (skills) => (skills ? TEMPLATES.filter((t) => skills.includes(t.skill)) : TEMPLATES);
+
+export function seedTemplates(root, tplDir, { ok = console.log, warn = console.error, version = '', skills } = {}) {
   requireDocNexus(root);
   const result = { seeded: [], skipped: [], failed: [], records: {} };
-  for (const t of TEMPLATES) {
+  for (const t of pick(skills)) {
     if (fs.existsSync(libFile(root, t))) {
       result.skipped.push(t.file);
       ok(`DocNexus 中已有 ${t.file}，保留不覆盖`);
@@ -87,8 +90,8 @@ export function seedTemplates(root, tplDir, { ok = console.log, warn = console.e
 }
 
 // 只读文件，不调用 docnexus；records 来自安装清单
-export function templateStatus(root, tplDir, records = {}) {
-  return TEMPLATES.map((t) => {
+export function templateStatus(root, tplDir, records = {}, skills) {
+  return pick(skills).map((t) => {
     if (!fs.existsSync(libFile(root, t))) return { file: t.file, status: 'missing', seededFrom: null, defaultPath: t.src };
     const def = sha256(defaultContent(tplDir, t));
     const lib = sha256(fs.readFileSync(libFile(root, t), 'utf8'));
@@ -103,10 +106,10 @@ export function templateStatus(root, tplDir, records = {}) {
 }
 
 // 把 outdated 的模板更新为当前默认模板（保留库中已有的元数据）。返回 { updated, failed, records }
-export function updateTemplates(root, tplDir, records = {}, { ok = console.log, warn = console.error, version = '' } = {}) {
+export function updateTemplates(root, tplDir, records = {}, { ok = console.log, warn = console.error, version = '', skills } = {}) {
   requireDocNexus(root);
   const result = { updated: [], failed: [], records: {} };
-  const targets = templateStatus(root, tplDir, records).filter((s) => s.status === 'outdated');
+  const targets = templateStatus(root, tplDir, records, skills).filter((s) => s.status === 'outdated');
   if (!targets.length) { ok('没有可自动更新的模板（只更新导入后未被改动、且默认模板有新版的）'); return result; }
   const q = docnexus(root, ['document', 'query', '--all', '--category', TEMPLATE_CATEGORY]);
   if (!q.ok) throw new Error(`document query 失败：${q.err}`);

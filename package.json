@@ -21,6 +21,7 @@
   },
   "files": [
     "bin",
+    "shared",
     "workflow",
     "dev",
     "project-review",

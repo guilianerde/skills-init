@@ -4,7 +4,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { loadSkills, deriveMeta } from '../skills.mjs';
+import { loadSkills, deriveMeta, withDependencies } from '../skills.mjs';
 
 export const TPL_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 export const PKG = JSON.parse(fs.readFileSync(path.join(TPL_DIR, 'package.json'), 'utf8'));
@@ -13,7 +13,10 @@ export const IS_WIN = process.platform === 'win32';
 export const ENV_NAMES = ['codex', 'claude', 'doubao', 'qwen'];
 export const CANON_DIR = path.join('.agents', 'skills'); // 单一来源目录
 // skill 列表、用户配置、改名清理、文档模板都来自各 skill 目录的 skill.json（见 bin/skills.mjs）
-export const META = deriveMeta(loadSkills(TPL_DIR));
+export const SKILL_LIST = loadSkills(TPL_DIR);
+export const META = deriveMeta(SKILL_LIST);
+// --skills 子集：加上 requires 依赖后的安装列表
+export const resolveSkillSelection = (names) => withDependencies(SKILL_LIST, names);
 export const SKILLS = META.skills;
 // 用户配置：重跑不覆盖；值为对应空模板（用于判断单一来源中的文件是否还没被填写过）
 export const USER_FILES = META.userFiles;

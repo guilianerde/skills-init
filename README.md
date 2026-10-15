@@ -184,6 +184,7 @@ npx @rowansenne/skills-init doctor
 | `-SkipDb` / `--skip-db` | 跳过数据库连接配置（database-query 不生成 config.json）                             |
 | `-WithDocNexus` / `--with-docnexus` | 可选：接入 [DocNexus](https://www.npmjs.com/package/@rowansenne/docnexus) 项目文档库（需 Node >= 22.13），见下方「DocNexus 文档库（可选）」 |
 | `-Copy` / `--copy`      | 不建软链接，各环境独立拷贝一份完整 skills                                  |
+| `--skills <列表>` | 只装这些 skill（逗号分隔），自动带上 `requires` 依赖；之后可以再用 `--skills` 补装，已装的保留；`upgrade` 只升级装过的。不含 database-query 时不询问数据库 |
 | `-SeedTemplates` / `--seed-templates` | 把自带的文档模板导入 DocNexus（已有的不覆盖）；接入 DocNexus 后文档类 skill 只从知识库取模板。`--with-docnexus` 会自动执行 |
 | `-Uninstall` / `--uninstall` | 按安装清单卸载本项目装的 skills 与链接，见下方「卸载」 |
 | `-Offline` / `--offline` | `doctor` 不测试数据库连通性 |
@@ -268,7 +269,10 @@ npx @rowansenne/skills-init doctor
   "name": "create-tech-md-doc",
   "order": 6,
   "userFiles": {},
-  "templates": [{ "id": "template.md", "src": "template.md", "title": "技术方案模板", "summary": "..." }],
+  "requires": ["workflow"],
+  "optional": ["md-to-wiki", "create-release-md-doc"],
+  "shared": ["diff-collection-common.md", "prd-fetch.md"],
+  "templates": [{ "id": "template.md", "src": "template.md", "title": "技术方案模板", "summary": "...", "lint": { "requiredMeta": ["模板来源"] } }],
   "renamedFrom": {}
 }
 ```
@@ -279,6 +283,13 @@ npx @rowansenne/skills-init doctor
 | `userFiles` | 用户配置（安装后的相对路径 → 对应空模板的源路径或 `null`），重跑不覆盖，卸载时备份 |
 | `templates` | 可由 DocNexus 接管的文档模板，知识库路径为 `templates/<skill>/<id>` |
 | `renamedFrom` | 旧名 → SKILL.md 签名正则；升级时只清理能确认是本项目装的旧目录 |
+| `requires` | 运行时必需的 skill（会调用它的脚本或读它的文件）；`--skills` 安装时自动带上 |
+| `optional` | 协作但非必需的 skill：没装时跳过对应增强（如 PRD 读取、自审），不报错 |
+| `shared` | 共享参考文件：源在仓库 `shared/`，安装时拷进本 skill 的 `references/`。仓库里只维护一份，装好后每个 skill 自带完整文件，运行时不依赖别的 skill |
+
+`tests/test-skills-meta.mjs` 会检查：skill 的文件里出现了别的 skill 的路径（如 `md-to-wiki/scripts/…`、`workflow/scripts/…`），就必须在 `requires` 或 `optional` 里声明；`requires` 声明了就必须真的用到，而且不能成环。
+
+当前依赖关系：`workflow` 是共享核心（模板来源、画像、文档自检脚本），`dev`、`project-review`、两个文档 skill 依赖它；`database-query`、`md-to-wiki` 完全独立；wiki 凭据只由 `md-to-wiki` 的脚本读取，其他 skill 拉 PRD 统一调用 `upload.mjs get`。
 
 新增一个 skill 就是新建目录、写 `SKILL.md.tpl` 和 `skill.json`，再加进 `package.json` 的 `files`。`tests/test-skills-meta.mjs` 会检查它们是否一致。
 
@@ -411,7 +422,8 @@ skills-init/
 │   └── seed-templates.mjs             # 把文档模板导入 DocNexus
 ├── init-skills.sh / init-skills.ps1   # 薄封装：以上级目录为项目根调用安装器
 ├── package.json                       # npm 包信息（bin: skills-init）
-├── tests/                             # 黑盒测试（bash / pwsh）+ node 测试
+├── shared/                            # 多个 skill 共用的参考文件（diff-collection-common.md、prd-fetch.md），安装时按 skill.json 的 shared 拷入
+├── tests/                             # node 测试 + 封装脚本冒烟测试（bash / pwsh）
 ├── evals/trigger-cases.json           # 多 skill 分流评估用例
 ├── scripts/eval-triggers.mjs          # 分流评估脚本
 ├── README.md                          # 本说明

@@ -1,5 +1,9 @@
 {
   "name": "md-to-wiki",
   "order": 5,
-  "userFiles": { "wiki-config.json": "wiki-config.json.tpl" }
+  "requires": [],
+  "optional": [],
+  "userFiles": {
+    "wiki-config.json": "wiki-config.json.tpl"
+  }
 }

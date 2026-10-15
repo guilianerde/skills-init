@@ -25,7 +25,7 @@ description: "Review source code (any language; Java/Spring, Go, TypeScript, Pyt
 - 安全（注入 / XSS / 越权 / 敏感信息 / 硬编码密钥）
 - 性能（N+1、循环内查询、大对象、无谓复制）
 - 一致性 / 命名 / 风格
-- 配置（见 `references/checklist.md` 第 10 维度；项目使用的配置中心取自 `workflow/profile.json` 的 `config_center`——配置相关发现按配置清单输出）
+- 配置（见第 4 步取到的审查清单中的配置维度；项目使用的配置中心取自 `workflow/profile.json` 的 `config_center`——配置相关发现按配置清单输出）
 
 ## Severity Levels
 

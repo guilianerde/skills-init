@@ -7,7 +7,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { parsePageId } from '../md-to-wiki/scripts/upload.mjs';
+import { parsePageId, storageToText } from '../md-to-wiki/scripts/upload.mjs';
 
 const SCRIPTS = fileURLToPath(new URL('../md-to-wiki/scripts/', import.meta.url));
 
@@ -18,7 +18,7 @@ function fakeConfluence() {
     const m = req.url.match(/^\/wiki\/rest\/api\/content\/(\d+)/);
     const send = (code, obj) => { res.writeHead(code, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(obj)); };
     if (!m || m[1] !== '123') return send(404, { message: 'not found' });
-    if (req.method === 'GET') return send(200, { id: '123', title: state.title, version: { number: state.version, when: 'now' }, space: { key: 'DEV' }, _links: { webui: '/spaces/DEV/pages/123' } });
+    if (req.method === 'GET') return send(200, { id: '123', title: state.title, version: { number: state.version, when: 'now' }, space: { key: 'DEV' }, _links: { webui: '/spaces/DEV/pages/123' }, ...(req.url.includes('body.storage') ? { body: { storage: { value: state.body || '<h2>背景</h2><p>A &amp; B</p><ul><li>导出订单</li></ul>' } } } : {}) });
     let data = '';
     req.on('data', (c) => { data += c; });
     req.on('end', () => {
@@ -108,5 +108,32 @@ test('info → put：版本校验、标题保留、上传后版本 +1；Bearer �
     assert.equal(state.title, '新标题');
     assert.equal(state.auths.at(-1), `Basic ${Buffer.from('me@x.com:TOK').toString('base64')}`);
     fs.rmSync(basic.dir, { recursive: true, force: true });
+  } finally { server.close(); }
+});
+
+test('storageToText：标题、列表、表格、实体与代码块', () => {
+  const t = storageToText('<h1>需求 &amp; 背景</h1><p>第一段<br/>第二行</p><ul><li>功能 A</li></ul><table><tr><th>表</th><th>说明</th></tr><tr><td>users</td><td>用户</td></tr></table><ac:structured-macro ac:name="code"><ac:parameter ac:name="language">sql</ac:parameter><ac:plain-text-body><![CDATA[select 1 where a < 2]]></ac:plain-text-body></ac:structured-macro>');
+  assert.match(t, /^# 需求 & 背景\n第一段\n第二行/);
+  assert.match(t, /\n- 功能 A\n/);
+  assert.match(t, /\| 表 \| 说明 \|\n\| users \| 用户 \|/);
+  assert.match(t, /select 1 where a < 2/);
+  assert.doesNotMatch(t, /language|sql\n/);
+});
+
+test('get：默认输出 storage，--text 输出纯文本（供其他 skill 拉 PRD）', async () => {
+  const { server, base } = await fakeConfluence();
+  try {
+    const { dir, run } = setup({ enabled: true, wiki: { base_url: base, api_token: 'SECRET' } });
+    let r = await run('get', '123');
+    assert.equal(r.status, 0, r.err);
+    let out = JSON.parse(r.out);
+    assert.equal(out.storage, '<h2>背景</h2><p>A &amp; B</p><ul><li>导出订单</li></ul>');
+    assert.equal(out.title, '技术方案');
+    r = await run('get', `${base}/spaces/DEV/pages/123/x`, '--text');
+    out = JSON.parse(r.out);
+    assert.equal(out.text, '## 背景\nA & B\n\n- 导出订单');
+    assert.ok(!('storage' in out));
+    assert.doesNotMatch(r.out, /SECRET/);
+    fs.rmSync(dir, { recursive: true, force: true });
   } finally { server.close(); }
 });

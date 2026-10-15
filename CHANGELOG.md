@@ -4,7 +4,14 @@
 
 ## [Unreleased]
 
+### 修复
+- dev 直接读 `project-review/references/checklist.md`：接入 DocNexus 后会用到默认清单而不是团队维护的版本。改为通过 `resolve.mjs template` 取；project-review 自身的配置维度说明同步修正。
+
 ### 新增
+- skill.json 新增 `requires` / `optional` / `shared`；安装器支持 `--skills <列表>` 按需安装并自动带上依赖，`upgrade` 只升级装过的 skill，模板导入与状态只针对已安装的 skill；`resolve.mjs status` 输出已安装的 skill。
+- 测试检查跨 skill 的文件引用必须在 `requires` / `optional` 中声明。
+- `upload.mjs get [--text]`：读取 wiki 页面正文；其他 skill 拉 PRD 统一调用它，不再直接读 `md-to-wiki/wiki-config.json`。
+- 共享参考文件 `shared/`（`diff-collection-common.md`、`prd-fetch.md`）：仓库只维护一份，安装时拷进声明它的 skill；两个文档 skill 的 `references/` 只保留各自特有的映射与规则。
 - `workflow/scripts/lint-doc.mjs`：对照当前生效的模板检查生成的文档（必填章节、残留占位符、元信息行、待填写位置），文档类 skill 与 dev 的 L 规模方案交付前运行。
 - `resolve.mjs infer-profile`：按固定规则从构建文件、Makefile、依赖与配置文件、git 推断项目画像草稿，每个字段附依据。
 - `query.mjs --schema [--tables] [--write]`：导出表结构为 Markdown，写入 schema.md 的 begin/end 标记之间（标记外的补充说明保留）。

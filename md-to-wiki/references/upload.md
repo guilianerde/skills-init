@@ -25,6 +25,7 @@
 
 ```bash
 node <skillDir>/scripts/upload.mjs info <pageId|url>
+node <skillDir>/scripts/upload.mjs get <pageId|url> [--text]      # 读正文；其他 skill 拉 PRD 也用它
 node <skillDir>/scripts/upload.mjs put <html> <pageId|url> --expect-version <n> [--title <标题>]
 ```
 

@@ -28,7 +28,7 @@ description: "Entry point for this project's personal dev workflow skills. Route
 | 把 md 发布到 wiki | `md-to-wiki` | 需 wiki 已配置 |
 | 记住 / 查找项目决策与约定 | DocNexus（入口 skill `docnexus`） | 需已接入；写入必须用户授权 |
 
-意图明确时直接按对应 skill 执行，不必先输出这张表。意图横跨多个阶段时按下面的「完整链路」逐段推进，每段结束告诉用户下一段是什么，由用户决定是否继续。
+意图明确时直接按对应 skill 执行，不必先输出这张表。目标 skill 没有安装（`resolve.mjs status` 输出的 `skills` 里没有它，安装时用了 `--skills` 子集）→ 告诉用户可以运行 `skills-init --skills <名称>` 补装，不要假装执行。意图横跨多个阶段时按下面的「完整链路」逐段推进，每段结束告诉用户下一段是什么，由用户决定是否继续。
 
 ### 完整链路（从需求到上线）
 
@@ -76,7 +76,7 @@ dev（需求 → 方案 → 实现 → 测试 → 自审）
 
 | 能力 | 判定为可用 | 用途 |
 |---|---|---|
-| wiki | `md-to-wiki/wiki-config.json` 中 `enabled=true` 且 `wiki.base_url` 非空；或环境存在 wiki MCP 工具 | 读 PRD、发布文档 |
+| wiki | `md-to-wiki/wiki-config.json` 中 `enabled=true` 且 `wiki.base_url` 非空；或环境存在 wiki MCP 工具 | 读 PRD（各 skill 按 `references/prd-fetch.md`，REST 通道统一调 `md-to-wiki/scripts/upload.mjs get`）、发布文档 |
 | DocNexus | 项目根有 `docnexus/project.json`，且 `./node_modules/.bin/docnexus` 可执行 | 查约定与历史决策、沉淀知识、提供文档模板 |
 | 数据库 | `database-query/config.json` 存在且 `connections` 非空 | 查表结构、核对数据 |
 | 项目画像 | `workflow/profile.json` 中 `main_branch` 与 `build` / `test` 非空 | dev 构建与测试 |

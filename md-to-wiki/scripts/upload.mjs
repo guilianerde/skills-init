@@ -3,6 +3,9 @@
 //
 //   node <skillDir>/scripts/upload.mjs info <pageId|url>
 //       读取页面当前标题、版本号、空间与链接（只读）。把结果给用户确认是否覆盖。
+//   node <skillDir>/scripts/upload.mjs get <pageId|url> [--text]
+//       读取页面正文（只读）：默认输出 storage XHTML；--text 输出去掉标签的纯文本（保留标题层级 / 列表 / 表格），
+//       供其他 skill 拉取 PRD，凭据只在这里使用。
 //   node <skillDir>/scripts/upload.mjs put <html> <pageId|url> --expect-version <n> [--title <标题>]
 //       上传前校验 XHTML 良构；页面当前版本必须等于用户确认过的 <n>（否则说明有人刚改过，停止）；
 //       上传后重新读取，确认版本号变为 n+1。
@@ -81,6 +84,30 @@ export async function getInfo(w, pageId) {
   return pageInfo(w, await request(w, 'GET', `/rest/api/content/${pageId}?expand=version,space`));
 }
 
+// Confluence storage XHTML -> 可读纯文本：标题转 #、列表转 -、表格行转 | a | b |，其余标签去掉
+export function storageToText(html) {
+  const decode = (t) => t
+    .replace(/&nbsp;/g, ' ').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;|&apos;/g, "'")
+    .replace(/&#(\d+);/g, (_, n) => String.fromCodePoint(Number(n))).replace(/&#x([0-9a-f]+);/gi, (_, n) => String.fromCodePoint(parseInt(n, 16)))
+    .replace(/&amp;/g, '&');
+  let t = String(html)
+    .replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, (_, c) => `\n${c.replace(/</g, '&lt;')}\n`)
+    .replace(/<ac:parameter[^>]*>[\s\S]*?<\/ac:parameter>/g, '')
+    .replace(/<h([1-6])[^>]*>/gi, (_, n) => `\n${'#'.repeat(Number(n))} `).replace(/<\/h[1-6]>/gi, '\n')
+    .replace(/<li[^>]*>/gi, '\n- ').replace(/<\/li>/gi, '')
+    .replace(/<tr[^>]*>/gi, '\n|').replace(/<\/t[hd]>/gi, ' |').replace(/<t[hd][^>]*>/gi, ' ')
+    .replace(/<br\s*\/?>/gi, '\n').replace(/<\/(p|div|ul|ol|table|blockquote|pre)>/gi, '\n')
+    .replace(/<[^>]+>/g, '');
+  t = decode(t);
+  return t.split('\n').map((l) => l.replace(/[ \t]+/g, ' ').trimEnd()).join('\n').replace(/\n{3,}/g, '\n\n').trim();
+}
+
+export async function getPage(w, pageId, { text = false } = {}) {
+  const page = await request(w, 'GET', `/rest/api/content/${pageId}?expand=body.storage,version,space`);
+  const storage = page.body?.storage?.value ?? '';
+  return { ...pageInfo(w, page), ...(text ? { text: storageToText(storage) } : { storage }) };
+}
+
 export async function put(w, pageId, html, { expectVersion, title }) {
   const wf = checkWellFormed(html);
   if (!wf.ok) throw Object.assign(new Error(`XHTML 不良构，拒绝上传（第 ${wf.line} 行）：${wf.error}`), { exit: 3 });
@@ -104,11 +131,12 @@ export async function put(w, pageId, html, { expectVersion, title }) {
 }
 
 function parseArgs(argv) {
-  const o = { cmd: argv[0], pos: [], expectVersion: null, title: '' };
+  const o = { cmd: argv[0], pos: [], expectVersion: null, title: '', text: false };
   for (let i = 1; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--expect-version') o.expectVersion = Number(argv[++i]);
     else if (a === '--title') o.title = argv[++i] ?? '';
+    else if (a === '--text') o.text = true;
     else if (a.startsWith('--')) throw new UsageError(`未知参数 ${a}`);
     else o.pos.push(a);
   }
@@ -122,6 +150,11 @@ export async function main(argv) {
     console.log(JSON.stringify(await getInfo(w, parsePageId(o.pos[0])), null, 2));
     return 0;
   }
+  if (o.cmd === 'get' && o.pos.length === 1) {
+    const w = loadWikiConfig();
+    console.log(JSON.stringify(await getPage(w, parsePageId(o.pos[0]), { text: o.text }), null, 2));
+    return 0;
+  }
   if (o.cmd === 'put' && o.pos.length === 2) {
     if (!Number.isInteger(o.expectVersion)) throw new UsageError('put 需要 --expect-version <n>：先运行 info，把标题与版本给用户确认后再上传');
     const [htmlPath, page] = o.pos;
@@ -131,7 +164,7 @@ export async function main(argv) {
     console.log(JSON.stringify(r, null, 2));
     return 0;
   }
-  throw new UsageError('用法: upload.mjs info <pageId|url> | upload.mjs put <html> <pageId|url> --expect-version <n> [--title <标题>]');
+  throw new UsageError('用法: upload.mjs info <pageId|url> | upload.mjs get <pageId|url> [--text] | upload.mjs put <html> <pageId|url> --expect-version <n> [--title <标题>]');
 }
 
 const invoked = process.argv[1] && fs.realpathSync(process.argv[1]) === fs.realpathSync(fileURLToPath(import.meta.url));

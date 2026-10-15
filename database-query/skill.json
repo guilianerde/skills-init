@@ -1,5 +1,10 @@
 {
   "name": "database-query",
   "order": 4,
-  "userFiles": { "config.json": null, "references/schema.md": null }
+  "requires": [],
+  "optional": [],
+  "userFiles": {
+    "config.json": null,
+    "references/schema.md": null
+  }
 }

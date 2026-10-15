@@ -46,3 +46,62 @@ test('package.json files 与 README 覆盖全部 skill', () => {
     assert.ok(readme.includes(name), `README 未提及 ${name}`);
   }
 });
+
+// skill 目录里的所有文本文件（SKILL.md、references、scripts、模板）
+function skillFiles(name) {
+  const out = [];
+  const walk = (d) => {
+    for (const e of fs.readdirSync(d, { withFileTypes: true })) {
+      const p = path.join(d, e.name);
+      if (e.isDirectory()) walk(p);
+      else if (/\.(md|tpl|mjs|json)$/.test(e.name) && e.name !== 'skill.json') out.push(p);
+    }
+  };
+  walk(path.join(REPO, name));
+  // 声明的共享文件安装后就是本 skill 的一部分，一并检查
+  for (const f of skills.find((s) => s.name === name)?.shared ?? []) out.push(path.join(REPO, 'shared', f));
+  return out;
+}
+
+test('requires / optional 只引用存在的 skill，且 requires 无环', () => {
+  const names = new Set(meta.skills);
+  for (const s of skills) {
+    for (const d of [...s.requires, ...s.optional]) assert.ok(names.has(d) && d !== s.name, `${s.name} 依赖了不存在或自身：${d}`);
+  }
+  const byName = new Map(skills.map((s) => [s.name, s]));
+  const visit = (n, stack) => {
+    assert.ok(!stack.includes(n), `requires 有环：${[...stack, n].join(' -> ')}`);
+    for (const d of byName.get(n).requires) visit(d, [...stack, n]);
+  };
+  for (const s of skills) visit(s.name, []);
+});
+
+test('跨 skill 的文件引用必须在 requires 或 optional 中声明', () => {
+  // 形如 <other>/scripts/…、<other>/references/…、<other>/xxx.json|md|mjs 的路径引用
+  for (const s of skills) {
+    const declared = new Set([...s.requires, ...s.optional]);
+    for (const f of skillFiles(s.name)) {
+      const text = fs.readFileSync(f, 'utf8');
+      for (const other of meta.skills) {
+        if (other === s.name) continue;
+        const re = new RegExp(`(?<![\\w-])${other}/(scripts|references)/|(?<![\\w-])${other}/[\\w.-]+\\.(json|md|mjs)\\b`);
+        const m = text.match(re);
+        if (m) assert.ok(declared.has(other), `${path.relative(REPO, f)} 引用了 ${m[0]}，但 ${s.name}/skill.json 没有声明依赖 ${other}`);
+      }
+    }
+  }
+});
+
+test('requires 的依赖必须被实际使用（避免声明过时）', () => {
+  for (const s of skills) {
+    const text = skillFiles(s.name).map((f) => fs.readFileSync(f, 'utf8')).join('\n');
+    for (const d of s.requires) assert.match(text, new RegExp(`${d}/`), `${s.name} 声明了 requires ${d}，但没有引用它的任何文件`);
+  }
+});
+
+test('shared 声明的文件都存在，且每个共享文件至少被一个 skill 使用', () => {
+  const used = new Set(skills.flatMap((s) => s.shared));
+  for (const f of used) assert.ok(fs.existsSync(path.join(REPO, 'shared', f)), `shared/${f} 不存在`);
+  for (const f of fs.readdirSync(path.join(REPO, 'shared'))) assert.ok(used.has(f), `shared/${f} 没有被任何 skill 声明`);
+  for (const s of skills) for (const f of s.shared) assert.ok(!fs.existsSync(path.join(REPO, s.name, 'references', f)), `${s.name}/references/${f} 与共享文件重名`);
+});

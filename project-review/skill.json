@@ -1,8 +1,19 @@
 {
   "name": "project-review",
   "order": 3,
-  "renamedFrom": { "code-review": "^name:\\s*code-review\\s*$[\\s\\S]*?description:\\s*\"Review source code \\(" },
+  "requires": [
+    "workflow"
+  ],
+  "optional": [],
+  "renamedFrom": {
+    "code-review": "^name:\\s*code-review\\s*$[\\s\\S]*?description:\\s*\"Review source code \\("
+  },
   "templates": [
-    { "id": "checklist.md", "src": "references/checklist.md.tpl", "title": "代码审查清单", "summary": "project-review 逐项审查时使用的 10 维度检查清单。" }
+    {
+      "id": "checklist.md",
+      "src": "references/checklist.md.tpl",
+      "title": "代码审查清单",
+      "summary": "project-review 逐项审查时使用的 10 维度检查清单。"
+    }
   ]
 }
