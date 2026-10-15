@@ -17,7 +17,7 @@ $ErrorActionPreference = 'Stop'
 $OutputEncoding = [Console]::OutputEncoding
 
 $Repo   = Split-Path -Parent $PSScriptRoot
-$Skills = @('workflow','dev','code-review','database-query','md-to-wiki','create-tech-md-doc','create-release-md-doc')
+$Skills = @('workflow','dev','project-review','database-query','md-to-wiki','create-tech-md-doc','create-release-md-doc')
 $OldRev = '71a23c8'   # 单一来源之前的版本：各环境独立拷贝，画像在 dev\profile.json
 $Work   = Join-Path ([IO.Path]::GetTempPath()) ("skills-init-test-" + [Guid]::NewGuid().ToString('N').Substring(0, 8))
 New-Item -ItemType Directory -Force -Path $Work | Out-Null
@@ -137,7 +137,7 @@ function Test-FreshInstallLinks {
   foreach ($s in $Skills) { Assert-Dir ".agents\skills\$s"; Assert-File ".agents\skills\$s\SKILL.md" }
   Assert-EnvLinked '.claude\skills'
   Assert-EnvLinked '.qwen\skills'
-  Assert-Same '.agents\skills\code-review\references\checklist.md' (Join-Path $Repo 'code-review\references\checklist.md.tpl')
+  Assert-Same '.agents\skills\project-review\references\checklist.md' (Join-Path $Repo 'project-review\references\checklist.md.tpl')
   Assert-Same '.agents\skills\md-to-wiki\scripts\md_to_wiki.py' (Join-Path $Repo 'md-to-wiki\scripts\md_to_wiki.py')
   Assert-Same '.agents\skills\md-to-wiki\wiki-config.json' (Join-Path $Repo 'md-to-wiki\wiki-config.json.tpl')
   Assert-Same '.agents\skills\workflow\profile.json' (Join-Path $Repo 'workflow\profile.json.tpl')
@@ -262,11 +262,13 @@ function Test-UpgradeFromCopies {
   if ($wikiBak.Count -ne 1) { Fail "claude 的 md-to-wiki 备份数量 $($wikiBak.Count)，期望 1" }
   elseif ((Get-FileHash -LiteralPath $wikiBak[0]).Hash -ne (Get-FileHash -LiteralPath (Join-Path $Work 'upgrade-wiki.json')).Hash) { Fail '备份的 wiki-config.json 内容不符' }
   foreach ($e in 'claude', 'qwen') {
-    foreach ($s in 'dev', 'code-review', 'database-query', 'md-to-wiki', 'create-tech-md-doc', 'create-release-md-doc') {
+    foreach ($s in 'dev', 'database-query', 'md-to-wiki', 'create-tech-md-doc', 'create-release-md-doc') {
       $n = @($backups | Where-Object { Test-Path -LiteralPath (Join-Path $_.FullName "$e\$s") }).Count
       Assert-Eq $n 1 "$e\$s 的备份数量"
     }
   }
+  # code-review 已改名为 project-review：旧名的目录 / 链接全部清理，不留备份
+  foreach ($e in '.agents', '.claude', '.qwen') { Assert-Missing "$e\skills\code-review" }
 }
 
 function Test-UpgradeConflictKeepsOldDir {
@@ -282,7 +284,7 @@ function Test-UpgradeConflictKeepsOldDir {
   Assert-Dir '.claude\skills\md-to-wiki'
   Assert-Same '.claude\skills\md-to-wiki\wiki-config.json' (Join-Path $Work 'conflict-b.json')
   Assert-Same '.agents\skills\md-to-wiki\wiki-config.json' (Join-Path $Work 'conflict-a.json')
-  foreach ($s in 'workflow', 'dev', 'code-review', 'database-query', 'create-tech-md-doc', 'create-release-md-doc') {
+  foreach ($s in 'workflow', 'dev', 'project-review', 'database-query', 'create-tech-md-doc', 'create-release-md-doc') {
     Assert-Link ".claude\skills\$s" "..\..\.agents\skills\$s"
   }
   # qwen 的拷贝没填写过 wiki，不算冲突

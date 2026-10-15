@@ -1,6 +1,6 @@
 ---
 name: workflow
-description: "Entry point for this project's personal dev workflow skills. Routes a request to the right skill (dev, code-review, database-query, create-tech-md-doc, create-release-md-doc, md-to-wiki, DocNexus), owns the shared project profile (workflow/profile.json: main branch, build/test commands, config center, deploy platform) and the capability check for wiki / DocNexus / database. Use when the user invokes /workflow, asks what the workflow can do, wants to set up or update the project profile, check which integrations are configured, or hands over a multi-stage task such as 从需求到上线 / 这个需求从头到尾帮我搞定 / 现在 skills 配好了吗 / 项目画像 / workflow status. Other skills in this project read workflow/profile.json and follow the capability check defined here."
+description: "Entry point for this project's personal dev workflow skills. Routes a request to the right skill (dev, project-review, database-query, create-tech-md-doc, create-release-md-doc, md-to-wiki, DocNexus), owns the shared project profile (workflow/profile.json: main branch, build/test commands, config center, deploy platform) and the capability check for wiki / DocNexus / database. Use when the user invokes /workflow, asks what the workflow can do, wants to set up or update the project profile, check which integrations are configured, or hands over a multi-stage task such as 从需求到上线 / 这个需求从头到尾帮我搞定 / 现在 skills 配好了吗 / 项目画像 / workflow status. Other skills in this project read workflow/profile.json and follow the capability check defined here. When a request clearly belongs to a single skill, use that skill directly instead."
 ---
 
 # Workflow
@@ -21,7 +21,7 @@ description: "Entry point for this project's personal dev workflow skills. Route
 |---|---|---|
 | 开发新功能、改逻辑、加接口 | `dev` | 默认功能开发模式 |
 | 修 bug、排查报错、线上问题 | `dev --bug` | 先复现再修 |
-| 审代码、审分支、合并前检查 | `code-review` | |
+| 审代码、审分支、合并前检查 | `project-review` | |
 | 查库、跑 SQL、核对数据 | `database-query` | 只读优先 |
 | 根据分支 diff 出技术方案 | `create-tech-md-doc` | 可带 `--prd` |
 | 根据分支 diff 出上线方案 | `create-release-md-doc` | 可带 `--tech` 复用技术方案 |
@@ -49,10 +49,10 @@ dev（需求 → 方案 → 实现 → 测试 → 自审）
 
 | 字段 | 含义 | 谁在用 |
 |---|---|---|
-| `main_branch` | 主分支名，diff 基线 | dev、code-review、文档类 |
+| `main_branch` | 主分支名，diff 基线 | dev、project-review、文档类 |
 | `build` / `test` / `lint` | 构建、全量测试、静态检查命令 | dev |
 | `test_single` | 只跑一个测试的命令，`{target}` 为测试类或文件，如 `mvn -q test -Dtest={target}` | dev |
-| `config_center` | 配置中心：`nacos` / `apollo` / `spring-cloud-config` / `none`，空 = 未知 | code-review 第 10 维度、dev 配置清单、上线方案 |
+| `config_center` | 配置中心：`nacos` / `apollo` / `spring-cloud-config` / `none`，空 = 未知 | project-review 第 10 维度、dev 配置清单、上线方案 |
 | `deploy.platform` | 发布平台名称（如公司内部发布系统） | 技术 / 上线方案「上线服务」 |
 | `deploy.regions` | 可选的部署环境 / Region 列表 | 技术 / 上线方案 |
 | `job_annotation` | 定时任务注解（如 `@XxlJob`、`@Scheduled`） | 技术方案「定时任务变更」 |

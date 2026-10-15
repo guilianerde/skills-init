@@ -1,6 +1,6 @@
 ---
 name: database-query
-description: "Query the project database via SQL and report results. Use when the user asks to run SQL, query tables, look up records, count rows, check statistics, verify data, debug data issues, or explore the database schema (e.g. 帮我查库 / 跑个SQL / 查一下这个表 / 统计数据 / 看看有没有这笔记录 / query the database / run this SQL). Read config.json in this skill directory for connection details; never ask the user to retype credentials."
+description: "Query the project database via SQL and report results. Use when the user asks to run SQL, query tables, look up records, count rows, check statistics, verify data, debug data issues, or explore the database schema (e.g. 帮我查库 / 跑个SQL / 查一下这个表 / 统计数据 / 看看有没有这笔记录 / query the database / run this SQL). Read config.json in this skill directory for connection details; never ask the user to retype credentials. Not for explaining or just writing SQL the user will run elsewhere, and not for changing application code (dev)."
 ---
 
 # Database Query

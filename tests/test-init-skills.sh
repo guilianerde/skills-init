@@ -12,7 +12,7 @@
 set -u
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-SKILLS=(workflow dev code-review database-query md-to-wiki create-tech-md-doc create-release-md-doc)
+SKILLS=(workflow dev project-review database-query md-to-wiki create-tech-md-doc create-release-md-doc)
 OLD_REV=71a23c8   # 单一来源之前的版本：各环境独立拷贝，画像在 dev/profile.json
 FILTER="${1:-}"
 WORK="$(mktemp -d "${TMPDIR:-/tmp}/skills-init-test.XXXXXX")"
@@ -92,7 +92,7 @@ test_fresh_install_links() {
   done
   all_linked .claude/skills
   all_linked .qwen/skills
-  assert_same .agents/skills/code-review/references/checklist.md "$REPO/code-review/references/checklist.md.tpl"
+  assert_same .agents/skills/project-review/references/checklist.md "$REPO/project-review/references/checklist.md.tpl"
   assert_same .agents/skills/md-to-wiki/scripts/md_to_wiki.py "$REPO/md-to-wiki/scripts/md_to_wiki.py"
   assert_same .agents/skills/md-to-wiki/wiki-config.json "$REPO/md-to-wiki/wiki-config.json.tpl"
   assert_same .agents/skills/workflow/profile.json "$REPO/workflow/profile.json.tpl"
@@ -190,11 +190,13 @@ test_upgrade_from_copies() {
   if [[ -z "$b" ]]; then fail "缺少 claude 的 md-to-wiki 备份"; else assert_same "$b/wiki-config.json" "$WORK/upgrade-wiki.json"; fi
   local s e n
   for e in claude qwen; do
-    for s in dev code-review database-query md-to-wiki create-tech-md-doc create-release-md-doc; do
+    for s in dev database-query md-to-wiki create-tech-md-doc create-release-md-doc; do
       n="$(cd "$P" && ls -d tmp/skills/backup/*/$e/$s 2>/dev/null | wc -l | tr -d ' ')"
       assert_eq "$n" 1 "$e/$s 的备份数量"
     done
   done
+  # code-review 已改名为 project-review：旧名的目录 / 链接全部清理，不留备份
+  for e in .agents .claude .qwen; do assert_missing "$e/skills/code-review"; done
 }
 
 test_upgrade_conflict_keeps_old_dir() {
@@ -213,7 +215,7 @@ test_upgrade_conflict_keeps_old_dir() {
   [[ -z "$(cd "$P" && ls -d tmp/skills/backup/*/claude/md-to-wiki 2>/dev/null)" ]] || fail "冲突的旧目录不应被备份移走"
   # 其余 skill 照常建链接；qwen 的拷贝没填写过 wiki，不算冲突
   local s
-  for s in workflow dev code-review database-query create-tech-md-doc create-release-md-doc; do
+  for s in workflow dev project-review database-query create-tech-md-doc create-release-md-doc; do
     assert_link ".claude/skills/$s" "../../.agents/skills/$s"
   done
   all_linked .qwen/skills

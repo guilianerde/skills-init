@@ -1,6 +1,6 @@
 ---
 name: dev
-description: "Implement a feature or fix a bug in this project end to end: understand the requirement, study existing code, plan at the right size, implement in small verified steps, run tests, self-review the diff with code-review, and deliver a summary with config/SQL checklists. Use when the user asks to develop, implement, add, change or fix something in the codebase, or invokes /dev <需求> or /dev --bug <现象>. Trigger phrases: 帮我开发 / 实现这个需求 / 加个接口 / 改一下这个逻辑 / 修这个 bug / 排查并修复 / 线上报错了帮我修 / implement this feature / fix this bug. Not for pure code review (code-review), SQL lookups (database-query) or doc generation (create-tech-md-doc / create-release-md-doc)."
+description: "Implement a feature or fix a bug in this project end to end: understand the requirement, study existing code, plan at the right size, implement in small verified steps, run tests, self-review the diff with project-review, and deliver a summary with config/SQL checklists. Use when the user asks to develop, implement, add, change or fix something in the codebase, or invokes /dev <需求> or /dev --bug <现象>. Trigger phrases: 帮我开发 / 实现这个需求 / 加个接口 / 改一下这个逻辑 / 修这个 bug / 排查并修复 / 线上报错了帮我修 / implement this feature / fix this bug. Not for pure code review (project-review), SQL lookups (database-query) or doc generation (create-tech-md-doc / create-release-md-doc)."
 ---
 
 # Dev
@@ -12,7 +12,7 @@ description: "Implement a feature or fix a bug in this project end to end: under
 | 需求背景 | `md-to-wiki` 的 wiki 连接（读 PRD） | 只用对话中的需求描述 |
 | 项目约定 / 历史决策 | DocNexus（`docnexus-recall` skill） | 读 `CLAUDE.md` / `AGENTS.md` 与代码 |
 | 数据核对 | `database-query`（只读） | 给出 SQL 让用户执行 |
-| 自审 | `code-review` | 按其 `references/checklist.md` 手动过 |
+| 自审 | `project-review` | 按其 `references/checklist.md` 手动过 |
 | 交付文档 | `create-tech-md-doc` / `create-release-md-doc` | 只在对话中汇总 |
 
 ## Command Format
@@ -37,7 +37,7 @@ description: "Implement a feature or fix a bug in this project end to end: under
 
 ### F1 — 理解需求
 
-- 需求来源是 PRD pageId/URL 且 wiki 可用 → 按 `create-tech-md-doc` Step 0.5 的方式拉取并提炼；wiki 不可用 → 请用户贴出关键内容。
+- 需求来源是 PRD pageId/URL 且 wiki 可用 → 按 `create-tech-md-doc/references/prd.md` 的方式拉取并提炼；wiki 不可用 → 请用户贴出关键内容。
 - DocNexus 可用 → 按 `docnexus-recall` 用需求里的业务名词 `search` / `recall`，找相关约定与历史决策，引用 `docnexus/library/<path>`。
 - 输出 **需求要点 + 验收标准**（可验证的行为，而不是实现手段）。
 - 存在歧义（边界、异常分支、兼容性、权限）→ **一次性**列出问题问用户，不要边做边问，也不要自行假设后继续。
@@ -53,16 +53,16 @@ description: "Implement a feature or fix a bug in this project end to end: under
 | 规模 | 判定 | 做法 |
 |---|---|---|
 | **S** | ≤3 个文件，无接口签名 / 表结构 / 配置项变更 | 在对话中列改动步骤，直接开始 |
-| **M** | 新增或修改接口、配置项、少量表字段 | 在对话中给出简要方案（用 `references/plan-template.md` 的精简版），**等用户确认后再写代码** |
-| **L** | 新模块、跨服务、表结构较大变更、数据迁移 | 按 `references/plan-template.md` 写方案文档落盘（见 Artifact Location），用户确认后再写代码；完成后建议用 `create-tech-md-doc` 生成正式技术方案 |
+| **M** | 新增或修改接口、配置项、少量表字段 | 在对话中给出简要方案（方案模板的精简版），**等用户确认后再写代码** |
+| **L** | 新模块、跨服务、表结构较大变更、数据迁移 | 按方案模板写方案文档落盘（见 Artifact Location），用户确认后再写代码；完成后建议用 `create-tech-md-doc` 生成正式技术方案 |
 
-规模拿不准时按大一级处理。
+规模拿不准时按大一级处理。方案模板：项目中存在 `docs/skills/templates/dev/plan-template.md` 时用它，否则用本 skill 的 `references/plan-template.md`。
 
 ### F4 — 实现
 
 - **小步推进**：每完成一个可编译的单元，就运行 `profile.build`（没有则用对应构建工具的编译命令）确认通过，再进入下一步。
 - **贴合现有代码**：沿用参照实现的写法；不顺手重构、不改无关代码、不升级依赖。看到范围外的问题记进交付说明，不在本次修。
-- **配置**：新增配置项记入配置清单（key、位置、用途、建议默认值、上线前需下发的环境），按 `profile.config_center` 与 `code-review/references/checklist.md` 第 10 维度处理。
+- **配置**：新增配置项记入配置清单（key、位置、用途、建议默认值、上线前需下发的环境），按 `profile.config_center` 与 `project-review/references/checklist.md` 第 10 维度处理。
 - **数据库变更**：DDL / 数据修正写成 SQL 脚本放进项目约定的目录（没有约定则放进交付说明），**不在任何环境直接执行**。
 - **敏感信息**：不硬编码密钥、密码、内网地址；日志不打印敏感字段。
 
@@ -74,13 +74,13 @@ description: "Implement a feature or fix a bug in this project end to end: under
 
 ### F6 — 自审
 
-- 按 `code-review` skill 审本次改动：分支已有提交时用 `git diff <main_branch>...HEAD`，再加上 `git diff HEAD` 的未提交部分。
+- 按 `project-review` skill 审本次改动：分支已有提交时用 `git diff <main_branch>...HEAD`，再加上 `git diff HEAD` 的未提交部分。
 - CRITICAL / HIGH 必须修掉后重新跑 F5；MEDIUM / LOW 修掉或写进交付说明。
-- 自审结论放进交付说明即可，不单独落盘审查报告（用户要求时再按 code-review 的产物规范落盘）。
+- 自审结论放进交付说明即可，不单独落盘审查报告（用户要求时再按 project-review 的产物规范落盘）。
 
 ### F7 — 交付
 
-按下方「交付模板」输出，然后**询问**下一步，不要自行执行：
+按 `references/delivery-template.md` 输出交付说明（小改动可压缩成「改动 + 验证 + 下一步」，但验证结果必须如实），然后**询问**下一步，不要自行执行：
 
 - 提交：给出建议的 commit message，用户同意后再 `git commit`；**不 push**，除非用户明确要求。
 - 文档：M / L 规模建议 `create-tech-md-doc`；要上线时建议 `create-release-md-doc`。
@@ -120,45 +120,6 @@ description: "Implement a feature or fix a bug in this project end to end: under
 - 不安装新依赖；确实需要时说明理由，等用户同意。
 - 每个关于现有代码的结论都指向真实文件和行号；读不到的内容如实说明。
 - 用户中途改变需求 → 回到 F1 更新验收标准，再继续。
-
-## 交付模板
-
-```
-# 开发交付 — <需求或缺陷简述>
-
-## 结果
-<一两句话：做成了什么；有无未完成项>
-
-## 改动
-| 文件 | 改动说明 |
-|---|---|
-
-## 验证
-- 构建：<命令> → <通过 / 失败 / 未运行（原因）>
-- 测试：<命令> → <通过 n 个 / 失败 / 未运行（原因）>；新增测试：<列表>
-- 未验证项：<需要用户在什么环境怎么验证>
-
-## 根因（仅缺陷修复）
-<证据链：现象 → 出错位置 → 原因>
-
-## 配置清单
-| key | 位置 | 用途 | 建议默认值 | 需下发环境 |
-|---|---|---|---|---|
-
-## SQL 脚本（未执行）
-<文件路径或脚本内容；无则写「无」>
-
-## 自审
-<code-review 结论摘要；遗留的 MEDIUM / LOW>
-
-## 范围外发现
-<顺带看到但本次未处理的问题>
-
-## 建议下一步
-<commit message 建议 / 文档 / DocNexus 沉淀>
-```
-
-> 小改动可以压缩成「改动 + 验证 + 下一步」三段；但验证结果必须如实。
 
 ## Artifact Location
 

@@ -1,6 +1,6 @@
 # skills-init — 项目级 Agent Skills 一键初始化
 
-把 **workflow（入口路由 + 共用项目画像）**、**dev（功能开发 / 缺陷修复编排）**、**database-query（数据库查询）**、**code-review（代码审查）**、**md-to-wiki（发布文档到**
+把 **workflow（入口路由 + 共用项目画像）**、**dev（功能开发 / 缺陷修复编排）**、**database-query（数据库查询）**、**project-review（代码审查）**、**md-to-wiki（发布文档到**
 
 **Confluence）**、**create-tech-md-doc /create-release-md-doc（从 git diff 生成技术 / 上线方案）**
 
@@ -21,17 +21,19 @@
 
 ## 快速开始
 
-
+需要 **Node.js >= 18**（接入 DocNexus 时需 >= 22.13）。安装逻辑只有一份实现 `bin/skills-init.mjs`，两个脚本只是薄封装：
 
 ```
-# Windows（PowerShell，项目根目录执行）
-.\skills-init\init-skills.ps1
+# 仓库放在 <项目根>/skills-init/ 时，在项目根执行
+./skills-init/init-skills.sh          # macOS / Linux / Git Bash / WSL
+.\skills-init\init-skills.ps1         # Windows PowerShell
+node skills-init/bin/skills-init.mjs --project-root .   # 直接调用，等价
 
-# macOS / Linux / Git Bash / WSL
-./skills-init/init-skills.sh
+# 发布到 npm 后（package.json 目前为 private，尚未发布），可在任意项目根执行
+npx @rowansenne/skills-init
 ```
 
-按提示：选择环境（编号多选，回车 = 全部）→ 确认 / 填写数据库连接 → 自动生成。
+按提示：选择环境（编号多选，回车 = 全部）→ 确认 / 填写数据库连接 → 自动生成。装完后在 agent 里运行 `/workflow profile` 填写项目画像。
 
 非交互示例：
 
@@ -39,7 +41,7 @@
 
 ```
 .\skills-init\init-skills.ps1 -Envs codex,claude,doubao,qwen -Yes   # 用现有配置，装全部环境
-.\skills-init\init-skills.ps1 -Envs all -Yes -SkipDb                 # 跳过数据库，只装 code-review 等
+.\skills-init\init-skills.ps1 -Envs all -Yes -SkipDb                 # 跳过数据库，只装 project-review 等
 ```
 
 
@@ -57,7 +59,7 @@
 
 | 环境          | 生成目录                         | 启用方式                                     |
 | ----------- | ---------------------------- | ---------------------------------------- |
-| codex       | `.agents/skills/`（**单一来源**，完整文件） | 重启 codex 自动发现；也可 `/use code-review` 手动加载 |
+| codex       | `.agents/skills/`（**单一来源**，完整文件） | 重启 codex 自动发现；也可 `/use project-review` 手动加载 |
 | claude-code | `.claude/skills/<skill>` → 软链接到 `.agents/skills/<skill>` | Claude Code 自动发现，无需额外配置                  |
 | doubao      | `.agents/skills/`（与 codex 共用）   | 豆包办公自动发现（新会话生效）                          |
 | qwen        | `.qwen/skills/<skill>` → 软链接到 `.agents/skills/<skill>` | Qwen Code 自动发现；`/skills` 面板可查看与切换        |
@@ -82,7 +84,7 @@
 ├── workflow/                         # 入口：路由到各 skill、能力探测、维护共用项目画像
 │   ├── SKILL.md
 │   └── profile.json                  # 项目画像：主分支、构建 / 测试命令、配置中心、发布平台等（无凭据，可提交；重跑不覆盖）
-├── code-review/                      # 代码审查
+├── project-review/                      # 代码审查
 │   ├── SKILL.md                      # 触发描述 + 审查工作流 + 输出模板
 │   └── references/checklist.md       # 10 维度审查清单（配置维度按 profile.config_center 判断）
 ├── database-query/                   # 数据库查询
@@ -131,9 +133,9 @@
 
 | 字段 | 影响 |
 | --- | --- |
-| `main_branch` | dev、code-review、文档类的 diff 基线 |
+| `main_branch` | dev、project-review、文档类的 diff 基线 |
 | `build` / `test` / `test_single` / `lint` | dev 的编译与测试 |
-| `config_center` | code-review 第 10 维度（配置中心下发的 key 不算缺失）、dev 配置清单、上线方案的上线顺序与配置回滚 |
+| `config_center` | project-review 第 10 维度（配置中心下发的 key 不算缺失）、dev 配置清单、上线方案的上线顺序与配置回滚 |
 | `deploy` | 技术 / 上线方案「上线服务」的服务名与环境说明 |
 | `job_annotation` | 技术方案「定时任务变更」识别任务类 |
 | `data_review` | 是否输出技术方案模块 7 与上线方案 2.3 的库表评审块 |
@@ -147,7 +149,7 @@
 /dev --bug <现象 | 报错 | 日志>       # 缺陷修复
 ```
 
-* **功能开发**：理解需求（可读 PRD、查 DocNexus 历史决策）→ 调研现有代码 → 按规模出方案（S 直接做；M 对话内方案待确认；L 落盘方案文档待确认）→ 小步实现并编译 → 补测试并运行 → 用 code-review 自审 → 输出交付说明（改动、验证结果、配置清单、未执行的 SQL）。
+* **功能开发**：理解需求（可读 PRD、查 DocNexus 历史决策）→ 调研现有代码 → 按规模出方案（S 直接做；M 对话内方案待确认；L 落盘方案文档待确认）→ 小步实现并编译 → 补测试并运行 → 用 project-review 自审 → 输出交付说明（改动、验证结果、配置清单、未执行的 SQL）。
 * **缺陷修复**：收集现象 → 用失败测试复现 → 用证据定位根因 → 最小修复让测试转绿 → 自审 → 交付（必须写明根因）。
 * 守则：不写库、不改凭据、不擅自 commit / push、不装新依赖；测试没跑就写「未验证」。
 * 其他 skill 都是可选增强：wiki、DocNexus、数据库没配置时自动跳过，并在交付说明中注明。
@@ -163,6 +165,8 @@
 | `-WithDocNexus` / `--with-docnexus` | 可选：接入 [DocNexus](https://www.npmjs.com/package/@rowansenne/docnexus) 项目文档库（需 Node >= 22.13），见下方「DocNexus 文档库（可选）」 |
 | `-Copy` / `--copy`      | 不建软链接，各环境独立拷贝一份完整 skills                                  |
 | `-Yes` / `--yes`        | 非交互：自动使用已有数据库配置（依次查找 `.codex/database-query/config.json` 与各环境已安装的 `database-query/config.json`）；都没有且未 `-SkipDb` 时报错退出 |
+| `--project-root`        | 项目根目录；直接调用 `bin/skills-init.mjs` 时默认当前目录，两个封装脚本自动传上级目录 |
+| `-v` / `--version`      | 显示版本                                                                |
 | `-h` / `--help`         | 帮助                                                                    |
 
 ## DocNexus 文档库（可选）
@@ -188,7 +192,7 @@
 * DocNexus 的 skills 不在本仓库中，始终以安装的 npm 包为准；重跑脚本会按包版本重新同步与链接（`docnexus init` 可重复执行，不影响已有记忆）。
 * `.qwen/skills/` 下已存在的同名**真实目录**不会被替换，脚本会提示跳过。
 * npm 安装或 `docnexus init` 失败时只跳过 DocNexus，本仓库的 skills 照常安装，脚本最后以退出码 1 结束；修好后重跑即可。
-* 安装后 `dev`、`code-review` 会先按 `docnexus-recall` 查项目约定；`dev`、`create-tech-md-doc`、`create-release-md-doc` 结束时只会**提议**沉淀，**任何写入 DocNexus 的操作都必须经你授权**。
+* 安装后 `dev`、`project-review` 会先按 `docnexus-recall` 查项目约定；`dev`、`create-tech-md-doc`、`create-release-md-doc` 结束时只会**提议**沉淀，**任何写入 DocNexus 的操作都必须经你授权**。
 * 离线或测试时可用环境变量指定安装来源，例如 `DOCNEXUS_PKG=/path/to/rowansenne-docnexus-0.13.0.tgz ./skills-init/init-skills.sh --with-docnexus`（PowerShell：`$env:DOCNEXUS_PKG=...`）。
 * Windows 上 qwen 的链接使用目录 junction（与 docnexus 的做法一致）；Git Bash 下 `ln -s` 是否生成真正的链接取决于 MSYS 设置，建议 Windows 用 PowerShell 版。
 
@@ -200,7 +204,9 @@
 * 用户填过的 `md-to-wiki/wiki-config.json`、`database-query/references/schema.md`、`workflow/profile.json` **保留不覆盖**；
 * `database-query/config.json` 只在本次确认或填写了数据库配置时写入；`--skip-db` 时保留已有文件；
 * `.gitignore` 规则无论是否配置数据库都会补齐（只追加缺失的行）；
-* `init-skills.sh` 兼容 macOS 自带的 bash 3.2。
+* 安装器按 skill 目录自动发现文件（`*.tpl` 去掉后缀），新增 `references/` 文件不需要改安装器。
+* `code-review` 已改名为 `project-review`（避免与 Claude Code 内置的 `/code-review` 撞名）：重跑时自动移除旧名的目录和链接；只删能确认是本项目装的那份，你自己的同名 skill 不动。
+* 设置环境变量 `SKILLS_INIT_NO_SYMLINK=1` 可强制不建软链接（各环境独立拷贝）；无法建链接时会先探测，旧目录原样保留、只更新模板。
 
 ## 测试
 
@@ -273,7 +279,7 @@ CI（`.github/workflows/test.yml`）在 push 到 main 和每个 PR 上运行：m
 
 | 技能                    | 产物         | 规范路径                                                               |
 | --------------------- | ---------- | ------------------------------------------------------------------ |
-| code-review           | 审查报告（md）   | `docs/skills/code-review/review-<范围>-<YYYYMMDD>.md`                |
+| project-review           | 审查报告（md）   | `docs/skills/project-review/review-<范围>-<YYYYMMDD>.md`                |
 | create-tech-md-doc    | 技术方案（md）   | `docs/skills/create-tech-md-doc/tech-doc_<分支>_<YYYYMMDD>.md`       |
 | create-release-md-doc | 上线方案（md）   | `docs/skills/create-release-md-doc/release-doc_<分支>_<YYYYMMDD>.md` |
 | database-query        | 查询结果       | 默认对话输出；导出时 `tmp/skills/database-query/result-<时间戳>.csv`            |
@@ -302,29 +308,35 @@ CI（`.github/workflows/test.yml`）在 push 到 main 和每个 PR 上运行：m
 
 ```
 skills-init/
-├── init-skills.ps1                    # Windows 初始化命令
-├── init-skills.sh                     # bash 初始化命令（macOS/Linux/Git Bash）
+├── bin/skills-init.mjs                # 安装器（唯一实现，Node >= 18）
+├── init-skills.sh / init-skills.ps1   # 薄封装：以上级目录为项目根调用安装器
+├── package.json                       # npm 包信息（bin: skills-init）
+├── evals/trigger-cases.json           # 多 skill 分流评估用例
+├── scripts/eval-triggers.mjs          # 分流评估脚本
 ├── README.md                          # 本说明
 ├── database-query/
 │   ├── SKILL.md.tpl
 │   ├── config.json.tpl
 │   └── references/schema.md.tpl
-├── code-review/
+├── project-review/
 │   ├── SKILL.md.tpl
 │   └── references/checklist.md.tpl
 ├── md-to-wiki/
 │   ├── SKILL.md.tpl
 │   ├── wiki-config.json.tpl
-│   └── scripts/md_to_wiki.py          # 纯拷贝（无占位符）
+│   ├── references/                    # upload.md（上传通道）、troubleshooting.md（脚本与排错）
+│   └── scripts/md_to_wiki.py
 ├── create-tech-md-doc/
 │   ├── SKILL.md.tpl
-│   └── template.md                    # 8 模块文档模板（纯拷贝）
+│   ├── references/                    # diff-collection.md（分层采集）、prd.md（PRD 拉取）
+│   └── template.md                    # 8 模块文档模板
 ├── create-release-md-doc/
 │   ├── SKILL.md.tpl
-│   └── template.md                    # 6 模块文档模板（纯拷贝）
+│   ├── references/                    # diff-collection.md、prd.md
+│   └── template.md                    # 6 模块文档模板
 ├── dev/
 │   ├── SKILL.md.tpl
-│   └── references/plan-template.md    # 方案模板（纯拷贝）
+│   └── references/                    # plan-template.md（方案模板）、delivery-template.md（交付模板）
 └── workflow/
     ├── SKILL.md.tpl
     └── profile.json.tpl               # 空画像，首次使用时由 agent 推断并经确认后填写
@@ -340,9 +352,33 @@ skills-init/
 
   `<env-dir>/database-query/references/schema.md`，能显著提升查库效率。
 
-* 技术 / 上线方案的 `template.md` 是团队 Confluence 模板的结构（8 / 6 模块），项目字段按 profile 填充；
+* SKILL.md 只保留主流程，细节放在各自的 `references/`，agent 需要时再读，减少每次触发占用的上下文。
 
-  结构本身不适用时直接修改 `template.md`。
+### 按项目覆盖模板（不改 skills-init）
+
+在项目里放同名文件即可覆盖默认模板，skill 会优先使用：
+
+| 覆盖文件 | 替代 |
+| --- | --- |
+| `docs/skills/templates/create-tech-md-doc/template.md` | 技术方案模板 |
+| `docs/skills/templates/create-release-md-doc/template.md` | 上线方案模板 |
+| `docs/skills/templates/dev/plan-template.md` | dev 的方案模板 |
+| `docs/skills/templates/project-review/checklist.md` | 审查清单 |
+
+这样换团队、换文档格式时只改项目里的文件，重跑 init 也不会被覆盖。
+
+## 触发准确度评估
+
+7 个 skill 的描述有交叉（如「修 bug」该走 dev 而不是 project-review），`evals/trigger-cases.json` 收录了 26 条真实口吻的请求及期望的 skill（含不该触发任何 skill 的近似请求）。评估方法：在临时项目里装好全部 skill，用 `claude -p` 逐条发送，取第一个被调用的工具判断分流结果：
+
+```
+npm run eval:triggers                       # 全量，每条 1 次
+node scripts/eval-triggers.mjs --runs 3     # 每条 3 次，看稳定性
+node scripts/eval-triggers.mjs --only dev   # 只跑期望为 dev 的用例
+```
+
+* 需要已登录的 `claude` CLI（终端执行 `claude` 后 `/login`）；每条请求会真实调用一次模型并计费，检测到第一个工具调用即终止，不会执行任何工具。
+* 结果明细写到 `tmp/evals/`。改了任何 skill 的 description 后建议重跑一次。
 
 ## 为什么这些路径
 

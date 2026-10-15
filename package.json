@@ -1,0 +1,30 @@
+{
+  "name": "@rowansenne/skills-init",
+  "version": "0.2.0",
+  "description": "项目级 Agent Skills 一键初始化：workflow / dev / project-review / database-query / md-to-wiki / 技术与上线方案生成",
+  "type": "module",
+  "license": "MIT",
+  "private": true,
+  "engines": {
+    "node": ">=18"
+  },
+  "bin": {
+    "skills-init": "bin/skills-init.mjs"
+  },
+  "files": [
+    "bin",
+    "workflow",
+    "dev",
+    "project-review",
+    "database-query",
+    "md-to-wiki",
+    "create-tech-md-doc",
+    "create-release-md-doc",
+    "init-skills.sh",
+    "init-skills.ps1",
+    "README.md"
+  ],
+  "scripts": {
+    "eval:triggers": "node scripts/eval-triggers.mjs"
+  }
+}
