@@ -104,8 +104,12 @@ npx @rowansenne/skills-init doctor
 │   ├── scripts/resolve.mjs           # 模板来源 / 画像 / 能力探测的判定脚本
 │   └── profile.json                  # 项目画像：主分支、构建 / 测试命令、配置中心、发布平台等（无凭据，可提交；重跑不覆盖）
 ├── project-review/                      # 代码审查
-│   ├── SKILL.md                      # 触发描述 + 审查工作流 + 输出模板
-│   └── references/checklist.md       # 10 维度审查清单（配置维度按 profile.config_center 判断）
+│   ├── SKILL.md                      # 触发描述 + 审查工作流（含大改动分批、发现复核）
+│   └── references/
+│       ├── checklist.md              # 10 维度审查清单（配置维度按 profile.config_center 判断）
+│       ├── report.md                 # 审查报告模板（触发条件、复核列、审查方式元信息；lint-doc 据此自检）
+│       ├── diff-strategy.md          # 读 diff 的策略：按规模全量 / 按风险分批，未提交改动
+│       └── diff-collection-common.md # 与文档类共用的分层过滤规则
 ├── database-query/                   # 数据库查询
 │   ├── SKILL.md                      # 触发描述 + 查询工作流 + 只读/安全规则
 │   ├── config.json                   # 数据库连接（init 生成，已加入 .gitignore）
@@ -457,7 +461,7 @@ skills-init/
 │   └── references/                    # plan-template.md（方案模板）、delivery-template.md（交付模板）
 ├── project-review/
 │   ├── SKILL.md.tpl · skill.json
-│   └── references/checklist.md.tpl
+│   └── references/                    # checklist.md.tpl、report.md.tpl（报告模板）、diff-strategy.md
 ├── database-query/
 │   ├── SKILL.md.tpl · skill.json
 │   ├── scripts/query.mjs              # 只读查询执行与表结构导出
@@ -502,6 +506,7 @@ skills-init/
 | create-release-md-doc | `template.md` | 上线方案模板 |
 | dev | `plan-template.md` | 开发方案模板 |
 | project-review | `checklist.md` | 审查清单 |
+| project-review | `report.md` | 审查报告模板 |
 
 **模板导入 DocNexus**：
 

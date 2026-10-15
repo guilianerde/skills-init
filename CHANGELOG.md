@@ -4,6 +4,15 @@
 
 ## [Unreleased]
 
+### 变更
+- project-review 审查流程：
+  - 大改动不再逐个文件扫一眼：新增 `references/diff-strategy.md`，按规模决定全量精读还是按风险分批（P0 资金 / 事务 / 权限 / SQL / 对外接口 / MQ / 配置优先），没精读的文件写进报告「未覆盖与待确认」；也写明了未提交改动怎么审。与文档类共用 `diff-collection-common.md` 的分层与排除规则。
+  - 新增交付前的「复核」步骤：CRITICAL / HIGH 逐条回到代码确认片段与行号、写出触发条件、排查别处是否已兜住、确认是本次改动引入的；复核不了的降级并标「⚠ 待确认」，不计入「不建议合并」的结论。
+
+### 新增
+- 审查报告模板 `project-review/references/report.md`（`resolve.mjs template project-review report.md`）：元信息三行（审查范围、对比分支、审查方式）、问题表带「触发条件」与「复核」列、「未覆盖与待确认」必填。落盘后跑 `lint-doc.mjs --skill project-review --facts` 自检，和文档类 skill 一样能被 DocNexus 团队模板覆盖。
+  - 已接入 DocNexus 的项目升级后运行 `skills-init seed-templates` 补导入这份模板，否则落盘报告时 skill 会停下提示缺模板。
+
 ## [0.5.0] - 2026-10-15
 
 ### 变更

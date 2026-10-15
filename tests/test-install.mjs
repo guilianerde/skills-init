@@ -366,7 +366,7 @@ test('--skills 子集：自动带上 requires 依赖；不装 database-query 时
   assert.ok(!p.exists('.agents/skills/dev'), 'upgrade 只升级装过的 skill');
   const status = JSON.parse(spawnSync(process.execPath, [p.at('.agents/skills/workflow/scripts/resolve.mjs'), 'status'], { cwd: p.P, encoding: 'utf8' }).stdout);
   assert.deepEqual(status.skills.sort(), ['md-to-wiki', 'project-review', 'workflow']);
-  assert.deepEqual(status.templates.map((t) => t.skill), ['project-review']);
+  assert.deepEqual(status.templates.map((t) => t.skill), ['project-review', 'project-review']);
   r = p.install(['--envs', 'claude', '--yes', '--skip-db', '--skills', 'nope']);
   assert.equal(r.status, 1); assert.match(r.log, /未知的 skill：nope/);
 });

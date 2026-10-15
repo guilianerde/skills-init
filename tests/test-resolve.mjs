@@ -77,7 +77,7 @@ test('画像空字段与能力探测不输出凭据', () => {
   assert.equal(s.profile.ok, true);
   assert.equal(s.wiki.ok, false);
   assert.equal(s.docnexus.ok, false);
-  assert.equal(s.templates.length, 4);
+  assert.equal(s.templates.length, 5);
   fs.rmSync(root, { recursive: true, force: true });
 });
 

@@ -61,7 +61,22 @@ test('CLI：自带模板生成的骨架报错；已接入 DocNexus 时改用知�
   const out = JSON.parse(r.stdout);
   assert.equal(out.source, 'default');
   assert.ok(out.errors.some((e) => e.includes('模板来源')));
-  assert.equal(cli('raw.md', '--skill', 'project-review').status, 3);
+  assert.equal(cli('raw.md', '--skill', 'database-query').status, 3, '没有带 lint 的模板');
+  // 审查报告：原样的模板报占位符；按模板写完的报告通过，缺元信息行与必填章节报错
+  fs.copyFileSync(path.join(REPO, 'project-review/references/report.md.tpl'), path.join(root, 'review-raw.md'));
+  r = cli('review-raw.md', '--skill', 'project-review', '--json');
+  assert.equal(r.status, 1);
+  assert.equal(JSON.parse(r.stdout).template, '.agents/skills/project-review/references/report.md');
+  const review = ['# 代码审查报告 — feature-x', '> 审查范围：分支对比 ｜ 日期：2026-10-15', '> 对比分支：`feature-x` ←→ `main`', '> 审查方式：全量精读 ｜ 清单来源：skill 默认',
+    '## 结论摘要', '可合并。', '## 严重问题（CRITICAL / HIGH）', '无', '## 一般问题（MEDIUM）', '无', '## 优化建议（LOW）', '无', '## 影响面', '无', '## 未覆盖与待确认', '无', ''].join('\n');
+  fs.writeFileSync(path.join(root, 'review.md'), review);
+  r = cli('review.md', '--skill', 'project-review');
+  assert.equal(r.status, 0, r.stdout);
+  fs.writeFileSync(path.join(root, 'review.md'), review.replace(/> 审查方式.*\n/, '').replace('## 未覆盖与待确认\n无\n', ''));
+  r = cli('review.md', '--skill', 'project-review', '--json');
+  assert.equal(r.status, 1);
+  const errs = JSON.parse(r.stdout).errors;
+  assert.ok(errs.some((e) => e.includes('审查方式')) && errs.some((e) => e.includes('未覆盖与待确认')), errs.join('\n'));
   fs.mkdirSync(path.join(root, 'docnexus/library/templates/create-tech-md-doc'), { recursive: true });
   fs.mkdirSync(path.join(root, 'node_modules/.bin'), { recursive: true });
   for (const f of ['docnexus/project.json', 'node_modules/.bin/docnexus', 'node_modules/.bin/docnexus.cmd']) fs.writeFileSync(path.join(root, f), '{}');

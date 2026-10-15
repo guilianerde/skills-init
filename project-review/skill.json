@@ -14,7 +14,23 @@
       "src": "references/checklist.md.tpl",
       "title": "代码审查清单",
       "summary": "project-review 逐项审查时使用的 10 维度检查清单。"
+    },
+    {
+      "id": "report.md",
+      "src": "references/report.md.tpl",
+      "title": "代码审查报告模板",
+      "summary": "project-review 落盘审查报告时使用的 Markdown 模板（含复核列与审查方式元信息）。",
+      "lint": {
+        "requiredMeta": [
+          "审查范围",
+          "对比分支",
+          "审查方式"
+        ]
+      }
     }
+  ],
+  "shared": [
+    "diff-collection-common.md"
   ],
   "docnexus": {
     "category": "code-review",
