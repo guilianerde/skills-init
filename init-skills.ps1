@@ -1,5 +1,5 @@
 ﻿# =====================================================================
-# init-skills.ps1 — 项目级 Agent Skills 一键初始化（database-query + code-review）
+# init-skills.ps1 — 项目级 Agent Skills 一键初始化（dev / code-review / database-query / 文档类）
 #
 # 支持环境：codex / claude-code / doubao / qwen
 #   安装路径（均为项目级，团队共享）：
@@ -16,7 +16,7 @@
 # 模板目录：skills-init\（database-query / code-review 两个 skill 的 .tpl 源文件）
 #
 # 重跑安全：SKILL.md / references 模板会更新；用户已填写的 wiki-config.json、
-#           schema.md 保留不覆盖；database-query/config.json 仅在本次提供了数据库配置时写入。
+#           schema.md、dev/profile.json 保留不覆盖；database-query/config.json 仅在本次提供了数据库配置时写入。
 # =====================================================================
 
 param(
@@ -191,6 +191,14 @@ function Install-Skills([string]$targetBase, $dbConfig) {
   Copy-TplFile 'create-tech-md-doc\template.md'              "$targetBase\create-tech-md-doc\template.md"
   Render-Template 'create-release-md-doc\SKILL.md.tpl'       "$targetBase\create-release-md-doc\SKILL.md" @{}
   Copy-TplFile 'create-release-md-doc\template.md'           "$targetBase\create-release-md-doc\template.md"
+  # ---- dev（开发 / 修 bug 编排；profile.json 记录项目构建与测试命令，可提交，重跑不覆盖）
+  Render-Template 'dev\SKILL.md.tpl'                         "$targetBase\dev\SKILL.md" @{}
+  Copy-TplFile 'dev\references\plan-template.md'             "$targetBase\dev\references\plan-template.md"
+  if (Test-Path -LiteralPath "$targetBase\dev\profile.json") {
+    Write-Ok "$targetBase\dev\profile.json 已存在，保留不覆盖"
+  } else {
+    Copy-TplFile 'dev\profile.json.tpl'                       "$targetBase\dev\profile.json"
+  }
 }
 
 # ------------------------------------------------- 4. .gitignore 保护

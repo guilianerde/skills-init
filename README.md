@@ -1,6 +1,6 @@
 # skills-init — 项目级 Agent Skills 一键初始化
 
-把 **database-query（数据库查询）**、**code-review（代码审查）**、**md-to-wiki（发布文档到**
+把 **dev（功能开发 / 缺陷修复编排）**、**database-query（数据库查询）**、**code-review（代码审查）**、**md-to-wiki（发布文档到**
 
 **Confluence）**、**create-tech-md-doc /create-release-md-doc（从 git diff 生成技术 / 上线方案）**
 
@@ -84,10 +84,26 @@
 ├── create-tech-md-doc/               # 从分支 diff 生成技术方案 md（8 模块）
 │   ├── SKILL.md
 │   └── template.md
-└── create-release-md-doc/            # 从分支 diff 生成上线方案 md（6 模块）
+├── create-release-md-doc/            # 从分支 diff 生成上线方案 md（6 模块）
+│   ├── SKILL.md
+│   └── template.md
+└── dev/                              # 开发 / 修 bug：需求→调研→方案→实现→测试→自审→交付
     ├── SKILL.md
-    └── template.md
+    ├── profile.json                  # 主分支、构建 / 测试 / lint 命令（无凭据，可提交；重跑不覆盖）
+    └── references/plan-template.md   # M / L 规模方案模板
 ```
+
+## dev：开发与修 bug
+
+```
+/dev <需求描述 | PRD pageId/url>     # 功能开发
+/dev --bug <现象 | 报错 | 日志>       # 缺陷修复
+```
+
+* **功能开发**：理解需求（可读 PRD、查 DocNexus 历史决策）→ 调研现有代码 → 按规模出方案（S 直接做；M 对话内方案待确认；L 落盘方案文档待确认）→ 小步实现并编译 → 补测试并运行 → 用 code-review 自审 → 输出交付说明（改动、验证结果、配置清单、未执行的 SQL）。
+* **缺陷修复**：收集现象 → 用失败测试复现 → 用证据定位根因 → 最小修复让测试转绿 → 自审 → 交付（必须写明根因）。
+* 守则：不写库、不改凭据、不擅自 commit / push、不装新依赖；测试没跑就写「未验证」。
+* 其他 skill 都是可选增强：wiki、DocNexus、数据库没配置时自动跳过，并在交付说明中注明。
 
 ## 参数
 
@@ -105,7 +121,7 @@
 可以放心重复执行 init 来升级模板：
 
 * `SKILL.md`、`references/checklist.md`、`template.md`、脚本等**模板文件会被更新**；
-* 用户填过的 `md-to-wiki/wiki-config.json`、`database-query/references/schema.md` **保留不覆盖**；
+* 用户填过的 `md-to-wiki/wiki-config.json`、`database-query/references/schema.md`、`dev/profile.json` **保留不覆盖**；
 * `database-query/config.json` 只在本次确认或填写了数据库配置时写入；`--skip-db` 时保留已有文件；
 * `.gitignore` 规则无论是否配置数据库都会补齐（只追加缺失的行）；
 * `init-skills.sh` 兼容 macOS 自带的 bash 3.2。
@@ -166,6 +182,7 @@
 | create-tech-md-doc    | 技术方案（md）   | `docs/skills/create-tech-md-doc/tech-doc_<分支>_<YYYYMMDD>.md`       |
 | create-release-md-doc | 上线方案（md）   | `docs/skills/create-release-md-doc/release-doc_<分支>_<YYYYMMDD>.md` |
 | database-query        | 查询结果       | 默认对话输出；导出时 `tmp/skills/database-query/result-<时间戳>.csv`            |
+| dev                   | L 规模方案（md） | `docs/skills/dev/plan-<需求短名>-<YYYYMMDD>.md`；交付说明默认只在对话输出 |
 | md-to-wiki            | 转换临时 XHTML | `tmp/skills/md-to-wiki/_wiki_upload_<时间戳>.html`（上传后可删）             |
 
 规则：
@@ -207,9 +224,13 @@ skills-init/
 ├── create-tech-md-doc/
 │   ├── SKILL.md.tpl
 │   └── template.md                    # 8 模块文档模板（纯拷贝）
-└── create-release-md-doc/
+├── create-release-md-doc/
+│   ├── SKILL.md.tpl
+│   └── template.md                    # 6 模块文档模板（纯拷贝）
+└── dev/
     ├── SKILL.md.tpl
-    └── template.md                    # 6 模块文档模板（纯拷贝）
+    ├── profile.json.tpl               # 空画像，首次使用时由 agent 推断并经确认后填写
+    └── references/plan-template.md    # 方案模板（纯拷贝）
 ```
 
 

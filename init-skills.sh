@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =====================================================================
-# init-skills.sh — 项目级 Agent Skills 一键初始化（database-query + code-review）
+# init-skills.sh — 项目级 Agent Skills 一键初始化（dev / code-review / database-query / 文档类）
 # 跨平台版：macOS / Linux / Windows(Git Bash / WSL)；兼容 macOS 自带 bash 3.2
 #
 # 支持环境：codex / claude / doubao / qwen
@@ -16,7 +16,7 @@
 #   ./skills-init/init-skills.sh --envs all --yes --skip-db        # 全环境、非交互、跳过数据库
 #
 # 重跑安全：SKILL.md / references 模板会更新；用户已填写的 wiki-config.json、
-#           schema.md 保留不覆盖；database-query/config.json 仅在本次提供了数据库配置时写入。
+#           schema.md、dev/profile.json 保留不覆盖；database-query/config.json 仅在本次提供了数据库配置时写入。
 # =====================================================================
 
 set -euo pipefail
@@ -162,7 +162,8 @@ get_db() {
 install_skills() { # $1=目标目录  $2=是否有数据库配置(1/0)
   local base="$1" has_db="$2"
   mkdir -p "$base/code-review/references" "$base/database-query/references" \
-           "$base/md-to-wiki/scripts" "$base/create-tech-md-doc" "$base/create-release-md-doc"
+           "$base/md-to-wiki/scripts" "$base/create-tech-md-doc" "$base/create-release-md-doc" \
+           "$base/dev/references"
   # code-review
   cp "$TPL_DIR/code-review/SKILL.md.tpl"                "$base/code-review/SKILL.md"
   cp "$TPL_DIR/code-review/references/checklist.md.tpl" "$base/code-review/references/checklist.md"
@@ -200,6 +201,15 @@ install_skills() { # $1=目标目录  $2=是否有数据库配置(1/0)
   cp "$TPL_DIR/create-release-md-doc/SKILL.md.tpl"  "$base/create-release-md-doc/SKILL.md"
   cp "$TPL_DIR/create-release-md-doc/template.md"   "$base/create-release-md-doc/template.md"
   ok "create-tech-md-doc / create-release-md-doc -> $base"
+  # dev（开发 / 修 bug 编排；profile.json 记录项目构建与测试命令，可提交，重跑不覆盖）
+  cp "$TPL_DIR/dev/SKILL.md.tpl"                    "$base/dev/SKILL.md"
+  cp "$TPL_DIR/dev/references/plan-template.md"     "$base/dev/references/plan-template.md"
+  if [[ -f "$base/dev/profile.json" ]]; then
+    ok "dev -> $base/dev（profile.json 已存在，保留不覆盖）"
+  else
+    cp "$TPL_DIR/dev/profile.json.tpl" "$base/dev/profile.json"
+    ok "dev -> $base/dev（profile.json 首次使用时由 agent 推断并经你确认后填写）"
+  fi
 }
 
 # ---------------- 4. .gitignore 保护（无论是否配置数据库都执行：wiki 凭据与 tmp 产物同样需要忽略）
