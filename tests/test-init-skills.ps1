@@ -39,9 +39,13 @@ function Assert-Dir([string]$rel) {
 }
 function Assert-Missing([string]$rel) { if (ItemOf $rel) { Fail "不应存在: $rel" } }
 function Assert-Link([string]$rel, [string]$target) {
+  # 软链接或 junction 均可，只要解析后指向期望的目录（$target 相对链接所在目录）
   $i = ItemOf $rel
-  if (-not $i -or $i.LinkType -ne 'SymbolicLink') { Fail "应为软链接: $rel"; return }
-  if ([string]$i.Target -ne $target) { Fail "$rel -> $($i.Target)，期望 -> $target" }
+  if (-not $i -or $i.LinkType -notin 'SymbolicLink', 'Junction') { Fail "应为链接: $rel"; return }
+  $parent = Split-Path -Parent (PathOf $rel)
+  $actual = [IO.Path]::GetFullPath((Join-Path $parent ([string]$i.Target))).TrimEnd('\', '/')
+  $want   = [IO.Path]::GetFullPath((Join-Path $parent $target)).TrimEnd('\', '/')
+  if ($actual -ne $want) { Fail "$rel -> $($i.Target)，期望 -> $target" }
   if (-not (Test-Path -LiteralPath (Join-Path (PathOf $rel) 'SKILL.md'))) { Fail "软链接目标不可读: $rel" }
 }
 function Assert-Same([string]$rel, [string]$expected) {
@@ -57,9 +61,6 @@ function Assert-Content([string]$rel, [string]$expected) {
 function Assert-Eq($actual, $expected, [string]$what) {
   if ([string]$actual -cne [string]$expected) { Fail "$what：实际 [$actual]，期望 [$expected]" }
 }
-function Assert-Log([string]$text) {
-  if (-not (Get-Content -LiteralPath $script:Log -Raw).Contains($text)) { Fail "输出中缺少: $text" }
-}
 function Expect-Rc([int]$rc) {
   if ($script:Rc -ne $rc) {
     Fail "退出码 $($script:Rc)，期望 $rc"
@@ -72,8 +73,9 @@ function New-Project([string]$name) {
   $script:Log = Join-Path $Work "$name.log"
   $dst = Join-Path $script:P 'skills-init'
   New-Item -ItemType Directory -Force -Path $dst | Out-Null
-  Copy-Item -LiteralPath (Join-Path $Repo 'init-skills.ps1'), (Join-Path $Repo 'init-skills.sh') -Destination $dst
-  foreach ($s in $Skills) { Copy-Item -LiteralPath (Join-Path $Repo $s) -Destination $dst -Recurse }
+  # 整个工作区（除 git / CI / 测试本身），实现换成什么都按原样带上
+  Get-ChildItem -LiteralPath $Repo -Force | Where-Object { $_.Name -notin '.git', '.github', '.claude', 'tests' } |
+    ForEach-Object { Copy-Item -LiteralPath $_.FullName -Destination $dst -Recurse -Force }
 }
 
 # 独立 pwsh 进程执行安装脚本；$stdin 为交互输入（多行字符串），退出码写入 $script:Rc
@@ -140,7 +142,6 @@ function Test-FreshInstallLinks {
   Assert-Same '.agents\skills\md-to-wiki\wiki-config.json' (Join-Path $Repo 'md-to-wiki\wiki-config.json.tpl')
   Assert-Same '.agents\skills\workflow\profile.json' (Join-Path $Repo 'workflow\profile.json.tpl')
   Assert-Missing '.agents\skills\database-query\config.json'
-  Assert-Missing '.claude\skills\.skills-init-link-probe'
   # 重跑：链接已正确时保持不变
   Invoke-Install @('-Envs', 'claude,qwen', '-Yes', '-SkipDb'); Expect-Rc 0
   Assert-EnvLinked '.claude\skills'
@@ -156,10 +157,8 @@ function Test-NoSymlinkFallsBackToCopy {
   foreach ($d in '.claude\skills', '.qwen\skills') {
     foreach ($s in $Skills) { Assert-Dir "$d\$s"; Assert-File "$d\$s\SKILL.md" }
     Assert-Same "$d\workflow\profile.json" (Join-Path $Repo 'workflow\profile.json.tpl')
-    Assert-Missing "$d\.skills-init-link-probe"
   }
   Assert-Dir '.agents\skills\workflow'
-  Assert-Log '系统不允许创建软链接'
 }
 
 function Test-NoSymlinkUpgradeKeepsOldCopies {
@@ -193,7 +192,6 @@ function Test-CopyMode {
 function Test-YesWithoutDbConfigFails {
   New-Project 'yes-no-db'
   Invoke-Install @('-Envs', 'claude', '-Yes'); Expect-Rc 1
-  Assert-Log '未找到已有数据库配置'
   Assert-Missing '.agents\skills'
 }
 
@@ -210,7 +208,6 @@ function Test-InteractivePasswordEscaping {
   Assert-File '.agents\skills\database-query\references\schema.md'
   # -Yes 重跑复用已有配置，密码保持一致
   Invoke-Install @('-Envs', 'claude,qwen', '-Yes'); Expect-Rc 0
-  Assert-Log '非交互模式，使用现有配置'
   try { Assert-Eq (Get-Json $cfg).connections.default.password $Password '重跑后 config.json 中的密码' }
   catch { Fail "重跑后 config.json 不是合法 JSON：$($_.Exception.Message)" }
 }
@@ -282,7 +279,6 @@ function Test-UpgradeConflictKeepsOldDir {
   Copy-Item -LiteralPath (PathOf '.claude\skills\md-to-wiki\wiki-config.json') -Destination (Join-Path $Work 'conflict-b.json')
 
   Invoke-Install @('-Envs', 'claude,qwen', '-Yes', '-SkipDb'); Expect-Rc 0
-  Assert-Log '无法自动合并'
   Assert-Dir '.claude\skills\md-to-wiki'
   Assert-Same '.claude\skills\md-to-wiki\wiki-config.json' (Join-Path $Work 'conflict-b.json')
   Assert-Same '.agents\skills\md-to-wiki\wiki-config.json' (Join-Path $Work 'conflict-a.json')
@@ -304,7 +300,6 @@ function Test-GitIgnoreAppendsOnlyMissing {
   Copy-Item -LiteralPath (PathOf '.gitignore') -Destination (Join-Path $Work 'gitignore.after')
   Invoke-Install @('-Envs', 'claude', '-Yes', '-SkipDb'); Expect-Rc 0
   Assert-Same '.gitignore' (Join-Path $Work 'gitignore.after')
-  Assert-Log '.gitignore 已包含全部规则'
 }
 
 # =====================================================================

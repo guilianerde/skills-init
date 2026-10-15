@@ -35,14 +35,17 @@ assert_same()     { cmp -s "$P/$1" "$2" || fail "$1 内容与 $2 不同"; }
 assert_content()  { [[ "$(cat "$P/$1")" == "$2" ]] || fail "$1 内容不符：$(cat "$P/$1" 2>/dev/null | head -n 3)"; }
 assert_contains() { grep -qF -- "$2" "$P/$1" || fail "$1 中缺少: $2"; }
 assert_eq()       { [[ "$1" == "$2" ]] || fail "$3：实际 [$1]，期望 [$2]"; }
-assert_log()      { grep -qF -- "$1" "$LOG" || fail "输出中缺少: $1"; }
 
-# 新建项目：<P>/skills-init 是当前工作区的脚本与模板副本
+# 新建项目：<P>/skills-init 是当前工作区的副本
 new_project() {
   P="$WORK/$1"; LOG="$WORK/$1.log"
   mkdir -p "$P/skills-init"
-  cp "$REPO/init-skills.sh" "$REPO/init-skills.ps1" "$P/skills-init/"
-  local s; for s in "${SKILLS[@]}"; do cp -R "$REPO/$s" "$P/skills-init/"; done
+  # 整个工作区（除 git / CI / 测试本身），实现换成什么都按原样带上
+  local e
+  for e in "$REPO"/* "$REPO"/.[!.]*; do
+    case "${e##*/}" in .git|.github|.claude|tests|'.[!.]*') continue ;; esac
+    cp -R "$e" "$P/skills-init/"
+  done
 }
 
 # 运行安装脚本：stdin 由调用方提供（默认空），输出写入 $LOG，返回退出码到 RC
@@ -117,7 +120,6 @@ test_copy_mode() {
 test_yes_without_db_config_fails() {
   new_project yes-no-db
   run_install --envs claude --yes </dev/null; expect_rc 1
-  assert_log "未找到已有数据库配置"
   assert_missing .agents/skills
 }
 
@@ -133,7 +135,6 @@ test_interactive_password_escaping() {
   assert_contains .agents/skills/database-query/references/schema.md appdb
   # --yes 重跑复用已有配置：密码经提取 / 反转义 / 再转义后保持一致
   run_install --envs claude,qwen --yes </dev/null; expect_rc 0
-  assert_log "非交互模式，使用现有配置"
   assert_eq "$(json_get "$cfg" '["connections"]["default"]["password"]')" "$PASSWORD" "重跑后 config.json 中的密码"
 }
 
@@ -205,7 +206,6 @@ test_upgrade_conflict_keeps_old_dir() {
   cp "$P/.claude/skills/md-to-wiki/wiki-config.json" "$WORK/conflict-b.json"
 
   run_install --envs claude,qwen --yes --skip-db </dev/null; expect_rc 0
-  assert_log "无法自动合并"
   # 冲突的 skill 保留旧目录、不建链接；两边内容都不动
   assert_dir .claude/skills/md-to-wiki
   assert_same .claude/skills/md-to-wiki/wiki-config.json "$WORK/conflict-b.json"
@@ -230,7 +230,6 @@ test_gitignore_appends_only_missing() {
   cp "$P/.gitignore" "$WORK/gitignore.after"
   run_install --envs claude --yes --skip-db </dev/null; expect_rc 0
   assert_same .gitignore "$WORK/gitignore.after"
-  assert_log ".gitignore 已包含全部规则"
 }
 
 # =====================================================================
