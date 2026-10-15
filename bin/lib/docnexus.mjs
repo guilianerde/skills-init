@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { templateStatus, STATUS_TEXT, TEMPLATES } from '../seed-templates.mjs';
-import { TPL_DIR, IS_WIN, DOCNEXUS_PKG, MANIFEST, PKG, step, ok, warn, fail, writeFile, lstat, findManifests } from './core.mjs';
+import { TPL_DIR, IS_WIN, DOCNEXUS_PKG, MANIFEST, PKG, step, ok, warn, fail, writeFile, lstat, findManifests, removeLink } from './core.mjs';
 
 export function run(cmd, args, cwd, quiet = false) {
   const r = spawnSync(cmd, args, { cwd, stdio: quiet ? ['ignore', 'ignore', 'inherit'] : 'inherit', shell: IS_WIN });
@@ -31,7 +31,7 @@ export function linkQwenDocNexus(root) {
     const link = path.join(dst, e.name);
     const st = lstat(link);
     if (st && !st.isSymbolicLink()) { warn(`${link} 已存在且不是软链接，跳过（如需改用 DocNexus 版本请先移除）`); continue; }
-    if (st) fs.rmSync(link, { force: true });
+    if (st) removeLink(link);
     try { fs.symlinkSync(path.join('..', '..', 'docnexus', 'skills', e.name), link, 'dir'); n++; }
     catch (err) { warn(`qwen：无法创建软链接 ${link}（${err.code}）`); }
   }

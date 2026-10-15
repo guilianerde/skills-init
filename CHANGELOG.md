@@ -4,6 +4,9 @@
 
 ## [Unreleased]
 
+### 修复
+- Windows 开启开发者模式（能建软链接）时安装 / 升级报 `ERR_FS_EISDIR: Path is a directory`：探测软链接能否创建后用 `fs.rmSync` 删除探测链接，Windows 把指向目录的软链接当成目录而删不掉。删除软链接统一改用先 `unlink`、遇到 EPERM / EISDIR 再 `rmdir`（只删链接，不碰目标），安装、重建链接、清理旧名、qwen 链接都改用它；下次运行时清掉上次异常退出留在 `.claude/skills` 等目录里的 `.skills-init-probe-*` 链接。CI 的 Windows 任务增加 Node 24。
+
 ## [0.6.0] - 2026-10-15
 
 ### 变更

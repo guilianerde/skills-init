@@ -70,6 +70,14 @@ export function removeEmptyDirs(dir, stop) {
 }
 
 export function lstat(p) { try { return fs.lstatSync(p); } catch { return null; } }
+// 删除软链接本身（不碰目标）。Windows 上指向目录的软链接 / junction 被当成目录：unlink 报 EPERM / EISDIR，
+// fs.rmSync 也会报「Path is a directory」，要用 rmdir 删；不存在时什么都不做
+export function removeLink(p) {
+  try { fs.unlinkSync(p); } catch (e) {
+    if (e.code === 'ENOENT') return;
+    if (e.code === 'EPERM' || e.code === 'EISDIR') fs.rmdirSync(p); else throw e;
+  }
+}
 export function timestamp() {
   const d = new Date(); const z = (n) => String(n).padStart(2, '0');
   return `${d.getFullYear()}${z(d.getMonth() + 1)}${z(d.getDate())}-${z(d.getHours())}${z(d.getMinutes())}${z(d.getSeconds())}`;

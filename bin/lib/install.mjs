@@ -2,7 +2,7 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { TPL_DIR, PKG, CANON_DIR, SKILLS, SKILL_LIST, USER_FILES, RENAMED, MANIFEST, ok, warn, readJson, walk, toPosix, sameFile, writeFile, render, sha256, fileHash, readManifest, removeEmptyDirs, lstat, timestamp } from './core.mjs';
+import { TPL_DIR, PKG, CANON_DIR, SKILLS, SKILL_LIST, USER_FILES, RENAMED, MANIFEST, ok, warn, readJson, walk, toPosix, sameFile, writeFile, render, sha256, fileHash, readManifest, removeEmptyDirs, lstat, timestamp, removeLink } from './core.mjs';
 import { ask } from './prompt.mjs';
 import { writeDbConfig } from './db.mjs';
 
@@ -169,16 +169,17 @@ export function migrateCopy(root, old, skill) {
 // 环境变量 SKILLS_INIT_NO_SYMLINK=1 可强制走独立拷贝（测试与无法建链接的环境用）。
 export function symlinkSupported(dir) {
   if (process.env.SKILLS_INIT_NO_SYMLINK === '1') return false;
+  // 清掉之前异常退出留下的探测链接（0.6.0 及更早在 Windows 上会删不掉它）
+  for (const f of fs.readdirSync(dir)) if (f.startsWith('.skills-init-probe-') && lstat(path.join(dir, f))?.isSymbolicLink()) removeLink(path.join(dir, f));
   const probe = path.join(dir, `.skills-init-probe-${process.pid}`);
   try {
     fs.symlinkSync('.', probe, 'dir');
-    return true;
   } catch (e) {
     if (e.code === 'EPERM' || e.code === 'EACCES' || e.code === 'ENOTSUP') return false;
     throw e;
-  } finally {
-    fs.rmSync(probe, { force: true });
   }
+  removeLink(probe);
+  return true;
 }
 
 // 返回 false 表示不能建软链接（调用方退回独立拷贝）
@@ -196,7 +197,7 @@ export function linkSkills(root, envName, rel, skills = SKILLS) {
     const st = lstat(link);
     if (st?.isSymbolicLink()) {
       if (path.normalize(fs.readlinkSync(link)) === path.normalize(target)) continue;
-      fs.rmSync(link, { force: true });
+      removeLink(link);
     } else if (st?.isDirectory()) {
       if (!migrateCopy(root, link, skill)) { skipped++; continue; }
       const bak = path.join(root, 'tmp', 'skills', 'backup', timestamp(), envName);
@@ -225,7 +226,7 @@ export function removeRenamed(root) {
       if (!st) continue;
       if (st.isSymbolicLink()) {
         if (path.normalize(fs.readlinkSync(p)) !== path.normalize(path.join('..', '..', CANON_DIR, oldName))) continue;
-        fs.rmSync(p, { force: true });
+        removeLink(p);
       } else if (st.isDirectory()) {
         const md = path.join(p, 'SKILL.md');
         if (!fs.existsSync(md) || !signature.test(fs.readFileSync(md, 'utf8'))) {

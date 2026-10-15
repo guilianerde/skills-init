@@ -2,7 +2,7 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { IS_WIN, CANON_DIR, MANIFEST, step, ok, warn, toPosix, fileHash, readManifest, removeEmptyDirs, lstat, timestamp } from './core.mjs';
+import { IS_WIN, CANON_DIR, MANIFEST, step, ok, warn, toPosix, fileHash, readManifest, removeEmptyDirs, lstat, timestamp, removeLink } from './core.mjs';
 
 // 软链接是否指向 absTarget（按解析后的绝对路径比较，兼容 Windows 上 readlink 返回的 \\?\ 前缀）
 export function linkPointsTo(link, absTarget) {
@@ -13,11 +13,6 @@ export function linkPointsTo(link, absTarget) {
   return norm(path.resolve(path.dirname(link), t)) === norm(absTarget);
 }
 // 删除目录软链接本身（Windows 上目录链接需 rmdir）
-export function removeLink(p) {
-  try { fs.unlinkSync(p); } catch (e) {
-    if (e.code === 'EPERM' || e.code === 'EISDIR') fs.rmdirSync(p); else throw e;
-  }
-}
 export function rmdirIfEmpty(dir) { try { fs.rmdirSync(dir); return true; } catch { return false; } }
 
 export function uninstall(root) {
