@@ -202,6 +202,25 @@
 * `.gitignore` 规则无论是否配置数据库都会补齐（只追加缺失的行）；
 * `init-skills.sh` 兼容 macOS 自带的 bash 3.2。
 
+## 测试
+
+`tests/` 下是两个安装脚本的黑盒测试：每个用例在临时目录放一份 skills-init 副本，执行安装后检查生成的目录、软链接和配置文件。
+
+```bash
+bash tests/test-init-skills.sh            # bash 版（兼容 macOS 自带的 /bin/bash 3.2）
+bash tests/test-init-skills.sh upgrade    # 只跑名字含 upgrade 的用例
+```
+
+```powershell
+pwsh -NoProfile -File tests/test-init-skills.ps1   # PowerShell 版（Windows，PowerShell 7）
+```
+
+覆盖的场景：全新安装（`.agents/skills` 完整文件 + `.claude` / `.qwen` 相对软链接）、`--copy`、`--yes` 无数据库配置时退出码 1、交互输入含 `/ & | " \` 的密码后 `config.json` 仍是合法 JSON 且值一致、重跑保留用户配置、从旧版各环境独立拷贝升级（用 git 历史中 `71a23c8` 的脚本生成旧布局）、两边配置冲突时保留旧目录、`.gitignore` 只追加缺失规则。PowerShell 版另外覆盖软链接不可用时退回独立拷贝（用环境变量 `SKILLS_INIT_NO_SYMLINK=1` 模拟）。
+
+依赖：bash 版需要 `python3` 校验 JSON；升级用例需要完整 git 历史（浅克隆时先 `git fetch --unshallow`）。
+
+CI（`.github/workflows/test.yml`）在 push 到 main 和每个 PR 上运行：macOS 用 `/bin/bash`、Ubuntu 用 bash 跑 bash 版，Windows 用 pwsh 跑 PowerShell 版。
+
 ## 凭据安全
 
 

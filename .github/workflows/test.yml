@@ -1,0 +1,43 @@
+name: test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  bash:
+    name: bash (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            shell: /bin/bash   # macOS 自带 bash 3.2
+          - os: ubuntu-latest
+            shell: bash
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # 升级用例要从 git 历史取旧版脚本
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Run bash tests
+        run: ${{ matrix.shell }} tests/test-init-skills.sh
+
+  pwsh:
+    name: pwsh (windows-latest)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Run PowerShell tests
+        shell: pwsh
+        run: pwsh -NoProfile -File tests/test-init-skills.ps1
