@@ -4,6 +4,8 @@
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-10-15
+
 ### 变更
 - dev 交付说明落盘：每次交付（功能开发与缺陷修复）都写到 `docs/skills/dev/delivery-<需求短名>-<YYYYMMDD>.md`，模板 `dev/references/delivery-template.md` 改为可被 DocNexus 覆盖、可 lint 的正式模板（元信息：类型、规模、对比分支、参考产物、DocNexus），写完跑 `lint-doc.mjs --template delivery-template.md`；对话里只给摘要和路径。
 - dev 交付后，已接入 DocNexus 时**每次都问**要不要启动 DocNexus 流程沉淀本次交付（列出建议沉淀的决定 / 约定 / 坑 / 根因 / 配置变化）；同意后以交付说明为来源、`dev-notes` 分类写入，成功后把 `docnexus/library/<path>` 记回交付说明的「DocNexus」元信息行；未接入时不提问。
@@ -95,7 +97,8 @@
 - 安装器改为单一 Node 实现，`init-skills.sh` / `init-skills.ps1` 只是薄封装。
 - `code-review` 改名为 `project-review`，升级时自动清理旧名。
 
-[Unreleased]: https://github.com/guilianerde/skills-init/compare/v0.6.2...HEAD
+[Unreleased]: https://github.com/guilianerde/skills-init/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/guilianerde/skills-init/compare/v0.6.2...v0.7.0
 [0.6.2]: https://github.com/guilianerde/skills-init/compare/v0.6.1...v0.6.2
 [0.6.1]: https://github.com/guilianerde/skills-init/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/guilianerde/skills-init/compare/v0.5.0...v0.6.0
