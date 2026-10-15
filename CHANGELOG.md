@@ -4,6 +4,8 @@
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-10-15
+
 ### 变更
 - dev 新增「F3 需求澄清」（借鉴 grill-me）：把需求拆成决策树（行为、边界、异常、兼容、权限、数据、范围），按轮提问，每轮把现在能问的问题一次问完、编号并给推荐答案和依据；代码 / 表结构 / PRD / DocNexus 能查到的事实自己查，只把业务决定交给用户；M / L 规模问到没有被默默假设的决定、用户确认理解一致后才出方案，S 规模无未定决定时跳过。细则在 `dev/references/clarify.md`；之后的步骤顺延为 F4 方案 … F8 交付。开发方案模板第 1 节、交付说明新增「已确认的决定」。缺陷修复的信息收集只问只有用户知道的事实。
 - 按分类检索：`knowledge.mjs --query "<问题>" [--recall-limit n]` 在 `readFrom` 的每个分类内 `recall --category`（DocNexus 0.16.0 起），能找到标题摘要里没写、正文里提到的沉淀；已装版本不支持时输出 `recall_by_category: false` 并提示改用不带分类的 recall。dev、project-review、两个文档 skill 开工前改用 `--query`；`doctor` 检查已装 DocNexus 是否支持 `recall --category`。
@@ -77,7 +79,8 @@
 - 安装器改为单一 Node 实现，`init-skills.sh` / `init-skills.ps1` 只是薄封装。
 - `code-review` 改名为 `project-review`，升级时自动清理旧名。
 
-[Unreleased]: https://github.com/guilianerde/skills-init/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/guilianerde/skills-init/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/guilianerde/skills-init/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/guilianerde/skills-init/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/guilianerde/skills-init/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/guilianerde/skills-init/compare/v0.2.0...v0.3.0
