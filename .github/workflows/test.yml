@@ -35,7 +35,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        node: [22, 24]   # 24：Windows 上删除目录软链接的行为与 22 不同（0.6.0 的 EISDIR 报错）
+        node: [22, 24]   # 多覆盖一个 Node 版本：0.6.0 的 EISDIR 报错出现在用户的 Windows 环境，CI 的 Node 22 没复现
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4

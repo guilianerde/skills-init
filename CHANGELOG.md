@@ -4,8 +4,10 @@
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-10-15
+
 ### 修复
-- Windows 开启开发者模式（能建软链接）时安装 / 升级报 `ERR_FS_EISDIR: Path is a directory`：探测软链接能否创建后用 `fs.rmSync` 删除探测链接，Windows 把指向目录的软链接当成目录而删不掉。删除软链接统一改用先 `unlink`、遇到 EPERM / EISDIR 再 `rmdir`（只删链接，不碰目标），安装、重建链接、清理旧名、qwen 链接都改用它；下次运行时清掉上次异常退出留在 `.claude/skills` 等目录里的 `.skills-init-probe-*` 链接。CI 的 Windows 任务增加 Node 24。
+- Windows 开启开发者模式（能建软链接）时安装 / 升级报 `ERR_FS_EISDIR: Path is a directory`：探测软链接能否创建后用 `fs.rmSync` 删除探测链接，Windows 把指向目录的软链接当成目录而删不掉。删除软链接统一改用先 `unlink`、遇到 EPERM / EISDIR 再 `rmdir`（只删链接，不碰目标），安装、重建链接、清理旧名、qwen 链接都改用它；下次运行时清掉上次异常退出留在 `.claude/skills` 等目录里的 `.skills-init-probe-*` 链接。CI 的 Windows 任务增加 Node 24，并补了软链接删除与探测的测试。
 
 ## [0.6.0] - 2026-10-15
 
@@ -82,7 +84,8 @@
 - 安装器改为单一 Node 实现，`init-skills.sh` / `init-skills.ps1` 只是薄封装。
 - `code-review` 改名为 `project-review`，升级时自动清理旧名。
 
-[Unreleased]: https://github.com/guilianerde/skills-init/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/guilianerde/skills-init/compare/v0.6.1...HEAD
+[0.6.1]: https://github.com/guilianerde/skills-init/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/guilianerde/skills-init/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/guilianerde/skills-init/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/guilianerde/skills-init/compare/v0.3.0...v0.4.0
