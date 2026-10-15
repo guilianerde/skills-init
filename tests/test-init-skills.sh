@@ -53,13 +53,13 @@ run_install() {
   (cd "$P" && "$BASH" skills-init/init-skills.sh "$@") >>"$LOG" 2>&1
   RC=$?
 }
-expect_rc() { [[ "$RC" == "$1" ]] || { fail "退出码 $RC，期望 $1（日志 ${LOG#$WORK/}）"; sed 's/^/        | /' "$LOG" | tail -n 20; }; }
+expect_rc() { [[ "$RC" == "$1" ]] || { fail "退出码 ${RC}，期望 $1（日志 ${LOG#$WORK/}）"; sed 's/^/        | /' "$LOG" | tail -n 20; }; }
 
 # 用 git 历史中的旧版脚本生成旧布局（各环境独立拷贝），再换成当前版本的 skills-init
 old_layout() {
   rm -rf "$P/skills-init"; mkdir -p "$P/skills-init"
   if ! git -C "$REPO" archive "$OLD_REV" | tar -x -C "$P/skills-init"; then
-    fail "无法从 git 历史取出 $OLD_REV（CI 需 fetch-depth: 0）"; return 1
+    fail "无法从 git 历史取出 ${OLD_REV}（CI 需 fetch-depth: 0）"; return 1
   fi
   (cd "$P" && "$BASH" skills-init/init-skills.sh "$@" </dev/null) >>"$LOG" 2>&1 || { fail "旧版脚本执行失败"; return 1; }
   rm -rf "$P/skills-init"
@@ -261,6 +261,6 @@ for t in "${TESTS[@]}"; do
 done
 
 echo
-echo "通过 $PASSED，失败 $FAILED"
+echo "通过 ${PASSED}，失败 $FAILED"
 if [[ "$FAILED" != "0" ]]; then printf '  失败用例: %s\n' "${FAILED_CASES[@]}"; exit 1; fi
 exit 0
