@@ -59,7 +59,6 @@ description: "Generate a Markdown release/deployment plan (上线方案) from th
 
 1. **确认在 git 仓库内**：`git rev-parse --is-inside-work-tree` 为 true，否则停。
 2. **校验分支存在**：`git rev-parse --verify <branch>`（或 `origin/<branch>`）；不存在 → 列出候选分支让用户挑，停。
-3. **（可选）探测符号索引增强层**：环境若有 GitNexus 类符号索引且可用 → `enhanced = true`（Step 3b 用于受影响入口）；否则 `enhanced = false`，不阻塞。
 
 > **判停**：分支不存在 → 停。其余项不阻塞。
 
@@ -97,9 +96,7 @@ description: "Generate a Markdown release/deployment plan (上线方案) from th
 
 **3a. 从 diff 抽取事实（必做，纯 git）**：DDL 原样保留；Entity 新增字段（字段+类型+@TableField）；配置新增（key+用途+值）；Kafka topic（如有）；接口路径+方法（Controller diff）；db_name 推断（SQL `USE` → datasource url → 表名前缀，不确定标"待人工确认"）；受影响模块/包名汇总（改动范围）。只读 diff 内可见事实，看不到写"待补充"。
 
-**3b. 符号增强（可选，仅 `enhanced=true` 时）**：对 diff 中实际出现的 Controller/Service 方法查上游调用方（d=1）→ 填「四.2 受影响入口验证」。只查 diff 内符号、每个一次；失败静默回退，不中止。
-
-**3c. PRD 对齐校验（仅 `prd_context != null`）**：PRD 功能点 vs diff 实现语义对齐 → 模块六追加「对齐缺口 / 实现超出 PRD」清单。
+**3b. PRD 对齐校验（仅 `prd_context != null`）**：PRD 功能点 vs diff 实现语义对齐 → 模块六追加「对齐缺口 / 实现超出 PRD」清单。
 
 ### Step 4 — 填充模板 6 个模块
 
@@ -129,7 +126,6 @@ description: "Generate a Markdown release/deployment plan (上线方案) from th
 > diff 概览：<files> files changed, <ins> insertions(+), <del> deletions(-)
 > PRD 参考：<pageId 或 URL 或「无」>
 > 技术方案引用：<path 或「无」>
-> 符号索引增强：<已启用 / 已跳过>
 > 填充模块：1/2/4/5/6 +（有 PRD 时）3
 > ⚠️ 灰度/回滚策略基于 diff 推断，需人工校对后补充。
 ```
@@ -141,7 +137,6 @@ description: "Generate a Markdown release/deployment plan (上线方案) from th
 | 不加路径过滤直接 diff | 巨大 diff 灌进上下文 | 分层 `--name-only` |
 | 把测试代码算进影响范围 | 上线方案失真 | 排除 `src/test/**` |
 | wiki 未配置硬跑 `--prd` | 拉取失败/编造 PRD | GATE 判停，回退无 PRD |
-| 用 `detect_changes` 替代任意两分支 diff | 该工具只看工作区，漏 dev 分支变更 | 永远用 `git diff <main>...<dev>` |
 | 覆盖已存在文档 | 丢失人工补充 | `_v2/_v3` |
 | 编造灰度/回滚策略 | 上线风险 | diff 推断 + 标注"待人工确认" |
 

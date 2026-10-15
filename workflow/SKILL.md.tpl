@@ -77,7 +77,6 @@ dev（需求 → 方案 → 实现 → 测试 → 自审）
 | wiki | `md-to-wiki/wiki-config.json` 中 `enabled=true` 且 `wiki.base_url` 非空；或环境存在 wiki MCP 工具 | 读 PRD、发布文档 |
 | DocNexus | 项目根有 `docnexus/project.json`，且 `./node_modules/.bin/docnexus` 可执行 | 查约定与历史决策、沉淀知识 |
 | 数据库 | `database-query/config.json` 存在且 `connections` 非空 | 查表结构、核对数据 |
-| 符号索引 | 环境有 GitNexus 类工具且索引非 stale | 技术 / 上线方案的调用方增强 |
 | 项目画像 | `workflow/profile.json` 中 `main_branch` 与 `build` / `test` 非空 | dev 构建与测试 |
 
 ### `/workflow status` 输出
@@ -91,7 +90,6 @@ dev（需求 → 方案 → 实现 → 测试 → 自审）
 | wiki | ✅ / ❌ | 填写 md-to-wiki/wiki-config.json 或接入 wiki MCP |
 | DocNexus | ✅ / ❌ | 重跑 init-skills 并加 --with-docnexus |
 | 数据库 | ✅ / ❌ | 重跑 init-skills 补配 |
-| 符号索引 | ✅ / ❌ | 可选 |
 ```
 
 探测只读文件、只看命令是否存在，**不输出任何凭据内容**（密码、token 一律不回显）。

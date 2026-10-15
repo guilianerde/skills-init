@@ -13,7 +13,6 @@
 > 对比分支：`{{devBranch}}` ←→ `{{mainBranch}}`（主分支为基线）
 > diff 概览：{{files}} files changed, {{insertions}} insertions(+), {{deletions}} deletions(-)
 > PRD 参考：{{pageId 或 URL 或「无」}}
-> GitNexus 增强：{{已启用 / 已跳过（索引 stale 或不可用）}}
 > 填充模块：2/3/4/5/6/8 +（有 PRD 时）1/7（无 PRD 时模块 1 需求背景需人工补充，模块 7 数据链路从 diff 推断）
 > ⚠️ 内容基于代码 diff 推断，业务语义/PRD 链接需人工校对后补充。
 
@@ -185,7 +184,7 @@ table_name：
 - 配置项变更 → 是否需要灰度/回滚方案
 {{#if prd_context}}
 
-### 8.x PRD 对齐缺口（来源 PRD 校验，Step 2c）
+### 8.x PRD 对齐缺口（来源 PRD 校验，Step 2b）
 
 ⚠️ **对齐缺口**（PRD 提及但 diff 未实现，请核对是否漏实现/在别的分支）：
 {{#each alignment_gaps}}

@@ -13,7 +13,6 @@
 > diff 概览：{{files}} files changed, {{insertions}} insertions(+), {{deletions}} deletions(-)
 > PRD 参考：{{pageId 或 URL 或「无」}}
 > 技术方案引用：{{path 或「无」}}
-> GitNexus 增强：{{已启用 / 已跳过（索引 stale 或不可用）}}
 > 填充模块：1/2/4/5/6 +（有 PRD 时）3
 > ⚠️ 灰度/回滚策略基于 diff 推断，需人工校对后补充。
 
@@ -106,17 +105,8 @@ table_name：
 |------|------|------|
 | `{{path}}` | {{POST/GET}} | {{从 Controller diff 或 --tech 模块4 推断返回/行为}} |
 
-{{#if gitnexus_callers}}
-#### 4.2 受影响入口验证（GitNexus impact d=1）
-
-以下调用方受本次改动影响，上线后需重点验证：
-{{#each gitnexus_callers}}
-- {{this.symbol}}（{{this.location}}）
-{{/each}}
-{{/if}}
-
 {{#if prd_context}}
-#### 4.3 业务场景验证（来自 PRD）
+#### 4.2 业务场景验证（来自 PRD）
 
 {{#each prd_context.verifyScenarios}}
 - {{this.name}}：{{this.desc}}
@@ -141,7 +131,7 @@ table_name：
 
 {{#if prd_context}}
 
-#### 6.x PRD 对齐缺口（来源 PRD 校验，Step 2c）
+#### 6.x PRD 对齐缺口（来源 PRD 校验，Step 3b）
 
 ⚠️ **对齐缺口**（PRD 提及但 diff 未实现，请核对是否漏实现/在别的分支）：
 {{#each alignment_gaps}}

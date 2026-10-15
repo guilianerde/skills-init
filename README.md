@@ -108,7 +108,7 @@
 
 ```
 /workflow            # 按请求路由到对应 skill；无具体请求时输出能力地图 + 状态
-/workflow status     # 检查项目画像、wiki、DocNexus、数据库、符号索引是否可用
+/workflow status     # 检查项目画像、wiki、DocNexus、数据库是否可用
 /workflow profile    # 从仓库推断并经你确认后填写 workflow/profile.json
 ```
 

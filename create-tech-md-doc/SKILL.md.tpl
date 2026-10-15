@@ -55,7 +55,6 @@ description: "Generate a Markdown technical design doc (技术方案) from the d
 
 1. **确认在 git 仓库内**：`git rev-parse --is-inside-work-tree` 必须返回 `true`。否则停止并告诉用户。
 2. **校验两个分支都存在**：`git rev-parse --verify <branch>`（或 `origin/<branch>`）。不存在的分支 → 列出 `git branch -a | grep -i <keyword>` 给用户挑，停止。
-3. **（可选）探测符号索引增强层**：环境若有 GitNexus 类符号索引（MCP `gitnexus://repo/{repo}/context` 或 CLI），且索引可用非 stale → 标记 `enhanced = true`，Step 2 启用符号级增强；否则 `enhanced = false`，回退纯 git diff，不阻塞。不要为刷新索引跑重分析命令。
 
 > **判停**：分支不存在 → 停。其余项不阻塞。
 
@@ -106,9 +105,7 @@ description: "Generate a Markdown technical design doc (技术方案) from the d
 - **配置变更**：新增 key + 值 → 6
 - 抽取规则：**只读 diff 内可见事实**，看不到写"待补充"，不编造。
 
-**2b. 符号增强（可选，仅 `enhanced=true` 时）**：对 diff 中实际出现的 Controller/Service 方法，用符号索引查上游调用方（d=1）与参与的执行流，填 3.详细方案 与 8.兼容问题。只查 diff 内符号，每个最多查一次，不扩散。**2b 失败/超时 → 静默回退，不中止**。
-
-**2c. PRD 对齐校验（仅 `prd_context != null`）**：PRD 功能点 vs diff 实现做语义对齐 → 模块 8 产出「对齐缺口」与「实现超出 PRD」两张清单。匹配不确定的不算缺口，标"待人工核对"。
+**2b. PRD 对齐校验（仅 `prd_context != null`）**：PRD 功能点 vs diff 实现做语义对齐 → 模块 8 产出「对齐缺口」与「实现超出 PRD」两张清单。匹配不确定的不算缺口，标"待人工核对"。
 
 ### Step 3 — 填充模板 8 个模块
 
@@ -118,12 +115,12 @@ description: "Generate a Markdown technical design doc (技术方案) from the d
 |---|---|---|
 | 1. 需求背景 | 有 PRD 时填；无 PRD 时留空（"待补充"占位） | `prd_context`；diff 无法推断 |
 | 2. 影响范围 | ✅ | Step1 各层命中的模块/包名 |
-| 3. 详细方案 | ✅ | Step2a Service + Step2b 执行流；有 PRD 时补业务语义（标注来源 PRD） |
+| 3. 详细方案 | ✅ | Step2a Service；有 PRD 时补业务语义（标注来源 PRD） |
 | 4. 接口文档 | ✅ | Step2a Controller + Kafka |
 | 5. 涉及服务 | ✅ | git remote + 项目结构推断 |
 | 6. 中间件变更 | ✅ | Step2a SQL + Entity + 配置 + pom + Job |
 | 7. 数据链路 | 有 PRD 且提及表名时填；否则从 diff 推断 | `prd_context.tables`；Step2a 推断 |
-| 8. 兼容问题&方案 | ✅ | diff 推断 + Step2b 调用方 + Step2c 对齐缺口 |
+| 8. 兼容问题&方案 | ✅ | diff 推断 + Step2b 对齐缺口 |
 
 ### Step 4 — 写文件
 
@@ -140,7 +137,6 @@ description: "Generate a Markdown technical design doc (技术方案) from the d
 > 对比分支：`<dev>` ←→ `<main>`（主分支为基线）
 > diff 概览：<files> files changed, <ins> insertions(+), <del> deletions(-)
 > PRD 参考：<pageId 或 URL 或「无」>
-> 符号索引增强：<已启用 / 已跳过>
 > 填充模块：2/3/4/5/6/8 +（有 PRD 时）1/7
 > ⚠️ 内容基于代码 diff 推断，业务语义/PRD 链接需人工校对后补充。
 ```
@@ -154,8 +150,6 @@ description: "Generate a Markdown technical design doc (技术方案) from the d
 | 编造业务语义 | 文档失真 | diff 看不到写"待补充" |
 | 覆盖已存在文档 | 丢失人工补充 | 加 `_v2/_v3` |
 | wiki 未配置仍硬跑 `--prd` | 拉取失败/编造 PRD | GATE 判停，回退纯-diff |
-| 对 diff 外符号做符号索引查询 | 上下文膨胀 | 只查 diff 内符号，d=1 |
-| 符号增强失败中止整个文档 | 用户拿不到产出 | 静默回退，diff 事实已足够 |
 
 ## Red Flags — STOP
 
