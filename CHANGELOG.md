@@ -4,6 +4,8 @@
 
 ## [Unreleased]
 
+## [0.6.2] - 2026-10-15
+
 ### 变更
 - Windows 上 `init` / `upgrade` 只能在管理员终端执行：开始前检测当前终端是否以管理员身份运行（PowerShell 判断管理员角色，没有 PowerShell 时用 `net session`），不是就直接停下、不做任何改动，并提示「以管理员身份运行」终端后进入项目目录重跑（给出原命令；经 init-skills 脚本调用时提示重跑脚本）。`doctor`、`seed-templates`、`uninstall` 不受限制；macOS / Linux 不检查。
 
@@ -87,7 +89,8 @@
 - 安装器改为单一 Node 实现，`init-skills.sh` / `init-skills.ps1` 只是薄封装。
 - `code-review` 改名为 `project-review`，升级时自动清理旧名。
 
-[Unreleased]: https://github.com/guilianerde/skills-init/compare/v0.6.1...HEAD
+[Unreleased]: https://github.com/guilianerde/skills-init/compare/v0.6.2...HEAD
+[0.6.2]: https://github.com/guilianerde/skills-init/compare/v0.6.1...v0.6.2
 [0.6.1]: https://github.com/guilianerde/skills-init/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/guilianerde/skills-init/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/guilianerde/skills-init/compare/v0.4.0...v0.5.0
