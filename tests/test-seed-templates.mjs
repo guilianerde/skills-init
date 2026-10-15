@@ -13,7 +13,7 @@ import { seedTemplates, templateStatus, updateTemplates, TEMPLATES } from '../bi
 const REPO = fileURLToPath(new URL('..', import.meta.url));
 const skip = process.platform === 'win32' ? '假 CLI 用 shebang 脚本实现，Windows 跳过' : false;
 
-// 假 docnexus：draft new 分配目录，draft seal 记录目标路径，document add 把 document.md 拷进 library
+// 假 docnexus：draft new 分配目录，draft seal 记录目标路径（带 --category 时像真 CLI 一样写进 metadata.json），document add 把 document.md 拷进 library
 const FAKE = `#!/usr/bin/env node
 const fs = require('fs'); const path = require('path');
 const [cmd, sub, ...rest] = process.argv.slice(2);
@@ -28,6 +28,12 @@ if (cmd === 'draft' && sub === 'new') {
   const a = (f) => path.join(dir, f);
   console.log(JSON.stringify({ draft_id: id, artifacts: { source: a('source.md'), document: a('document.md'), metadata: a('metadata.json') } }));
 } else if (cmd === 'draft' && sub === 'seal') {
+  if (rest.includes('--category')) {
+    const mf = path.join('docnexus/drafts', arg('--id'), 'metadata.json');
+    const m = JSON.parse(fs.readFileSync(mf, 'utf8'));
+    m.category = arg('--category'); m.category_reason = rest.includes('--category-reason') ? arg('--category-reason') : 'Explicit category supplied by caller.';
+    fs.writeFileSync(mf, JSON.stringify(m));
+  }
   fs.writeFileSync(path.join('docnexus/drafts', arg('--id'), 'target'), JSON.stringify({ file: arg('--file'), base: arg('--base-version') }));
   console.log(JSON.stringify({ result: 'draft_ready' }));
 } else if (cmd === 'document' && sub === 'add') {
@@ -76,7 +82,7 @@ test('导入全部模板，内容与自带模板一致，元数据分类为 doc-
     assert.ok(r.metadata.tags.includes('skills-init-template'));
   }
   const calls = fs.readFileSync(path.join(root, 'calls.log'), 'utf8');
-  assert.match(calls, /draft seal --id draft_template-create-tech-md-doc\S* --file templates\/create-tech-md-doc\/template.md --base-version new/);
+  assert.match(calls, /draft seal --id draft_template-create-tech-md-doc\S* --file templates\/create-tech-md-doc\/template.md --base-version new --category doc-template --category-reason \S/);
   assert.doesNotMatch(calls, /--replace/);
   fs.rmSync(root, { recursive: true, force: true });
 });

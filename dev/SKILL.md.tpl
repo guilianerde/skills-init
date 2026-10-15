@@ -84,7 +84,7 @@ description: "Implement a feature or fix a bug in this project end to end: under
 
 - 提交：给出建议的 commit message，用户同意后再 `git commit`；**不 push**，除非用户明确要求。
 - 文档：M / L 规模建议 `create-tech-md-doc`；要上线时建议 `create-release-md-doc`。
-- 沉淀：本次产生了值得长期记住的决策、约定或坑，且 DocNexus 可用 → 提议走 DocNexus 的 capture 流程；**必须用户授权后才写入**。
+- 沉淀：本次产生了值得长期记住的决策、约定或坑，且 DocNexus 可用 → 提议走 DocNexus 的 capture 流程；**必须用户授权后才写入**。分类用 `node <skills>/workflow/scripts/resolve.mjs category dev` 的结果作为调用方显式分类封存（见 `workflow` skill「写入 DocNexus 的分类」）。
 
 ## 缺陷修复流程（`--bug`）
 

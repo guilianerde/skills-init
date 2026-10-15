@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { loadSkills, deriveMeta } from '../bin/skills.mjs';
+import { loadSkills, deriveMeta, validCategory, TEMPLATE_CATEGORY } from '../bin/skills.mjs';
 
 const REPO = fileURLToPath(new URL('..', import.meta.url));
 const skills = loadSkills(REPO);
@@ -104,4 +104,20 @@ test('shared 声明的文件都存在，且每个共享文件至少被一个 ski
   for (const f of used) assert.ok(fs.existsSync(path.join(REPO, 'shared', f)), `shared/${f} 不存在`);
   for (const f of fs.readdirSync(path.join(REPO, 'shared'))) assert.ok(used.has(f), `shared/${f} 没有被任何 skill 声明`);
   for (const s of skills) for (const f of s.shared) assert.ok(!fs.existsSync(path.join(REPO, s.name, 'references', f)), `${s.name}/references/${f} 与共享文件重名`);
+});
+
+test('docnexus 分类：名称合法；会写入 DocNexus 的 skill 都声明分类，并在 SKILL.md 里经 resolve.mjs category 取用', () => {
+  for (const s of skills) {
+    const md = read(`${s.name}/SKILL.md.tpl`);
+    if (s.docnexus) {
+      assert.ok(validCategory(s.docnexus.category), `${s.name}: ${s.docnexus.category}`);
+      assert.ok(s.docnexus.reason, s.name);
+      assert.ok(md.includes(`resolve.mjs category ${s.name}`), `${s.name} 声明了分类但 SKILL.md 没有取用`);
+    } else if (s.name !== 'workflow') {
+      // workflow 只写模板（固定 doc-template）
+      assert.doesNotMatch(md, /capture 流程/, `${s.name} 会写入 DocNexus，需在 skill.json 声明 docnexus.category`);
+    }
+  }
+  assert.ok(validCategory(TEMPLATE_CATEGORY));
+  for (const bad of ['', ' x', 'x ', 'a\nb', 'x'.repeat(81)]) assert.ok(!validCategory(bad), JSON.stringify(bad));
 });

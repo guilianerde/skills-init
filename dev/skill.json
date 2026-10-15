@@ -22,5 +22,9 @@
   ],
   "shared": [
     "prd-fetch.md"
-  ]
+  ],
+  "docnexus": {
+    "category": "dev-notes",
+    "reason": "dev skill 在开发交付时沉淀的决策、约定与坑"
+  }
 }

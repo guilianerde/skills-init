@@ -15,7 +15,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { loadSkills, deriveMeta, TEMPLATE_CATEGORY } from './skills.mjs';
+import { loadSkills, deriveMeta, TEMPLATE_CATEGORY, TEMPLATE_CATEGORY_REASON } from './skills.mjs';
 
 // 模板清单来自各 skill 的 skill.json（templates 字段）
 export const TEMPLATES = deriveMeta(loadSkills(path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'))).templates;
@@ -42,6 +42,7 @@ const libFile = (root, t) => path.join(root, 'docnexus', 'library', t.file);
 const defaultContent = (tplDir, t) => fs.readFileSync(path.join(tplDir, t.src), 'utf8');
 
 // 写草稿并提交；baseVersion 为 'new'（新建）或已有记录的 record_version（更新，带 --replace）。成功返回 null，失败返回错误信息
+// 分类以调用方显式分类封存（--category doc-template），不走模型分类；不支持该参数的旧版 DocNexus 会忽略它，仍按 metadata.category 入库
 function writeDraft(root, t, content, metadata, baseVersion) {
   const draft = docnexus(root, ['draft', 'new', '--slug', `template-${t.skill}`]);
   if (!draft.ok || !draft.json?.artifacts) return draft.err || 'draft new 失败';
@@ -49,7 +50,8 @@ function writeDraft(root, t, content, metadata, baseVersion) {
   fs.writeFileSync(path.join(root, a.source), content);
   fs.writeFileSync(path.join(root, a.document), content);
   fs.writeFileSync(path.join(root, a.metadata), JSON.stringify(metadata, null, 2) + '\n');
-  const seal = docnexus(root, ['draft', 'seal', '--id', draft.json.draft_id, '--file', t.file, '--base-version', baseVersion]);
+  const seal = docnexus(root, ['draft', 'seal', '--id', draft.json.draft_id, '--file', t.file, '--base-version', baseVersion,
+    '--category', TEMPLATE_CATEGORY, '--category-reason', TEMPLATE_CATEGORY_REASON]);
   const add = seal.ok ? docnexus(root, ['document', 'add', '--draft', draft.json.draft_id, ...(baseVersion === 'new' ? [] : ['--replace'])]) : seal;
   if (add.ok) return null;
   docnexus(root, ['draft', 'discard', '--id', draft.json.draft_id, '--force']);
@@ -60,7 +62,7 @@ const newMetadata = (t) => ({
   title: t.title,
   summary: t.summary,
   category: TEMPLATE_CATEGORY,
-  category_reason: '供 skills-init 文档类 skill 读取的写作模板，与普通知识文档区分；模板随知识库更新。',
+  category_reason: TEMPLATE_CATEGORY_REASON,
   tags: ['skills-init-template', t.skill],
   entities: [],
   relationships: [],
@@ -118,7 +120,10 @@ export function updateTemplates(root, tplDir, records = {}, { ok = console.log, 
     const doc = (q.json?.documents ?? []).find((d) => d.file_path === t.file);
     if (!doc) { result.failed.push({ file: t.file, error: '知识库中找不到对应记录' }); warn(`更新 ${t.file} 失败：知识库中找不到对应记录`); continue; }
     const got = docnexus(root, ['document', 'get', '--id', doc.id, '--include', 'metadata']);
-    const metadata = got.ok && got.json?.metadata ? got.json.metadata : newMetadata(t);
+    // 保留库中已有的元数据，但分类固定为 doc-template（模板按这个分类查询）
+    const metadata = got.ok && got.json?.metadata
+      ? { ...got.json.metadata, category: TEMPLATE_CATEGORY, category_reason: TEMPLATE_CATEGORY_REASON }
+      : newMetadata(t);
     const content = defaultContent(tplDir, t);
     const err = writeDraft(root, t, content, metadata, got.json?.record_version ?? doc.record_version);
     if (err) { result.failed.push({ file: t.file, error: err }); warn(`更新 ${t.file} 失败：${err}`); continue; }

@@ -80,3 +80,29 @@ test('画像空字段与能力探测不输出凭据', () => {
   assert.equal(s.templates.length, 4);
   fs.rmSync(root, { recursive: true, force: true });
 });
+
+test('category：skill.json 声明的显式分类，项目画像可覆盖，未声明 / 非法时退出 1', () => {
+  const { root, resolve, put } = project();
+  let r = resolve('category', 'create-tech-md-doc');
+  assert.equal(r.status, 0);
+  assert.equal(r.out.source, 'skill');
+  assert.equal(r.out.category, 'tech-design');
+  assert.deepEqual(r.out.seal_args, ['--category', 'tech-design', '--category-reason', r.out.reason]);
+  assert.deepEqual(r.out.metadata, { category: 'tech-design', category_reason: r.out.reason });
+  r = resolve('category', 'database-query');
+  assert.equal(r.status, 1);
+  assert.equal(r.out.error, 'none');
+  assert.equal(resolve('category', 'nope').out.error, 'unknown');
+  const profile = path.join(root, '.agents/skills/workflow/profile.json');
+  const p = JSON.parse(fs.readFileSync(profile, 'utf8'));
+  put('.agents/skills/workflow/profile.json', JSON.stringify({ ...p, docnexus_categories: { 'create-tech-md-doc': '技术方案', dev: ' 带空格 ' } }));
+  r = resolve('category', 'create-tech-md-doc');
+  assert.deepEqual([r.out.source, r.out.category], ['profile', '技术方案']);
+  r = resolve('category', 'dev');
+  assert.deepEqual([r.status, r.out.error], [1, 'invalid']);
+  const s = resolve('status').out;
+  assert.equal(s.docnexus.categories['create-tech-md-doc'], '技术方案');
+  assert.equal(s.docnexus.categories['create-release-md-doc'], 'release-plan');
+  assert.ok(!('database-query' in s.docnexus.categories));
+  fs.rmSync(root, { recursive: true, force: true });
+});

@@ -27,5 +27,9 @@
   "shared": [
     "diff-collection-common.md",
     "prd-fetch.md"
-  ]
+  ],
+  "docnexus": {
+    "category": "tech-design",
+    "reason": "create-tech-md-doc skill 从技术方案中沉淀的决策、约定与风险"
+  }
 }

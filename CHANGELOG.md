@@ -8,6 +8,7 @@
 - dev 直接读 `project-review/references/checklist.md`：接入 DocNexus 后会用到默认清单而不是团队维护的版本。改为通过 `resolve.mjs template` 取；project-review 自身的配置维度说明同步修正。
 
 ### 新增
+- 写入 DocNexus 时由 skill 显式指定分类（对应 DocNexus 新增的 `draft seal --category`）：skill.json 新增 `docnexus: { category, reason }`（`dev` → `dev-notes`，`create-tech-md-doc` → `tech-design`，`create-release-md-doc` → `release-plan`），`resolve.mjs category <skill>` 输出分类与 `seal_args`，项目可用 `profile.json` 的 `docnexus_categories` 覆盖；`resolve.mjs status` 列出各 skill 的分类。`seed-templates` 导入与更新模板时以 `--category doc-template` 封存，更新时分类固定为 `doc-template`。同时写 `metadata.category`，不支持 `--category` 的旧版 DocNexus（会忽略该参数）照常入库。
 - skill.json 新增 `requires` / `optional` / `shared`；安装器支持 `--skills <列表>` 按需安装并自动带上依赖，`upgrade` 只升级装过的 skill，模板导入与状态只针对已安装的 skill；`resolve.mjs status` 输出已安装的 skill。
 - 测试检查跨 skill 的文件引用必须在 `requires` / `optional` 中声明。
 - `upload.mjs get [--text]`：读取 wiki 页面正文；其他 skill 拉 PRD 统一调用它，不再直接读 `md-to-wiki/wiki-config.json`。

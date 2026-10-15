@@ -27,5 +27,9 @@
   "shared": [
     "diff-collection-common.md",
     "prd-fetch.md"
-  ]
+  ],
+  "docnexus": {
+    "category": "release-plan",
+    "reason": "create-release-md-doc skill 从上线方案中沉淀的配置变化、风险与回滚要点"
+  }
 }

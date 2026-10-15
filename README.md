@@ -273,6 +273,7 @@ npx @rowansenne/skills-init doctor
   "optional": ["md-to-wiki", "create-release-md-doc"],
   "shared": ["diff-collection-common.md", "prd-fetch.md"],
   "templates": [{ "id": "template.md", "src": "template.md", "title": "技术方案模板", "summary": "...", "lint": { "requiredMeta": ["模板来源"] } }],
+  "docnexus": { "category": "tech-design", "reason": "create-tech-md-doc skill 从技术方案中沉淀的决策、约定与风险" },
   "renamedFrom": {}
 }
 ```
@@ -286,6 +287,9 @@ npx @rowansenne/skills-init doctor
 | `requires` | 运行时必需的 skill（会调用它的脚本或读它的文件）；`--skills` 安装时自动带上 |
 | `optional` | 协作但非必需的 skill：没装时跳过对应增强（如 PRD 读取、自审），不报错 |
 | `shared` | 共享参考文件：源在仓库 `shared/`，安装时拷进本 skill 的 `references/`。仓库里只维护一份，装好后每个 skill 自带完整文件，运行时不依赖别的 skill |
+| `docnexus` | 本 skill 写入 DocNexus 时的显式分类 `{ category, reason }`。写入时以调用方显式分类封存（`draft seal --category`），不走 DocNexus 的模型分类；项目可在 `workflow/profile.json` 的 `docnexus_categories` 里按 skill 覆盖 |
+
+当前分类：`dev` → `dev-notes`，`create-tech-md-doc` → `tech-design`，`create-release-md-doc` → `release-plan`，导入的模板固定为 `doc-template`。`project-review` 只读 DocNexus，`database-query`、`md-to-wiki` 不写入，都不声明分类。测试会检查：SKILL.md 里有 DocNexus 写入步骤的 skill 必须声明分类，并通过 `resolve.mjs category` 取用。
 
 `tests/test-skills-meta.mjs` 会检查：skill 的文件里出现了别的 skill 的路径（如 `md-to-wiki/scripts/…`、`workflow/scripts/…`），就必须在 `requires` 或 `optional` 里声明；`requires` 声明了就必须真的用到，而且不能成环。
 
@@ -301,6 +305,7 @@ npx @rowansenne/skills-init doctor
 | --- | --- |
 | `workflow/scripts/resolve.mjs template <skill> <文件名>` | 判定用哪份模板：已接入 DocNexus 只用知识库，缺失时退出码 2 并给出导入来源；未接入时项目文件优先，其次默认模板 |
 | `workflow/scripts/resolve.mjs profile` | 读项目画像，列出空字段 |
+| `workflow/scripts/resolve.mjs category <skill>` | 该 skill 写入 DocNexus 时的显式分类（画像 `docnexus_categories` 优先，其次 skill.json），输出 `seal_args` 与 `metadata`；未声明时退出码 1 |
 | `workflow/scripts/resolve.mjs status` | `/workflow status` 的能力探测（不输出任何凭据） |
 | `workflow/scripts/resolve.mjs infer-profile` | 按固定规则从构建文件、Makefile、依赖与配置文件、git 推断项目画像草稿，每个字段附依据；不写文件 |
 | `workflow/scripts/lint-doc.mjs <文档> --skill <skill>` | 对照当前生效的模板检查生成的文档：必填章节、残留 `{{...}}` 占位符、元信息行为错误；缺普通章节、顺序不一致为警告；列出待填写位置 |

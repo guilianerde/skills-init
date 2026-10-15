@@ -7,8 +7,9 @@
 //   node .agents/skills/workflow/scripts/resolve.mjs templates                   # 所有模板的来源
 //   node .agents/skills/workflow/scripts/resolve.mjs profile                     # 项目画像与空字段
 //   node .agents/skills/workflow/scripts/resolve.mjs infer-profile               # 从仓库推断画像草稿（带依据，不写文件）
+//   node .agents/skills/workflow/scripts/resolve.mjs category <skill>             # 该 skill 写入 DocNexus 时的显式分类
 //   node .agents/skills/workflow/scripts/resolve.mjs status                      # 能力探测（/workflow status）
-// 输出 JSON。退出码：0 正常；2 已接入 DocNexus 但知识库缺该模板（按输出的 hint 处理）；1 参数错误
+// 输出 JSON。退出码：0 正常；2 已接入 DocNexus 但知识库缺该模板（按输出的 hint 处理）；1 参数错误 / 该 skill 没有声明分类
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -51,11 +52,36 @@ export function resolveTemplate(root, skill, id) {
     return {
       ok: false, ...res, error: 'missing', expected: rel(root, lib),
       import_from: fs.existsSync(project) ? rel(root, project) : rel(root, builtin),
-      hint: '已接入 DocNexus，只使用知识库中的模板。停下这一步告诉用户缺这份模板：可在项目根运行 skills-init seed-templates（或重跑安装加 --seed-templates），或经用户确认后把 import_from 按 capture 流程写入 expected（分类 doc-template）。',
+      hint: '已接入 DocNexus，只使用知识库中的模板。停下这一步告诉用户缺这份模板：可在项目根运行 skills-init seed-templates（或重跑安装加 --seed-templates），或经用户确认后把 import_from 按 capture 流程写入 expected（以显式分类 --category doc-template 封存）。',
     };
   }
   if (fs.existsSync(project)) return { ok: true, skill, id, docnexus: false, source: 'project', path: rel(root, project) };
   return { ok: true, skill, id, docnexus: false, source: 'default', path: rel(root, builtin) };
+}
+
+// DocNexus 对显式分类名的约束：1–80 字符，无首尾空白与控制字符（与 bin/skills.mjs 一致）
+const validCategory = (c) => typeof c === 'string' && c.length >= 1 && c.length <= 80 && c === c.trim() && !/[\u0000-\u001f\u007f]/.test(c);
+
+// skill 写入 DocNexus 的显式分类：项目画像 docnexus_categories.<skill> 优先，其次 skill.json 的 docnexus.category。
+// 入库时作为调用方显式分类封存（seal_args），metadata.category 写同一个值（兼容不支持 --category 的旧版 DocNexus）
+export function resolveCategory(root, skill) {
+  const meta = skillMeta(skill);
+  if (!meta) return { ok: false, error: 'unknown', message: `未安装 skill「${skill}」` };
+  const override = readProfile(root).profile.docnexus_categories?.[skill];
+  let category, reason, source;
+  if (override != null && override !== '') {
+    if (!validCategory(override)) return { ok: false, error: 'invalid', message: `workflow/profile.json 的 docnexus_categories.${skill} 不是合法分类名（1–80 字符，无首尾空白与控制字符）` };
+    [category, reason, source] = [override, `项目画像指定的 ${skill} skill 产出分类`, 'profile'];
+  } else if (meta.docnexus?.category) {
+    [category, reason, source] = [meta.docnexus.category, meta.docnexus.reason || `由 ${skill} skill 产出`, 'skill'];
+  } else {
+    return { ok: false, error: 'none', skill, message: `skill「${skill}」没有声明 DocNexus 分类，写入时按 DocNexus 默认流程由模型分类` };
+  }
+  return {
+    ok: true, skill, category, reason, source,
+    seal_args: ['--category', category, '--category-reason', reason],
+    metadata: { category, category_reason: reason },
+  };
 }
 
 export function readProfile(root) {
@@ -88,6 +114,8 @@ export function status(root) {
       ok: dn,
       missing_templates: dn ? templates.filter((t) => !t.ok).map((t) => t.expected) : [],
       stale_project_templates: dn ? templates.map((t) => t.stale_project_file).filter(Boolean) : [],
+      // 各 skill 写入时使用的显式分类（没声明的 skill 不列出）
+      categories: Object.fromEntries(skillMetas().map((m) => [m.name, resolveCategory(root, m.name)]).filter(([, c]) => c.ok).map(([n, c]) => [n, c.category])),
       how: dn ? '缺模板时运行 skills-init seed-templates' : '重跑 skills-init 并加 --with-docnexus',
     },
     database: {
@@ -119,9 +147,15 @@ function main(argv) {
     case 'templates': print(status(root).templates); return 0;
     case 'profile': print(readProfile(root)); return 0;
     case 'infer-profile': print({ current: readProfile(root).profile, ...inferProfile(root) }); return 0;
+    case 'category': {
+      if (rest.length !== 1) break;
+      const r = resolveCategory(root, rest[0]);
+      print(r);
+      return r.ok ? 0 : 1;
+    }
     case 'status': print(status(root)); return 0;
   }
-  console.error('用法: resolve.mjs [--root <项目根>] template <skill> <文件名> | templates | profile | infer-profile | status');
+  console.error('用法: resolve.mjs [--root <项目根>] template <skill> <文件名> | templates | profile | infer-profile | category <skill> | status');
   return 1;
 }
 
