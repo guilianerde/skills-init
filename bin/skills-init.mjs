@@ -25,7 +25,7 @@ import { ask, closePrompt } from './lib/prompt.mjs';
 import { findExistingDbConfig, getDb } from './lib/db.mjs';
 import { report, installSkills, linkSkills, removeRenamed, updateGitignore } from './lib/install.mjs';
 import { uninstall } from './lib/uninstall.mjs';
-import { checkNodeForDocNexus, setupDocNexus, templateRecords, saveTemplateRecords, reportTemplateStatus, installedSkills } from './lib/docnexus.mjs';
+import { checkNodeForDocNexus, setupDocNexus, templateRecords, saveTemplateRecords, reportTemplateStatus, installedSkills, docnexusConnected, printTemplateDiffs } from './lib/docnexus.mjs';
 import { upgradeOptions, doctor } from './lib/doctor.mjs';
 
 // ---------------------------------------------------------------- 参数
@@ -34,7 +34,8 @@ const HELP = `用法: skills-init [命令] [选项]
 
 命令：
   init（默认）         安装或重装 skills
-  upgrade              按安装清单里的环境与模式非交互升级到当前版本（保留数据库配置；手改过的文件另存 .new）
+  upgrade              按安装清单里的环境与模式非交互升级到当前版本（保留数据库配置；手改过的文件另存 .new）；
+                       已接入 DocNexus 时顺带导入新增的文档模板（只新增，不覆盖已有模板）
   doctor               自检：版本、手改 / 缺失文件、软链接、项目画像、DocNexus 模板、数据库连通性、.gitignore
   uninstall            按安装清单卸载本项目装的 skills 与链接（用户配置备份到 tmp/skills/uninstall-backup/）
   seed-templates       只把自带的文档模板导入 DocNexus（docnexus/library/templates/，已有的不覆盖）
@@ -50,6 +51,7 @@ init 选项：
   --uninstall          同 uninstall 命令
 seed-templates 选项：
   --update             同时把「导入后未改动、但默认模板有新版」的知识库模板更新为新版
+  --diff               不写入，只打印团队改过的模板与新默认模板的差异（customized / untracked），供手动合并
 doctor 选项：
   --offline            不测试数据库连通性
 通用：
@@ -58,7 +60,7 @@ doctor 选项：
   -h, --help           显示帮助`;
 
 function parseArgs(argv) {
-  const o = { cmd: 'init', envs: '', skipDb: false, yes: false, withDocNexus: false, copy: false, seedTemplates: false, update: false, skills: '', offline: false, root: process.cwd() };
+  const o = { cmd: 'init', envs: '', skipDb: false, yes: false, withDocNexus: false, copy: false, seedTemplates: false, update: false, diff: false, skills: '', offline: false, root: process.cwd() };
   let cmdGiven = false; // 命令可以出现在选项之间（封装脚本会先传 --project-root）
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
@@ -74,6 +76,7 @@ function parseArgs(argv) {
       case '--uninstall': o.cmd = 'uninstall'; cmdGiven = true; break;
       case '--offline': o.offline = true; break;
       case '--update': o.update = true; break;
+      case '--diff': o.diff = true; break;
       case '--project-root': o.root = path.resolve(val()); break;
       case '-v': case '--version': console.log(PKG.version); process.exit(0); break;
       case '-h': case '--help': console.log(HELP); process.exit(0); break;
@@ -113,6 +116,11 @@ async function main() {
   let o = parseArgs(process.argv.slice(2));
   if (o.cmd === 'uninstall') { step(`按安装清单卸载 ${o.root} 中的 skills`); return uninstall(o.root); }
   if (o.cmd === 'doctor') return doctor(o.root, o.offline);
+  if (o.cmd === 'seed-templates' && o.diff) {
+    step('团队改过的模板与新默认模板的差异（只读，不写入 DocNexus）');
+    printTemplateDiffs(o.root);
+    return 0;
+  }
   if (o.cmd === 'seed-templates') {
     step('导入文档模板到 DocNexus');
     try {
@@ -181,14 +189,20 @@ async function main() {
   updateGitignore(o.root, o.withDocNexus);
   const docnexus = o.withDocNexus ? setupDocNexus(o.root, sel) : 'skipped';
   let seedFailed = false;
-  // 接入 DocNexus 后文档类 skill 只从知识库取模板，所以 --with-docnexus 时一并导入（已有的不覆盖）
-  if ((o.seedTemplates || o.withDocNexus) && docnexus !== 'failed') {
-    step('导入文档模板到 DocNexus（--seed-templates）');
+  // 接入 DocNexus 后文档类 skill 只从知识库取模板，所以 --with-docnexus 时一并导入（已有的不覆盖）；
+  // upgrade 时新版本可能新增了模板（缺了 skill 会停下），已接入就顺带导入缺的，不改动已有模板
+  const upgradeSeed = o.upgrading && docnexusConnected(o.root);
+  if ((o.seedTemplates || o.withDocNexus || upgradeSeed) && docnexus !== 'failed') {
+    step(upgradeSeed && !o.seedTemplates && !o.withDocNexus ? '导入新增的文档模板到 DocNexus（只新增，已有模板不动）' : '导入文档模板到 DocNexus（--seed-templates）');
     try {
-      const r = seedTemplates(o.root, TPL_DIR, { ok, warn, version: PKG.version, skills: installedSkills(o.root) });
+      const r = seedTemplates(o.root, TPL_DIR, { ok, warn, version: PKG.version, skills: installedSkills(o.root), quietSkip: upgradeSeed });
       saveTemplateRecords(o.root, r.records);
-      seedFailed = r.failed.length > 0;
-    } catch (e) { warn(e.message); seedFailed = true; }
+      // upgrade 顺带的导入是尽力而为：失败只提示，不让升级本身算失败
+      const explicit = o.seedTemplates || o.withDocNexus;
+      seedFailed = explicit && r.failed.length > 0;
+      if (!explicit && r.failed.length) warn('新增模板导入失败（skills 已升级）：修复后运行 skills-init seed-templates 重试');
+      if (upgradeSeed && !r.seeded.length && !r.failed.length) ok('知识库里的文档模板齐全，无需导入');
+    } catch (e) { warn(e.message); seedFailed = o.seedTemplates || o.withDocNexus; }
   }
 
   step('安装完成，启用方式');

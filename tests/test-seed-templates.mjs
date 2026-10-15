@@ -175,3 +175,46 @@ test('CLI：安装时导入并记录到清单；doctor 提示 outdated；seed-te
   assert.equal(JSON.parse(fs.readFileSync(mf, 'utf8')).templates[t.file].version, JSON.parse(fs.readFileSync(path.join(REPO, 'package.json'), 'utf8')).version);
   fs.rmSync(root, { recursive: true, force: true });
 });
+
+test('CLI：upgrade 自动导入新增的模板（只新增）；seed-templates --diff 只读打印团队改过的模板与新默认的差异', { skip }, () => {
+  const root = project();
+  const cli = (...a) => spawnSync(process.execPath, [path.join(REPO, 'bin/skills-init.mjs'), '--project-root', root, ...a], { cwd: root, encoding: 'utf8' });
+  let r = cli('--envs', 'codex', '--skip-db', '--yes', '--seed-templates');
+  assert.equal(r.status, 0, r.stderr);
+  const mf = path.join(root, '.agents/skills/.skills-init.json');
+  const m = JSON.parse(fs.readFileSync(mf, 'utf8'));
+  const added = TEMPLATES.find((t) => t.skill === 'project-review' && t.id === 'report.md');
+  const custom = TEMPLATES.find((t) => t.skill === 'project-review' && t.id === 'checklist.md');
+  // 模拟「旧版本装的项目」：知识库里还没有新模板；清单是团队在旧默认基础上改过的
+  fs.rmSync(path.join(root, 'docnexus/library', added.file));
+  const reg = JSON.parse(fs.readFileSync(path.join(root, 'registry.json'), 'utf8'));
+  fs.writeFileSync(path.join(root, 'registry.json'), JSON.stringify(Object.fromEntries(Object.entries(reg).filter(([, d]) => d.file_path !== added.file))));
+  delete m.templates[added.file];
+  const oldDefault = '# 旧版清单\n## 1. 正确性\n';
+  fs.writeFileSync(path.join(root, 'docnexus/library', custom.file), `${oldDefault}## 团队加的章节\n`);
+  m.templates[custom.file] = { version: '0.5.0', sha256: crypto.createHash('sha256').update(oldDefault).digest('hex') };
+  fs.writeFileSync(mf, JSON.stringify(m));
+  fs.writeFileSync(path.join(root, 'calls.log'), '');
+
+  r = cli('upgrade');
+  assert.equal(r.status, 0, r.stderr);
+  assert.equal(fs.readFileSync(path.join(root, 'docnexus/library', added.file), 'utf8'), fs.readFileSync(path.join(REPO, added.src), 'utf8'));
+  assert.match(fs.readFileSync(path.join(root, 'docnexus/library', custom.file), 'utf8'), /团队加的章节/, '已有模板不动');
+  const seals = fs.readFileSync(path.join(root, 'calls.log'), 'utf8').split('\n').filter((l) => l.startsWith('draft seal'));
+  assert.equal(seals.length, 1);
+  assert.match(seals[0], new RegExp(`--file ${added.file} --base-version new`));
+  assert.ok(JSON.parse(fs.readFileSync(mf, 'utf8')).templates[added.file], '导入记录写回清单');
+  assert.doesNotMatch(r.stdout, /DocNexus 中已有/, 'upgrade 时不逐个列出已有模板');
+  assert.match(r.stderr, /seed-templates --diff/, 'customized 提示用 --diff 对比');
+
+  fs.writeFileSync(path.join(root, 'calls.log'), '');
+  r = cli('seed-templates', '--diff');
+  assert.equal(r.status, 0, r.stderr);
+  assert.match(r.stdout, new RegExp(custom.file.replace(/[.]/g, '\\.')));
+  assert.match(r.stdout, /^-## 团队加的章节$/m);
+  assert.match(r.stdout, /^\+## 11\. 幂等与消息一致性$/m);
+  assert.equal(fs.readFileSync(path.join(root, 'calls.log'), 'utf8'), '', '--diff 不调用 DocNexus');
+  r = cli('upgrade');
+  assert.match(r.stdout, /文档模板齐全/);
+  fs.rmSync(root, { recursive: true, force: true });
+});

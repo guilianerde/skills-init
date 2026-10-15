@@ -72,13 +72,13 @@ const newMetadata = (t) => ({
 // skills：只处理这些 skill 的模板（缺省为全部），--skills 子集安装时不导入没装的 skill 的模板
 const pick = (skills) => (skills ? TEMPLATES.filter((t) => skills.includes(t.skill)) : TEMPLATES);
 
-export function seedTemplates(root, tplDir, { ok = console.log, warn = console.error, version = '', skills } = {}) {
+export function seedTemplates(root, tplDir, { ok = console.log, warn = console.error, version = '', skills, quietSkip = false } = {}) {
   requireDocNexus(root);
   const result = { seeded: [], skipped: [], failed: [], records: {} };
   for (const t of pick(skills)) {
     if (fs.existsSync(libFile(root, t))) {
       result.skipped.push(t.file);
-      ok(`DocNexus 中已有 ${t.file}，保留不覆盖`);
+      if (!quietSkip) ok(`DocNexus 中已有 ${t.file}，保留不覆盖`);
       continue;
     }
     const content = defaultContent(tplDir, t);
@@ -137,8 +137,8 @@ export function updateTemplates(root, tplDir, records = {}, { ok = console.log, 
 export const STATUS_TEXT = {
   current: '与默认模板一致',
   outdated: '默认模板有新版，库中模板未改动：运行 skills-init seed-templates --update 更新',
-  customized: '团队改过，默认模板也有新版：对比默认模板手动合并',
+  customized: '团队改过，默认模板也有新版：运行 skills-init seed-templates --diff 查看差异后手动合并',
   edited: '团队改过（默认模板无变化）',
-  untracked: '没有导入记录，内容与默认模板不同：如需采用新默认模板请手动对比',
-  missing: '知识库中缺失：运行 skills-init seed-templates 导入',
+  untracked: '没有导入记录，内容与默认模板不同：如需采用新默认模板，运行 skills-init seed-templates --diff 对比',
+  missing: '知识库中缺失：运行 skills-init seed-templates 导入（upgrade 时会自动导入）',
 };

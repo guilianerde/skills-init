@@ -15,8 +15,9 @@
   - 新增交付前的「复核」步骤：CRITICAL / HIGH 逐条回到代码确认片段与行号、写出触发条件、排查别处是否已兜住、确认是本次改动引入的；复核不了的降级并标「⚠ 待确认」，不计入「不建议合并」的结论。
 
 ### 新增
+- `upgrade` 在已接入 DocNexus 的项目里顺带导入新版本新增的文档模板（如本版的审查报告模板）：只新增，不改动已有模板；导入失败只提示，不让升级失败。之前要手动 `seed-templates`，否则 skill 会停下提示缺模板。
+- `seed-templates --diff`：只读打印团队改过的模板（customized / untracked）与新默认模板的差异，例如团队维护的审查清单拿不到本版新增的第 11–14 维度时，对照差异手动合并；不写 DocNexus。`doctor` / `upgrade` 的模板状态提示改为指向它。
 - 审查报告模板 `project-review/references/report.md`（`resolve.mjs template project-review report.md`）：元信息三行（审查范围、对比分支、审查方式）、问题表带「触发条件」与「复核」列、「未覆盖与待确认」必填。落盘后跑 `lint-doc.mjs --skill project-review --facts` 自检，和文档类 skill 一样能被 DocNexus 团队模板覆盖。
-  - 已接入 DocNexus 的项目升级后运行 `skills-init seed-templates` 补导入这份模板，否则落盘报告时 skill 会停下提示缺模板。
 
 ## [0.5.0] - 2026-10-15
 

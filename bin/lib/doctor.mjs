@@ -18,7 +18,7 @@ export function upgradeOptions(o) {
   if (!envs) fail('安装清单里没有记录环境，请用 init --envs <列表> 重装。');
   // 只升级装过的 skill（--skills 子集安装时清单里只有这些）
   const skills = Object.keys(m.skills ?? {}).filter((s) => SKILLS.includes(s)).join(',');
-  return { ...o, cmd: 'init', envs, copy: m.mode === 'copy', yes: true, skipDb: true, skills: o.skills || skills };
+  return { ...o, cmd: 'init', upgrading: true, envs, copy: m.mode === 'copy', yes: true, skipDb: true, skills: o.skills || skills };
 }
 
 export function doctor(root, offline) {

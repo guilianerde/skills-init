@@ -59,10 +59,10 @@ npx @rowansenne/skills-init
 | 命令 | 作用 |
 | --- | --- |
 | `init`（默认，可省略） | 安装或重装 |
-| `upgrade` | 读安装清单里记录的环境与模式，非交互升级到当前版本：保留数据库配置，手改过的文件另存 `.new` |
+| `upgrade` | 读安装清单里记录的环境与模式，非交互升级到当前版本：保留数据库配置，手改过的文件另存 `.new`；已接入 DocNexus 时顺带导入新版本新增的文档模板（只新增，不改动已有模板） |
 | `doctor` | 自检：已装版本与当前包对比、手改 / 缺失 / 待合并的文件、软链接是否断开、项目画像、DocNexus 模板是否齐全、各数据库连接能否只读 `SELECT 1`（`--offline` 跳过）、`.gitignore` 是否忽略了凭据。有错误时退出码 1 |
 | `uninstall` | 等价于 `--uninstall` |
-| `seed-templates` | 只把默认文档模板导入 DocNexus，不重装 skills |
+| `seed-templates` | 只把默认文档模板导入 DocNexus，不重装 skills。`--update` 把导入后未改动的模板更新为新版；`--diff` 只读打印团队改过的模板与新默认模板的差异，供手动合并 |
 
 ```
 npx @rowansenne/skills-init upgrade      # 拿最新版升级
@@ -512,7 +512,9 @@ skills-init/
 
 ```
 ./skills-init/init-skills.sh --envs claude --skip-db --with-docnexus   # 接入时自动导入默认模板
-./skills-init/init-skills.sh seed-templates                      # 已接入的项目补导入缺的模板
+./skills-init/init-skills.sh seed-templates                      # 已接入的项目补导入缺的模板（upgrade 时也会自动导入新增的）
+./skills-init/init-skills.sh seed-templates --update             # 导入后没改过的模板更新为新版
+./skills-init/init-skills.sh seed-templates --diff               # 团队改过的模板：打印与新默认模板的差异，手动合并
 ```
 
 * 只导入 DocNexus 里还没有的模板，已有的不覆盖；项目已接入但缺模板时，安装结束会列出缺哪几份。

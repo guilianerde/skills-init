@@ -3,8 +3,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { templateStatus, STATUS_TEXT } from '../seed-templates.mjs';
-import { TPL_DIR, IS_WIN, DOCNEXUS_PKG, MANIFEST, step, ok, warn, fail, writeFile, lstat, findManifests } from './core.mjs';
+import { templateStatus, STATUS_TEXT, TEMPLATES } from '../seed-templates.mjs';
+import { TPL_DIR, IS_WIN, DOCNEXUS_PKG, MANIFEST, PKG, step, ok, warn, fail, writeFile, lstat, findManifests } from './core.mjs';
 
 export function run(cmd, args, cwd, quiet = false) {
   const r = spawnSync(cmd, args, { cwd, stdio: quiet ? ['ignore', 'ignore', 'inherit'] : 'inherit', shell: IS_WIN });
@@ -94,4 +94,27 @@ export function reportTemplateStatus(root, say = warn) {
   const list = templateStatus(root, TPL_DIR, templateRecords(root), installedSkills(root)).filter((s) => !['current', 'edited'].includes(s.status));
   for (const s of list) say(`DocNexus 模板 ${s.file}：${STATUS_TEXT[s.status]}${s.status === 'customized' || s.status === 'untracked' ? `（默认模板：${s.defaultPath}）` : ''}`);
   return list.length > 0;
+}
+
+export function docnexusConnected(root) {
+  return fs.existsSync(path.join(root, 'docnexus', 'project.json')) && fs.existsSync(path.join(root, 'node_modules', '.bin', IS_WIN ? 'docnexus.cmd' : 'docnexus'));
+}
+
+// 团队改过的模板（customized / untracked）与当前默认模板的差异：只读，不写 DocNexus。
+// 只有导入时的哈希、没有导入时的原文，做不了三方合并，所以差异里同时包含团队自己的改动和默认模板的新改动。返回打印了几份
+export function printTemplateDiffs(root) {
+  const list = templateStatus(root, TPL_DIR, templateRecords(root), installedSkills(root)).filter((s) => ['customized', 'untracked'].includes(s.status));
+  if (!list.length) { ok('没有需要手动合并的模板（团队改过、且默认模板有新版的）'); return 0; }
+  for (const s of list) {
+    const t = TEMPLATES.find((x) => x.file === s.file);
+    const lib = path.join('docnexus', 'library', t.file);
+    const def = path.join(TPL_DIR, t.src);
+    step(`${lib}（${s.status === 'customized' ? '团队改过，默认模板有新版' : '无导入记录，内容与默认模板不同'}）`);
+    console.log(`  --- 知识库：${lib}\n  +++ 新默认：${t.src}（skills-init ${PKG.version}）`);
+    const r = spawnSync('git', ['diff', '--no-index', '--no-color', '--', path.join(root, lib), def], { encoding: 'utf8' });
+    if (r.error) { warn(`未找到 git，无法生成差异；请手动对比上面两个文件`); continue; }
+    console.log(r.stdout.split('\n').filter((l) => !/^(diff --git|index |--- |\+\+\+ )/.test(l)).join('\n'));
+  }
+  console.log('「-」是知识库现有内容，「+」是新默认模板；其中既有团队自己的改动也有默认模板的新改动，只采纳需要的部分。合并方式：按 DocNexus 的更新流程改写知识库里的模板（写入需要授权）。');
+  return list.length;
 }

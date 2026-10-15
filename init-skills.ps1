@@ -23,6 +23,8 @@ param(
   [switch]$Copy,               # 不用软链接，每个环境各拷一份
   [switch]$SeedTemplates,      # 把自带的文档模板导入 DocNexus
   [switch]$Offline,            # doctor：不测试数据库连通性
+  [switch]$Update,             # seed-templates：把导入后未改动的模板更新为新版
+  [switch]$Diff,               # seed-templates：只读打印团队改过的模板与新默认模板的差异
   [switch]$Uninstall           # 按安装清单卸载本项目装的 skills 与链接（用户配置备份到 tmp\skills\uninstall-backup\）
 )
 
@@ -44,6 +46,8 @@ if ($WithDocNexus) { $cliArgs += '--with-docnexus' }
 if ($Copy)         { $cliArgs += '--copy' }
 if ($SeedTemplates) { $cliArgs += '--seed-templates' }
 if ($Offline)      { $cliArgs += '--offline' }
+if ($Update)       { $cliArgs += '--update' }
+if ($Diff)         { $cliArgs += '--diff' }
 if ($Uninstall)    { $cliArgs += '--uninstall' }
 
 & node @cliArgs
