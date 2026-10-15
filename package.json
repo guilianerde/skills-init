@@ -30,7 +30,8 @@
     "create-release-md-doc",
     "init-skills.sh",
     "init-skills.ps1",
-    "README.md"
+    "README.md",
+    "CHANGELOG.md"
   ],
   "scripts": {
     "test": "bash tests/test-init-skills.sh && node --test \"tests/*.mjs\"",
@@ -38,5 +39,9 @@
   },
   "publishConfig": {
     "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/guilianerde/skills-init.git"
   }
 }

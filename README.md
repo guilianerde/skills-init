@@ -319,6 +319,12 @@ pwsh -NoProfile -File tests/test-init-skills.ps1   # PowerShell 版（Windows，
 
 CI（`.github/workflows/test.yml`）在 push 到 main 和每个 PR 上运行：macOS 用 `/bin/bash`、Ubuntu 用 bash 跑 bash 版，Windows 用 pwsh 跑 PowerShell 版；三个平台都跑 node 测试。
 
+## 发布
+
+1. 在 `CHANGELOG.md` 的 `[Unreleased]` 下记录改动，发布时改成 `## [x.y.z] - 日期`，同步改 `package.json` 的 `version`。
+2. 推送 `vx.y.z` tag：`.github/workflows/release.yml` 校验 tag 与版本、CHANGELOG 一致，跑测试，然后用 npm Trusted Publishing 发布（不需要 npm token / OTP）。
+3. 首次使用前需要在 npmjs.com 的包设置 → Trusted Publisher 里登记 GitHub 仓库 `guilianerde/skills-init` 与工作流 `release.yml`。
+
 ## 凭据安全
 
 
