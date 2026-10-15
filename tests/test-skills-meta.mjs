@@ -15,7 +15,7 @@ test('每个 skill 有 SKILL.md.tpl，frontmatter name 与目录名一致', () =
   assert.ok(skills.length >= 7);
   for (const s of skills) {
     const md = read(`${s.name}/SKILL.md.tpl`);
-    assert.match(md, new RegExp(`^---\\nname: ${s.name}\\n`), s.name);
+    assert.match(md, new RegExp(`^---\\r?\\nname: ${s.name}\\r?\\n`), s.name);
   }
 });
 
