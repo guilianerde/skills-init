@@ -12,6 +12,7 @@ description: "Review source code (any language; Java/Spring, Go, TypeScript, Pyt
    - **可选：查项目约定（DocNexus）**：项目根存在 `docnexus/project.json` 且 `./node_modules/.bin/docnexus` 可执行时，先运行 `node <skills>/workflow/scripts/knowledge.mjs project-review --match <模块名 / 业务名词> --query "<一句话：改动涉及的模块与业务>"`，看以往审查沉淀的反复问题和开发约定（`--query` 在这些分类内按正文 recall；输出 `recall_by_category: false` 时改按 `docnexus-recall` 做不带分类的 recall），找相关的编码约定、历史决策与已知坑，作为审查依据并在报告中引用 `docnexus/library/<path>`。未检测到或查询失败就跳过，并在「未覆盖与待确认」中注明；审查过程中**不写入** DocNexus（写入见第 8 步）。
    - **同分支已有产物**：运行 `node <skills>/workflow/scripts/artifacts.mjs --branch <dev分支>`（单文件 / 未提交改动用当前分支，省略 `--branch`），看输出的 `latest`：
      - `latest.plan` 或 `latest.tech` 存在 → 读其中的验收标准、改动设计、接口 / 数据 / 配置变更，第 3 步审 diff 时做**需求对照**：方案里有、diff 里找不到的 → 漏实现（属于验收标准的按 HIGH，其余 MEDIUM）；diff 里有、方案里没提的接口 / 表结构 / 配置 / 依赖变更 → 列出请作者确认（不一定是问题）。只对照能在 diff 里核对的项，不推测业务语义。
+     - `latest.delivery` 存在（dev 的交付说明）→ 其中「已确认的决定」并入需求对照的依据；「配置清单」「SQL 脚本」和 diff 对照，diff 里有而交付说明漏列的配置 key / DDL 记为 MEDIUM（上线时会被漏掉）。
      - `latest.review` 存在 → 这是**复审**：读上次报告的问题表，并用 `git log --oneline --since=<上次报告日期> <dev分支>` 看之后改了什么。本次报告对上次的每条问题标「已修复 / 仍存在 / 不再适用」（「已修复」要看到对应改动），本次新发现的标「新增」。
 3. **分支对比**：基线默认取 `workflow/profile.json` 的 `main_branch`（未配置则 `main`）。按 `references/diff-strategy.md` 先量规模：小改动全量精读；改动多时按风险分级（P0 资金 / 事务 / 权限 / SQL / 对外接口 / MQ / 配置优先）分批精读，审不到的写进报告。只审本次改动引入的问题，同时检查改动是否破坏既有调用方。
 4. **逐项过检查清单**（在项目根运行 `node <skills>/workflow/scripts/resolve.mjs template project-review checklist.md`，读输出的 `path`；退出码 2 时停下并按 `hint` 处理）：对每个发现给出 文件+行号、问题描述、严重级别、修改建议。

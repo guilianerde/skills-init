@@ -15,7 +15,7 @@ description: "Generate a Markdown release/deployment plan (上线方案) from th
 
 - 两个分支都必填；用户只给一个时问另一个，不要默认 `master`。`--prd` / `--tech` 不能替代分支参数。
 - `<mainBranch>` 用户没给但 `workflow/profile.json` 有 `main_branch` 时，可提出用它作为基线并请用户确认。
-- `--tech <path>`：已生成的技术方案 md，复用其接口表 / 服务表 / DDL / 表名。没传时运行 `node <skills>/workflow/scripts/artifacts.mjs --branch <devBranch>`，`latest.tech` 非空就自动引用这份（元数据行写「<path>（按分支自动关联）」，并在交付时告诉用户；用户说不用就按无技术方案处理）。
+- `--tech <path>`：已生成的技术方案 md，复用其接口表 / 服务表 / DDL / 表名。没传时运行 `node <skills>/workflow/scripts/artifacts.mjs --branch <devBranch>`，`latest.tech` 非空就自动引用这份（元数据行写「<path>（按分支自动关联）」，并在交付时告诉用户；用户说不用就按无技术方案处理）。同一份输出里 `latest.delivery`（dev 的交付说明）非空时也读它：「配置清单」「SQL 脚本（未执行）」「未验证项」分别并入配置下发、上线 SQL 与上线后验证，和 diff 不一致时以 diff 为准并在交付时指出；元数据行「交付说明引用」写它的路径。
 - `--prd`：Confluence PRD 的 pageId 或 URL，依赖 wiki 连接（见 Step 1）。
 
 ## Workflow
@@ -59,6 +59,7 @@ description: "Generate a Markdown release/deployment plan (上线方案) from th
 > PRD 参考：<pageId 或 URL 或「无」/「PRD 增强已跳过」>
 > 模板来源：<DocNexus / 项目文件 / skill 默认>
 > 技术方案引用：<path 或「无」>
+> 交付说明引用：<path 或「无」>
 > 填充模块：1/2/4/5/6 +（有 PRD 时）3
 > ⚠️ 灰度 / 回滚策略基于 diff 推断，需人工校对后补充。
 ```

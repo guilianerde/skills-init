@@ -18,6 +18,18 @@
       "title": "开发方案模板",
       "summary": "dev skill 在 M / L 规模需求中使用的开发方案模板。",
       "lint": {}
+    },
+    {
+      "id": "delivery-template.md",
+      "src": "references/delivery-template.md",
+      "title": "开发交付模板",
+      "summary": "dev skill 交付时落盘的交付说明模板（含分支元信息、验证、配置清单、SQL、DocNexus 沉淀记录）。",
+      "lint": {
+        "requiredMeta": [
+          "类型",
+          "对比分支"
+        ]
+      }
     }
   ],
   "shared": [

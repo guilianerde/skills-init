@@ -91,11 +91,16 @@ description: "Implement a feature or fix a bug in this project end to end: under
 
 ### F8 — 交付
 
-按 `references/delivery-template.md` 输出交付说明（小改动可压缩成「改动 + 验证 + 下一步」，但验证结果必须如实），然后**询问**下一步，不要自行执行：
-
-- 提交：给出建议的 commit message，用户同意后再 `git commit`；**不 push**，除非用户明确要求。
-- 文档：运行 `node <skills>/workflow/scripts/artifacts.mjs` 看本分支已有哪些产物（开发方案、审查报告、技术方案、上线方案及 wiki 发布记录），按输出的 `next` 建议下一步：M / L 规模缺技术方案时建议 `create-tech-md-doc`，要上线时建议 `create-release-md-doc`（会自动引用本分支的技术方案）。
-- 沉淀：本次产生了值得长期记住的决策、约定或坑，且 DocNexus 可用 → 提议走 DocNexus 的 capture 流程；**必须用户授权后才写入**。分类用 `node <skills>/workflow/scripts/resolve.mjs category dev` 的结果作为调用方显式分类封存（见 `<skills>/workflow/references/docnexus.md`「写入 DocNexus 的分类」）。
+1. **落盘交付说明**：模板路径用 `node <skills>/workflow/scripts/resolve.mjs template dev delivery-template.md` 取（退出码 2 时停下并按 `hint` 处理），写到 `docs/skills/dev/delivery-<需求短名>-<YYYYMMDD>.md`（见 Artifact Location）。元信息行的「对比分支」写当前分支和 `profile.main_branch`，`artifacts.mjs`、project-review、上线方案靠它找到这份交付；有开发方案时「参考产物」写方案路径。小改动每节一两行即可，不适用的节写「无」，但验证结果必须如实。
+2. **自检**：运行 `node <skills>/workflow/scripts/lint-doc.mjs <交付路径> --skill dev --template delivery-template.md`，有「错误」先修正。
+3. **对话里给摘要**：结果、验证（含未验证项）、配置 / SQL 有无、交付文件路径；不必把全文贴进对话。
+4. **询问下一步**，不要自行执行：
+   - 提交：给出建议的 commit message（建议把交付说明一起提交，随分支保留），用户同意后再 `git commit`；**不 push**，除非用户明确要求。
+   - 文档：运行 `node <skills>/workflow/scripts/artifacts.mjs` 看本分支已有哪些产物（开发方案、交付说明、审查报告、技术方案、上线方案及 wiki 发布记录），按输出的 `next` 建议下一步：M / L 规模缺技术方案时建议 `create-tech-md-doc`，要上线时建议 `create-release-md-doc`（会自动引用本分支的技术方案和交付说明）。
+   - **沉淀到 DocNexus**（`resolve.mjs status` 的 `docnexus.ok` 为 true 时**每次都问**）：明确问用户「要不要启动 DocNexus 流程，把本次交付沉淀到 DocNexus？」，并从交付说明里列出建议沉淀的内容（已确认的决定、新约定、踩到的坑、缺陷根因、配置 / 表结构变化）；没有特别值得记的也照问，并说明这一点。
+     - 用户同意 → 以交付说明为来源，按 DocNexus 入口 skill `docnexus` 的 capture 流程写入；分类用 `node <skills>/workflow/scripts/resolve.mjs category dev` 的结果作为调用方显式分类封存（见 `<skills>/workflow/references/docnexus.md`「写入 DocNexus 的分类」）。只沉淀确认过的事实，不沉淀「未验证」「待确认」的内容；知识库已有同主题的沉淀时更新那一篇（带 `--base-version`），不重复新建。写入成功后把交付说明的「DocNexus」元信息行改成 `docnexus/library/<path>`，并回报给用户。
+     - 用户不同意 → 元信息行保持「未沉淀」，不再追问。
+     - 未接入 DocNexus → 元信息行写「未接入」，不提问、不提示安装。
 
 ## 缺陷修复流程（`--bug`）
 
@@ -122,7 +127,7 @@ description: "Implement a feature or fix a bug in this project end to end: under
 
 ### B5 — 自审与交付
 
-同 F7、F8。交付说明里必须包含：**根因**、修复方式、为什么这样修、同类风险排查结果。
+同 F7、F8（交付说明同样落盘，「类型」写缺陷修复）。交付说明的「根因」节必须写：证据链、修复方式、为什么这样修、同类风险排查结果；DocNexus 沉淀时根因是首要候选。
 
 ## Rules
 
@@ -134,7 +139,13 @@ description: "Implement a feature or fix a bug in this project end to end: under
 
 ## Artifact Location
 
-- 交付说明默认只在对话中输出。
+- 交付说明（每次交付都落盘，功能开发和缺陷修复都是）：
+
+  ```
+  docs/skills/dev/delivery-<需求短名>-<YYYYMMDD>.md
+  ```
+
+  有开发方案时 `<需求短名>` 与方案一致；缺陷修复用缺陷短名（如 `fix-order-npe`）。
 - L 规模的方案文档（或用户要求落盘的 M 规模方案）：
 
   ```

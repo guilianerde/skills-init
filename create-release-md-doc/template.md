@@ -13,6 +13,7 @@
 > diff 概览：{{files}} files changed, {{insertions}} insertions(+), {{deletions}} deletions(-)
 > PRD 参考：{{pageId 或 URL 或「无」}}
 > 技术方案引用：{{path 或「无」}}
+> 交付说明引用：{{path 或「无」}}
 > 填充模块：1/2/4/5/6 +（有 PRD 时）3
 > ⚠️ 灰度/回滚策略基于 diff 推断，需人工校对后补充。
 

@@ -4,6 +4,12 @@
 
 ## [Unreleased]
 
+### 变更
+- dev 交付说明落盘：每次交付（功能开发与缺陷修复）都写到 `docs/skills/dev/delivery-<需求短名>-<YYYYMMDD>.md`，模板 `dev/references/delivery-template.md` 改为可被 DocNexus 覆盖、可 lint 的正式模板（元信息：类型、规模、对比分支、参考产物、DocNexus），写完跑 `lint-doc.mjs --template delivery-template.md`；对话里只给摘要和路径。
+- dev 交付后，已接入 DocNexus 时**每次都问**要不要启动 DocNexus 流程沉淀本次交付（列出建议沉淀的决定 / 约定 / 坑 / 根因 / 配置变化）；同意后以交付说明为来源、`dev-notes` 分类写入，成功后把 `docnexus/library/<path>` 记回交付说明的「DocNexus」元信息行；未接入时不提问。
+- `artifacts.mjs` 识别交付说明（`latest.delivery`）。project-review 把交付说明里「已确认的决定」并入需求对照，并核对它的配置清单 / SQL 有没有漏列 diff 里的配置 key / DDL；上线方案按分支自动引用交付说明的配置清单、SQL 与未验证项（新增元信息行「交付说明引用」）。
+- 已接入 DocNexus 的项目 `upgrade` 时会自动导入新的交付说明模板。
+
 ## [0.6.2] - 2026-10-15
 
 ### 变更

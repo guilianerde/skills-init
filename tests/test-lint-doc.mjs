@@ -110,3 +110,17 @@ test('--facts：类名 / 文件 / 接口 / 表名在 diff 或 head 代码里找�
   assert.equal(checkRefs(root, [], 'main...nope').ok, false);
   fs.rmSync(root, { recursive: true, force: true });
 });
+
+test('交付说明模板：原样报占位符与缺元信息；按模板写完的小改动交付通过且无警告', () => {
+  const tpl = fs.readFileSync(path.join(REPO, 'dev/references/delivery-template.md'), 'utf8');
+  const meta = JSON.parse(fs.readFileSync(path.join(REPO, 'dev/skill.json'), 'utf8')).templates.find((t) => t.id === 'delivery-template.md').lint;
+  assert.equal(lint(tpl, tpl, meta).ok, false, '原样模板有占位符');
+  const doc = ['# 开发交付 — 订单列表按创建时间筛选', '', '> 类型：功能开发 ｜ 规模：S ｜ 日期：2026-10-15', '> 对比分支：`feature/order-filter` ←→ `main`', '> 参考产物：无', '> DocNexus：未沉淀',
+    '## 结果', '已完成。', '## 改动', '| 文件 | 改动说明 |', '|---|---|', '| OrderController.java | 加参数 |', '## 验证', '- 测试：mvn test → 通过 12 个',
+    '## 配置清单', '无', '## SQL 脚本（未执行）', '无', '## 自审', '无问题', '## 范围外发现', '无', '## 建议下一步', '提交', ''].join('\n');
+  const r = lint(doc, tpl, meta);
+  assert.equal(r.ok, true, r.errors.join('\n'));
+  assert.deepEqual(r.warnings, [], '省略「已确认的决定」「根因」（如有）不算缺章节');
+  const bad = lint(doc.replace(/> 对比分支.*\n/, '').replace('## 验证', '## 验收'), tpl, meta);
+  assert.ok(bad.errors.some((e) => e.includes('对比分支')) && bad.errors.some((e) => e.includes('验证')), bad.errors.join('\n'));
+});

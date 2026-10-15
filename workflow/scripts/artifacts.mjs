@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// 按分支汇总各 skill 的产物：开发方案、审查报告、技术方案、上线方案，以及它们的 wiki 发布记录。
+// 按分支汇总各 skill 的产物：开发方案、交付说明、审查报告、技术方案、上线方案，以及它们的 wiki 发布记录。
 // 不另存记录文件：直接扫描 docs/skills/<skill>/ 下的 Markdown，从元信息行读分支（「分支：」「对比分支：」），
 // 从第一行的 <!-- md-to-wiki: ... --> 读发布记录（md-to-wiki 上传后写入）。只读。
 //
@@ -16,6 +16,7 @@ import { fileURLToPath } from 'node:url';
 // 产物种类 → 产出它的 skill 目录与文件名前缀；顺序即链路顺序
 export const KINDS = [
   { kind: 'plan', skill: 'dev', prefix: 'plan-', label: '开发方案' },
+  { kind: 'delivery', skill: 'dev', prefix: 'delivery-', label: '交付说明' },
   { kind: 'review', skill: 'project-review', prefix: 'review-', label: '审查报告' },
   { kind: 'tech', skill: 'create-tech-md-doc', prefix: 'tech-doc', label: '技术方案' },
   { kind: 'release', skill: 'create-release-md-doc', prefix: 'release-doc', label: '上线方案' },
