@@ -20,7 +20,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { seedTemplates, updateTemplates } from './seed-templates.mjs';
-import { TPL_DIR, PKG, ENV_NAMES, CANON_DIR, SKILLS, resolveSkillSelection, step, ok, warn, CliError, fail } from './lib/core.mjs';
+import { TPL_DIR, PKG, ENV_NAMES, CANON_DIR, SKILLS, resolveSkillSelection, step, ok, warn, CliError, fail, isAdminTerminal } from './lib/core.mjs';
 import { ask, closePrompt } from './lib/prompt.mjs';
 import { findExistingDbConfig, getDb } from './lib/db.mjs';
 import { report, installSkills, linkSkills, removeRenamed, updateGitignore } from './lib/install.mjs';
@@ -136,6 +136,16 @@ async function main() {
       reportTemplateStatus(o.root);
       return failed ? 1 : 0;
     } catch (e) { warn(e.message); return 1; }
+  }
+  // Windows：安装 / 升级只在管理员终端进行（建目录软链接需要该权限），否则直接停下，不做任何改动
+  if (!isAdminTerminal()) {
+    const args = process.argv.slice(2);
+    // 经 init-skills.ps1 / .sh 调用时会带 --project-root，给不出原命令，只提示重跑脚本
+    const again = args.includes('--project-root') ? '重新运行刚才的 init-skills 脚本（参数不变）' : `npx @rowansenne/skills-init ${args.join(' ')}`.trim();
+    fail(`当前终端没有管理员权限，已停止${o.cmd === 'upgrade' ? '升级' : '安装'}（没有做任何改动）。
+请以管理员身份打开终端：开始菜单搜索「PowerShell」或「终端」→ 右键「以管理员身份运行」，进入项目目录后重新执行：
+  cd "${o.root}"
+  ${again}`);
   }
   if (o.cmd === 'upgrade') o = upgradeOptions(o);
   if (o.withDocNexus) { step('检查 DocNexus 依赖'); checkNodeForDocNexus(); }

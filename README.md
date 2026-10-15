@@ -26,7 +26,7 @@
 ```
 # 仓库放在 <项目根>/skills-init/ 时，在项目根执行
 ./skills-init/init-skills.sh          # macOS / Linux / Git Bash / WSL
-.\skills-init\init-skills.ps1         # Windows PowerShell
+.\skills-init\init-skills.ps1         # Windows PowerShell（需以管理员身份运行）
 node skills-init/bin/skills-init.mjs --project-root .   # 直接调用，等价
 
 # 或者不拷贝仓库，直接在任意项目根执行（npm 包）
@@ -86,7 +86,7 @@ npx @rowansenne/skills-init doctor
 
 * 按 skill 建链接而不是链接整个目录，这样 `.claude/skills/` 里还能放其他 skill（例如 DocNexus 的链接）。
 * 从旧版本（各环境独立拷贝）升级时，脚本会把旧拷贝里的用户配置（`config.json`、`schema.md`、`wiki-config.json`、`profile.json`）并入 `.agents/skills/`，原目录移到 `tmp/skills/backup/<时间>/<环境>/`；两边配置都填过且内容不同时不会自动合并，会保留旧目录并提示手动处理。
-* Windows：建软链接需要开启「开发者模式」或以管理员运行，建不了时该环境自动退回独立拷贝；在 Windows 上 clone 含软链接的仓库需要 `git config core.symlinks true`。
+* Windows：安装与升级（`init` / `upgrade`）**必须在管理员终端执行**（建目录软链接需要该权限）；在普通终端运行会直接停下、不做任何改动，并提示改用「以管理员身份运行」的终端。`doctor`、`seed-templates`、`uninstall` 不要求管理员。少数文件系统仍建不了软链接时，该环境自动退回独立拷贝。在 Windows 上 clone 含软链接的仓库需要 `git config core.symlinks true`。
 * 不想用软链接：加 `--copy`（PowerShell：`-Copy`），每个环境各装一份完整文件。
 
 > Codex 也可选择额外安装到用户级

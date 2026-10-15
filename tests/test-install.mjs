@@ -117,6 +117,23 @@ test('全新安装：单一来源完整文件 + 相对软链接；重跑不变',
   assert.ok(!p.exists('tmp/skills/backup'));
 });
 
+test('非管理员终端（SKILLS_INIT_ADMIN=0 模拟）：安装与升级直接停下并提示用管理员终端，不做任何改动；doctor 不受影响', () => {
+  const p = project('non-admin');
+  const env = { SKILLS_INIT_ADMIN: '0' };
+  let r = p.install(['--envs', 'claude', '--yes', '--skip-db'], { env });
+  assert.equal(r.status, 1);
+  assert.match(r.log, /没有管理员权限，已停止安装/);
+  assert.match(r.log, /以管理员身份运行/);
+  assert.deepEqual(fs.readdirSync(p.P).filter((f) => f !== 'skills-init'), [], '没有创建任何文件');
+  ok(p.install(['--envs', 'claude', '--yes', '--skip-db']));
+  const before = p.read('.agents/skills/.skills-init.json');
+  r = p.install(['upgrade'], { env });
+  assert.equal(r.status, 1);
+  assert.match(r.log, /已停止升级/);
+  assert.equal(p.read('.agents/skills/.skills-init.json'), before);
+  assert.doesNotMatch(p.install(['doctor', '--offline'], { env }).log, /管理员/, 'doctor 只读，不要求管理员');
+});
+
 test('SKILLS_INIT_NO_SYMLINK=1：退回各环境独立拷贝', () => {
   const p = project('no-symlink');
   ok(p.install(['--envs', 'claude,qwen', '--yes', '--skip-db'], { env: { SKILLS_INIT_NO_SYMLINK: '1' } }));

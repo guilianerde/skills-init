@@ -3,6 +3,7 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
+import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { loadSkills, deriveMeta, withDependencies } from '../skills.mjs';
 
@@ -31,6 +32,22 @@ export const ok = (m) => console.log(`    OK  ${m}`);
 export const warn = (m) => console.error(`    !!  ${m}`);
 export class CliError extends Error {}
 export const fail = (m) => { throw new CliError(m); };
+
+// Windows 上安装 / 升级要求管理员终端（建目录软链接需要该权限）。非 Windows 一律放行。
+// SKILLS_INIT_ADMIN=1 / 0 强制视为管理员 / 非管理员（测试用，任何平台都生效）
+export function isAdminTerminal() {
+  const forced = process.env.SKILLS_INIT_ADMIN;
+  if (forced === '1') return true;
+  if (forced === '0') return false;
+  if (!IS_WIN) return true;
+  const ps = spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command',
+    '([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)'],
+  { encoding: 'utf8', windowsHide: true, timeout: 20000 });
+  const m = /\b(True|False)\b/.exec(ps.stdout ?? '');
+  if (m) return m[1] === 'True';
+  // 没有 PowerShell 时退回 net session（只有提升权限的进程能成功）
+  return spawnSync('net', ['session'], { stdio: 'ignore', windowsHide: true }).status === 0;
+}
 
 export function readJson(file) {
   try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch { return null; }
