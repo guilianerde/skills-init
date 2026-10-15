@@ -1,6 +1,6 @@
 # skills-init — 项目级 Agent Skills 一键初始化
 
-把 **dev（功能开发 / 缺陷修复编排）**、**database-query（数据库查询）**、**code-review（代码审查）**、**md-to-wiki（发布文档到**
+把 **workflow（入口路由 + 共用项目画像）**、**dev（功能开发 / 缺陷修复编排）**、**database-query（数据库查询）**、**code-review（代码审查）**、**md-to-wiki（发布文档到**
 
 **Confluence）**、**create-tech-md-doc /create-release-md-doc（从 git diff 生成技术 / 上线方案）**
 
@@ -48,6 +48,7 @@
 ./skills-init/init-skills.sh --envs all --yes                        # bash 版等价
 ./skills-init/init-skills.sh --envs codex,qwen --skip-db
 ./skills-init/init-skills.sh --envs claude,qwen --skip-db --with-docnexus   # 同时接入 DocNexus 文档库
+./skills-init/init-skills.sh --envs all --skip-db --copy             # 不用软链接，各环境独立拷贝
 ```
 
 ## 安装路径与启用方式
@@ -56,10 +57,17 @@
 
 | 环境          | 生成目录                         | 启用方式                                     |
 | ----------- | ---------------------------- | ---------------------------------------- |
-| codex       | `.agents/skills/`（项目级，与豆包共用） | 重启 codex 自动发现；也可 `/use code-review` 手动加载 |
-| claude-code | `.claude/skills/`            | Claude Code 自动发现，无需额外配置                  |
-| doubao      | `.agents/skills/`            | 豆包办公自动发现（新会话生效）                          |
-| qwen        | `.qwen/skills/`              | Qwen Code 自动发现；`/skills` 面板可查看与切换        |
+| codex       | `.agents/skills/`（**单一来源**，完整文件） | 重启 codex 自动发现；也可 `/use code-review` 手动加载 |
+| claude-code | `.claude/skills/<skill>` → 软链接到 `.agents/skills/<skill>` | Claude Code 自动发现，无需额外配置                  |
+| doubao      | `.agents/skills/`（与 codex 共用）   | 豆包办公自动发现（新会话生效）                          |
+| qwen        | `.qwen/skills/<skill>` → 软链接到 `.agents/skills/<skill>` | Qwen Code 自动发现；`/skills` 面板可查看与切换        |
+
+**单一来源 + 软链接**：skills 只在 `.agents/skills/` 装一份完整文件，`.claude/skills`、`.qwen/skills` 下按 skill 建相对软链接（`../../.agents/skills/<skill>`），改模板、填配置都只需改一处。因此即使只选了 claude 或 qwen，`.agents/skills/` 也会生成。
+
+* 按 skill 建链接而不是链接整个目录，这样 `.claude/skills/` 里还能放其他 skill（例如 DocNexus 的链接）。
+* 从旧版本（各环境独立拷贝）升级时，脚本会把旧拷贝里的用户配置（`config.json`、`schema.md`、`wiki-config.json`、`profile.json`）并入 `.agents/skills/`，原目录移到 `tmp/skills/backup/<时间>/<环境>/`；两边配置都填过且内容不同时不会自动合并，会保留旧目录并提示手动处理。
+* Windows：建软链接需要开启「开发者模式」或以管理员运行，建不了时该环境自动退回独立拷贝；在 Windows 上 clone 含软链接的仓库需要 `git config core.symlinks true`。
+* 不想用软链接：加 `--copy`（PowerShell：`-Copy`），每个环境各装一份完整文件。
 
 > Codex 也可选择额外安装到用户级
 > `~/.codex/skills/`
@@ -71,9 +79,12 @@
 
 ```
 <env-dir>/
+├── workflow/                         # 入口：路由到各 skill、能力探测、维护共用项目画像
+│   ├── SKILL.md
+│   └── profile.json                  # 项目画像：主分支、构建 / 测试命令、配置中心、发布平台等（无凭据，可提交；重跑不覆盖）
 ├── code-review/                      # 代码审查
 │   ├── SKILL.md                      # 触发描述 + 审查工作流 + 输出模板
-│   └── references/checklist.md       # 10 维度审查清单（含 Nacos 配置维度）
+│   └── references/checklist.md       # 10 维度审查清单（配置维度按 profile.config_center 判断）
 ├── database-query/                   # 数据库查询
 │   ├── SKILL.md                      # 触发描述 + 查询工作流 + 只读/安全规则
 │   ├── config.json                   # 数据库连接（init 生成，已加入 .gitignore）
@@ -90,9 +101,44 @@
 │   └── template.md
 └── dev/                              # 开发 / 修 bug：需求→调研→方案→实现→测试→自审→交付
     ├── SKILL.md
-    ├── profile.json                  # 主分支、构建 / 测试 / lint 命令（无凭据，可提交；重跑不覆盖）
     └── references/plan-template.md   # M / L 规模方案模板
 ```
+
+## workflow：入口与项目画像
+
+```
+/workflow            # 按请求路由到对应 skill；无具体请求时输出能力地图 + 状态
+/workflow status     # 检查项目画像、wiki、DocNexus、数据库、符号索引是否可用
+/workflow profile    # 从仓库推断并经你确认后填写 workflow/profile.json
+```
+
+`workflow/profile.json` 是所有 skill 共用的项目事实，模板里不再写死任何公司或项目约定。缺失字段视为空，文档中对应位置写「待填写」。示例：
+
+```json
+{
+  "main_branch": "master",
+  "build": "mvn -q -DskipTests compile",
+  "test": "mvn -q test",
+  "test_single": "mvn -q test -Dtest={target}",
+  "lint": "",
+  "config_center": "nacos",
+  "deploy": { "platform": "Diamond", "regions": ["阿里云", "华为云", "阿里云墨西哥", "华为云-墨西哥", "华为云-菲律宾"] },
+  "job_annotation": "@MyJobHandle",
+  "data_review": true,
+  "notes": ["需求单走 TAPD，技术方案「上线服务」与「数据链路」为必填"]
+}
+```
+
+| 字段 | 影响 |
+| --- | --- |
+| `main_branch` | dev、code-review、文档类的 diff 基线 |
+| `build` / `test` / `test_single` / `lint` | dev 的编译与测试 |
+| `config_center` | code-review 第 10 维度（配置中心下发的 key 不算缺失）、dev 配置清单、上线方案的上线顺序与配置回滚 |
+| `deploy` | 技术 / 上线方案「上线服务」的服务名与环境说明 |
+| `job_annotation` | 技术方案「定时任务变更」识别任务类 |
+| `data_review` | 是否输出技术方案模块 7 与上线方案 2.3 的库表评审块 |
+
+旧版本的 `dev/profile.json` 会在重跑 init 时自动迁移为 `workflow/profile.json`。
 
 ## dev：开发与修 bug
 
@@ -115,6 +161,7 @@
 | `-Envs` / `--envs`      | 环境列表，逗号分隔：`codex,claude,doubao,qwen`；`all` = 全部                       |
 | `-SkipDb` / `--skip-db` | 跳过数据库连接配置（database-query 不生成 config.json）                             |
 | `-WithDocNexus` / `--with-docnexus` | 可选：接入 [DocNexus](https://www.npmjs.com/package/@rowansenne/docnexus) 项目文档库（需 Node >= 22.13），见下方「DocNexus 文档库（可选）」 |
+| `-Copy` / `--copy`      | 不建软链接，各环境独立拷贝一份完整 skills                                  |
 | `-Yes` / `--yes`        | 非交互：自动使用已有数据库配置（依次查找 `.codex/database-query/config.json` 与各环境已安装的 `database-query/config.json`）；都没有且未 `-SkipDb` 时报错退出 |
 | `-h` / `--help`         | 帮助                                                                    |
 
@@ -150,7 +197,7 @@
 可以放心重复执行 init 来升级模板：
 
 * `SKILL.md`、`references/checklist.md`、`template.md`、脚本等**模板文件会被更新**；
-* 用户填过的 `md-to-wiki/wiki-config.json`、`database-query/references/schema.md`、`dev/profile.json` **保留不覆盖**；
+* 用户填过的 `md-to-wiki/wiki-config.json`、`database-query/references/schema.md`、`workflow/profile.json` **保留不覆盖**；
 * `database-query/config.json` 只在本次确认或填写了数据库配置时写入；`--skip-db` 时保留已有文件；
 * `.gitignore` 规则无论是否配置数据库都会补齐（只追加缺失的行）；
 * `init-skills.sh` 兼容 macOS 自带的 bash 3.2。
@@ -256,25 +303,27 @@ skills-init/
 ├── create-release-md-doc/
 │   ├── SKILL.md.tpl
 │   └── template.md                    # 6 模块文档模板（纯拷贝）
-└── dev/
+├── dev/
+│   ├── SKILL.md.tpl
+│   └── references/plan-template.md    # 方案模板（纯拷贝）
+└── workflow/
     ├── SKILL.md.tpl
-    ├── profile.json.tpl               # 空画像，首次使用时由 agent 推断并经确认后填写
-    └── references/plan-template.md    # 方案模板（纯拷贝）
+    └── profile.json.tpl               # 空画像，首次使用时由 agent 推断并经确认后填写
 ```
 
 
 
 * 修改 `SKILL.md.tpl` 可调整触发词、工作流、输出模板（四环境共用同一份）。
 
-* `code-review` 的 checklist 含 Nacos 远程配置审查维度，适配本项目约定；其他项目可按需编辑。
+* 项目相关的约定（配置中心、发布平台与 Region、定时任务注解、是否需要库表评审）不写在模板里，统一由 `workflow/profile.json` 提供；换项目时只需重新填画像。
 
 * 安装后建议运行一次 `SHOW TABLES` 并 `DESCRIBE` 关键表，把结构补进
 
   `<env-dir>/database-query/references/schema.md`，能显著提升查库效率。
 
-* 技术 / 上线方案的 `template.md` 保留团队模板占位（如数仓评审、Diamond 服务参数），
+* 技术 / 上线方案的 `template.md` 是团队 Confluence 模板的结构（8 / 6 模块），项目字段按 profile 填充；
 
-  其他项目按自身流程调整。
+  结构本身不适用时直接修改 `template.md`。
 
 ## 为什么这些路径
 

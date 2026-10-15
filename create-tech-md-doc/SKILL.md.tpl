@@ -71,6 +71,8 @@ description: "Generate a Markdown technical design doc (技术方案) from the d
 
 ### Step 1 — 采集 diff（分层过滤，对抗巨大 diff）
 
+> **项目画像**：主分支默认取 `workflow/profile.json` 的 `main_branch`；下表路径过滤以 Java/Spring 工程为默认，其他技术栈按项目实际目录调整（如 Go 的 `internal/handler`、前端的 `src/api`）。发布平台、配置中心、定时任务注解、是否需要数据评审同样取自 profile，未配置的部分在文档中写「待填写」，不要沿用其他项目的取值。
+
 > **diff 基线必须用三点 `<main>...<dev>`**：比较的是 dev 相对两分支合并基点（merge-base）的改动。两点 `<main>..<dev>` 等价于直接比较两个分支末端，主干前进后会把主干新提交以「反向删除」混进文档。
 
 按下列顺序执行（每层独立、可并行），**必须分层过滤**，否则上下文会爆：

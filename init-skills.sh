@@ -15,9 +15,13 @@
 #   ./skills-init/init-skills.sh --envs codex,claude,doubao,qwen   # 指定环境（仍会交互确认数据库）
 #   ./skills-init/init-skills.sh --envs all --yes --skip-db        # 全环境、非交互、跳过数据库
 #   ./skills-init/init-skills.sh --envs claude,qwen --with-docnexus  # 同时接入 DocNexus 文档库（需 Node >= 22.13）
+#   ./skills-init/init-skills.sh --envs all --copy                 # 不用软链接，每个环境各拷一份
+#
+# 单一来源：skills 只完整安装到 .agents/skills（codex / doubao 直接使用）；
+#           .claude/skills、.qwen/skills 下按 skill 建相对软链接指向它。--copy 退回各环境独立拷贝。
 #
 # 重跑安全：SKILL.md / references 模板会更新；用户已填写的 wiki-config.json、
-#           schema.md、dev/profile.json 保留不覆盖；database-query/config.json 仅在本次提供了数据库配置时写入。
+#           schema.md、workflow/profile.json 保留不覆盖；database-query/config.json 仅在本次提供了数据库配置时写入。
 # =====================================================================
 
 set -euo pipefail
@@ -29,6 +33,11 @@ ENVS_ARG=""
 SKIP_DB=0
 YES=0
 WITH_DOCNEXUS=0
+COPY_MODE=0
+CANON_DIR=".agents/skills"   # 单一来源目录
+SKILLS=(workflow dev code-review database-query md-to-wiki create-tech-md-doc create-release-md-doc)
+# 各 skill 内的用户配置（相对 skill 目录），迁移旧的独立拷贝时需要保留
+USER_FILES=(database-query/config.json database-query/references/schema.md md-to-wiki/wiki-config.json workflow/profile.json)
 # DocNexus 安装来源：默认 npm 包；可用环境变量指向本地 tarball / 目录（离线或测试用）
 DOCNEXUS_PKG="${DOCNEXUS_PKG:-@rowansenne/docnexus}"
 
@@ -39,8 +48,9 @@ while [[ $# -gt 0 ]]; do
     --skip-db) SKIP_DB=1; shift ;;
     --yes)    YES=1; shift ;;
     --with-docnexus) WITH_DOCNEXUS=1; shift ;;
+    --copy)   COPY_MODE=1; shift ;;
     -h|--help)
-      echo "用法: ./init-skills.sh [--envs codex,claude,doubao,qwen|all] [--skip-db] [--yes] [--with-docnexus]"; exit 0 ;;
+      echo "用法: ./init-skills.sh [--envs codex,claude,doubao,qwen|all] [--skip-db] [--yes] [--with-docnexus] [--copy]"; exit 0 ;;
     *) echo "未知参数: $1"; exit 1 ;;
   esac
 done
@@ -168,7 +178,7 @@ install_skills() { # $1=目标目录  $2=是否有数据库配置(1/0)
   local base="$1" has_db="$2"
   mkdir -p "$base/code-review/references" "$base/database-query/references" \
            "$base/md-to-wiki/scripts" "$base/create-tech-md-doc" "$base/create-release-md-doc" \
-           "$base/dev/references"
+           "$base/dev/references" "$base/workflow"
   # code-review
   cp "$TPL_DIR/code-review/SKILL.md.tpl"                "$base/code-review/SKILL.md"
   cp "$TPL_DIR/code-review/references/checklist.md.tpl" "$base/code-review/references/checklist.md"
@@ -206,14 +216,86 @@ install_skills() { # $1=目标目录  $2=是否有数据库配置(1/0)
   cp "$TPL_DIR/create-release-md-doc/SKILL.md.tpl"  "$base/create-release-md-doc/SKILL.md"
   cp "$TPL_DIR/create-release-md-doc/template.md"   "$base/create-release-md-doc/template.md"
   ok "create-tech-md-doc / create-release-md-doc -> $base"
-  # dev（开发 / 修 bug 编排；profile.json 记录项目构建与测试命令，可提交，重跑不覆盖）
+  # dev（开发 / 修 bug 编排）
   cp "$TPL_DIR/dev/SKILL.md.tpl"                    "$base/dev/SKILL.md"
   cp "$TPL_DIR/dev/references/plan-template.md"     "$base/dev/references/plan-template.md"
-  if [[ -f "$base/dev/profile.json" ]]; then
-    ok "dev -> $base/dev（profile.json 已存在，保留不覆盖）"
+  ok "dev -> $base/dev"
+  # workflow（入口路由 + 共用项目画像 profile.json：无凭据，可提交，重跑不覆盖）
+  cp "$TPL_DIR/workflow/SKILL.md.tpl"               "$base/workflow/SKILL.md"
+  if [[ -f "$base/workflow/profile.json" ]]; then
+    ok "workflow -> $base/workflow（profile.json 已存在，保留不覆盖）"
+  elif [[ -f "$base/dev/profile.json" ]]; then
+    # 旧版本画像放在 dev/ 下：字段兼容，原样迁移（新增字段缺失时视为空）
+    mv "$base/dev/profile.json" "$base/workflow/profile.json"
+    ok "workflow -> $base/workflow（已把旧的 dev/profile.json 迁移为 workflow/profile.json）"
   else
-    cp "$TPL_DIR/dev/profile.json.tpl" "$base/dev/profile.json"
-    ok "dev -> $base/dev（profile.json 首次使用时由 agent 推断并经你确认后填写）"
+    cp "$TPL_DIR/workflow/profile.json.tpl" "$base/workflow/profile.json"
+    ok "workflow -> $base/workflow（profile.json 首次使用时由 agent 推断并经你确认后填写）"
+  fi
+}
+
+# ---------------- 3b. 软链接到单一来源（.claude/skills、.qwen/skills -> .agents/skills）
+user_file_tpl() { # 用户配置对应的空模板（用于判断单一来源里的文件是否还没被填写过）
+  case "$1" in
+    md-to-wiki/wiki-config.json) echo "$TPL_DIR/md-to-wiki/wiki-config.json.tpl" ;;
+    dev/profile.json)            echo "$TPL_DIR/dev/profile.json.tpl" ;;
+    *) echo "" ;;
+  esac
+}
+
+migrate_copy() { # $1=旧的独立拷贝目录  $2=skill 名；把其中用户配置并入单一来源，冲突返回 1
+  local old="$1" skill="$2" rel src dst tpl
+  for rel in "${USER_FILES[@]}"; do
+    [[ "$rel" == "$skill/"* ]] || continue
+    src="$old/${rel#*/}"; dst="$ROOT_DIR/$CANON_DIR/$rel"
+    [[ -f "$src" ]] || continue
+    if [[ ! -f "$dst" ]] || cmp -s "$src" "$dst"; then
+      :
+    else
+      tpl="$(user_file_tpl "$rel")"
+      if [[ -z "$tpl" ]] || ! cmp -s "$dst" "$tpl"; then
+        warn "$old 与 $CANON_DIR/$skill 的 ${rel#*/} 内容不同，无法自动合并：保留旧目录、未建链接。请手动合并后删除旧目录再重跑。"
+        return 1
+      fi
+    fi
+    mkdir -p "$(dirname "$dst")"; cp "$src" "$dst"
+  done
+  # 旧版本画像在 dev/profile.json：单一来源里的 workflow/profile.json 还是空模板时迁移过去
+  # 旧画像里没有任何非空字符串值 = 未填写过的空模板，直接忽略
+  if [[ "$skill" == "dev" && -f "$old/profile.json" ]] \
+     && grep -qE '"[^"]+"[[:space:]]*:[[:space:]]*"[^"]+' "$old/profile.json"; then
+    dst="$ROOT_DIR/$CANON_DIR/workflow/profile.json"
+    if [[ ! -f "$dst" ]] || cmp -s "$dst" "$TPL_DIR/workflow/profile.json.tpl"; then
+      mkdir -p "$(dirname "$dst")"; cp "$old/profile.json" "$dst"
+    elif ! cmp -s "$old/profile.json" "$dst"; then
+      warn "$old/profile.json 与 $CANON_DIR/workflow/profile.json 都填写过且内容不同：未迁移，旧文件会随目录备份，请手动合并。"
+    fi
+  fi
+  return 0
+}
+
+link_skills() { # $1=环境名  $2=相对项目根的 skills 目录（深度固定两级，如 .claude/skills）
+  local ename="$1" rel="$2" dir skill link target bak skipped=0
+  dir="$ROOT_DIR/$rel"; mkdir -p "$dir"
+  for skill in "${SKILLS[@]}"; do
+    link="$dir/$skill"; target="../../$CANON_DIR/$skill"
+    if [[ -L "$link" ]]; then
+      [[ "$(readlink "$link")" == "$target" ]] && continue
+      rm -f "$link"
+    elif [[ -d "$link" ]]; then
+      migrate_copy "$link" "$skill" || { skipped=$((skipped + 1)); continue; }
+      bak="$ROOT_DIR/tmp/skills/backup/$(date +%Y%m%d-%H%M%S)/$ename"
+      mkdir -p "$bak"; mv "$link" "$bak/$skill"
+      ok "$rel/$skill 旧的独立拷贝已并入单一来源，原目录备份到 ${bak#$ROOT_DIR/}/$skill"
+    elif [[ -e "$link" ]]; then
+      warn "$link 已存在且不是目录或软链接，跳过"; skipped=$((skipped + 1)); continue
+    fi
+    ln -s "$target" "$link"
+  done
+  if [[ "$skipped" == "0" ]]; then
+    ok "$ename -> $rel（软链接到 $CANON_DIR）"
+  else
+    warn "$ename -> $rel：$skipped 个 skill 未建链接（见上方提示），其余已软链接到 $CANON_DIR"
   fi
 }
 
@@ -327,15 +409,18 @@ if [[ "$SKIP_DB" == "0" ]]; then
   if get_db; then HAS_DB=1; fi
 fi
 
-TARGETS=()
-for e in "${SEL[@]}"; do
-  case "$e" in
-    codex)  TARGETS+=("codex|.agents/skills") ;;
-    claude) TARGETS+=("claude|.claude/skills") ;;
-    doubao) TARGETS+=("doubao|.agents/skills") ;;
-    qwen)   TARGETS+=("qwen|.qwen/skills") ;;
-  esac
-done
+# 安装目标：单一来源模式下 .agents/skills 只装一次，其余环境建链接；--copy 时各环境各装一份
+TARGETS=() LINKS=()
+has_env() { [[ " ${SEL[*]} " == *" $1 "* ]]; }
+if [[ "$COPY_MODE" == "1" ]]; then
+  { has_env codex || has_env doubao; } && TARGETS+=("codex/doubao|$CANON_DIR")
+  has_env claude && TARGETS+=("claude|.claude/skills")
+  has_env qwen   && TARGETS+=("qwen|.qwen/skills")
+else
+  TARGETS+=("单一来源|$CANON_DIR")
+  has_env claude && LINKS+=("claude|.claude/skills")
+  has_env qwen   && LINKS+=("qwen|.qwen/skills")
+fi
 
 if [[ " ${SEL[*]} " == *" codex "* && "$YES" == "0" ]]; then
   printf '是否同时安装到 Codex 用户级 ~/.codex/skills（所有项目可用）？[y/N]: '
@@ -353,6 +438,12 @@ for t in "${TARGETS[@]}"; do
   esac
   step "安装到 $ename  ->  $abs"
   install_skills "$abs" "$HAS_DB"
+done
+
+for t in ${LINKS[@]+"${LINKS[@]}"}; do
+  IFS='|' read -r ename dir <<< "$t"
+  step "链接 $ename  ->  $ROOT_DIR/$dir"
+  link_skills "$ename" "$dir"
 done
 
 update_gitignore

@@ -1,7 +1,7 @@
 <!--
   template.md — create-release-md-doc skill 的文档模板
-  结构来源：wiki.weicai.com.cn Confluence 上线方案模板 pageId=152531169（6 模块）
-  参考样例：pageId=156293627 Joy换包-上线方案（填充详尽）
+  结构来源：团队 Confluence 上线方案模板（6 模块）
+  项目相关字段（发布平台 / 环境 / 配置中心 / 数据评审）取自 workflow/profile.json，未配置的部分按「待填写」输出
   始终填充模块：1/2/4/5/6
   条件填充模块：3（灰度方案）— 有 --prd 时从 PRD 填充，无 --prd 时留骨架占位
 -->
@@ -25,17 +25,17 @@
 |--------|------|------|--------|----------|----------|
 | {{服务名}} | {{环境}} | {{git remote 仓库地址}} | {{mainBranch}} | {{devBranch}} | {{常规发布/灰度}} |
 
-参数说明：
-- 服务名：Diamond 生产环境服务名
-- 环境：Diamond 服务 Region（阿里云、华为云、阿里云墨西哥、华为云-墨西哥、华为云-菲律宾）
-- 仓库：ssh git 链接，如 `git@gitlab.weicai.com.cn:foreign/xxx.git`
-- 主分支：仓库主分支（main / master）
+参数说明（发布平台与可选环境取自 `workflow/profile.json` 的 `deploy`；未配置时按「待填写」输出）：
+- 服务名：{{profile.deploy.platform}} 上的生产环境服务名
+- 环境：可选值 {{profile.deploy.regions，逗号分隔；为空写「待填写」}}
+- 仓库：git remote 地址（`git remote get-url origin`）
+- 主分支：仓库主分支（profile.main_branch，或 main / master）
 - 开发分支：当前 dev 分支名
 - 上线方式：常规发布 / 灰度发布
 
-改动范围：{{从 diff 各层命中的模块/包名汇总，如 APP 首页 / 贷超列表 / 风控回调 / CMS 配置}}
+改动范围：{{从 diff 各层命中的模块/包名汇总，如 首页 / 列表接口 / 回调处理 / 后台配置}}
 
-上线顺序：{{DDL 先行→ Nacos 配置补齐→ 服务发布 master→ 其他动作；从 DDL/config 存在推断；无则"常规发布"}}
+上线顺序：{{DDL 先行→ 配置补齐（profile.config_center，未配置则写「配置文件随包发布」）→ 服务发布 → 其他动作；从 DDL/config 存在推断；无则"常规发布"}}
 
 ## 二、中间件上线
 
@@ -53,17 +53,19 @@
 |------|--------|------|------|
 | {{table}} | {{field}} | {{type}} | {{comment}} |
 
-### 2.2 Nacos 配置新增（如有）
+### 2.2 配置新增（如有）
 
-{{从配置 diff + 代码中 RedisKeyConstants 推断}}
+{{从配置 diff + 代码中的配置引用推断；profile.config_center 非空时注明需在该配置中心下发}}
 | 配置项 | 用途 | 值 |
 |--------|------|------|
 | {{key}} | {{用途}} | {{值}} |
 
-### 2.3 db_name（数仓评审）
+### 2.3 db_name（数据评审）
+
+<!-- 仅当 profile.data_review 为 true 时输出本节；否则删除本节 -->
 
 {{#if tech_context_db_name}}
-> 来自技术方案引用（{{tech_context path}}，需数仓核对）
+> 来自技术方案引用（{{tech_context path}}，需数据团队核对）
 ```
 db_name：{{tech_context.db_name}}
 table_name：
@@ -134,7 +136,7 @@ table_name：
 ## 六、回滚/止损方案
 
 - DDL 回滚：{{从 DDL 推断，如"新增字段可直接 DROP"；ALTER MODIFY 需备份}}
-- 配置回滚：{{从 Nacos 配置推断，如"删除新增 key"}}
+- 配置回滚：{{从配置变更推断，如"删除新增 key"；配置中心项写明在 profile.config_center 中回滚}}
 - 服务回滚：回滚到上一镜像版本
 
 {{#if prd_context}}

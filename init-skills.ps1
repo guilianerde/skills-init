@@ -17,14 +17,20 @@
 # 模板目录：skills-init\（database-query / code-review 两个 skill 的 .tpl 源文件）
 #
 # 重跑安全：SKILL.md / references 模板会更新；用户已填写的 wiki-config.json、
-#           schema.md、dev/profile.json 保留不覆盖；database-query/config.json 仅在本次提供了数据库配置时写入。
+#           schema.md、workflow/profile.json 保留不覆盖；database-query/config.json 仅在本次提供了数据库配置时写入。
+#
+# 单一来源：skills 只完整安装到 .agents\skills（codex / doubao 直接使用）；
+#           .claude\skills、.qwen\skills 下按 skill 建相对软链接指向它。
+#           Windows 建软链接需开启「开发者模式」或管理员权限；建不了时该环境自动退回独立拷贝。
+#           -Copy 直接使用各环境独立拷贝。
 # =====================================================================
 
 param(
   [string]$Envs = "",          # 逗号分隔环境：codex,claude,doubao,qwen 或 all
   [switch]$SkipDb,             # 跳过数据库连接配置（database-query 不生成 config.json）
   [switch]$Yes,                # 非交互模式：使用检测到的现有数据库配置；无配置且未 SkipDb 时报错退出
-  [switch]$WithDocNexus        # 安装 @rowansenne/docnexus 并执行 docnexus init（需 Node >= 22.13）
+  [switch]$WithDocNexus,       # 安装 @rowansenne/docnexus 并执行 docnexus init（需 Node >= 22.13）
+  [switch]$Copy                # 不用软链接，每个环境各拷一份
 )
 
 $ErrorActionPreference = 'Stop'
@@ -33,6 +39,15 @@ $ScriptDir  = Split-Path -Parent $MyInvocation.MyCommand.Path
 $Root       = Split-Path -Parent $ScriptDir
 $TplDir     = $ScriptDir
 $envNames   = @('codex','claude','doubao','qwen')
+$CanonDir   = '.agents\skills'   # 单一来源目录
+$SkillNames = @('workflow','dev','code-review','database-query','md-to-wiki','create-tech-md-doc','create-release-md-doc')
+# 各 skill 内的用户配置（相对 skill 目录），迁移旧的独立拷贝时需要保留；值为对应空模板（无则为 $null）
+$UserFiles  = [ordered]@{
+  'database-query\config.json'          = $null
+  'database-query\references\schema.md' = $null
+  'md-to-wiki\wiki-config.json'         = 'md-to-wiki\wiki-config.json.tpl'
+  'workflow\profile.json'               = 'workflow\profile.json.tpl'
+}
 # DocNexus 安装来源：默认 npm 包；可用环境变量 DOCNEXUS_PKG 指向本地 tarball / 目录（离线或测试用）
 $DocNexusPkg = if ($env:DOCNEXUS_PKG) { $env:DOCNEXUS_PKG } else { '@rowansenne/docnexus' }
 
@@ -195,14 +210,110 @@ function Install-Skills([string]$targetBase, $dbConfig) {
   Copy-TplFile 'create-tech-md-doc\template.md'              "$targetBase\create-tech-md-doc\template.md"
   Render-Template 'create-release-md-doc\SKILL.md.tpl'       "$targetBase\create-release-md-doc\SKILL.md" @{}
   Copy-TplFile 'create-release-md-doc\template.md'           "$targetBase\create-release-md-doc\template.md"
-  # ---- dev（开发 / 修 bug 编排；profile.json 记录项目构建与测试命令，可提交，重跑不覆盖）
+  # ---- dev（开发 / 修 bug 编排）
   Render-Template 'dev\SKILL.md.tpl'                         "$targetBase\dev\SKILL.md" @{}
   Copy-TplFile 'dev\references\plan-template.md'             "$targetBase\dev\references\plan-template.md"
-  if (Test-Path -LiteralPath "$targetBase\dev\profile.json") {
-    Write-Ok "$targetBase\dev\profile.json 已存在，保留不覆盖"
+  # ---- workflow（入口路由 + 共用项目画像 profile.json：无凭据，可提交，重跑不覆盖）
+  Render-Template 'workflow\SKILL.md.tpl'                    "$targetBase\workflow\SKILL.md" @{}
+  $wfProfile  = "$targetBase\workflow\profile.json"
+  $oldProfile = "$targetBase\dev\profile.json"
+  if (Test-Path -LiteralPath $wfProfile) {
+    Write-Ok "$wfProfile 已存在，保留不覆盖"
+  } elseif (Test-Path -LiteralPath $oldProfile) {
+    # 旧版本画像放在 dev\ 下：字段兼容，原样迁移（新增字段缺失时视为空）
+    Move-Item -LiteralPath $oldProfile -Destination $wfProfile
+    Write-Ok "已把旧的 dev\profile.json 迁移为 $wfProfile"
   } else {
-    Copy-TplFile 'dev\profile.json.tpl'                       "$targetBase\dev\profile.json"
+    Copy-TplFile 'workflow\profile.json.tpl'                  $wfProfile
   }
+}
+
+# ------------------------------------------------- 3b. 软链接到单一来源
+function Test-SameFile([string]$a, [string]$b) {
+  return (Get-FileHash -LiteralPath $a).Hash -eq (Get-FileHash -LiteralPath $b).Hash
+}
+
+function Merge-OldCopy([string]$old, [string]$skill) {
+  # 把旧的独立拷贝里的用户配置并入单一来源；冲突返回 $false
+  foreach ($rel in $UserFiles.Keys) {
+    if (-not $rel.StartsWith("$skill\")) { continue }
+    $src = Join-Path $old $rel.Substring($skill.Length + 1)
+    $dst = Join-Path (Join-Path $Root $CanonDir) $rel
+    if (-not (Test-Path -LiteralPath $src)) { continue }
+    if ((Test-Path -LiteralPath $dst) -and -not (Test-SameFile $src $dst)) {
+      $tpl = $UserFiles[$rel]
+      if (-not $tpl -or -not (Test-SameFile $dst (Join-Path $TplDir $tpl))) {
+        Write-Warn "$old 与 $CanonDir\$skill 的 $($rel.Substring($skill.Length + 1)) 内容不同，无法自动合并：保留旧目录、未建链接。请手动合并后删除旧目录再重跑。"
+        return $false
+      }
+    }
+    New-Item -ItemType Directory -Force -Path (Split-Path -Parent $dst) | Out-Null
+    Copy-Item -LiteralPath $src -Destination $dst -Force
+  }
+  # 旧版本画像在 dev\profile.json：单一来源里的 workflow\profile.json 还是空模板时迁移过去
+  $oldProfile = Join-Path $old 'profile.json'
+  # 旧画像里没有任何非空字符串值 = 未填写过的空模板，直接忽略
+  $oldFilled = $false
+  if ($skill -eq 'dev' -and (Test-Path -LiteralPath $oldProfile)) {
+    try {
+      $p = Get-Content -LiteralPath $oldProfile -Raw | ConvertFrom-Json
+      $oldFilled = @($p.PSObject.Properties | Where-Object { $_.Value -is [string] -and $_.Value -ne '' }).Count -gt 0
+    } catch { $oldFilled = $true }
+  }
+  if ($oldFilled) {
+    $dst = Join-Path (Join-Path $Root $CanonDir) 'workflow\profile.json'
+    if (-not (Test-Path -LiteralPath $dst) -or (Test-SameFile $dst (Join-Path $TplDir 'workflow\profile.json.tpl'))) {
+      New-Item -ItemType Directory -Force -Path (Split-Path -Parent $dst) | Out-Null
+      Copy-Item -LiteralPath $oldProfile -Destination $dst -Force
+    } elseif (-not (Test-SameFile $oldProfile $dst)) {
+      Write-Warn "$oldProfile 与 $CanonDir\workflow\profile.json 都填写过且内容不同：未迁移，旧文件会随目录备份，请手动合并。"
+    }
+  }
+  return $true
+}
+
+function New-RelLink([string]$link, [string]$target) {
+  # 相对目录软链接：PowerShell 7 用 .NET API（保留相对路径），否则用 mklink /D
+  try {
+    if ([IO.Directory] | Get-Member -Static -Name CreateSymbolicLink) {
+      [IO.Directory]::CreateSymbolicLink($link, $target) | Out-Null
+    } else {
+      cmd /c mklink /D "`"$link`"" "`"$target`"" 2>&1 | Out-Null
+    }
+  } catch { }
+  return (Test-Path -LiteralPath $link)
+}
+
+function Link-Skills([string]$envName, [string]$rel, $dbConfig) {
+  # 返回 $true 表示全部建链成功；建链不被系统允许时退回独立拷贝
+  $dir = Join-Path $Root $rel
+  New-Item -ItemType Directory -Force -Path $dir | Out-Null
+  $skipped = 0
+  foreach ($skill in $SkillNames) {
+    $link   = Join-Path $dir $skill
+    $target = "..\..\$CanonDir\$skill"
+    $item   = Get-Item -LiteralPath $link -Force -ErrorAction SilentlyContinue
+    if ($item -and $item.LinkType -eq 'SymbolicLink') {
+      if ([string]$item.Target -eq $target) { continue }
+      $item.Delete()
+    } elseif ($item -and $item.PSIsContainer) {
+      if (-not (Merge-OldCopy $link $skill)) { $skipped++; continue }
+      $bak = Join-Path $Root ("tmp\skills\backup\{0}\{1}" -f (Get-Date -Format 'yyyyMMdd-HHmmss'), $envName)
+      New-Item -ItemType Directory -Force -Path $bak | Out-Null
+      Move-Item -LiteralPath $link -Destination (Join-Path $bak $skill)
+      Write-Ok "$rel\$skill 旧的独立拷贝已并入单一来源，原目录备份到 $bak\$skill"
+    } elseif ($item) {
+      Write-Warn "$link 已存在且不是目录或软链接，跳过"; $skipped++; continue
+    }
+    if (-not (New-RelLink $link $target)) {
+      Write-Warn "$envName：系统不允许创建软链接（需开启开发者模式或以管理员运行），改为独立拷贝到 $dir"
+      Install-Skills $dir $dbConfig
+      return $false
+    }
+  }
+  if ($skipped -eq 0) { Write-Ok "$envName -> $rel（软链接到 $CanonDir）" }
+  else { Write-Warn "$envName -> $rel：$skipped 个 skill 未建链接（见上方提示），其余已软链接到 $CanonDir" }
+  return $true
 }
 
 # ------------------------------------------------- 4. .gitignore 保护
@@ -319,14 +430,17 @@ Write-Step ("目标环境：{0}" -f ($sel -join ', '))
 $dbConfig = $null
 if (-not $SkipDb) { $dbConfig = Get-DbConfig }
 
+# 安装目标：单一来源模式下 .agents\skills 只装一次，其余环境建链接；-Copy 时各环境各装一份
 $targets = @()
-foreach ($e in $sel) {
-  switch ($e) {
-    'codex'  { $targets += @{ Env='codex';  Dir='.agents\skills' } }
-    'claude' { $targets += @{ Env='claude'; Dir='.claude\skills' } }
-    'doubao' { $targets += @{ Env='doubao'; Dir='.agents\skills' } }
-    'qwen'   { $targets += @{ Env='qwen';   Dir='.qwen\skills'   } }
-  }
+$links   = @()
+if ($Copy) {
+  if ('codex' -in $sel -or 'doubao' -in $sel) { $targets += @{ Env='codex/doubao'; Dir=$CanonDir } }
+  if ('claude' -in $sel) { $targets += @{ Env='claude'; Dir='.claude\skills' } }
+  if ('qwen'   -in $sel) { $targets += @{ Env='qwen';   Dir='.qwen\skills'   } }
+} else {
+  $targets += @{ Env='单一来源'; Dir=$CanonDir }
+  if ('claude' -in $sel) { $links += @{ Env='claude'; Dir='.claude\skills' } }
+  if ('qwen'   -in $sel) { $links += @{ Env='qwen';   Dir='.qwen\skills'   } }
 }
 
 # codex 用户级（可选）
@@ -344,6 +458,11 @@ foreach ($t in $targets) {
   $abs = if ([IO.Path]::IsPathRooted($t.Dir)) { $t.Dir } else { Join-Path $Root $t.Dir }
   Write-Step ("安装到 {0}  ->  {1}" -f $t.Env, $abs)
   Install-Skills $abs $dbConfig
+}
+
+foreach ($l in $links) {
+  Write-Step ("链接 {0}  ->  {1}" -f $l.Env, (Join-Path $Root $l.Dir))
+  Link-Skills $l.Env $l.Dir $dbConfig | Out-Null
 }
 
 # wiki 凭据与 tmp 产物同样需要忽略：无论是否配置数据库都执行

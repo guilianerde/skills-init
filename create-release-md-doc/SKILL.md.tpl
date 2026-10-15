@@ -65,6 +65,8 @@ description: "Generate a Markdown release/deployment plan (上线方案) from th
 
 ### Step 1 — 采集 diff（分层过滤）
 
+> **项目画像**：主分支默认取 `workflow/profile.json` 的 `main_branch`；下表路径过滤以 Java/Spring 工程为默认，其他技术栈按项目实际目录调整（如 Go 的 `internal/handler`、前端的 `src/api`）。发布平台、配置中心、定时任务注解、是否需要数据评审同样取自 profile，未配置的部分在文档中写「待填写」，不要沿用其他项目的取值。
+
 > **diff 基线必须用三点 `<main>...<dev>`**：比较的是 dev 相对两分支合并基点（merge-base）的改动。两点 `<main>..<dev>` 等价于直接比较两个分支末端，主干前进后会把主干新提交以「反向删除」混进文档。
 
 | 层 | 命令（路径过滤） | 用途 | 喂给哪个模块 |
@@ -72,7 +74,7 @@ description: "Generate a Markdown release/deployment plan (上线方案) from th
 | 1. Controller | `git diff <main>...<dev> --name-only -- '**/controller/**'` | 接口验证 | 四.接口验证 |
 | 2. Service/Impl | `-- '**/service/**'` | 业务影响 | 一.改动范围 |
 | 3. SQL | `-- '*.sql' '**/db/**' '**/migration/**'` | DDL | 二.中间件 |
-| 4. 配置 | `-- '**/application*.yml' '*.properties' 'bootstrap*.yml'` | Nacos/开关 | 二.中间件 |
+| 4. 配置 | `-- '**/application*.yml' '*.properties' 'bootstrap*.yml'` | 配置中心 / 开关 | 二.中间件 |
 | 5. pom | `-- 'pom.xml' '**/pom.xml'` | 依赖 | 二.中间件 |
 | 6. Job | `-- '**/job/**' '**/*Job.java'` | 定时任务 | 五.监控 |
 

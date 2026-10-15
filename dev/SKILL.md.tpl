@@ -26,20 +26,12 @@ description: "Implement a feature or fix a bug in this project end to end: under
 
 ## Step 0 — 前置检查（两种模式共用）
 
-1. **项目画像**：读本 skill 目录下的 `profile.json`。字段含义：
-   - `main_branch`：主分支名（如 `main` / `master`），diff 基线；
-   - `build` / `test` / `lint`：构建、全量测试、静态检查命令；
-   - `test_single`：只跑一个测试的命令，用 `{target}` 表示测试类或文件（如 `mvn -q test -Dtest={target}`）；
-   - `notes`：其他项目约定（如「启动需要本地 Redis」），一条一句。
-   - 字段为空 → 从仓库推断：`pom.xml`/`build.gradle`（Maven/Gradle）、`package.json` scripts、`go.mod`、`pyproject.toml`、`Makefile`、CI 配置，以及 `CLAUDE.md` / `AGENTS.md` 中的命令约定。
-   - 把推断结果给用户确认后写回 `profile.json`（只写命令和分支名，不写任何凭据）。用户不确认就只在本次使用，不落盘。
+1. **项目画像**：读同项目 `workflow` skill 目录下的 `profile.json`（字段含义见 `workflow` skill）。本 skill 用到 `main_branch`、`build`、`test`、`test_single`（`{target}` 替换为测试类或文件）、`lint`、`config_center`、`notes`。
+   - 需要的字段为空 → 按 `workflow` skill「填写与更新」的步骤推断，经用户确认后写回；用户不确认就只在本次使用，不落盘。
 2. **工作区状态**：`git status --short` 与当前分支。
    - 有与本需求无关的未提交改动 → 告知用户，不要混进本次改动，也不要替用户 stash / 丢弃。
    - 当前在主分支（`profile.main_branch`）上 → 建议先建特性分支，用户同意后再建。
-3. **增强能力探测**（都不阻塞，探测失败就跳过并在交付时注明）：
-   - wiki：`md-to-wiki/wiki-config.json` 中 `enabled=true` 且 `base_url` 非空，或环境有 wiki MCP 工具；
-   - DocNexus：项目根存在 `docnexus/project.json` 且 `./node_modules/.bin/docnexus` 可执行；
-   - 数据库：`database-query/config.json` 存在。
+3. **增强能力探测**：按 `workflow` skill「增强能力探测」表判断 wiki、DocNexus、数据库是否可用。都不阻塞，不可用就跳过对应增强，并在交付说明中注明。
 
 ## 功能开发流程
 
@@ -70,7 +62,7 @@ description: "Implement a feature or fix a bug in this project end to end: under
 
 - **小步推进**：每完成一个可编译的单元，就运行 `profile.build`（没有则用对应构建工具的编译命令）确认通过，再进入下一步。
 - **贴合现有代码**：沿用参照实现的写法；不顺手重构、不改无关代码、不升级依赖。看到范围外的问题记进交付说明，不在本次修。
-- **配置**：新增配置项记入配置清单（key、位置、用途、建议默认值、上线前需下发的环境），遵循 `code-review/references/checklist.md` 第 10 维度的项目约定。
+- **配置**：新增配置项记入配置清单（key、位置、用途、建议默认值、上线前需下发的环境），按 `profile.config_center` 与 `code-review/references/checklist.md` 第 10 维度处理。
 - **数据库变更**：DDL / 数据修正写成 SQL 脚本放进项目约定的目录（没有约定则放进交付说明），**不在任何环境直接执行**。
 - **敏感信息**：不硬编码密钥、密码、内网地址；日志不打印敏感字段。
 

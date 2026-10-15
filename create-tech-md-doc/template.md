@@ -1,7 +1,7 @@
 <!--
   template.md — create-tech-md-doc skill 的文档模板
-  结构来源：wiki.weicai.com.cn Confluence templateId=98074628（8 模块）
-  参考样例：pageId=152517635 【PRD】DinaJoy拒量导流-技术方案
+  结构来源：团队 Confluence 技术方案模板（8 模块）
+  项目相关字段（发布平台 / 环境 / 配置中心 / 定时任务注解 / 数据评审）取自 workflow/profile.json，未配置的部分按「待填写」输出
   始终填充模块：2/3/4/5/6/8
   条件填充模块：1（需求背景）、7（数据链路）— 有 --prd 时从 PRD 填充，无 --prd 时模块1留空待人工、模块7从 diff 推断
   标题层级：一、开发部分 = h1（#），子模块 = h2（##），对齐 Confluence 样例
@@ -34,7 +34,7 @@
 {{else}}
 > **【留空 — 待人工补充】**
 > 关联需求（PRD 链接）：
-> TAPD 链接：
+> 需求单链接：
 > （未传入 --prd，diff 无法推断业务背景，需人工填写）
 {{/if}}
 
@@ -90,17 +90,17 @@
 
 ## 5. 涉及服务 *
 
-> (不填写会影响TAPD流程流转)
+> （必填）
 
 | 服务名 | 环境 | 仓库 | 主分支 | 开发分支 |
 |--------|------|------|--------|----------|
 | {{从 git remote 推断的服务名}} | {{环境}} | {{git remote 仓库地址}} | {{mainBranch}} | {{devBranch}} |
 
-参数说明：
-- 服务名：Diamond 生产环境服务名
-- 环境：Diamond 服务 Region（阿里云、华为云、阿里云墨西哥、华为云-墨西哥、华为云-菲律宾）
-- 仓库：ssh git 链接，如 `git@gitlab.weicai.com.cn:foreign/xxx.git`
-- 主分支：仓库主分支（main / master）
+参数说明（发布平台与可选环境取自 `workflow/profile.json` 的 `deploy`；未配置时按「待填写」输出）：
+- 服务名：{{profile.deploy.platform}} 上的生产环境服务名
+- 环境：可选值 {{profile.deploy.regions，逗号分隔；为空写「待填写」}}
+- 仓库：git remote 地址（`git remote get-url origin`）
+- 主分支：仓库主分支（profile.main_branch，或 main / master）
 - 开发分支：当前 dev 分支名
 
 ## 6. 中间件变更
@@ -123,24 +123,26 @@
 
 ### 6.2 Redis 变更（如有）
 
-{{从配置 diff + 代码中 RedisKeyConstants 推断}}
+{{从配置 diff + 代码中的缓存 key 常量 / 前缀定义推断}}
 - 新增 key：`{{key}}`，用途：{{用途}}
 
 ### 6.3 定时任务变更（如有）
 
-{{从 job/** 包 diff 提取，含 @MyJobHandle 注解的类}}
+{{从 job/** 包 diff 提取；profile.job_annotation 非空时按该注解（如 @XxlJob / @Scheduled）识别任务类}}
 - 新增/修改任务：{{类名}} - {{cron/描述}}
 
 ### 6.4 依赖变更（如有）
 
-{{从 pom.xml diff 提取}}
+{{从构建文件 diff 提取：pom.xml / build.gradle / package.json / go.mod 等}}
 - 新增依赖：`{{groupId}}:{{artifactId}}:{{version}}`
 
 ## 7. 数据链路
 
+<!-- 仅当 profile.data_review 为 true 时填写 db_name / table_name 评审块；为 false 或未配置时本模块只列涉及的表即可 -->
+
 {{#if prd_context}}
 {{#if prd_context.tables}}
-> PRD 提及的数据表（来自 {{prd_context.pageUrl}}，需数仓核对）
+> PRD 提及的数据表（来自 {{prd_context.pageUrl}}，需数据团队核对）
 
 ```
 db_name：{{从 SQL/datasource 推断，PRD 提及则优先}}
@@ -150,9 +152,8 @@ table_name：
 ```
 {{else}}
 > **【待人工补充】**
-> PRD 未提及具体表名，需人工/数仓填写。
-> 数仓审核信息：请填写本次需求修改的数据库名、表名
-> （不填写或者填写错误信息会影响TAPD流程流转）
+> PRD 未提及具体表名，需人工填写。
+> 数据评审信息：请填写本次需求修改的数据库名、表名
 
 ```
 db_name：{{从 SQL USE 语句 / application.yml datasource url / 表名前缀推断，不确定标"待人工确认"}}
@@ -162,8 +163,7 @@ table_name：
 ```
 {{/if}}
 {{else}}
-> 数仓审核信息：请填写本次需求修改的数据库名、表名
-> （不填写或者填写错误信息会影响TAPD流程流转）
+> 数据评审信息：请填写本次需求修改的数据库名、表名
 > 无 --prd 时 db_name 从 diff 推断（SQL/datasource/Entity @TableName），不确定处标"待人工确认"
 
 ```
