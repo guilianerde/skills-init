@@ -51,6 +51,7 @@ npx @rowansenne/skills-init
 ./skills-init/init-skills.sh --envs codex,qwen --skip-db
 ./skills-init/init-skills.sh --envs claude,qwen --skip-db --with-docnexus   # 同时接入 DocNexus 文档库
 ./skills-init/init-skills.sh --envs all --skip-db --copy             # 不用软链接，各环境独立拷贝
+./skills-init/init-skills.sh --uninstall                             # 按安装清单卸载（PowerShell：-Uninstall）
 ```
 
 ## 安装路径与启用方式
@@ -164,6 +165,7 @@ npx @rowansenne/skills-init
 | `-SkipDb` / `--skip-db` | 跳过数据库连接配置（database-query 不生成 config.json）                             |
 | `-WithDocNexus` / `--with-docnexus` | 可选：接入 [DocNexus](https://www.npmjs.com/package/@rowansenne/docnexus) 项目文档库（需 Node >= 22.13），见下方「DocNexus 文档库（可选）」 |
 | `-Copy` / `--copy`      | 不建软链接，各环境独立拷贝一份完整 skills                                  |
+| `-Uninstall` / `--uninstall` | 按安装清单卸载本项目装的 skills 与链接，见下方「卸载」 |
 | `-Yes` / `--yes`        | 非交互：自动使用已有数据库配置（依次查找 `.codex/database-query/config.json` 与各环境已安装的 `database-query/config.json`）；都没有且未 `-SkipDb` 时报错退出 |
 | `--project-root`        | 项目根目录；直接调用 `bin/skills-init.mjs` 时默认当前目录，两个封装脚本自动传上级目录 |
 | `-v` / `--version`      | 显示版本                                                                |
@@ -200,13 +202,40 @@ npx @rowansenne/skills-init
 
 可以放心重复执行 init 来升级模板：
 
-* `SKILL.md`、`references/checklist.md`、`template.md`、脚本等**模板文件会被更新**；
+* `SKILL.md`、`references/checklist.md`、`template.md`、脚本等**模板文件会被更新**；但被你**手动改过**的模板文件不会被静默覆盖（见下方「安装清单」）；
+* 新版本模板里已删除的文件会被清理；你改过的不删，保留并在结尾提示；
 * 用户填过的 `md-to-wiki/wiki-config.json`、`database-query/references/schema.md`、`workflow/profile.json` **保留不覆盖**；
 * `database-query/config.json` 只在本次确认或填写了数据库配置时写入；`--skip-db` 时保留已有文件；
 * `.gitignore` 规则无论是否配置数据库都会补齐（只追加缺失的行）；
 * 安装器按 skill 目录自动发现文件（`*.tpl` 去掉后缀），新增 `references/` 文件不需要改安装器。
 * `code-review` 已改名为 `project-review`（避免与 Claude Code 内置的 `/code-review` 撞名）：重跑时自动移除旧名的目录和链接；只删能确认是本项目装的那份，你自己的同名 skill 不动。
 * 设置环境变量 `SKILLS_INIT_NO_SYMLINK=1` 可强制不建软链接（各环境独立拷贝）；无法建链接时会先探测，旧目录原样保留、只更新模板。
+
+### 安装清单
+
+每次安装后在 `.agents/skills/.skills-init.json`（`--copy` 时各目标目录各一份）写入清单：安装器版本、安装时间、所选环境、安装模式，以及每个 skill 的模板文件相对路径与 sha256。用户配置（`config.json`、`schema.md`、`wiki-config.json`、`profile.json`）只记录存在与否，不记哈希。重跑时据此判断：
+
+| 情况 | 交互模式 | `--yes` |
+| --- | --- | --- |
+| 模板文件当前内容与清单记录一致（没改过） | 直接更新 | 直接更新 |
+| 与清单记录不同（手改过） | 询问：`o` 用新模板覆盖 / `k` 保留你的版本 / 回车 = 保留并把新模板另存为同目录的 `<文件名>.new` | 保留你的版本，新模板写成 `<文件名>.new`，结尾汇总列出 |
+| 清单里有、新模板里已没有 | 没改过就删除；改过的保留并提示 | 同左 |
+
+* 合并完 `.new` 后删掉它即可；你采纳了新模板（内容与新模板一致）或选了覆盖 / 保留后，下次重跑会自动清掉上次生成的 `.new`。
+* 没有清单的旧安装（本功能之前装的）无从判断是否手改过，第一次重跑仍按旧行为直接更新模板，之后就有清单了。
+
+### 卸载
+
+```
+./skills-init/init-skills.sh --uninstall       # PowerShell：.\skills-init\init-skills.ps1 -Uninstall
+```
+
+按清单移除本项目安装的 skill 文件、`.claude/skills` 与 `.qwen/skills` 下指向 `.agents/skills` 的软链接，以及清单本身：
+
+* 用户配置（`config.json`、`schema.md`、`wiki-config.json`、`profile.json`）和手改过的模板文件先移到 `tmp/skills/uninstall-backup/<时间戳>/<安装目录>/<skill>/`，结尾列出；
+* 不在清单里的文件、你自己的 skill 和链接都不动；skill 目录里还有你自己加的文件时保留该目录并提示；目录清空后才删除；
+* `.gitignore` 里追加的规则和 DocNexus 不处理；没有清单时什么也不做。
+* 用户级 `~/.codex/skills` 不在卸载范围内。
 
 ## 测试
 
@@ -221,7 +250,7 @@ bash tests/test-init-skills.sh upgrade    # 只跑名字含 upgrade 的用例
 pwsh -NoProfile -File tests/test-init-skills.ps1   # PowerShell 版（Windows，PowerShell 7）
 ```
 
-覆盖的场景：全新安装（`.agents/skills` 完整文件 + `.claude` / `.qwen` 相对软链接）、`--copy`、`--yes` 无数据库配置时退出码 1、交互输入含 `/ & | " \` 的密码后 `config.json` 仍是合法 JSON 且值一致、重跑保留用户配置、从旧版各环境独立拷贝升级（用 git 历史中 `71a23c8` 的脚本生成旧布局）、两边配置冲突时保留旧目录、`.gitignore` 只追加缺失规则。PowerShell 版另外覆盖软链接不可用时退回独立拷贝（用环境变量 `SKILLS_INIT_NO_SYMLINK=1` 模拟）。
+覆盖的场景：全新安装（`.agents/skills` 完整文件 + `.claude` / `.qwen` 相对软链接）、`--copy`、`--yes` 无数据库配置时退出码 1、交互输入含 `/ & | " \` 的密码后 `config.json` 仍是合法 JSON 且值一致、重跑保留用户配置、从旧版各环境独立拷贝升级（用 git 历史中 `71a23c8` 的脚本生成旧布局）、两边配置冲突时保留旧目录、`.gitignore` 只追加缺失规则、安装清单内容（版本 / 环境 / sha256，`--copy` 各目录一份）、手改 `SKILL.md` 后重跑保留并生成 `.new`（含交互选覆盖 / 保留）、模板删除的文件重跑后被清理（改过的保留）、`--uninstall` 后目录与链接消失、用户配置被备份、用户自己的 skill 不受影响。PowerShell 版另外覆盖软链接不可用时退回独立拷贝（用环境变量 `SKILLS_INIT_NO_SYMLINK=1` 模拟）。
 
 依赖：bash 版需要 `python3` 校验 JSON；升级用例需要完整 git 历史（浅克隆时先 `git fetch --unshallow`）。
 

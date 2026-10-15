@@ -8,6 +8,7 @@
 #   ./skills-init/init-skills.sh --envs all --yes --skip-db        # 全环境、非交互、跳过数据库
 #   ./skills-init/init-skills.sh --envs claude,qwen --with-docnexus
 #   ./skills-init/init-skills.sh --envs all --copy                 # 不用软链接
+#   ./skills-init/init-skills.sh --uninstall                       # 按安装清单卸载
 # 完整参数：./skills-init/init-skills.sh --help
 # =====================================================================
 set -eu

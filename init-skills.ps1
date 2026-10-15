@@ -7,6 +7,7 @@
 #   .\skills-init\init-skills.ps1 -Envs all -Yes -SkipDb           # 全环境、非交互、跳过数据库
 #   .\skills-init\init-skills.ps1 -Envs claude,qwen -WithDocNexus
 #   .\skills-init\init-skills.ps1 -Envs all -Copy                  # 不用软链接
+#   .\skills-init\init-skills.ps1 -Uninstall                       # 按安装清单卸载
 # Windows 建软链接需开启「开发者模式」或以管理员运行；建不了时该环境自动退回独立拷贝。
 # =====================================================================
 
@@ -15,7 +16,8 @@ param(
   [switch]$SkipDb,             # 跳过数据库连接配置
   [switch]$Yes,                # 非交互模式：使用已有数据库配置；无配置且未 SkipDb 时报错退出
   [switch]$WithDocNexus,       # 安装 @rowansenne/docnexus 并执行 docnexus init（需 Node >= 22.13）
-  [switch]$Copy                # 不用软链接，每个环境各拷一份
+  [switch]$Copy,               # 不用软链接，每个环境各拷一份
+  [switch]$Uninstall           # 按安装清单卸载本项目装的 skills 与链接（用户配置备份到 tmp\skills\uninstall-backup\）
 )
 
 $ErrorActionPreference = 'Stop'
@@ -33,6 +35,7 @@ if ($SkipDb)       { $cliArgs += '--skip-db' }
 if ($Yes)          { $cliArgs += '--yes' }
 if ($WithDocNexus) { $cliArgs += '--with-docnexus' }
 if ($Copy)         { $cliArgs += '--copy' }
+if ($Uninstall)    { $cliArgs += '--uninstall' }
 
 & node @cliArgs
 exit $LASTEXITCODE

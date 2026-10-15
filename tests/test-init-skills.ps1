@@ -219,7 +219,7 @@ function Test-RerunPreservesUserFiles {
   Set-Wiki "$c\md-to-wiki\wiki-config.json" 'https://wiki.example.com'
   [IO.File]::WriteAllText((PathOf "$c\database-query\references\schema.md"), "# my schema`n")
   Set-Profile "$c\workflow\profile.json" 'develop'
-  [IO.File]::WriteAllText((PathOf "$c\dev\SKILL.md"), "stale`n")   # 模板文件会被更新
+  [IO.File]::WriteAllText((PathOf "$c\dev\SKILL.md"), "stale`n")   # 手改过的模板文件：保留，新模板另存为 .new
   foreach ($f in 'database-query\config.json', 'md-to-wiki\wiki-config.json', 'workflow\profile.json') {
     Copy-Item -LiteralPath (PathOf "$c\$f") -Destination (Join-Path $Work ('rerun-' + (Split-Path -Leaf $f)))
   }
@@ -228,9 +228,119 @@ function Test-RerunPreservesUserFiles {
   Assert-Content "$c\database-query\references\schema.md" '# my schema'
   Assert-Same "$c\workflow\profile.json" (Join-Path $Work 'rerun-profile.json')
   Assert-Same "$c\database-query\config.json" (Join-Path $Work 'rerun-config.json')
-  Assert-Same "$c\dev\SKILL.md" (Join-Path $Repo 'dev\SKILL.md.tpl')
+  Assert-Content "$c\dev\SKILL.md" 'stale'
+  Assert-Same "$c\dev\SKILL.md.new" (Join-Path $Repo 'dev\SKILL.md.tpl')
   Invoke-Install @('-Envs', 'claude,qwen', '-Yes', '-SkipDb'); Expect-Rc 0
   Assert-Same "$c\database-query\config.json" (Join-Path $Work 'rerun-config.json')
+}
+
+function Get-Sha([string]$file) { (Get-FileHash -LiteralPath $file -Algorithm SHA256).Hash.ToLowerInvariant() }
+function Log-Has([string]$text) { (Get-Content -LiteralPath $script:Log -Raw) -like "*$text*" }
+
+function Test-ManifestWritten {
+  New-Project 'manifest'
+  Invoke-Install @('-Envs', 'claude,qwen', '-Yes', '-SkipDb'); Expect-Rc 0
+  $m = '.agents\skills\.skills-init.json'
+  Assert-File $m
+  $j = Get-Json $m
+  Assert-Eq $j.version (Get-Content -LiteralPath (Join-Path $Repo 'package.json') -Raw | ConvertFrom-Json).version '清单中的安装器版本'
+  Assert-Eq ($j.envs -join ',') 'claude,qwen' '清单中的环境'
+  Assert-Eq $j.skills.dev.files.'SKILL.md' (Get-Sha (Join-Path $Repo 'dev\SKILL.md.tpl')) '清单中 dev/SKILL.md 的 sha256'
+  Assert-Eq $j.skills.'project-review'.files.'references/checklist.md' (Get-Sha (Join-Path $Repo 'project-review\references\checklist.md.tpl')) '清单中 checklist.md 的 sha256'
+  # 用户配置只记存在与否，不记哈希
+  Assert-Eq $j.skills.workflow.userFiles.'profile.json' 'True' '清单中 profile.json 的存在标记'
+  Assert-Eq $j.skills.'database-query'.userFiles.'config.json' 'False' '清单中 config.json 的存在标记'
+  if ($j.skills.workflow.files.PSObject.Properties.Name -contains 'profile.json') { Fail 'profile.json 不应记录哈希' }
+  Assert-Missing '.claude\skills\.skills-init.json'
+  # -Copy：每个目标目录各一份
+  New-Project 'manifest-copy'
+  Invoke-Install @('-Envs', 'claude,qwen', '-Copy', '-Yes', '-SkipDb'); Expect-Rc 0
+  Assert-File '.claude\skills\.skills-init.json'
+  Assert-File '.qwen\skills\.skills-init.json'
+  Assert-Eq (Get-Json '.qwen\skills\.skills-init.json').mode 'copy' '-Copy 清单中的 mode'
+}
+
+function Test-ModifiedTemplateKeptAsNew {
+  New-Project 'modified'
+  Invoke-Install @('-Envs', 'claude,qwen', '-Yes', '-SkipDb'); Expect-Rc 0
+  $c = '.agents\skills'
+  $tpl = Join-Path $Repo 'dev\SKILL.md.tpl'
+  [IO.File]::WriteAllText((PathOf "$c\dev\SKILL.md"), "my edits`n")
+  # -Yes：保留用户版本，新模板写成 SKILL.md.new，结尾汇总提示
+  Invoke-Install @('-Envs', 'claude,qwen', '-Yes', '-SkipDb'); Expect-Rc 0
+  Assert-Content "$c\dev\SKILL.md" 'my edits'
+  Assert-Same "$c\dev\SKILL.md.new" $tpl
+  if (-not (Log-Has '.agents/skills/dev/SKILL.md  ->  SKILL.md.new')) { Fail '日志中缺少 .new 汇总提示' }
+  # 交互选 k：保留用户版本、清理上次的 .new
+  Invoke-Install @('-Envs', 'claude,qwen', '-SkipDb') "k`n"; Expect-Rc 0
+  Assert-Content "$c\dev\SKILL.md" 'my edits'
+  Assert-Missing "$c\dev\SKILL.md.new"
+  # 交互选 o：用新模板覆盖
+  Invoke-Install @('-Envs', 'claude,qwen', '-SkipDb') "o`n"; Expect-Rc 0
+  Assert-Same "$c\dev\SKILL.md" $tpl
+  Assert-Missing "$c\dev\SKILL.md.new"
+}
+
+function Test-RemovedTemplateFilesPruned {
+  New-Project 'prune'
+  Invoke-Install @('-Envs', 'claude,qwen', '-Yes', '-SkipDb'); Expect-Rc 0
+  $c = '.agents\skills'
+  Add-Content -LiteralPath (PathOf "$c\dev\references\delivery-template.md") -Value 'my notes'
+  Copy-Item -LiteralPath (PathOf "$c\dev\references\delivery-template.md") -Destination (Join-Path $Work 'prune-delivery.md')
+  # 新版本模板删掉文件：未改过的被清理，改过的保留并提示
+  Remove-Item -LiteralPath (PathOf 'skills-init\dev\references\plan-template.md'), (PathOf 'skills-init\dev\references\delivery-template.md')
+  Remove-Item -LiteralPath (PathOf 'skills-init\create-tech-md-doc\references') -Recurse -Force
+  Invoke-Install @('-Envs', 'claude,qwen', '-Yes', '-SkipDb'); Expect-Rc 0
+  Assert-Missing "$c\dev\references\plan-template.md"
+  Assert-Same "$c\dev\references\delivery-template.md" (Join-Path $Work 'prune-delivery.md')
+  Assert-Missing "$c\create-tech-md-doc\references"
+  Assert-File "$c\create-tech-md-doc\SKILL.md"
+  if (-not (Log-Has '.agents/skills/dev/references/delivery-template.md')) { Fail '日志中缺少保留过时文件的提示' }
+}
+
+function Test-Uninstall {
+  New-Project 'uninstall'
+  Invoke-Install @('-Envs', 'claude,qwen', '-Yes', '-SkipDb'); Expect-Rc 0
+  $c = '.agents\skills'
+  Set-Wiki "$c\md-to-wiki\wiki-config.json" 'https://wiki.example.com'
+  Set-Profile "$c\workflow\profile.json" 'develop'
+  [IO.File]::WriteAllText((PathOf "$c\project-review\SKILL.md"), "my edits`n")
+  Copy-Item -LiteralPath (PathOf "$c\md-to-wiki\wiki-config.json") -Destination (Join-Path $Work 'uninstall-wiki.json')
+  Copy-Item -LiteralPath (PathOf "$c\workflow\profile.json") -Destination (Join-Path $Work 'uninstall-profile.json')
+  # 用户自己的 skill / 文件：都不动
+  New-Item -ItemType Directory -Force -Path (PathOf "$c\my-skill"), (PathOf '.claude\skills\my-claude-skill') | Out-Null
+  [IO.File]::WriteAllText((PathOf "$c\my-skill\SKILL.md"), "mine`n")
+  [IO.File]::WriteAllText((PathOf '.claude\skills\my-claude-skill\SKILL.md'), "mine`n")
+  [IO.File]::WriteAllText((PathOf "$c\dev\notes.md"), "notes`n")
+
+  Invoke-Install @('-Uninstall'); Expect-Rc 0
+  foreach ($s in $Skills) {
+    Assert-Missing ".claude\skills\$s"
+    Assert-Missing ".qwen\skills\$s"
+    if ($s -ne 'dev') { Assert-Missing "$c\$s" }
+  }
+  Assert-Missing "$c\.skills-init.json"
+  Assert-Missing "$c\dev\SKILL.md"
+  Assert-Content "$c\dev\notes.md" 'notes'
+  Assert-Content "$c\my-skill\SKILL.md" 'mine'
+  Assert-Content '.claude\skills\my-claude-skill\SKILL.md' 'mine'
+  # 用户配置与手改过的模板文件备份到 tmp\skills\uninstall-backup\<时间戳>\
+  $b = @(Get-ChildItem -LiteralPath (PathOf 'tmp\skills\uninstall-backup') -Directory -ErrorAction SilentlyContinue)
+  if ($b.Count -ne 1) { Fail "uninstall-backup 下的目录数 $($b.Count)，期望 1"; return }
+  $bak = Join-Path 'tmp\skills\uninstall-backup' $b[0].Name
+  Assert-Same "$bak\$c\md-to-wiki\wiki-config.json" (Join-Path $Work 'uninstall-wiki.json')
+  Assert-Same "$bak\$c\workflow\profile.json" (Join-Path $Work 'uninstall-profile.json')
+  Assert-Content "$bak\$c\project-review\SKILL.md" 'my edits'
+  # 再卸载一次：没有清单，什么也不做
+  Invoke-Install @('-Uninstall'); Expect-Rc 0
+  Assert-Content "$c\my-skill\SKILL.md" 'mine'
+}
+
+function Test-UninstallCopyMode {
+  New-Project 'uninstall-copy'
+  Invoke-Install @('-Envs', 'claude,qwen', '-Copy', '-Yes', '-SkipDb'); Expect-Rc 0
+  Invoke-Install @('-Uninstall'); Expect-Rc 0
+  foreach ($d in '.claude', '.qwen', '.agents') { Assert-Missing $d }
 }
 
 function Test-UpgradeFromCopies {
@@ -309,6 +419,7 @@ Write-Host ("pwsh {0} on {1}；软链接可用：{2}" -f $PSVersionTable.PSVersi
 $tests = @(
   'Test-FreshInstallLinks', 'Test-NoSymlinkFallsBackToCopy', 'Test-NoSymlinkUpgradeKeepsOldCopies', 'Test-CopyMode',
   'Test-YesWithoutDbConfigFails', 'Test-InteractivePasswordEscaping', 'Test-RerunPreservesUserFiles',
+  'Test-ManifestWritten', 'Test-ModifiedTemplateKeptAsNew', 'Test-RemovedTemplateFilesPruned', 'Test-Uninstall', 'Test-UninstallCopyMode',
   'Test-UpgradeFromCopies', 'Test-UpgradeConflictKeepsOldDir', 'Test-GitIgnoreAppendsOnlyMissing'
 )
 $passed = 0; $failedCases = @()
