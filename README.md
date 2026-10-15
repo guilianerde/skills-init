@@ -526,7 +526,9 @@ node scripts/eval-triggers.mjs --only dev   # 只跑期望为 dev 的用例
 ```
 
 * 需要已登录的 `claude` CLI（终端执行 `claude` 后 `/login`）；每条请求会真实调用一次模型并计费，检测到第一个工具调用即终止，不会执行任何工具。
-* 结果明细写到 `tmp/evals/`。改了任何 skill 的 description 后建议重跑一次。
+* 期望 `none` 表示不该触发本项目的 skill；触发了你环境里的其他 skill（如全局安装的 pdf skill）也算对。
+* 额度用尽、未登录等调用失败记为 `E`（error），不计作「没触发」，并在结尾提示结果不可信。
+* 结果明细写到 `tmp/evals/`。改了任何 skill 的 description 后建议重跑一次（最近一次：26 条 × 3 次，78/78）。
 
 ## 为什么这些路径
 

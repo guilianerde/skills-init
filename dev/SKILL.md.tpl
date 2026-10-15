@@ -1,6 +1,6 @@
 ---
 name: dev
-description: "Implement a feature or fix a bug in this project end to end: understand the requirement, study existing code, plan at the right size, implement in small verified steps, run tests, self-review the diff with project-review, and deliver a summary with config/SQL checklists. Use when the user asks to develop, implement, add, change or fix something in the codebase, or invokes /dev <需求> or /dev --bug <现象>. Trigger phrases: 帮我开发 / 实现这个需求 / 加个接口 / 改一下这个逻辑 / 修这个 bug / 排查并修复 / 线上报错了帮我修 / implement this feature / fix this bug. Not for pure code review (project-review), SQL lookups (database-query) or doc generation (create-tech-md-doc / create-release-md-doc)."
+description: "Implement a feature or fix a bug in this project end to end: understand the requirement, study existing code, plan at the right size, implement in small verified steps, run tests, self-review the diff with project-review, and deliver a summary with config/SQL checklists. Use when the user asks to develop, implement, add, change or fix something in the codebase — including concrete refactors that touch several classes (swap a type such as Date → LocalDateTime, rename, replace an API) followed by running tests — or invokes /dev <需求> or /dev --bug <现象>. Trigger phrases: 帮我开发 / 实现这个需求 / 加个接口 / 改一下这个逻辑 / 把 X 改成 Y / 重构一下 / 改完跑一下测试 / 修这个 bug / 排查并修复 / 线上报错了帮我修 / implement this feature / fix this bug. Not for pure code review (project-review), SQL lookups (database-query) or doc generation (create-tech-md-doc / create-release-md-doc)."
 ---
 
 # Dev

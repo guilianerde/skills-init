@@ -5,6 +5,8 @@
 ## [Unreleased]
 
 ### 变更
+- 触发评估（26 条 × 3 次）发现两处不稳定后调整 description：project-review 补充「对照两个类 / DTO↔VO 转换漏字段」，dev 补充「跨几个类的具体重构（如 Date → LocalDateTime）后跑测试」。调整后 78/78。
+- `eval-triggers.mjs`：期望 `none` 的用例触发了用户环境里的其他 skill 也算对；调用失败（额度用尽 / 未登录）记为 error 并提示结果不可信，不再误计为「没触发」。
 - workflow 的 SKILL.md 精简为路由、链路与能力探测（159 → 74 行），画像、模板来源、DocNexus 约定、status 输出格式移到 `workflow/references/`；其他 skill 直接引用对应文件，不再需要加载整篇 workflow SKILL.md。测试检查引用的 `<skills>/<skill>/references|scripts` 路径都存在。
 
 ### 新增

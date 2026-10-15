@@ -51,7 +51,7 @@ function runOne(query) {
     if (MODEL) cmd.push('--model', MODEL);
     const env = { ...process.env }; delete env.CLAUDECODE;
     const p = spawn('claude', cmd, { cwd: proj, env, stdio: ['ignore', 'pipe', 'ignore'] });
-    let buf = '', tool = null, json = '', done = false;
+    let buf = '', tool = null, json = '', done = false, streamed = false;
     const finish = (r) => { if (done) return; done = true; p.kill('SIGKILL'); clearTimeout(t); resolve(r); };
     const t = setTimeout(() => finish('timeout'), TIMEOUT);
     p.stdout.on('data', (d) => {
@@ -61,7 +61,10 @@ function runOne(query) {
         const line = buf.slice(0, i).trim(); buf = buf.slice(i + 1);
         if (!line) continue;
         let ev; try { ev = JSON.parse(line); } catch { continue; }
+        // 额度用尽、未登录等调用失败：记为 error，不能当成「没触发 skill」
+        if (ev.type === 'result' && ev.is_error) return finish('error');
         if (ev.type !== 'stream_event') continue;
+        streamed = true;
         const se = ev.event || {};
         if (se.type === 'content_block_start' && se.content_block?.type === 'tool_use') {
           tool = se.content_block.name; json = '';
@@ -73,9 +76,12 @@ function runOne(query) {
         }
       }
     });
-    p.on('close', () => finish('none'));
+    p.on('close', () => finish(streamed ? 'none' : 'error')); // 一个流事件都没有：进程没正常跑起来
   });
 }
+
+// 期望 none 表示「不该触发本项目的 skill」：触发了用户环境里的其他 skill（如 other:anthropic-skills:pdf）也算对
+const hit = (c, got) => c.expect.includes(got) || (got.startsWith('other:') && c.expect.includes('none'));
 
 const jobs = [];
 for (const c of cases) for (let r = 0; r < RUNS; r++) jobs.push(c);
@@ -86,22 +92,24 @@ async function worker() {
     const c = jobs[next++];
     const got = await runOne(c.query);
     results.get(c).push(got);
-    process.stderr.write(got === 'timeout' ? 'T' : c.expect.includes(got) ? '.' : 'x');
+    process.stderr.write(got === 'timeout' ? 'T' : got === 'error' ? 'E' : hit(c, got) ? '.' : 'x');
   }
 }
 console.error(`评估 ${cases.length} 条请求 × ${RUNS} 次，并发 ${CONC}，临时项目 ${proj}`);
 await Promise.all(Array.from({ length: CONC }, worker));
 process.stderr.write('\n');
 
+const errors = [...results.values()].flat().filter((g) => g === 'error' || g === 'timeout').length;
 let pass = 0, total = 0;
 const rows = [];
 for (const [c, got] of results) {
-  const ok = got.filter((g) => c.expect.includes(g)).length;
+  const ok = got.filter((g) => hit(c, g)).length;
   pass += ok; total += got.length;
   rows.push({ ok: ok === got.length, expect: c.expect.join('|'), got: got.join(','), query: c.query });
 }
 for (const r of rows.filter((r) => !r.ok)) console.log(`✗ 期望 ${r.expect}，实际 ${r.got}\n    ${r.query}`);
 console.log(`\n准确率 ${pass}/${total}（${(100 * pass / total).toFixed(0)}%）`);
+if (errors) console.log(`⚠ ${errors} 次调用失败或超时（额度用尽 / 未登录 / 网络），结果不可信，请恢复后重跑`);
 const out = path.join(REPO, 'tmp', 'evals', `trigger-${Date.now()}.json`);
 fs.mkdirSync(path.dirname(out), { recursive: true });
 fs.writeFileSync(out, JSON.stringify(rows, null, 2));
