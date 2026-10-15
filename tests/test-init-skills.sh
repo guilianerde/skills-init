@@ -145,7 +145,7 @@ test_rerun_preserves_user_files() {
   fill_wiki "$c/md-to-wiki/wiki-config.json" https://wiki.example.com
   printf '# my schema\n' > "$P/$c/database-query/references/schema.md"
   fill_profile "$c/workflow/profile.json" develop
-  printf 'stale\n' > "$P/$c/dev/SKILL.md"   # 模板文件会被更新
+  printf 'stale\n' > "$P/$c/dev/SKILL.md"   # 手改过的模板文件：保留，新模板另存为 .new
   cp "$P/$c/database-query/config.json" "$WORK/rerun-config.json"
   cp "$P/$c/md-to-wiki/wiki-config.json" "$WORK/rerun-wiki.json"
   cp "$P/$c/workflow/profile.json" "$WORK/rerun-profile.json"
@@ -154,10 +154,139 @@ test_rerun_preserves_user_files() {
   assert_content "$c/database-query/references/schema.md" '# my schema'
   assert_same "$c/workflow/profile.json" "$WORK/rerun-profile.json"
   assert_same "$c/database-query/config.json" "$WORK/rerun-config.json"
-  assert_same "$c/dev/SKILL.md" "$REPO/dev/SKILL.md.tpl"
+  assert_content "$c/dev/SKILL.md" 'stale'
+  assert_same "$c/dev/SKILL.md.new" "$REPO/dev/SKILL.md.tpl"
   # --skip-db 时保留已有 config.json
   run_install --envs claude,qwen --yes --skip-db </dev/null; expect_rc 0
   assert_same "$c/database-query/config.json" "$WORK/rerun-config.json"
+}
+
+sha256_of() { python3 -c 'import hashlib,sys; print(hashlib.sha256(open(sys.argv[1],"rb").read()).hexdigest(), end="")' "$1"; }
+
+test_manifest_written() {
+  new_project manifest
+  run_install --envs claude,qwen --yes --skip-db </dev/null; expect_rc 0
+  local m=.agents/skills/.skills-init.json
+  assert_file "$m"
+  assert_eq "$(json_get "$m" '["version"]')" "$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["version"], end="")' "$REPO/package.json")" "清单中的安装器版本"
+  assert_eq "$(json_get "$m" '["envs"]')" "['claude', 'qwen']" "清单中的环境"
+  assert_eq "$(json_get "$m" '["skills"]["dev"]["files"]["SKILL.md"]')" "$(sha256_of "$REPO/dev/SKILL.md.tpl")" "清单中 dev/SKILL.md 的 sha256"
+  assert_eq "$(json_get "$m" '["skills"]["project-review"]["files"]["references/checklist.md"]')" "$(sha256_of "$REPO/project-review/references/checklist.md.tpl")" "清单中 checklist.md 的 sha256"
+  # 用户配置只记存在与否，不记哈希
+  assert_eq "$(json_get "$m" '["skills"]["workflow"]["userFiles"]["profile.json"]')" "True" "清单中 profile.json 的存在标记"
+  assert_eq "$(json_get "$m" '["skills"]["database-query"]["userFiles"]["config.json"]')" "False" "清单中 config.json 的存在标记"
+  assert_eq "$(json_get "$m" '["skills"]["workflow"]["files"].get("profile.json", "none")')" "none" "profile.json 不应记录哈希"
+  # 单一来源模式下 .claude / .qwen 不写清单
+  assert_missing .claude/skills/.skills-init.json
+  # --copy：每个目标目录各一份
+  new_project manifest-copy
+  run_install --envs claude,qwen --copy --yes --skip-db </dev/null; expect_rc 0
+  assert_file .claude/skills/.skills-init.json
+  assert_file .qwen/skills/.skills-init.json
+  assert_eq "$(json_get .qwen/skills/.skills-init.json '["mode"]')" "copy" "--copy 清单中的 mode"
+}
+
+test_modified_template_kept_as_new() {
+  new_project modified
+  run_install --envs claude,qwen --yes --skip-db </dev/null; expect_rc 0
+  local c=.agents/skills
+  printf 'my edits\n' > "$P/$c/dev/SKILL.md"
+  # --yes：保留用户版本，新模板写成 SKILL.md.new，结尾汇总提示
+  run_install --envs claude,qwen --yes --skip-db </dev/null; expect_rc 0
+  assert_content "$c/dev/SKILL.md" 'my edits'
+  assert_same "$c/dev/SKILL.md.new" "$REPO/dev/SKILL.md.tpl"
+  grep -qF "$c/dev/SKILL.md  ->  SKILL.md.new" "$LOG" || fail "日志中缺少 .new 汇总提示"
+  # 再跑一次：仍判定为手改过，不会被静默覆盖
+  run_install --envs claude,qwen --yes --skip-db </dev/null; expect_rc 0
+  assert_content "$c/dev/SKILL.md" 'my edits'
+  assert_file "$c/dev/SKILL.md.new"
+  # 交互选 k：保留用户版本、不生成 .new（上次的 .new 被清理）
+  printf 'k\n' > "$WORK/answer-k"
+  run_install --envs claude,qwen --skip-db <"$WORK/answer-k"; expect_rc 0
+  assert_content "$c/dev/SKILL.md" 'my edits'
+  assert_missing "$c/dev/SKILL.md.new"
+  # 交互选 o：用新模板覆盖
+  printf 'o\n' > "$WORK/answer-o"
+  run_install --envs claude,qwen --skip-db <"$WORK/answer-o"; expect_rc 0
+  assert_same "$c/dev/SKILL.md" "$REPO/dev/SKILL.md.tpl"
+  assert_missing "$c/dev/SKILL.md.new"
+  # 用户手动采纳 .new 后重跑：不再提示，.new 被清理
+  printf 'mine again\n' > "$P/$c/dev/SKILL.md"
+  run_install --envs claude,qwen --yes --skip-db </dev/null; expect_rc 0
+  mv "$P/$c/dev/SKILL.md.new" "$P/$c/dev/SKILL.md"
+  : > "$LOG"
+  run_install --envs claude,qwen --yes --skip-db </dev/null; expect_rc 0
+  assert_same "$c/dev/SKILL.md" "$REPO/dev/SKILL.md.tpl"
+  assert_missing "$c/dev/SKILL.md.new"
+  grep -qF 'SKILL.md.new' "$LOG" && fail "无冲突时不应再提示 .new"
+}
+
+test_removed_template_files_pruned() {
+  new_project prune
+  run_install --envs claude,qwen --yes --skip-db </dev/null; expect_rc 0
+  local c=.agents/skills
+  printf 'my notes\n' >> "$P/$c/dev/references/delivery-template.md"
+  cp "$P/$c/dev/references/delivery-template.md" "$WORK/prune-delivery.md"
+  # 新版本模板删掉两个文件：未改过的被清理，改过的保留并提示
+  rm "$P/skills-init/dev/references/plan-template.md" "$P/skills-init/dev/references/delivery-template.md"
+  rm -r "$P/skills-init/create-tech-md-doc/references"
+  run_install --envs claude,qwen --yes --skip-db </dev/null; expect_rc 0
+  assert_missing "$c/dev/references/plan-template.md"
+  assert_same "$c/dev/references/delivery-template.md" "$WORK/prune-delivery.md"
+  assert_missing "$c/create-tech-md-doc/references"
+  assert_file "$c/create-tech-md-doc/SKILL.md"
+  grep -qF "$c/dev/references/delivery-template.md" "$LOG" || fail "日志中缺少保留过时文件的提示"
+  assert_eq "$(json_get "$c/.skills-init.json" '["skills"]["dev"]["files"].get("references/plan-template.md", "none")')" "none" "清单中应去掉已删除的模板文件"
+}
+
+test_uninstall() {
+  new_project uninstall
+  run_install --envs claude,qwen --yes --skip-db </dev/null; expect_rc 0
+  local c=.agents/skills s b
+  fill_wiki "$c/md-to-wiki/wiki-config.json" https://wiki.example.com
+  fill_profile "$c/workflow/profile.json" develop
+  printf 'my edits\n' > "$P/$c/project-review/SKILL.md"
+  cp "$P/$c/md-to-wiki/wiki-config.json" "$WORK/uninstall-wiki.json"
+  cp "$P/$c/workflow/profile.json" "$WORK/uninstall-profile.json"
+  # 用户自己的 skill / 链接 / 文件：都不动
+  mkdir -p "$P/$c/my-skill" "$P/.claude/skills/my-claude-skill"
+  printf 'mine\n' > "$P/$c/my-skill/SKILL.md"
+  printf 'mine\n' > "$P/.claude/skills/my-claude-skill/SKILL.md"
+  ln -s ../../.agents/skills/my-skill "$P/.qwen/skills/my-skill"
+  printf 'notes\n' > "$P/$c/dev/notes.md"
+
+  run_install --uninstall </dev/null; expect_rc 0
+  for s in "${SKILLS[@]}"; do
+    assert_missing ".claude/skills/$s"
+    assert_missing ".qwen/skills/$s"
+    [[ "$s" == dev ]] || assert_missing "$c/$s"
+  done
+  assert_missing "$c/.skills-init.json"
+  assert_missing "$c/dev/SKILL.md"
+  assert_content "$c/dev/notes.md" 'notes'
+  assert_content "$c/my-skill/SKILL.md" 'mine'
+  assert_content .claude/skills/my-claude-skill/SKILL.md 'mine'
+  assert_link .qwen/skills/my-skill ../../.agents/skills/my-skill
+  # 用户配置与手改过的模板文件备份到 tmp/skills/uninstall-backup/<时间戳>/
+  b="$(cd "$P" && ls -d tmp/skills/uninstall-backup/* 2>/dev/null | head -n 1)"
+  if [[ -z "$b" ]]; then fail "缺少 uninstall-backup 目录"; else
+    assert_same "$b/$c/md-to-wiki/wiki-config.json" "$WORK/uninstall-wiki.json"
+    assert_same "$b/$c/workflow/profile.json" "$WORK/uninstall-profile.json"
+    assert_content "$b/$c/project-review/SKILL.md" 'my edits'
+  fi
+  grep -qF 'uninstall-backup' "$LOG" || fail "日志中缺少备份位置提示"
+  # 再卸载一次：没有清单，什么也不做
+  run_install --uninstall </dev/null; expect_rc 0
+  assert_content "$c/my-skill/SKILL.md" 'mine'
+}
+
+test_uninstall_copy_mode() {
+  new_project uninstall-copy
+  run_install --envs claude,qwen --copy --yes --skip-db </dev/null; expect_rc 0
+  run_install --uninstall </dev/null; expect_rc 0
+  assert_missing .claude
+  assert_missing .qwen
+  assert_missing .agents
 }
 
 test_upgrade_from_copies() {
@@ -244,6 +373,11 @@ TESTS=(
   test_yes_without_db_config_fails
   test_interactive_password_escaping
   test_rerun_preserves_user_files
+  test_manifest_written
+  test_modified_template_kept_as_new
+  test_removed_template_files_pruned
+  test_uninstall
+  test_uninstall_copy_mode
   test_upgrade_from_copies
   test_upgrade_conflict_keeps_old_dir
   test_gitignore_appends_only_missing

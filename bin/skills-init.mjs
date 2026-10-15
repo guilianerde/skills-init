@@ -10,7 +10,10 @@
 //           .claude/skills、.qwen/skills 下按 skill 建相对软链接指向它；--copy 退回各环境独立拷贝。
 // 重跑安全：SKILL.md / references / 模板会更新；用户已填写的 wiki-config.json、schema.md、
 //           workflow/profile.json 保留不覆盖；database-query/config.json 仅在本次提供了数据库配置时写入。
+// 安装清单：每个安装目录写 .skills-init.json，记录模板文件的 sha256。重跑时据此判断模板文件是否被手改过
+//           （改过的不静默覆盖）、清理模板里已删除的文件；--uninstall 按清单卸载。
 
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -36,6 +39,7 @@ const USER_FILES = {
 // 改过名的 skill：旧名 -> 新名。升级时只清理能确认是本项目安装的旧目录 / 链接（按 SKILL.md 签名判断）
 const RENAMED = { 'code-review': { to: 'project-review', signature: /^name:\s*code-review\s*$[\s\S]*?description:\s*"Review source code \(/m } };
 const DOCNEXUS_PKG = process.env.DOCNEXUS_PKG || '@rowansenne/docnexus';
+const MANIFEST = '.skills-init.json'; // 安装清单，位于每个安装目录（单一来源时只有 .agents/skills 一份）
 
 // ---------------------------------------------------------------- 输出
 const step = (m) => console.log(`==> ${m}`);
@@ -54,12 +58,13 @@ const HELP = `用法: skills-init [选项]
   --copy               不用软链接，各环境独立拷贝
   --seed-templates     把自带的文档模板导入 DocNexus（docnexus/library/templates/，已有的不覆盖）；
                        接入 DocNexus 后文档类 skill 只从知识库取模板。--with-docnexus 会自动执行这一步
+  --uninstall          按安装清单卸载本项目装的 skills 与链接（用户配置备份到 tmp/skills/uninstall-backup/）
   --project-root <dir> 项目根目录（默认当前目录）
   -v, --version        显示版本
   -h, --help           显示帮助`;
 
 function parseArgs(argv) {
-  const o = { envs: '', skipDb: false, yes: false, withDocNexus: false, copy: false, seedTemplates: false, root: process.cwd() };
+  const o = { envs: '', skipDb: false, yes: false, withDocNexus: false, copy: false, seedTemplates: false, uninstall: false, root: process.cwd() };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     const val = () => { if (i + 1 >= argv.length) fail(`${a} 需要一个值`); return argv[++i]; };
@@ -70,6 +75,7 @@ function parseArgs(argv) {
       case '--with-docnexus': o.withDocNexus = true; break;
       case '--copy': o.copy = true; break;
       case '--seed-templates': o.seedTemplates = true; break;
+      case '--uninstall': o.uninstall = true; break;
       case '--project-root': o.root = path.resolve(val()); break;
       case '-v': case '--version': console.log(PKG.version); process.exit(0); break;
       case '-h': case '--help': console.log(HELP); process.exit(0); break;
@@ -203,17 +209,92 @@ function render(text, vars) {
   return text.replace(/\{\{(\w+)\}\}/g, (m, k) => (k in vars ? String(vars[k]) : m));
 }
 
-function installSkills(base, db) {
+// ---------------------------------------------------------------- 3a. 安装清单
+const sha256 = (buf) => crypto.createHash('sha256').update(buf).digest('hex');
+const fileHash = (f) => sha256(fs.readFileSync(f));
+function readManifest(base) {
+  const m = readJson(path.join(base, MANIFEST));
+  return m && typeof m === 'object' && m.skills && typeof m.skills === 'object' ? m : null;
+}
+// 结尾汇总：另存为 .new 的 / 保留用户版本的 / 模板已删除但用户改过而保留的文件
+const report = { asNew: [], kept: [], stale: [] };
+// 删除 dir 及其上级的空目录，直到 stop（不含）
+function removeEmptyDirs(dir, stop) {
+  for (let d = dir; d !== stop && d.startsWith(stop + path.sep); d = path.dirname(d)) {
+    try { fs.rmdirSync(d); } catch { break; }
+  }
+}
+// 清单里有、新模板里已没有的文件：未被修改时删除，改过的保留并汇总提示
+function pruneFile(file, recorded, stop, label) {
+  if (!lstat(file)?.isFile()) return;
+  if (fileHash(file) !== recorded) { report.stale.push(label); return; }
+  fs.rmSync(file);
+  removeEmptyDirs(path.dirname(file), stop);
+  ok(`已清理模板中已删除的文件 ${label}`);
+}
+
+// 模板文件：不存在或未被手改过（与清单记录的哈希一致）时直接写入；手改过的按交互选择 / --yes 另存 .new。
+// 没有清单（首次安装或旧版本装的）时无从判断，照旧覆盖。返回本次生成的 .new 文件名（没有则为 null）。
+async function installTemplate(dst, content, recorded, hasManifest, ctx, label) {
+  if (!fs.existsSync(dst)) { writeFile(dst, content); return null; }
+  const cur = fileHash(dst);
+  if (cur === sha256(content)) return null;
+  if (!hasManifest || cur === recorded) { writeFile(dst, content); return null; }
+  let choice = 'new';
+  if (!ctx.yes) {
+    const a = (await ask(`    ${label} 与上次安装的版本不同（被手动修改过）。o=用新模板覆盖 / k=保留你的版本 / 回车=保留并把新模板另存为 .new: `)).toLowerCase();
+    if (a === 'o') choice = 'overwrite';
+    else if (a === 'k') choice = 'keep';
+  }
+  if (choice === 'overwrite') { writeFile(dst, content); ok(`${label} 已用新模板覆盖`); return null; }
+  if (choice === 'keep') { report.kept.push(label); return null; }
+  writeFile(`${dst}.new`, content);
+  report.asNew.push(label);
+  return `${path.basename(dst)}.new`;
+}
+
+// entry 为 null 表示整个 skill 已从模板中移除
+function pruneSkill(base, skill, prevSkill, entry, root) {
+  if (!prevSkill) return;
+  const dir = path.join(base, skill);
+  if (lstat(dir)?.isSymbolicLink()) return;
+  const stop = entry ? dir : base;
+  for (const [rel, h] of Object.entries(prevSkill.files ?? {})) {
+    if (entry && rel in entry.files) continue;
+    pruneFile(path.join(dir, rel), h, stop, `${toPosix(path.relative(root, dir))}/${rel}`);
+  }
+  // 上次生成、这次不再需要的 .new（用户已处理，或这次选了覆盖 / 保留）
+  for (const rel of prevSkill.pending ?? []) {
+    if (entry?.pending.includes(rel)) continue;
+    const f = path.join(dir, rel);
+    if (lstat(f)?.isFile()) { fs.rmSync(f); removeEmptyDirs(path.dirname(f), stop); }
+  }
+}
+
+// ctx: { root, yes, envs, mode }
+async function installSkills(base, db, ctx) {
+  const prev = readManifest(base);
+  const manifest = { installer: PKG.name, version: PKG.version, installedAt: new Date().toISOString(), envs: ctx.envs, mode: ctx.mode, skills: {} };
   for (const skill of SKILLS) {
     const srcDir = path.join(TPL_DIR, skill);
     const dstDir = path.join(base, skill);
+    const prevSkill = prev?.skills?.[skill];
+    const entry = { files: {}, userFiles: {}, pending: [] };
     const notes = [];
     for (const rel of walk(srcDir)) {
       const outRel = rel.endsWith('.tpl') ? rel.slice(0, -4) : rel;
       const key = `${skill}/${toPosix(outRel)}`;
       const src = path.join(srcDir, rel);
       const dst = path.join(dstDir, outRel);
-      if (!(key in USER_FILES)) { writeFile(dst, fs.readFileSync(src)); continue; }
+      if (!(key in USER_FILES)) {
+        const content = fs.readFileSync(src);
+        const relPosix = toPosix(outRel);
+        entry.files[relPosix] = sha256(content);
+        const label = `${toPosix(path.relative(ctx.root, dstDir))}/${relPosix}`;
+        const pending = await installTemplate(dst, content, prevSkill?.files?.[relPosix], !!prev, ctx, label);
+        if (pending) entry.pending.push(path.posix.join(path.posix.dirname(relPosix), pending));
+        continue;
+      }
 
       if (key === 'database-query/references/schema.md') {
         if (fs.existsSync(dst)) notes.push('schema.md 已存在，保留不覆盖');
@@ -235,8 +316,19 @@ function installSkills(base, db) {
       else writeFile(dst, fs.readFileSync(src));
     }
     if (skill === 'database-query') notes.push(writeDbConfig(path.join(dstDir, 'config.json'), db));
+    // 用户配置只记录存在与否，不记哈希
+    for (const key of Object.keys(USER_FILES)) {
+      if (key.startsWith(`${skill}/`)) entry.userFiles[key.slice(skill.length + 1)] = fs.existsSync(path.join(base, key));
+    }
+    pruneSkill(base, skill, prevSkill, entry, ctx.root);
+    manifest.skills[skill] = entry;
     ok(`${skill} -> ${dstDir}${notes.length ? `（${notes.join('；')}）` : ''}`);
   }
+  // 清单里有、本版本已不再提供的 skill：按同样规则清理
+  for (const [skill, prevSkill] of Object.entries(prev?.skills ?? {})) {
+    if (!SKILLS.includes(skill)) pruneSkill(base, skill, prevSkill, null, ctx.root);
+  }
+  writeFile(path.join(base, MANIFEST), JSON.stringify(manifest, null, 2) + '\n');
 }
 
 // config.json 不来自模板：沿用已有配置时原样保留；新填写的连接写入 default，并保留文件中的其他连接
@@ -339,6 +431,8 @@ function linkSkills(root, envName, rel) {
     }
     fs.symlinkSync(target, link, 'dir');
   }
+  // 之前 --copy 装在这里的清单：skill 都已换成链接，清单由单一来源那份负责
+  if (skipped === 0) fs.rmSync(path.join(dir, MANIFEST), { force: true });
   if (skipped === 0) ok(`${envName} -> ${toPosix(rel)}（软链接到 ${toPosix(CANON_DIR)}）`);
   else warn(`${envName} -> ${toPosix(rel)}：${skipped} 个 skill 未建链接（见上方提示），其余已软链接到 ${toPosix(CANON_DIR)}`);
   return true;
@@ -366,6 +460,86 @@ function removeRenamed(root) {
       ok(`已移除旧名 ${toPosix(path.join(rel, oldName))}（已改名为 ${to}）`);
     }
   }
+}
+
+// ---------------------------------------------------------------- 3d. 卸载
+// 软链接是否指向 absTarget（按解析后的绝对路径比较，兼容 Windows 上 readlink 返回的 \\?\ 前缀）
+function linkPointsTo(link, absTarget) {
+  let t;
+  try { t = fs.readlinkSync(link); } catch { return false; }
+  t = t.replace(/^\\\\\?\\/, '');
+  const norm = (p) => (IS_WIN ? path.resolve(p).toLowerCase() : path.resolve(p));
+  return norm(path.resolve(path.dirname(link), t)) === norm(absTarget);
+}
+// 删除目录软链接本身（Windows 上目录链接需 rmdir）
+function removeLink(p) {
+  try { fs.unlinkSync(p); } catch (e) {
+    if (e.code === 'EPERM' || e.code === 'EISDIR') fs.rmdirSync(p); else throw e;
+  }
+}
+function rmdirIfEmpty(dir) { try { fs.rmdirSync(dir); return true; } catch { return false; } }
+
+function uninstall(root) {
+  const bases = [CANON_DIR, path.join('.claude', 'skills'), path.join('.qwen', 'skills')];
+  const found = bases.map((rel) => [rel, readManifest(path.join(root, rel))]).filter(([, m]) => m);
+  if (!found.length) { warn(`未找到安装清单（${bases.map((b) => toPosix(path.join(b, MANIFEST))).join(' / ')}），没有可卸载的内容`); return 0; }
+  const backupRoot = path.join(root, 'tmp', 'skills', 'uninstall-backup', timestamp());
+  const backedUp = [];
+  const leftovers = [];
+
+  // 1. .claude / .qwen 下指向单一来源、且在清单里的 skill 链接；用户自己的链接和目录不动
+  const canon = found.find(([rel]) => rel === CANON_DIR)?.[1];
+  for (const rel of bases.slice(1)) {
+    const dir = path.join(root, rel);
+    let n = 0;
+    for (const skill of Object.keys(canon?.skills ?? {})) {
+      const link = path.join(dir, skill);
+      if (!lstat(link)?.isSymbolicLink() || !linkPointsTo(link, path.join(root, CANON_DIR, skill))) continue;
+      removeLink(link); n++;
+    }
+    if (n) ok(`已移除 ${toPosix(rel)} 下 ${n} 个指向 ${toPosix(CANON_DIR)} 的软链接`);
+  }
+
+  // 2. 各安装目录：按清单删除模板文件；用户配置与手改过的模板文件先备份
+  for (const [rel, m] of found) {
+    const base = path.join(root, rel);
+    for (const [skill, entry] of Object.entries(m.skills)) {
+      const dir = path.join(base, skill);
+      const st = lstat(dir);
+      if (!st || st.isSymbolicLink() || !st.isDirectory()) continue;
+      const backup = (f) => {
+        const to = path.join(backupRoot, rel, skill, f);
+        fs.mkdirSync(path.dirname(to), { recursive: true });
+        fs.renameSync(path.join(dir, f), to);
+        backedUp.push(toPosix(path.join(rel, skill, f)));
+      };
+      const remove = (f) => { fs.rmSync(path.join(dir, f)); };
+      const files = [];
+      for (const f of Object.keys(entry.userFiles ?? {})) if (lstat(path.join(dir, f))?.isFile()) { backup(f); files.push(f); }
+      for (const [f, h] of Object.entries(entry.files ?? {})) {
+        if (!lstat(path.join(dir, f))?.isFile()) continue;
+        if (fileHash(path.join(dir, f)) === h) remove(f); else backup(f);
+        files.push(f);
+      }
+      for (const f of entry.pending ?? []) if (lstat(path.join(dir, f))?.isFile()) { remove(f); files.push(f); }
+      for (const f of files) removeEmptyDirs(path.dirname(path.join(dir, f)), base);
+      if (fs.existsSync(dir)) leftovers.push(toPosix(path.join(rel, skill)));
+      else ok(`已移除 ${toPosix(path.join(rel, skill))}`);
+    }
+    fs.rmSync(path.join(base, MANIFEST), { force: true });
+  }
+
+  // 3. 清空后的环境目录一并移除（.claude/.qwen 里还有别的东西时保留）
+  for (const rel of bases) if (rmdirIfEmpty(path.join(root, rel))) rmdirIfEmpty(path.dirname(path.join(root, rel)));
+
+  step('卸载完成');
+  if (backedUp.length) {
+    ok(`用户配置与手改过的文件已备份到 ${toPosix(path.relative(root, backupRoot))}/：`);
+    for (const f of backedUp) console.log(`      ${f}`);
+  }
+  for (const d of leftovers) warn(`${d} 中有不在清单里的文件，已保留该目录`);
+  console.log('.gitignore 中追加的规则未移除，如不再需要可手动删除。');
+  return 0;
 }
 
 // ---------------------------------------------------------------- 4. .gitignore 保护
@@ -439,6 +613,7 @@ function setupDocNexus(root, sel) {
 // ================================================================= main
 async function main() {
   const o = parseArgs(process.argv.slice(2));
+  if (o.uninstall) { step(`按安装清单卸载 ${o.root} 中的 skills`); return uninstall(o.root); }
   if (o.withDocNexus) { step('检查 DocNexus 依赖'); checkNodeForDocNexus(); }
 
   const sel = await resolveEnvs(o);
@@ -468,18 +643,19 @@ async function main() {
     const a = (await ask('是否同时安装到 Codex 用户级 ~/.codex/skills（所有项目可用）？[y/N]: ')).toLowerCase();
     if (a === 'y') targets.push(['codex(user)', path.join(os.homedir(), '.codex', 'skills')]);
   }
-  rl?.close();
 
   removeRenamed(o.root);
+  const ctx = { root: o.root, yes: o.yes, envs: sel, mode: o.copy ? 'copy' : 'symlink' };
   for (const [name, dir] of targets) {
     const abs = path.resolve(o.root, dir);
     step(`安装到 ${name}  ->  ${abs}`);
-    installSkills(abs, db);
+    await installSkills(abs, db, ctx);
   }
   for (const [name, dir] of links) {
     step(`链接 ${name}  ->  ${path.join(o.root, dir)}`);
-    if (!linkSkills(o.root, name, dir)) installSkills(path.join(o.root, dir), db);
+    if (!linkSkills(o.root, name, dir)) await installSkills(path.join(o.root, dir), db, { ...ctx, mode: 'copy-fallback' });
   }
+  rl?.close(); // 模板冲突时可能还要询问，装完再关
 
   updateGitignore(o.root, o.withDocNexus);
   const docnexus = o.withDocNexus ? setupDocNexus(o.root, sel) : 'skipped';
@@ -509,6 +685,12 @@ async function main() {
     if (missing.length) warn(`注意：DocNexus 中缺少模板 ${missing.join('、')}；接入 DocNexus 后不再使用默认模板，请重跑并加 --seed-templates 导入。`);
   }
   if (docnexus === 'failed') warn('注意：DocNexus 接入失败（见上方输出），其他 skills 不受影响；修复后可重跑（加 --with-docnexus）。');
+  if (report.asNew.length) {
+    warn('以下文件被手动修改过，已保留你的版本，新模板另存为同目录的 <文件名>.new（对比合并后删除 .new，或用新模板覆盖原文件）：');
+    for (const f of report.asNew) warn(`  ${f}  ->  ${path.basename(f)}.new`);
+  }
+  if (report.kept.length) warn(`以下文件按你的选择保留了修改，未更新为新模板：${report.kept.join('、')}`);
+  if (report.stale.length) warn(`以下文件已不在新模板中，但被手动修改过，保留未删除：${report.stale.join('、')}`);
   console.log('先运行 /workflow profile 填写项目画像；说明见 skills-init README。');
   // skills 已装好，但显式要求的 DocNexus 未接入：返回非 0 便于自动化感知
   return docnexus === 'failed' || seedFailed ? 1 : 0;
