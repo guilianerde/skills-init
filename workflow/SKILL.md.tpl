@@ -75,7 +75,7 @@ dev（需求 → 方案 → 实现 → 测试 → 自审）
 | 能力 | 判定为可用 | 用途 |
 |---|---|---|
 | wiki | `md-to-wiki/wiki-config.json` 中 `enabled=true` 且 `wiki.base_url` 非空；或环境存在 wiki MCP 工具 | 读 PRD、发布文档 |
-| DocNexus | 项目根有 `docnexus/project.json`，且 `./node_modules/.bin/docnexus` 可执行 | 查约定与历史决策、沉淀知识 |
+| DocNexus | 项目根有 `docnexus/project.json`，且 `./node_modules/.bin/docnexus` 可执行 | 查约定与历史决策、沉淀知识、提供文档模板 |
 | 数据库 | `database-query/config.json` 存在且 `connections` 非空 | 查表结构、核对数据 |
 | 项目画像 | `workflow/profile.json` 中 `main_branch` 与 `build` / `test` 非空 | dev 构建与测试 |
 
@@ -88,11 +88,38 @@ dev（需求 → 方案 → 实现 → 测试 → 自审）
 |---|---|---|
 | 项目画像 | ✅ / ⚠️ 部分字段为空 | <空字段>；运行 /workflow profile |
 | wiki | ✅ / ❌ | 填写 md-to-wiki/wiki-config.json 或接入 wiki MCP |
-| DocNexus | ✅ / ❌ | 重跑 init-skills 并加 --with-docnexus |
+| DocNexus | ✅ / ❌ | 重跑 skills-init 并加 --with-docnexus；已接入但缺模板时列出缺的模板并提示 --seed-templates |
 | 数据库 | ✅ / ❌ | 重跑 init-skills 补配 |
 ```
 
 探测只读文件、只看命令是否存在，**不输出任何凭据内容**（密码、token 一律不回显）。
+
+## 模板来源（文档类 skill 共用）
+
+技术方案、上线方案、开发方案、审查清单的模板来源取决于项目是否接入了 DocNexus（判定见上方「增强能力探测」），并在产出中注明「模板来源」：
+
+**已接入 DocNexus：只用 DocNexus 里的模板**
+
+- 读取 `docnexus/library/templates/<skill>/<文件名>`（分类 `doc-template`）。它是普通 Markdown，直接读文件即可，你手工改过的内容也会立即生效；需要确认版本时用 `./node_modules/.bin/docnexus document query --category doc-template`。
+- **不再使用** skill 自带的默认模板，也不使用 `docs/skills/templates/` 下的项目文件——知识库是唯一来源，避免几份模板各自演化。
+- 库里没有需要的模板 → **停下这一步**，告诉用户缺哪份模板，提供两个选择：在项目根重跑 skills-init 加 `--seed-templates` 导入默认模板；或者由你现在把模板导入 DocNexus（项目里有 `docs/skills/templates/` 的同名文件时导入它，否则导入 skill 自带的默认模板），用户确认后按 DocNexus 的 capture 流程写入 `templates/<skill>/<文件名>`，分类 `doc-template`。导入完成后再继续生成。
+- 发现 `docs/skills/templates/` 下还有模板文件 → 提醒用户它们已不再生效，建议导入 DocNexus 后删除。
+
+**未接入 DocNexus：按顺序取第一个存在的**
+
+1. 项目文件 `docs/skills/templates/<skill>/<文件名>`
+2. skill 自带默认模板
+
+| skill | 文件名 | 自带默认位置 |
+|---|---|---|
+| create-tech-md-doc | `template.md` | `create-tech-md-doc/template.md` |
+| create-release-md-doc | `template.md` | `create-release-md-doc/template.md` |
+| dev | `plan-template.md` | `dev/references/plan-template.md` |
+| project-review | `checklist.md` | `project-review/references/checklist.md` |
+
+- 把默认模板导入 DocNexus：`--with-docnexus` 接入时会自动导入；之后补导入可重跑 skills-init 并加 `--seed-templates`（已存在的不覆盖）。
+- **模板随知识库更新**：用户在生成的文档里做了结构性调整（新增 / 删除 / 重排章节、改表格列、改必填项），且项目已接入 DocNexus 时，交付后列出这些调整，**询问**是否同步回模板；同意后按 DocNexus 的 capture 流程更新同一路径（先 `document get --include document,metadata,timeline` 取 `record_version`，以 `--base-version <record_version>` 封存，用户确认后 `document add --draft <id> --replace`），DocNexus 会在 timeline 中记录每次变更。只改结构，不把某次需求的具体内容写进模板。用户也可以直接编辑库里的模板文件，再用 `docnexus document sync --id <id>` 采纳。
+- 模板里的 `{{...}}` 是给 agent 看的填写提示，不是模板引擎语法；不要写成单独一行的 `{{fact:...}}`（那是 DocNexus 的事实引用语法）。
 
 ## Rules
 

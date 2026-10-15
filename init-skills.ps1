@@ -15,7 +15,8 @@ param(
   [switch]$SkipDb,             # 跳过数据库连接配置
   [switch]$Yes,                # 非交互模式：使用已有数据库配置；无配置且未 SkipDb 时报错退出
   [switch]$WithDocNexus,       # 安装 @rowansenne/docnexus 并执行 docnexus init（需 Node >= 22.13）
-  [switch]$Copy                # 不用软链接，每个环境各拷一份
+  [switch]$Copy,               # 不用软链接，每个环境各拷一份
+  [switch]$SeedTemplates       # 把自带的文档模板导入 DocNexus
 )
 
 $ErrorActionPreference = 'Stop'
@@ -33,6 +34,7 @@ if ($SkipDb)       { $cliArgs += '--skip-db' }
 if ($Yes)          { $cliArgs += '--yes' }
 if ($WithDocNexus) { $cliArgs += '--with-docnexus' }
 if ($Copy)         { $cliArgs += '--copy' }
+if ($SeedTemplates) { $cliArgs += '--seed-templates' }
 
 & node @cliArgs
 exit $LASTEXITCODE

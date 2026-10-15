@@ -33,7 +33,7 @@
     "README.md"
   ],
   "scripts": {
-    "test": "bash tests/test-init-skills.sh && node --test tests/test-md-to-wiki.mjs",
+    "test": "bash tests/test-init-skills.sh && node --test tests/test-md-to-wiki.mjs tests/test-seed-templates.mjs",
     "eval:triggers": "node scripts/eval-triggers.mjs"
   },
   "publishConfig": {

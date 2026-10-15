@@ -28,7 +28,7 @@ jobs:
       - name: Run bash tests
         run: ${{ matrix.shell }} tests/test-init-skills.sh
       - name: Run node tests
-        run: node --test tests/test-md-to-wiki.mjs
+        run: node --test tests/test-md-to-wiki.mjs tests/test-seed-templates.mjs
 
   pwsh:
     name: pwsh (windows-latest)
@@ -44,4 +44,4 @@ jobs:
         shell: pwsh
         run: pwsh -NoProfile -File tests/test-init-skills.ps1
       - name: Run node tests
-        run: node --test tests/test-md-to-wiki.mjs
+        run: node --test tests/test-md-to-wiki.mjs tests/test-seed-templates.mjs

@@ -36,7 +36,7 @@ wiki GATE：读 `md-to-wiki/wiki-config.json`，`enabled` 非 `true` 或 `wiki.b
 
 ### Step 3 — 选模板并填充
 
-- 模板：项目中存在 `docs/skills/templates/create-release-md-doc/template.md` 时用它，否则用本 skill 目录的 `template.md`。
+- 模板：按 `workflow` skill「模板来源」取 `create-release-md-doc` 的 `template.md`。已接入 DocNexus 时**只用** `docnexus/library/templates/create-release-md-doc/template.md`，库里没有就停下并按该节提示导入，不回退到默认模板；未接入时依次取 `docs/skills/templates/create-release-md-doc/template.md`、本 skill 目录的 `template.md`。
 - 填充来源：
 
 | 模块 | 填充 | 来源 |
@@ -56,6 +56,7 @@ wiki GATE：读 `md-to-wiki/wiki-config.json`，`enabled` 非 `true` 或 `wiki.b
 > 对比分支：`<dev>` ←→ `<main>`（主分支为基线）
 > diff 概览：<files> files changed, <ins> insertions(+), <del> deletions(-)
 > PRD 参考：<pageId 或 URL 或「无」/「PRD 增强已跳过」>
+> 模板来源：<DocNexus / 项目文件 / skill 默认>
 > 技术方案引用：<path 或「无」>
 > 填充模块：1/2/4/5/6 +（有 PRD 时）3
 > ⚠️ 灰度 / 回滚策略基于 diff 推断，需人工校对后补充。
@@ -70,6 +71,7 @@ wiki GATE：读 `md-to-wiki/wiki-config.json`，`enabled` 非 `true` 或 `wiki.b
 ### Step 5 — 后续（都需要用户同意）
 
 - 发布到 wiki：`/md-to-wiki <文档路径> <pageId>`。
+- 模板回写：用户对生成的文档做了结构性调整、且项目已接入 DocNexus 时，按 `workflow` skill「模板随知识库更新」提议同步回模板。
 - 沉淀到 DocNexus（项目根有 `docnexus/project.json` 且 `./node_modules/.bin/docnexus` 可执行时）：列出值得长期记住的决策、配置 / 依赖变化、风险与坑，**询问用户**；同意后按 DocNexus 入口 skill `docnexus` 的 capture 流程写入并回报 `docnexus/library/<path>`。只沉淀确认过的事实，不沉淀「待补充」「待人工确认」的推断。未检测到 DocNexus 就跳过，不提示安装。
 
 ## Red Flags — STOP

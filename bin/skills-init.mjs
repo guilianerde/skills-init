@@ -17,6 +17,7 @@ import path from 'node:path';
 import readline from 'node:readline';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { seedTemplates, TEMPLATES } from './seed-templates.mjs';
 
 const TPL_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const PKG = JSON.parse(fs.readFileSync(path.join(TPL_DIR, 'package.json'), 'utf8'));
@@ -51,12 +52,14 @@ const HELP = `用法: skills-init [选项]
   --yes                非交互：使用已有数据库配置；都没有且未 --skip-db 时报错退出
   --with-docnexus      同时接入 DocNexus 文档库（需 Node >= 22.13 与 npm）
   --copy               不用软链接，各环境独立拷贝
+  --seed-templates     把自带的文档模板导入 DocNexus（docnexus/library/templates/，已有的不覆盖）；
+                       接入 DocNexus 后文档类 skill 只从知识库取模板。--with-docnexus 会自动执行这一步
   --project-root <dir> 项目根目录（默认当前目录）
   -v, --version        显示版本
   -h, --help           显示帮助`;
 
 function parseArgs(argv) {
-  const o = { envs: '', skipDb: false, yes: false, withDocNexus: false, copy: false, root: process.cwd() };
+  const o = { envs: '', skipDb: false, yes: false, withDocNexus: false, copy: false, seedTemplates: false, root: process.cwd() };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     const val = () => { if (i + 1 >= argv.length) fail(`${a} 需要一个值`); return argv[++i]; };
@@ -66,6 +69,7 @@ function parseArgs(argv) {
       case '--yes': o.yes = true; break;
       case '--with-docnexus': o.withDocNexus = true; break;
       case '--copy': o.copy = true; break;
+      case '--seed-templates': o.seedTemplates = true; break;
       case '--project-root': o.root = path.resolve(val()); break;
       case '-v': case '--version': console.log(PKG.version); process.exit(0); break;
       case '-h': case '--help': console.log(HELP); process.exit(0); break;
@@ -479,6 +483,15 @@ async function main() {
 
   updateGitignore(o.root, o.withDocNexus);
   const docnexus = o.withDocNexus ? setupDocNexus(o.root, sel) : 'skipped';
+  let seedFailed = false;
+  // 接入 DocNexus 后文档类 skill 只从知识库取模板，所以 --with-docnexus 时一并导入（已有的不覆盖）
+  if ((o.seedTemplates || o.withDocNexus) && docnexus !== 'failed') {
+    step('导入文档模板到 DocNexus（--seed-templates）');
+    try {
+      const r = seedTemplates(o.root, TPL_DIR, { ok, warn });
+      seedFailed = r.failed.length > 0;
+    } catch (e) { warn(e.message); seedFailed = true; }
+  }
 
   step('安装完成，启用方式');
   console.log('  codex     : 重启 codex 后自动发现项目级 skills（.agents/skills）；也可 /use project-review 手动加载');
@@ -489,11 +502,16 @@ async function main() {
   else warn('注意：本次未写入数据库连接。可重跑补配，或手动放置 database-query/config.json（已有的保留不动）。');
   warn('注意：md-to-wiki 的 wiki 连接（wiki-config.json）默认留空（enabled=false），未配置前 md-to-wiki 与 create-*-md-doc 的 --prd 增强不启动。');
   warn('        启用方法：填写 .agents/skills/md-to-wiki/wiki-config.json（enabled: true + base_url + api_token），或接入对应环境的 wiki MCP。重跑不会覆盖已填写的配置。');
-  if (docnexus === 'ok') ok('DocNexus 已接入：dev / project-review 会按 docnexus-recall 查项目约定；任何写入 DocNexus 的操作都需你授权。');
+  if (docnexus === 'ok') ok('DocNexus 已接入：dev / project-review 会按 docnexus-recall 查项目约定；文档类 skill 只从 docnexus/library/templates/ 取模板；任何写入 DocNexus 的操作都需你授权。');
+  // 已接入 DocNexus 但知识库缺模板时，文档类 skill 会停下来要求导入，这里提前提示
+  if (fs.existsSync(path.join(o.root, 'docnexus', 'project.json'))) {
+    const missing = TEMPLATES.filter((t) => !fs.existsSync(path.join(o.root, 'docnexus', 'library', t.file))).map((t) => t.file);
+    if (missing.length) warn(`注意：DocNexus 中缺少模板 ${missing.join('、')}；接入 DocNexus 后不再使用默认模板，请重跑并加 --seed-templates 导入。`);
+  }
   if (docnexus === 'failed') warn('注意：DocNexus 接入失败（见上方输出），其他 skills 不受影响；修复后可重跑（加 --with-docnexus）。');
   console.log('先运行 /workflow profile 填写项目画像；说明见 skills-init README。');
   // skills 已装好，但显式要求的 DocNexus 未接入：返回非 0 便于自动化感知
-  return docnexus === 'failed' ? 1 : 0;
+  return docnexus === 'failed' || seedFailed ? 1 : 0;
 }
 
 main().then((code) => process.exit(code), (e) => {

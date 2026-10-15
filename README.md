@@ -164,6 +164,7 @@ npx @rowansenne/skills-init
 | `-SkipDb` / `--skip-db` | 跳过数据库连接配置（database-query 不生成 config.json）                             |
 | `-WithDocNexus` / `--with-docnexus` | 可选：接入 [DocNexus](https://www.npmjs.com/package/@rowansenne/docnexus) 项目文档库（需 Node >= 22.13），见下方「DocNexus 文档库（可选）」 |
 | `-Copy` / `--copy`      | 不建软链接，各环境独立拷贝一份完整 skills                                  |
+| `-SeedTemplates` / `--seed-templates` | 把自带的文档模板导入 DocNexus（已有的不覆盖）；接入 DocNexus 后文档类 skill 只从知识库取模板。`--with-docnexus` 会自动执行 |
 | `-Yes` / `--yes`        | 非交互：自动使用已有数据库配置（依次查找 `.codex/database-query/config.json` 与各环境已安装的 `database-query/config.json`）；都没有且未 `-SkipDb` 时报错退出 |
 | `--project-root`        | 项目根目录；直接调用 `bin/skills-init.mjs` 时默认当前目录，两个封装脚本自动传上级目录 |
 | `-v` / `--version`      | 显示版本                                                                |
@@ -354,18 +355,31 @@ skills-init/
 
 * SKILL.md 只保留主流程，细节放在各自的 `references/`，agent 需要时再读，减少每次触发占用的上下文。
 
-### 按项目覆盖模板（不改 skills-init）
+### 模板从哪里取
 
-在项目里放同名文件即可覆盖默认模板，skill 会优先使用：
+文档类 skill 的模板来源取决于项目是否接入了 DocNexus，生成的文档开头会注明「模板来源」：
 
-| 覆盖文件 | 替代 |
-| --- | --- |
-| `docs/skills/templates/create-tech-md-doc/template.md` | 技术方案模板 |
-| `docs/skills/templates/create-release-md-doc/template.md` | 上线方案模板 |
-| `docs/skills/templates/dev/plan-template.md` | dev 的方案模板 |
-| `docs/skills/templates/project-review/checklist.md` | 审查清单 |
+* **已接入 DocNexus：只用知识库里的模板** `docnexus/library/templates/<skill>/<文件名>`（分类 `doc-template`）。不再使用 skill 自带的默认模板，也不使用 `docs/skills/templates/` 下的文件。库里缺模板时 skill 会停下来，提示你导入后再继续，不会悄悄回退到默认模板。
+* **未接入 DocNexus**：依次取项目文件 `docs/skills/templates/<skill>/<文件名>`、skill 自带默认模板。
 
-这样换团队、换文档格式时只改项目里的文件，重跑 init 也不会被覆盖。
+| skill | 文件名 | 用途 |
+| --- | --- | --- |
+| create-tech-md-doc | `template.md` | 技术方案模板 |
+| create-release-md-doc | `template.md` | 上线方案模板 |
+| dev | `plan-template.md` | 开发方案模板 |
+| project-review | `checklist.md` | 审查清单 |
+
+**模板导入 DocNexus**：
+
+```
+./skills-init/init-skills.sh --envs claude --skip-db --with-docnexus   # 接入时自动导入默认模板
+./skills-init/init-skills.sh --envs claude --skip-db --seed-templates  # 已接入的项目补导入缺的模板
+```
+
+* 只导入 DocNexus 里还没有的模板，已有的不覆盖；项目已接入但缺模板时，安装结束会列出缺哪几份。
+* 之后模板随知识库更新：直接编辑 `docnexus/library/templates/...` 后执行 `./node_modules/.bin/docnexus document sync --id <id>` 采纳；或者在生成文档后，skill 发现你做了结构性调整时会提议同步回模板（你确认后才写入）。每次变更都记录在 DocNexus 的 timeline 里，可追溯。
+* 模板里的 `{{...}}` 是给 agent 的填写提示，DocNexus 原样保存；不要写成单独一行的 `{{fact:...}}`（那是 DocNexus 的事实引用语法）。
+* 没接入 DocNexus 时，可用 `docs/skills/templates/` 下的同名文件覆盖默认模板；之后接入 DocNexus，skill 会提示你把这些文件导入知识库（导入后它们不再生效）。
 
 ## 触发准确度评估
 
