@@ -106,8 +106,8 @@ npx @rowansenne/skills-init doctor
 ├── project-review/                      # 代码审查
 │   ├── SKILL.md                      # 触发描述 + 审查工作流（含大改动分批、发现复核）
 │   └── references/
-│       ├── checklist.md              # 10 维度审查清单（配置维度按 profile.config_center 判断）
-│       ├── report.md                 # 审查报告模板（触发条件、复核列、审查方式元信息；lint-doc 据此自检）
+│       ├── checklist.md              # 14 维度审查清单（配置维度按 profile.config_center 判断；含幂等、DB 变更、测试、语言专项）
+│       ├── report.md                 # 审查报告模板（触发条件、复核列、复审对比、需求对照；lint-doc 据此自检）
 │       ├── diff-strategy.md          # 读 diff 的策略：按规模全量 / 按风险分批，未提交改动
 │       └── diff-collection-common.md # 与文档类共用的分层过滤规则
 ├── database-query/                   # 数据库查询
@@ -323,7 +323,7 @@ npx @rowansenne/skills-init doctor
 | `workflow/scripts/resolve.mjs status` | `/workflow status` 的能力探测（不输出任何凭据） |
 | `workflow/scripts/resolve.mjs infer-profile` | 按固定规则从构建文件、Makefile、依赖与配置文件、git 推断项目画像草稿，每个字段附依据；不写文件 |
 | `workflow/scripts/lint-doc.mjs <文档> --skill <skill> [--facts]` | 对照当前生效的模板检查生成的文档：必填章节、残留 `{{...}}` 占位符、元信息行为错误；缺普通章节、顺序不一致为警告；列出待填写位置。`--facts` 再核对正文里的类名、文件、接口、表名：在对比分支的 diff 和代码里都找不到的记为警告（防编造） |
-| `workflow/scripts/artifacts.mjs [--branch b \| --all]` | 按分支汇总 `docs/skills/` 下的开发方案、审查报告、技术方案、上线方案及其 wiki 发布记录，给出下一步建议；分支取自文档元信息行，不另存记录。上线方案没传 `--tech` 时据此自动引用同分支的技术方案 |
+| `workflow/scripts/artifacts.mjs [--branch b \| --all]` | 按分支汇总 `docs/skills/` 下的开发方案、审查报告、技术方案、上线方案及其 wiki 发布记录，给出下一步建议；分支取自文档元信息行，不另存记录。上线方案没传 `--tech` 时据此自动引用同分支的技术方案；project-review 据此对照本分支方案、识别复审 |
 | `database-query/scripts/query.mjs` | 执行 SQL：选连接、取密码（只通过环境变量传给客户端）、会话层只读、拦截写语句和多语句、自动补 LIMIT、超时、脱敏敏感列；支持 mysql / psql 客户端，其他 driver 退回 JDBC |
 | `database-query/scripts/query.mjs --schema [--tables a,b] [--write]` | 按只读会话导出表结构为 Markdown；`--write` 写入 `references/schema.md` 的 `schema:begin` / `schema:end` 之间，标记外的补充说明保留 |
 | `md-to-wiki/scripts/upload.mjs info / put / target / record` | REST 上传通道：`info` 读页面标题与版本给用户确认；`put --expect-version <n> [--record <md>]` 先校验 XHTML 良构，版本对不上就拒绝上传，上传后确认版本 +1，并把发布记录写回 Markdown 第一行注释（转换时丢弃，不出现在页面上）；`target` 读出记录，再次发布同一文档不必再给 pageId；`record` 供 MCP 通道上传后补写 |

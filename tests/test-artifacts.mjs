@@ -57,3 +57,10 @@ test('按当前分支归组：最新一份、wiki 记录、下一步建议；其
   assert.equal(run('--bogus').status, 1);
   fs.rmSync(root, { recursive: true, force: true });
 });
+
+test('审查报告模板的元信息：取对比分支里的开发分支，不被「审查范围：分支对比」误导', () => {
+  const head = '# 代码审查报告 — feature-x\n\n> 审查范围：分支对比：feature/x 合并前 ｜ 日期：2026-10-15\n> 对比分支：`feature/x` ←→ `main`\n> 审查方式：全量精读\n> 参考产物：无\n';
+  assert.equal(parseBranch(head), 'feature/x');
+  const tpl = fs.readFileSync(fileURLToPath(new URL('../project-review/references/report.md.tpl', import.meta.url)), 'utf8');
+  assert.equal(parseBranch(tpl), null, '未填写的模板不算任何分支');
+});

@@ -70,8 +70,9 @@ test('CLI：自带模板生成的骨架报错；已接入 DocNexus 时改用知�
   const review = ['# 代码审查报告 — feature-x', '> 审查范围：分支对比 ｜ 日期：2026-10-15', '> 对比分支：`feature-x` ←→ `main`', '> 审查方式：全量精读 ｜ 清单来源：skill 默认',
     '## 结论摘要', '可合并。', '## 严重问题（CRITICAL / HIGH）', '无', '## 一般问题（MEDIUM）', '无', '## 优化建议（LOW）', '无', '## 影响面', '无', '## 未覆盖与待确认', '无', ''].join('\n');
   fs.writeFileSync(path.join(root, 'review.md'), review);
-  r = cli('review.md', '--skill', 'project-review');
+  r = cli('review.md', '--skill', 'project-review', '--json');
   assert.equal(r.status, 0, r.stdout);
+  assert.deepEqual(JSON.parse(r.stdout).warnings, [], '首次审查、没有方案时省略「与上次审查对比」「需求对照」不算缺章节');
   fs.writeFileSync(path.join(root, 'review.md'), review.replace(/> 审查方式.*\n/, '').replace('## 未覆盖与待确认\n无\n', ''));
   r = cli('review.md', '--skill', 'project-review', '--json');
   assert.equal(r.status, 1);

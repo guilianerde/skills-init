@@ -10,6 +10,9 @@ description: "Review source code (any language; Java/Spring, Go, TypeScript, Pyt
 1. **确定审查范围**：单文件 / 单方法、分支对比（如 `branch` vs `main`），还是未提交改动（`git diff HEAD`，见 `references/diff-strategy.md`「未提交改动」）。
 2. **建立理解**：先读实体、接口、DTO、调用链，理清数据流再下结论；不要凭文件名猜内容。
    - **可选：查项目约定（DocNexus）**：项目根存在 `docnexus/project.json` 且 `./node_modules/.bin/docnexus` 可执行时，先运行 `node <skills>/workflow/scripts/knowledge.mjs project-review --match <模块名 / 业务名词>`，看以往审查沉淀的反复问题和开发约定；再按 `docnexus-recall` 用改动涉及的模块名 / 业务名词 `search` / `recall`，找相关的编码约定、历史决策与已知坑，作为审查依据并在报告中引用 `docnexus/library/<path>`。未检测到或查询失败就跳过，并在「未覆盖与待确认」中注明；审查过程中**不写入** DocNexus（写入见第 8 步）。
+   - **同分支已有产物**：运行 `node <skills>/workflow/scripts/artifacts.mjs --branch <dev分支>`（单文件 / 未提交改动用当前分支，省略 `--branch`），看输出的 `latest`：
+     - `latest.plan` 或 `latest.tech` 存在 → 读其中的验收标准、改动设计、接口 / 数据 / 配置变更，第 3 步审 diff 时做**需求对照**：方案里有、diff 里找不到的 → 漏实现（属于验收标准的按 HIGH，其余 MEDIUM）；diff 里有、方案里没提的接口 / 表结构 / 配置 / 依赖变更 → 列出请作者确认（不一定是问题）。只对照能在 diff 里核对的项，不推测业务语义。
+     - `latest.review` 存在 → 这是**复审**：读上次报告的问题表，并用 `git log --oneline --since=<上次报告日期> <dev分支>` 看之后改了什么。本次报告对上次的每条问题标「已修复 / 仍存在 / 不再适用」（「已修复」要看到对应改动），本次新发现的标「新增」。
 3. **分支对比**：基线默认取 `workflow/profile.json` 的 `main_branch`（未配置则 `main`）。按 `references/diff-strategy.md` 先量规模：小改动全量精读；改动多时按风险分级（P0 资金 / 事务 / 权限 / SQL / 对外接口 / MQ / 配置优先）分批精读，审不到的写进报告。只审本次改动引入的问题，同时检查改动是否破坏既有调用方。
 4. **逐项过检查清单**（在项目根运行 `node <skills>/workflow/scripts/resolve.mjs template project-review checklist.md`，读输出的 `path`；退出码 2 时停下并按 `hint` 处理）：对每个发现给出 文件+行号、问题描述、严重级别、修改建议。
 5. **影响面分析**：改动是否影响其他调用方/模块，用 grep 或精读调用链确认；查不到调用方的符号不能当作安全，要明说"未确认"。
@@ -32,6 +35,10 @@ description: "Review source code (any language; Java/Spring, Go, TypeScript, Pyt
 - 安全（注入 / XSS / 越权 / 敏感信息 / 硬编码密钥）
 - 性能（N+1、循环内查询、大对象、无谓复制）
 - 一致性 / 命名 / 风格
+- 幂等与消息一致性（重复消费 / 回调、事务内发消息）
+- 数据库变更安全（锁表、滚动发布兼容、索引支撑）
+- 测试（改动有没有被测试覆盖、断言是否有效）
+- 语言专项（Java / Go / TS / Python / SQL 各自的常见坑，按改动涉及的语言选读）
 - 配置（见第 4 步取到的审查清单中的配置维度；项目使用的配置中心取自 `workflow/profile.json` 的 `config_center`——配置相关发现按配置清单输出）
 
 ## Severity Levels
@@ -43,7 +50,7 @@ description: "Review source code (any language; Java/Spring, Go, TypeScript, Pyt
 
 ## Output Template
 
-报告结构以第 7 步取到的报告模板为准：元信息三行（审查范围、对比分支、审查方式）、结论摘要、严重问题（带触发条件与复核列）、一般问题、优化建议、配置清单（如有）、影响面、未覆盖与待确认。某一节没有内容写「无」，不要删标题。
+报告结构以第 7 步取到的报告模板为准：元信息（审查范围、对比分支、审查方式、参考产物）、结论摘要、与上次审查对比（复审时）、严重问题（带触发条件与复核列）、一般问题、优化建议、需求对照（有方案时）、配置清单（如有）、影响面、未覆盖与待确认。某一节没有内容写「无」，不要删标题。
 
 > 灵活模式：单文件 / 小改动只在对话里回复时，可以直接列 findings，不必套完整模板；但每个结论必须指向真实文件+行号并引用代码，不得用"应该/大概"下结论，CRITICAL / HIGH 仍要复核。落盘的报告一律用模板。
 
