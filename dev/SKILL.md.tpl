@@ -38,7 +38,7 @@ description: "Implement a feature or fix a bug in this project end to end: under
 ### F1 — 理解需求
 
 - 需求来源是 PRD pageId/URL → 按 `references/prd-fetch.md` 拉取并提炼；wiki 不可用 → 请用户贴出关键内容。
-- DocNexus 可用 → 按 `docnexus-recall` 用需求里的业务名词 `search` / `recall`，找相关约定与历史决策，引用 `docnexus/library/<path>`。
+- DocNexus 可用 → 先运行 `node <skills>/workflow/scripts/knowledge.mjs dev --match <模块名 / 业务名词>`，看以往开发沉淀、技术方案和反复出现的审查问题里有没有相关的；再按 `docnexus-recall` 用需求里的业务名词 `search` / `recall` 补充。引用 `docnexus/library/<path>`（见 `workflow` skill「按分类参考知识库」）。
 - 输出 **需求要点 + 验收标准**（可验证的行为，而不是实现手段）。
 - 存在歧义（边界、异常分支、兼容性、权限）→ **一次性**列出问题问用户，不要边做边问，也不要自行假设后继续。
 

@@ -25,6 +25,11 @@
   ],
   "docnexus": {
     "category": "dev-notes",
-    "reason": "dev skill 在开发交付时沉淀的决策、约定与坑"
+    "reason": "dev skill 在开发交付时沉淀的决策、约定与坑",
+    "readFrom": [
+      "dev",
+      "create-tech-md-doc",
+      "project-review"
+    ]
   }
 }

@@ -13,6 +13,7 @@
 //   shared       共享参考文件名列表：源在仓库 shared/ 下，安装时拷进本 skill 的 references/（仓库里只维护一份，装好后各 skill 自带）
 //   docnexus     本 skill 写入 DocNexus 时的显式分类：{ category, reason }，由 resolve.mjs category 读取（项目画像可覆盖），
 //                入库时以调用方显式分类封存（draft seal --category），不走 DocNexus 的模型分类
+//                readFrom：开工前要参考哪些 skill 的沉淀（knowledge.mjs 按它们的分类列出文档）
 
 import fs from 'node:fs';
 import path from 'node:path';

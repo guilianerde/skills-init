@@ -30,6 +30,10 @@
   ],
   "docnexus": {
     "category": "release-plan",
-    "reason": "create-release-md-doc skill 从上线方案中沉淀的配置变化、风险与回滚要点"
+    "reason": "create-release-md-doc skill 从上线方案中沉淀的配置变化、风险与回滚要点",
+    "readFrom": [
+      "create-release-md-doc",
+      "create-tech-md-doc"
+    ]
   }
 }

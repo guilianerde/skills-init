@@ -273,7 +273,7 @@ npx @rowansenne/skills-init doctor
   "optional": ["md-to-wiki", "create-release-md-doc"],
   "shared": ["diff-collection-common.md", "prd-fetch.md"],
   "templates": [{ "id": "template.md", "src": "template.md", "title": "技术方案模板", "summary": "...", "lint": { "requiredMeta": ["模板来源"] } }],
-  "docnexus": { "category": "tech-design", "reason": "create-tech-md-doc skill 从技术方案中沉淀的决策、约定与风险" },
+  "docnexus": { "category": "tech-design", "reason": "create-tech-md-doc skill 从技术方案中沉淀的决策、约定与风险", "readFrom": ["create-tech-md-doc", "dev"] },
   "renamedFrom": {}
 }
 ```
@@ -287,9 +287,18 @@ npx @rowansenne/skills-init doctor
 | `requires` | 运行时必需的 skill（会调用它的脚本或读它的文件）；`--skills` 安装时自动带上 |
 | `optional` | 协作但非必需的 skill：没装时跳过对应增强（如 PRD 读取、自审），不报错 |
 | `shared` | 共享参考文件：源在仓库 `shared/`，安装时拷进本 skill 的 `references/`。仓库里只维护一份，装好后每个 skill 自带完整文件，运行时不依赖别的 skill |
-| `docnexus` | 本 skill 写入 DocNexus 时的显式分类 `{ category, reason }`。写入时以调用方显式分类封存（`draft seal --category`），不走 DocNexus 的模型分类；项目可在 `workflow/profile.json` 的 `docnexus_categories` 里按 skill 覆盖 |
+| `docnexus` | 本 skill 写入 DocNexus 时的显式分类 `{ category, reason }`。写入时以调用方显式分类封存（`draft seal --category`），不走 DocNexus 的模型分类；项目可在 `workflow/profile.json` 的 `docnexus_categories` 里按 skill 覆盖。`readFrom` 列出开工前要参考哪些 skill 的沉淀，`knowledge.mjs` 按它们的分类列出文档 |
 
-当前分类：`dev` → `dev-notes`，`create-tech-md-doc` → `tech-design`，`create-release-md-doc` → `release-plan`，导入的模板固定为 `doc-template`。`project-review` 只读 DocNexus，`database-query`、`md-to-wiki` 不写入，都不声明分类。测试会检查：SKILL.md 里有 DocNexus 写入步骤的 skill 必须声明分类，并通过 `resolve.mjs category` 取用。
+当前分类与参考关系：
+
+| skill | 写入分类 | 开工前参考（readFrom） |
+| --- | --- | --- |
+| `dev` | `dev-notes` | dev、create-tech-md-doc、project-review |
+| `project-review` | `code-review` | project-review、dev |
+| `create-tech-md-doc` | `tech-design` | create-tech-md-doc、dev |
+| `create-release-md-doc` | `release-plan` | create-release-md-doc、create-tech-md-doc |
+
+导入的模板固定为 `doc-template`；`database-query`、`md-to-wiki` 不读写知识库。这样形成闭环：审查发现的反复问题沉淀为 `code-review`，下次 dev 开工前会被列出来。测试会检查：SKILL.md 里有 DocNexus 写入步骤的 skill 必须声明分类并通过 `resolve.mjs category` 取用；`readFrom` 只能引用声明了分类的 skill，且 SKILL.md 里有对应的 `knowledge.mjs` 调用。
 
 `tests/test-skills-meta.mjs` 会检查：skill 的文件里出现了别的 skill 的路径（如 `md-to-wiki/scripts/…`、`workflow/scripts/…`），就必须在 `requires` 或 `optional` 里声明；`requires` 声明了就必须真的用到，而且不能成环。
 
@@ -305,6 +314,7 @@ npx @rowansenne/skills-init doctor
 | --- | --- |
 | `workflow/scripts/resolve.mjs template <skill> <文件名>` | 判定用哪份模板：已接入 DocNexus 只用知识库，缺失时退出码 2 并给出导入来源；未接入时项目文件优先，其次默认模板 |
 | `workflow/scripts/resolve.mjs profile` | 读项目画像，列出空字段 |
+| `workflow/scripts/knowledge.mjs <skill> [--match 词] [--limit n]` | 按 `readFrom` 的分类列出 DocNexus 文档（标题、摘要、路径，不含正文）；DocNexus 的 search / recall 不能按分类过滤，这里补上。未接入时退出码 2 |
 | `workflow/scripts/resolve.mjs category <skill>` | 该 skill 写入 DocNexus 时的显式分类（画像 `docnexus_categories` 优先，其次 skill.json），输出 `seal_args` 与 `metadata`；未声明时退出码 1 |
 | `workflow/scripts/resolve.mjs status` | `/workflow status` 的能力探测（不输出任何凭据） |
 | `workflow/scripts/resolve.mjs infer-profile` | 按固定规则从构建文件、Makefile、依赖与配置文件、git 推断项目画像草稿，每个字段附依据；不写文件 |
@@ -437,6 +447,7 @@ skills-init/
 │   ├── scripts/resolve.mjs            # 模板来源 / 画像 / 画像推断 / 能力探测
 │   ├── scripts/lint-doc.mjs           # 对照模板检查生成的文档
 │   ├── scripts/infer-profile.mjs      # 画像推断规则（resolve.mjs infer-profile 调用）
+│   ├── scripts/knowledge.mjs          # 按分类列出相关的 DocNexus 文档
 │   └── profile.json.tpl               # 空画像，首次使用时由 agent 推断并经确认后填写
 ├── dev/
 │   ├── SKILL.md.tpl · skill.json

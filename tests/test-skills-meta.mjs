@@ -121,3 +121,13 @@ test('docnexus 分类：名称合法；会写入 DocNexus 的 skill 都声明分
   assert.ok(validCategory(TEMPLATE_CATEGORY));
   for (const bad of ['', ' x', 'x ', 'a\nb', 'x'.repeat(81)]) assert.ok(!validCategory(bad), JSON.stringify(bad));
 });
+
+test('docnexus.readFrom：只引用已声明分类的 skill，且 SKILL.md 经 knowledge.mjs 取用', () => {
+  const byName = new Map(skills.map((s) => [s.name, s]));
+  for (const s of skills) {
+    const from = s.docnexus?.readFrom ?? [];
+    for (const n of from) assert.ok(byName.get(n)?.docnexus?.category, `${s.name} readFrom ${n}：该 skill 不存在或没有声明分类`);
+    const md = read(`${s.name}/SKILL.md.tpl`);
+    assert.equal(md.includes(`knowledge.mjs ${s.name}`), from.length > 0, `${s.name}：readFrom 与 SKILL.md 中的 knowledge.mjs 调用不一致`);
+  }
+});

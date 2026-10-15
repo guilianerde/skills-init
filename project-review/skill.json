@@ -15,5 +15,13 @@
       "title": "代码审查清单",
       "summary": "project-review 逐项审查时使用的 10 维度检查清单。"
     }
-  ]
+  ],
+  "docnexus": {
+    "category": "code-review",
+    "reason": "project-review skill 从审查中沉淀的反复出现的问题与约定",
+    "readFrom": [
+      "project-review",
+      "dev"
+    ]
+  }
 }

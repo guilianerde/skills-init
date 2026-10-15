@@ -4,6 +4,10 @@
 
 ## [Unreleased]
 
+### 新增
+- 按分类参考知识库：`workflow/scripts/knowledge.mjs <skill> [--match 词] [--limit n]` 按 skill.json 的 `docnexus.readFrom` 列出相关分类下的 DocNexus 文档（标题、摘要、路径，不含正文），补上 search / recall 不能按分类过滤的缺口；分类名跟随项目画像的覆盖。dev、project-review、两个文档 skill 开工前先看同类沉淀，再做关键词 recall。
+- project-review 支持沉淀（需用户授权）：反复出现的问题模式与新确立的约定以 `code-review` 分类写入，已有同类沉淀时更新而不是重复新建；dev 开工前会参考它。
+
 ## [0.4.0] - 2026-10-15
 
 ### 修复
