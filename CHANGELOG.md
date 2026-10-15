@@ -4,6 +4,8 @@
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-10-15
+
 ### 变更
 - 触发评估（26 条 × 3 次）发现两处不稳定后调整 description：project-review 补充「对照两个类 / DTO↔VO 转换漏字段」，dev 补充「跨几个类的具体重构（如 Date → LocalDateTime）后跑测试」。调整后 78/78。
 - `eval-triggers.mjs`：期望 `none` 的用例触发了用户环境里的其他 skill 也算对；调用失败（额度用尽 / 未登录）记为 error 并提示结果不可信，不再误计为「没触发」。
@@ -60,7 +62,8 @@
 - 安装器改为单一 Node 实现，`init-skills.sh` / `init-skills.ps1` 只是薄封装。
 - `code-review` 改名为 `project-review`，升级时自动清理旧名。
 
-[Unreleased]: https://github.com/guilianerde/skills-init/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/guilianerde/skills-init/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/guilianerde/skills-init/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/guilianerde/skills-init/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/guilianerde/skills-init/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/guilianerde/skills-init/releases/tag/v0.2.0
