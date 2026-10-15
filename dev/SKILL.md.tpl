@@ -1,6 +1,6 @@
 ---
 name: dev
-description: "Implement a feature or fix a bug in this project end to end: understand the requirement, study existing code, plan at the right size, implement in small verified steps, run tests, self-review the diff with project-review, and deliver a summary with config/SQL checklists. Use when the user asks to develop, implement, add, change or fix something in the codebase — including concrete refactors that touch several classes (swap a type such as Date → LocalDateTime, rename, replace an API) followed by running tests — or invokes /dev <需求> or /dev --bug <现象>. Trigger phrases: 帮我开发 / 实现这个需求 / 加个接口 / 改一下这个逻辑 / 把 X 改成 Y / 重构一下 / 改完跑一下测试 / 修这个 bug / 排查并修复 / 线上报错了帮我修 / implement this feature / fix this bug. Not for pure code review (project-review), SQL lookups (database-query) or doc generation (create-tech-md-doc / create-release-md-doc)."
+description: "Implement a feature or fix a bug in this project end to end: understand the requirement, study existing code, clarify open decisions with the user in rounds, plan at the right size, implement in small verified steps, run tests, self-review the diff with project-review, and deliver a summary with config/SQL checklists. Use when the user asks to develop, implement, add, change or fix something in the codebase — including concrete refactors that touch several classes (swap a type such as Date → LocalDateTime, rename, replace an API) followed by running tests — or invokes /dev <需求> or /dev --bug <现象>. Trigger phrases: 帮我开发 / 实现这个需求 / 加个接口 / 改一下这个逻辑 / 把 X 改成 Y / 重构一下 / 改完跑一下测试 / 修这个 bug / 排查并修复 / 线上报错了帮我修 / implement this feature / fix this bug. Not for pure code review (project-review), SQL lookups (database-query) or doc generation (create-tech-md-doc / create-release-md-doc)."
 ---
 
 # Dev
@@ -38,9 +38,8 @@ description: "Implement a feature or fix a bug in this project end to end: under
 ### F1 — 理解需求
 
 - 需求来源是 PRD pageId/URL → 按 `references/prd-fetch.md` 拉取并提炼；wiki 不可用 → 请用户贴出关键内容。
-- DocNexus 可用 → 先运行 `node <skills>/workflow/scripts/knowledge.mjs dev --match <模块名 / 业务名词>`，看以往开发沉淀、技术方案和反复出现的审查问题里有没有相关的；再按 `docnexus-recall` 用需求里的业务名词 `search` / `recall` 补充。引用 `docnexus/library/<path>`（见 `<skills>/workflow/references/docnexus.md`「按分类参考知识库」）。
-- 输出 **需求要点 + 验收标准**（可验证的行为，而不是实现手段）。
-- 存在歧义（边界、异常分支、兼容性、权限）→ **一次性**列出问题问用户，不要边做边问，也不要自行假设后继续。
+- DocNexus 可用 → 先运行 `node <skills>/workflow/scripts/knowledge.mjs dev --match <模块名 / 业务名词> --query "<一句话需求>"`，看以往开发沉淀、技术方案和反复出现的审查问题里有没有相关的（`--query` 在这些分类内按正文 recall；输出 `recall_by_category: false` 时改按 `docnexus-recall` 做不带分类的 recall）。引用 `docnexus/library/<path>`（见 `<skills>/workflow/references/docnexus.md`「按分类参考知识库」）。
+- 先在心里列出初版 **需求要点 + 验收标准**（可验证的行为，而不是实现手段）和还没定的决定，带进 F2 查事实、F3 澄清。
 
 ### F2 — 现状调研
 
@@ -48,7 +47,19 @@ description: "Implement a feature or fix a bug in this project end to end: under
 - 找到同类功能的既有实现，作为风格与结构的参照（命名、分层、异常、日志、事务、DTO 转换方式）。
 - 涉及表结构 → 先看 `database-query/references/schema.md`，需要时用 `database-query` 只读 `DESCRIBE` / 抽样核对。
 
-### F3 — 方案（按规模分级）
+### F3 — 需求澄清
+
+按 `references/clarify.md` 分轮提问：把需求拆成决策树（行为、边界、异常、兼容、权限、数据、范围），**事实自己查**（代码、表结构、PRD、DocNexus），**决定交给用户**；每轮把现在就能问的问题一次问完，编号并给出推荐答案和依据，等用户回答后再问下一轮，直到没有被默默假设的决定。
+
+| 情况 | 做法 |
+|---|---|
+| S 规模且 F2 后没有未定的决定 | 跳过提问，在开工前用一两句话写明本次的理解和假设 |
+| 只有一两个小决定 | 问一轮即可 |
+| M / L 规模，或用户说「拷问一下 / grill me / 先把需求问清楚」 | 按轮问到前沿为空，输出需求要点、验收标准、不在本次范围、已确认的决定，**等用户确认理解一致**再进 F4 |
+
+不要边写代码边问：实现中才发现的新决定，停下来按同样格式问，再继续。
+
+### F4 — 方案（按规模分级）
 
 | 规模 | 判定 | 做法 |
 |---|---|---|
@@ -58,7 +69,7 @@ description: "Implement a feature or fix a bug in this project end to end: under
 
 规模拿不准时按大一级处理。方案模板：在项目根运行 `node <skills>/workflow/scripts/resolve.mjs template dev plan-template.md`，读输出的 `path`；退出码 2（已接入 DocNexus 但缺模板）时停下并按 `hint` 处理。L 规模的方案文档落盘后运行 `node <skills>/workflow/scripts/lint-doc.mjs <方案路径> --skill dev` 自检，再请用户确认。
 
-### F4 — 实现
+### F5 — 实现
 
 - **小步推进**：每完成一个可编译的单元，就运行 `profile.build`（没有则用对应构建工具的编译命令）确认通过，再进入下一步。
 - **贴合现有代码**：沿用参照实现的写法；不顺手重构、不改无关代码、不升级依赖。看到范围外的问题记进交付说明，不在本次修。
@@ -66,19 +77,19 @@ description: "Implement a feature or fix a bug in this project end to end: under
 - **数据库变更**：DDL / 数据修正写成 SQL 脚本放进项目约定的目录（没有约定则放进交付说明），**不在任何环境直接执行**。
 - **敏感信息**：不硬编码密钥、密码、内网地址；日志不打印敏感字段。
 
-### F5 — 验证
+### F6 — 验证
 
 - 按验收标准补充或更新单元测试 / 集成测试，测试放在项目既有测试目录、沿用既有测试框架。
 - 运行 `profile.test`（或只跑相关测试的 `profile.test_single`）。有 `profile.lint` 时一并运行。
 - 如实报告结果：失败就给出失败输出并继续修；环境跑不了（缺依赖、缺中间件）就明确写「未验证」以及用户该如何验证。**不得声称未运行的测试已通过。**
 
-### F6 — 自审
+### F7 — 自审
 
 - 按 `project-review` skill 审本次改动：分支已有提交时用 `git diff <main_branch>...HEAD`，再加上 `git diff HEAD` 的未提交部分。
-- CRITICAL / HIGH 必须修掉后重新跑 F5；MEDIUM / LOW 修掉或写进交付说明。
+- CRITICAL / HIGH 必须修掉后重新跑 F6；MEDIUM / LOW 修掉或写进交付说明。
 - 自审结论放进交付说明即可，不单独落盘审查报告（用户要求时再按 project-review 的产物规范落盘）。
 
-### F7 — 交付
+### F8 — 交付
 
 按 `references/delivery-template.md` 输出交付说明（小改动可压缩成「改动 + 验证 + 下一步」，但验证结果必须如实），然后**询问**下一步，不要自行执行：
 
@@ -90,7 +101,7 @@ description: "Implement a feature or fix a bug in this project end to end: under
 
 ### B1 — 收集现象
 
-整理：现象、期望行为、触发条件、影响范围、首次出现时间、相关日志 / 报错 / 数据。信息不足以复现时，列出缺的信息问用户。
+整理：现象、期望行为、触发条件、影响范围、首次出现时间、相关日志 / 报错 / 数据。信息不足以复现时，列出缺的信息问用户：只问只有用户知道的（日志、发生时间、操作步骤、受影响的用户），代码和数据能查到的自己查；格式同 `references/clarify.md`。
 
 ### B2 — 复现
 
@@ -106,12 +117,12 @@ description: "Implement a feature or fix a bug in this project end to end: under
 
 ### B4 — 修复与验证
 
-- 做能消除根因的**最小改动**；B2 的测试由红变绿，相关已有测试保持通过（运行方式同 F5）。
+- 做能消除根因的**最小改动**；B2 的测试由红变绿，相关已有测试保持通过（运行方式同 F6）。
 - 如果历史脏数据需要修正，写成 SQL 脚本交给用户，不直接执行。
 
 ### B5 — 自审与交付
 
-同 F6、F7。交付说明里必须包含：**根因**、修复方式、为什么这样修、同类风险排查结果。
+同 F7、F8。交付说明里必须包含：**根因**、修复方式、为什么这样修、同类风险排查结果。
 
 ## Rules
 
@@ -119,7 +130,7 @@ description: "Implement a feature or fix a bug in this project end to end: under
 - 不 `git commit` / `git push` / 改写历史 / 删除分支，除非用户在本次对话中明确要求。
 - 不安装新依赖；确实需要时说明理由，等用户同意。
 - 每个关于现有代码的结论都指向真实文件和行号；读不到的内容如实说明。
-- 用户中途改变需求 → 回到 F1 更新验收标准，再继续。
+- 用户中途改变需求 → 回到 F3，只就变化的部分重新澄清并更新验收标准，再继续。
 
 ## Artifact Location
 

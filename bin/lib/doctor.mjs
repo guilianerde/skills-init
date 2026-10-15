@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { PKG, CANON_DIR, DOCNEXUS_PKG, SKILLS, step, ok, warn, fail, toPosix, fileHash, readManifest, lstat, findManifests, cmpVersion } from './core.mjs';
-import { reportTemplateStatus, docnexusSupportsCategory } from './docnexus.mjs';
+import { reportTemplateStatus, docnexusSupportsCategory, docnexusSupportsRecallCategory } from './docnexus.mjs';
 
 // upgrade = 用清单里记录的环境与模式非交互重装；数据库配置原样保留
 export function upgradeOptions(o) {
@@ -92,6 +92,8 @@ export function doctor(root, offline) {
       for (const f of st.docnexus.stale_project_templates) meh(`${f} 在接入 DocNexus 后已不再生效，建议删除`);
       if (docnexusSupportsCategory(root) === false) meh(`已装的 DocNexus 不支持 draft seal --category：各 skill 的分类只能经 metadata.category 写入，不记为调用方指定。升级：npm i -D ${DOCNEXUS_PKG}@latest`);
       else ok('DocNexus 支持调用方显式分类（draft seal --category）');
+      if (docnexusSupportsRecallCategory(root) === false) meh(`已装的 DocNexus 不支持 recall --category：knowledge.mjs --query 只列文档，skill 改用不带分类的 recall。升级：npm i -D ${DOCNEXUS_PKG}@latest`);
+      else ok('DocNexus 支持按分类检索（recall --category）');
     } else console.log('    --  DocNexus 未接入（可选）');
     if (!st.database.ok) console.log('    --  数据库未配置（可选）');
   }

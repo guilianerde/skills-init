@@ -15,6 +15,13 @@ const FAKE = `#!/usr/bin/env node
 const fs = require('fs');
 const [cmd, sub, ...rest] = process.argv.slice(2);
 const cat = rest[rest.indexOf('--category') + 1];
+// 有 old-docnexus 标记文件时模拟 0.16.0 之前的版本：帮助里 recall 没有 --category
+if (cmd === '--help') { console.log(fs.existsSync('old-docnexus') ? '  docnexus recall "q" --limit 5' : '  docnexus recall "q" --limit 5 [--category <name>]'); process.exit(0); }
+if (cmd === 'recall') {
+  const all = JSON.parse(fs.readFileSync('docs.json', 'utf8')).filter((d) => d.category === cat && d.body.includes(sub));
+  console.log(JSON.stringify({ query: sub, context_groups: all.map((d) => ({ id: d.id, path: 'docnexus/library/' + d.file_path })) }));
+  process.exit(0);
+}
 if (cmd !== 'document' || sub !== 'query') process.exit(1);
 if (cat === 'broken') { console.error('engine_unavailable'); process.exit(1); }
 const docs = JSON.parse(fs.readFileSync('docs.json', 'utf8')).filter((d) => d.category === cat);
@@ -31,10 +38,10 @@ function project({ connect = true } = {}) {
     fs.mkdirSync(path.join(root, 'node_modules', '.bin'), { recursive: true });
     fs.writeFileSync(path.join(root, 'node_modules', '.bin', 'docnexus'), FAKE, { mode: 0o755 });
   }
-  const doc = (id, category, title, updated_at, extra = {}) => ({ id, category, title, summary: `${title} 摘要`, file_path: `notes/${id}.md`, updated_at, tags: [], ...extra });
+  const doc = (id, category, title, updated_at, extra = {}) => ({ id, category, title, summary: `${title} 摘要`, file_path: `notes/${id}.md`, updated_at, tags: [], body: `${title} 正文`, ...extra });
   fs.writeFileSync(path.join(root, 'docs.json'), JSON.stringify([
     doc('a', 'dev-notes', '订单幂等约定', '2026-10-01'),
-    doc('b', 'dev-notes', '缓存击穿处理', '2026-10-03'),
+    doc('b', 'dev-notes', '缓存击穿处理', '2026-10-03', { body: '缓存失效时订单查询走互斥锁' }),
     doc('c', 'code-review', '金额精度', '2026-10-02', { tags: ['订单'] }),
     doc('d', 'tech-design', '支付重构', '2026-09-01'),
     doc('e', 'release-plan', '上线回滚', '2026-09-01'),
@@ -84,5 +91,22 @@ test('未接入 DocNexus 退出 2；未知 skill 退出 1', () => {
   assert.deepEqual([run('dev').status, run('dev').out.error], [2, 'no_docnexus']);
   assert.equal(run('nope').status, 1);
   assert.equal(run().status, 1);
+  fs.rmSync(root, { recursive: true, force: true });
+});
+
+test('--query：每个分类内 recall 按正文检索；旧版 DocNexus 不支持时只列文档并提示', { skip }, () => {
+  const { root, run } = project();
+  let r = run('dev', '--query', '订单');
+  assert.equal(r.status, 0);
+  assert.equal(r.out.recall_by_category, true);
+  // b 的标题不含「订单」，正文含，--match 找不到而 recall 能找到
+  assert.deepEqual(r.out.categories.map((c) => [c.category, c.recall.context_groups.map((g) => g.id)]), [['dev-notes', ['a', 'b']], ['tech-design', []], ['code-review', []]]);
+  assert.equal(run('dev').out.recall_by_category, undefined, '不给 --query 不 recall');
+  assert.equal(run('dev', '--query', 'x', '--recall-limit', '0').status, 1);
+  fs.writeFileSync(path.join(root, 'old-docnexus'), '');
+  r = run('dev', '--query', '订单');
+  assert.equal(r.out.recall_by_category, false);
+  assert.match(r.out.recall_hint, /0\.16\.0/);
+  assert.ok(r.out.categories.every((c) => c.recall === undefined));
   fs.rmSync(root, { recursive: true, force: true });
 });
