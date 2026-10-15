@@ -32,6 +32,7 @@ description: "Query the project database via SQL and report results. Use when th
 ```
 node <skills>/database-query/scripts/query.mjs [--conn <名称>] [--limit 200] [--timeout 30] [--format md|tsv|json] "<SQL>"
 node <skills>/database-query/scripts/query.mjs --list        # 列出连接（不含凭据）
+node <skills>/database-query/scripts/query.mjs --schema [--tables a,b] [--write]   # 导出表结构；--write 写入 references/schema.md，先经用户确认
 ```
 
 `<skills>` 是本 skill 所在的 skills 目录（如 `.agents/skills`）。上面「连接配置」的 1～4 条规则由脚本落实，不要自己拼 mysql / psql 命令：

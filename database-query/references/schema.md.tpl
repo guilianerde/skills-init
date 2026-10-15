@@ -1,7 +1,7 @@
 # Schema Notes
 
 > 本文件由 `init-skills` 生成，用于记录库表结构速查。初始化时为空，
-> 建议用 `SHOW TABLES` + `DESCRIBE <table>` 补齐后提交，帮助各平台 agent 快速定位表。
+> 可运行 `query.mjs --schema --write` 自动导出（经确认后），补充说明后提交，帮助各平台 agent 快速定位表。
 
 ## 连接
 
@@ -14,4 +14,10 @@
 
 ## 关键表结构
 
-（待补充：表名、字段、类型、索引、说明）
+<!-- schema:begin -->
+（待导出：`node <skills>/database-query/scripts/query.mjs --schema [--tables a,b] --write`）
+<!-- schema:end -->
+
+## 补充说明
+
+（字段口径、常用关联、注意事项写在这里，重新导出不会覆盖）

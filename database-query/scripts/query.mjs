@@ -13,6 +13,7 @@
 //   --write           在 readonly=false 的连接上执行写语句（必须先得到用户明确同意）
 //   --no-mask         不脱敏（仅在用户明确要求时使用）
 //   --list            列出连接（不含凭据）
+//   --schema [--tables a,b] [--write]   导出表结构为 Markdown；--write 写入 references/schema.md（begin/end 标记之间，先经用户确认）
 // 退出码：0 成功；1 执行失败；2 参数 / 配置 / 只读拦截；3 本机没有对应客户端（改用 SKILL.md 中的 JDBC 方式）
 
 import fs from 'node:fs';
@@ -142,7 +143,7 @@ function render(fmt, res) {
 }
 
 function parseArgs(argv) {
-  const o = { conn: '', limit: 200, timeout: 30, format: 'md', write: false, mask: true, list: false, sql: '' };
+  const o = { conn: '', limit: 200, timeout: 30, format: 'md', write: false, mask: true, list: false, schema: false, tables: '', sql: '' };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     const val = () => { if (i + 1 >= argv.length) throw new UsageError(`${a} 需要一个值`); return argv[++i]; };
@@ -154,6 +155,8 @@ function parseArgs(argv) {
       case '--write': o.write = true; break;
       case '--no-mask': o.mask = false; break;
       case '--list': o.list = true; break;
+      case '--schema': o.schema = true; break;
+      case '--tables': o.tables = val(); break;
       default:
         if (a.startsWith('--')) throw new UsageError(`未知参数 ${a}`);
         o.sql = o.sql ? `${o.sql} ${a}` : a;
@@ -163,6 +166,68 @@ function parseArgs(argv) {
   if (!(o.timeout > 0)) throw new UsageError('--timeout 需为正数');
   if (!['md', 'tsv', 'json'].includes(o.format)) throw new UsageError('--format 只支持 md / tsv / json');
   return o;
+}
+
+// 执行一条 SQL（调用方已完成语句检查），返回 { code, error, columns, rows, elapsed }；code 同退出码约定
+export function execute(conn, readonly, sql, timeoutSec) {
+  const timeoutMs = Math.round(timeoutSec * 1000);
+  const cmd = buildCommand(conn, readonly, sql, timeoutMs, password(conn));
+  if (!cmd) return { code: 3, error: `不支持的 driver「${conn.driver}」：按 SKILL.md 用项目的 JDBC 驱动写临时查询类（conn.setReadOnly(true)）` };
+  if (!onPath(cmd.bin)) return { code: 3, error: `本机没有 ${cmd.bin} 客户端：按 SKILL.md 改用 JDBC 临时查询类，或给出 SQL 让用户手动执行` };
+  const t0 = Date.now();
+  const r = spawnSync(cmd.bin, cmd.args, { encoding: 'utf8', env: { ...process.env, ...cmd.env }, timeout: timeoutMs + 5000, maxBuffer: 64 * 1024 * 1024 });
+  const elapsed = Date.now() - t0;
+  if (r.error?.code === 'ETIMEDOUT' || r.signal === 'SIGTERM') return { code: 1, error: `查询超时（${timeoutSec}s），已终止。缩小范围或加索引条件后重试` };
+  if (r.status !== 0) return { code: 1, error: (r.stderr || r.stdout || '执行失败').trim() };
+  return { code: 0, elapsed, ...parseTsv(r.stdout) };
+}
+
+// ---------------------------------------------------------------- 表结构导出（--schema）
+const SCHEMA_BEGIN = '<!-- schema:begin -->';
+const SCHEMA_END = '<!-- schema:end -->';
+
+export function schemaSql(driver, tables) {
+  const pg = /^(postgres|postgresql|pg)$/i.test(driver);
+  const list = tables.map((t) => `'${t}'`).join(', ');
+  if (pg) {
+    return `SELECT c.table_name, c.column_name, c.data_type, c.is_nullable, CASE WHEN k.column_name IS NOT NULL THEN 'PRI' ELSE '' END AS column_key, c.column_default, coalesce(pgd.description, '') AS column_comment, coalesce(obj_description(st.relid), '') AS table_comment
+FROM information_schema.columns c
+LEFT JOIN pg_catalog.pg_statio_all_tables st ON st.schemaname = c.table_schema AND st.relname = c.table_name
+LEFT JOIN pg_catalog.pg_description pgd ON pgd.objoid = st.relid AND pgd.objsubid = c.ordinal_position
+LEFT JOIN (SELECT kcu.table_name, kcu.column_name FROM information_schema.table_constraints tc JOIN information_schema.key_column_usage kcu ON tc.constraint_name = kcu.constraint_name AND tc.table_schema = kcu.table_schema WHERE tc.constraint_type = 'PRIMARY KEY' AND tc.table_schema = current_schema()) k ON k.table_name = c.table_name AND k.column_name = c.column_name
+WHERE c.table_schema = current_schema()${tables.length ? ` AND c.table_name IN (${list})` : ''}
+ORDER BY c.table_name, c.ordinal_position`;
+  }
+  return `SELECT c.TABLE_NAME, c.COLUMN_NAME, c.COLUMN_TYPE, c.IS_NULLABLE, c.COLUMN_KEY, c.COLUMN_DEFAULT, c.COLUMN_COMMENT, t.TABLE_COMMENT
+FROM information_schema.COLUMNS c JOIN information_schema.TABLES t ON t.TABLE_SCHEMA = c.TABLE_SCHEMA AND t.TABLE_NAME = c.TABLE_NAME
+WHERE c.TABLE_SCHEMA = DATABASE()${tables.length ? ` AND c.TABLE_NAME IN (${list})` : ''}
+ORDER BY c.TABLE_NAME, c.ORDINAL_POSITION`;
+}
+
+// 列结果 -> Markdown：每张表一节（表注释、字段表）
+export function schemaMarkdown(connName, conn, rows) {
+  const byTable = new Map();
+  for (const [table, col, type, nullable, key, def, comment, tcomment] of rows) {
+    if (!byTable.has(table)) byTable.set(table, { comment: tcomment, cols: [] });
+    byTable.get(table).cols.push({ col, type, nullable, key, def, comment });
+  }
+  const cell = (v) => (v == null || v === 'NULL' ? '' : String(v).replace(/\|/g, '\\|').replace(/\\n/g, ' '));
+  const out = [SCHEMA_BEGIN, `<!-- 由 query.mjs --schema 生成：连接 ${connName}（${conn.database}），${new Date().toISOString().slice(0, 10)}。重新生成会替换 begin/end 之间的内容，补充说明请写在外面。 -->`, ''];
+  out.push(`共 ${byTable.size} 张表：${[...byTable.keys()].map((t) => `\`${t}\``).join('、')}`, '');
+  for (const [table, { comment, cols }] of byTable) {
+    out.push(`### ${table}${comment ? ` — ${cell(comment)}` : ''}`, '', '| 字段 | 类型 | 可空 | 键 | 默认值 | 说明 |', '|---|---|---|---|---|---|');
+    for (const c of cols) out.push(`| ${cell(c.col)} | ${cell(c.type)} | ${c.nullable === 'YES' ? '是' : '否'} | ${cell(c.key)} | ${cell(c.def)} | ${cell(c.comment)} |`);
+    out.push('');
+  }
+  out.push(SCHEMA_END);
+  return out.join('\n');
+}
+
+// 写入 schema.md：替换 begin/end 之间的内容；没有标记时追加到末尾，其他内容保留
+export function mergeSchema(existing, block) {
+  const a = existing.indexOf(SCHEMA_BEGIN), b = existing.indexOf(SCHEMA_END);
+  if (a >= 0 && b > a) return existing.slice(0, a) + block + existing.slice(b + SCHEMA_END.length);
+  return `${existing.replace(/\s*$/, '')}\n\n## 表结构（自动导出）\n\n${block}\n`;
 }
 
 export function main(argv) {
@@ -175,32 +240,42 @@ export function main(argv) {
     }
     return 0;
   }
-  if (!o.sql && !process.stdin.isTTY) o.sql = fs.readFileSync(0, 'utf8');
   const { name, conn } = pickConn(cfg, o.conn);
   const readonly = conn.readonly !== false;
+
+  if (o.schema) {
+    const tables = o.tables ? o.tables.split(/[,，\s]+/).filter(Boolean) : [];
+    const badName = tables.find((t) => !/^[\w$]+$/.test(t));
+    if (badName) throw new UsageError(`表名不合法：${badName}`);
+    // 表结构查询只读，无论连接是否可写都按只读会话执行
+    const r = execute(conn, true, schemaSql(conn.driver || 'mysql', tables), o.timeout);
+    if (r.code) { console.error(r.error); return r.code; }
+    if (!r.rows.length) { console.error(tables.length ? `没有找到表：${tables.join('、')}` : '当前库 / schema 下没有表'); return 1; }
+    const block = schemaMarkdown(name, conn, r.rows);
+    if (!o.write) { console.log(block); return 0; }
+    const f = path.join(SKILL_DIR, 'references', 'schema.md');
+    fs.mkdirSync(path.dirname(f), { recursive: true });
+    fs.writeFileSync(f, mergeSchema(fs.existsSync(f) ? fs.readFileSync(f, 'utf8') : '# Schema Notes\n', block));
+    console.log(`已写入 ${f}（${new Set(r.rows.map((x) => x[0])).size} 张表）`);
+    return 0;
+  }
+
+  if (!o.sql && !process.stdin.isTTY) o.sql = fs.readFileSync(0, 'utf8');
   const { kind, keyword } = classify(o.sql);
   if (kind === 'write' && readonly) throw new UsageError(`连接「${name}」是只读的，拒绝执行 ${keyword.toUpperCase()}。需要写操作时请用户在 config.json 配置 "readonly": false 的连接并点名使用`);
   if (kind === 'write' && !o.write) throw new UsageError(`${keyword.toUpperCase()} 是写操作：先向用户说明影响并得到明确同意，再加 --write 执行`);
   const { sql, limited } = kind === 'read' ? addLimit(o.sql, o.limit) : { sql: o.sql.trim(), limited: false };
-  const timeoutMs = Math.round(o.timeout * 1000);
-  const cmd = buildCommand(conn, readonly, sql, timeoutMs, password(conn));
-  if (!cmd) { console.error(`不支持的 driver「${conn.driver}」：按 SKILL.md 用项目的 JDBC 驱动写临时查询类（conn.setReadOnly(true)）`); return 3; }
-  if (!onPath(cmd.bin)) { console.error(`本机没有 ${cmd.bin} 客户端：按 SKILL.md 改用 JDBC 临时查询类，或给出 SQL 让用户手动执行`); return 3; }
+  const r = execute(conn, readonly, sql, o.timeout);
+  if (r.code) { console.error(r.error); return r.code; }
 
-  const t0 = Date.now();
-  const r = spawnSync(cmd.bin, cmd.args, { encoding: 'utf8', env: { ...process.env, ...cmd.env }, timeout: timeoutMs + 5000, maxBuffer: 64 * 1024 * 1024 });
-  const elapsed = Date.now() - t0;
-  if (r.error?.code === 'ETIMEDOUT' || r.signal === 'SIGTERM') { console.error(`查询超时（${o.timeout}s），已终止。缩小范围或加索引条件后重试`); return 1; }
-  if (r.status !== 0) { console.error((r.stderr || r.stdout || '执行失败').trim()); return 1; }
-
-  let { columns, rows } = parseTsv(r.stdout);
+  let { columns, rows } = r;
   const truncated = limited && rows.length > o.limit;
   if (truncated) rows = rows.slice(0, o.limit);
   const extra = [...(cfg.mask_columns || []), ...(conn.mask_columns || [])].map((p) => new RegExp(p, 'i'));
   const maskIdx = o.mask ? columns.map((c, i) => (SECRET_COLS.test(c) || PII_COLS.test(c) || extra.some((re) => re.test(c)) ? i : -1)).filter((i) => i >= 0) : [];
   if (maskIdx.length) rows = rows.map((row) => row.map((v, i) => (maskIdx.includes(i) ? maskValue(columns[i], v) : v)));
   console.log(render(o.format, {
-    connection: name, readonly, sql, elapsed_ms: elapsed, columns, rows, truncated,
+    connection: name, readonly, sql, elapsed_ms: r.elapsed, columns, rows, truncated,
     limit_added: limited, limit: o.limit, masked: maskIdx.map((i) => columns[i]),
   }));
   return 0;
