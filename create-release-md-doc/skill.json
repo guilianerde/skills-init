@@ -2,6 +2,19 @@
   "name": "create-release-md-doc",
   "order": 7,
   "templates": [
-    { "id": "template.md", "src": "template.md", "title": "上线方案模板", "summary": "create-release-md-doc 生成上线方案时使用的 6 模块 Markdown 模板。" }
+    {
+      "id": "template.md",
+      "src": "template.md",
+      "title": "上线方案模板",
+      "summary": "create-release-md-doc 生成上线方案时使用的 6 模块 Markdown 模板。",
+      "lint": {
+        "requiredMeta": [
+          "自动生成",
+          "对比分支",
+          "diff 概览",
+          "模板来源"
+        ]
+      }
+    }
   ]
 }

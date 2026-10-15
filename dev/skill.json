@@ -2,6 +2,12 @@
   "name": "dev",
   "order": 2,
   "templates": [
-    { "id": "plan-template.md", "src": "references/plan-template.md", "title": "开发方案模板", "summary": "dev skill 在 M / L 规模需求中使用的开发方案模板。" }
+    {
+      "id": "plan-template.md",
+      "src": "references/plan-template.md",
+      "title": "开发方案模板",
+      "summary": "dev skill 在 M / L 规模需求中使用的开发方案模板。",
+      "lint": {}
+    }
   ]
 }

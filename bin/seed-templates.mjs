@@ -1,7 +1,16 @@
-// 把 skills-init 自带的文档模板导入 DocNexus（--seed-templates）。
-// 模板存为 docnexus/library/templates/<skill>/<文件名>，分类 doc-template；文档类 skill 优先从这里读取模板，
-// 之后模板随 DocNexus 知识库更新（每次变更都有 timeline）。已存在的模板一律不覆盖。
+// 把 skills-init 自带的文档模板导入 DocNexus（seed-templates），并跟踪导入时的版本。
+// 模板存为 docnexus/library/templates/<skill>/<文件名>，分类 doc-template；接入 DocNexus 后文档类 skill 只从这里读取模板，
+// 之后模板随 DocNexus 知识库更新（每次变更都有 timeline）。
+//
+// 导入记录（records）：{ "<库内路径>": { version, sha256 } }，保存在安装清单的 templates 字段，用来区分：
+//   current     知识库模板与当前默认模板一致
+//   outdated    知识库模板没被改过（仍是导入时的内容），但默认模板有新版 → seed-templates --update 可直接更新
+//   customized  知识库模板被团队改过，默认模板也有新版 → 需要人工对比合并（不自动改）
+//   edited      知识库模板被团队改过，默认模板没变 → 正常
+//   untracked   没有导入记录（本功能之前导入的），且内容与默认模板不同 → 无法判断，只提示
+//   missing     知识库里没有
 
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
@@ -13,53 +22,115 @@ export const TEMPLATES = deriveMeta(loadSkills(path.resolve(path.dirname(fileURL
 export { TEMPLATE_CATEGORY };
 
 const IS_WIN = process.platform === 'win32';
+const sha256 = (s) => crypto.createHash('sha256').update(s).digest('hex');
+const binPath = (root) => path.join(root, 'node_modules', '.bin', IS_WIN ? 'docnexus.cmd' : 'docnexus');
 
 function docnexus(root, args) {
-  const bin = path.join(root, 'node_modules', '.bin', IS_WIN ? 'docnexus.cmd' : 'docnexus');
-  const r = spawnSync(bin, args, { cwd: root, encoding: 'utf8', shell: IS_WIN });
+  const r = spawnSync(binPath(root), args, { cwd: root, encoding: 'utf8', shell: IS_WIN, maxBuffer: 64 * 1024 * 1024 });
   let json = null;
   try { json = JSON.parse(r.stdout); } catch { /* 非 JSON 输出 */ }
   return { ok: r.status === 0, json, err: (r.stderr || r.stdout || '').trim() };
 }
 
-// 返回 { seeded: [...], skipped: [...], failed: [{ file, error }] }；DocNexus 不可用时抛出带说明的错误
-export function seedTemplates(root, tplDir, { ok = console.log, warn = console.error } = {}) {
-  const bin = path.join(root, 'node_modules', '.bin', IS_WIN ? 'docnexus.cmd' : 'docnexus');
-  if (!fs.existsSync(path.join(root, 'docnexus', 'project.json')) || !fs.existsSync(bin)) {
+function requireDocNexus(root) {
+  if (!fs.existsSync(path.join(root, 'docnexus', 'project.json')) || !fs.existsSync(binPath(root))) {
     throw new Error('未检测到 DocNexus（需要 docnexus/project.json 与 node_modules/.bin/docnexus）。先加 --with-docnexus 接入，或在项目根执行 npx docnexus init。');
   }
-  const result = { seeded: [], skipped: [], failed: [] };
+}
+
+const libFile = (root, t) => path.join(root, 'docnexus', 'library', t.file);
+const defaultContent = (tplDir, t) => fs.readFileSync(path.join(tplDir, t.src), 'utf8');
+
+// 写草稿并提交；baseVersion 为 'new'（新建）或已有记录的 record_version（更新，带 --replace）。成功返回 null，失败返回错误信息
+function writeDraft(root, t, content, metadata, baseVersion) {
+  const draft = docnexus(root, ['draft', 'new', '--slug', `template-${t.skill}`]);
+  if (!draft.ok || !draft.json?.artifacts) return draft.err || 'draft new 失败';
+  const a = draft.json.artifacts;
+  fs.writeFileSync(path.join(root, a.source), content);
+  fs.writeFileSync(path.join(root, a.document), content);
+  fs.writeFileSync(path.join(root, a.metadata), JSON.stringify(metadata, null, 2) + '\n');
+  const seal = docnexus(root, ['draft', 'seal', '--id', draft.json.draft_id, '--file', t.file, '--base-version', baseVersion]);
+  const add = seal.ok ? docnexus(root, ['document', 'add', '--draft', draft.json.draft_id, ...(baseVersion === 'new' ? [] : ['--replace'])]) : seal;
+  if (add.ok) return null;
+  docnexus(root, ['draft', 'discard', '--id', draft.json.draft_id, '--force']);
+  return add.err || '提交失败';
+}
+
+const newMetadata = (t) => ({
+  title: t.title,
+  summary: t.summary,
+  category: TEMPLATE_CATEGORY,
+  category_reason: '供 skills-init 文档类 skill 读取的写作模板，与普通知识文档区分；模板随知识库更新。',
+  tags: ['skills-init-template', t.skill],
+  entities: [],
+  relationships: [],
+});
+
+// 导入缺失的模板。返回 { seeded, skipped, failed: [{ file, error }], records }；records 为本次导入的记录
+export function seedTemplates(root, tplDir, { ok = console.log, warn = console.error, version = '' } = {}) {
+  requireDocNexus(root);
+  const result = { seeded: [], skipped: [], failed: [], records: {} };
   for (const t of TEMPLATES) {
-    if (fs.existsSync(path.join(root, 'docnexus', 'library', t.file))) {
+    if (fs.existsSync(libFile(root, t))) {
       result.skipped.push(t.file);
       ok(`DocNexus 中已有 ${t.file}，保留不覆盖`);
       continue;
     }
-    const content = fs.readFileSync(path.join(tplDir, t.src), 'utf8');
-    const draft = docnexus(root, ['draft', 'new', '--slug', `template-${t.skill}`]);
-    if (!draft.ok || !draft.json?.artifacts) { result.failed.push({ file: t.file, error: draft.err }); warn(`导入 ${t.file} 失败：${draft.err}`); continue; }
-    const a = draft.json.artifacts;
-    fs.writeFileSync(path.join(root, a.source), content);
-    fs.writeFileSync(path.join(root, a.document), content);
-    fs.writeFileSync(path.join(root, a.metadata), JSON.stringify({
-      title: t.title,
-      summary: t.summary,
-      category: TEMPLATE_CATEGORY,
-      category_reason: '供 skills-init 文档类 skill 读取的写作模板，与普通知识文档区分；模板随知识库更新。',
-      tags: ['skills-init-template', t.skill],
-      entities: [],
-      relationships: [],
-    }, null, 2) + '\n');
-    const seal = docnexus(root, ['draft', 'seal', '--id', draft.json.draft_id, '--file', t.file, '--base-version', 'new']);
-    const add = seal.ok ? docnexus(root, ['document', 'add', '--draft', draft.json.draft_id]) : seal;
-    if (!add.ok) {
-      result.failed.push({ file: t.file, error: add.err });
-      warn(`导入 ${t.file} 失败：${add.err}`);
-      docnexus(root, ['draft', 'discard', '--id', draft.json.draft_id, '--force']);
-      continue;
-    }
+    const content = defaultContent(tplDir, t);
+    const err = writeDraft(root, t, content, newMetadata(t), 'new');
+    if (err) { result.failed.push({ file: t.file, error: err }); warn(`导入 ${t.file} 失败：${err}`); continue; }
     result.seeded.push(t.file);
+    result.records[t.file] = { version, sha256: sha256(content) };
     ok(`已导入 DocNexus：docnexus/library/${t.file}`);
   }
   return result;
 }
+
+// 只读文件，不调用 docnexus；records 来自安装清单
+export function templateStatus(root, tplDir, records = {}) {
+  return TEMPLATES.map((t) => {
+    if (!fs.existsSync(libFile(root, t))) return { file: t.file, status: 'missing', seededFrom: null, defaultPath: t.src };
+    const def = sha256(defaultContent(tplDir, t));
+    const lib = sha256(fs.readFileSync(libFile(root, t), 'utf8'));
+    const rec = records[t.file];
+    let status;
+    if (lib === def) status = 'current';
+    else if (!rec) status = 'untracked';
+    else if (lib === rec.sha256) status = 'outdated';
+    else status = rec.sha256 === def ? 'edited' : 'customized';
+    return { file: t.file, status, seededFrom: rec?.version ?? null, defaultPath: t.src };
+  });
+}
+
+// 把 outdated 的模板更新为当前默认模板（保留库中已有的元数据）。返回 { updated, failed, records }
+export function updateTemplates(root, tplDir, records = {}, { ok = console.log, warn = console.error, version = '' } = {}) {
+  requireDocNexus(root);
+  const result = { updated: [], failed: [], records: {} };
+  const targets = templateStatus(root, tplDir, records).filter((s) => s.status === 'outdated');
+  if (!targets.length) { ok('没有可自动更新的模板（只更新导入后未被改动、且默认模板有新版的）'); return result; }
+  const q = docnexus(root, ['document', 'query', '--all', '--category', TEMPLATE_CATEGORY]);
+  if (!q.ok) throw new Error(`document query 失败：${q.err}`);
+  for (const s of targets) {
+    const t = TEMPLATES.find((x) => x.file === s.file);
+    const doc = (q.json?.documents ?? []).find((d) => d.file_path === t.file);
+    if (!doc) { result.failed.push({ file: t.file, error: '知识库中找不到对应记录' }); warn(`更新 ${t.file} 失败：知识库中找不到对应记录`); continue; }
+    const got = docnexus(root, ['document', 'get', '--id', doc.id, '--include', 'metadata']);
+    const metadata = got.ok && got.json?.metadata ? got.json.metadata : newMetadata(t);
+    const content = defaultContent(tplDir, t);
+    const err = writeDraft(root, t, content, metadata, got.json?.record_version ?? doc.record_version);
+    if (err) { result.failed.push({ file: t.file, error: err }); warn(`更新 ${t.file} 失败：${err}`); continue; }
+    result.updated.push(t.file);
+    result.records[t.file] = { version, sha256: sha256(content) };
+    ok(`已更新 DocNexus 模板：docnexus/library/${t.file}（原导入自 ${s.seededFrom || '未知版本'}）`);
+  }
+  return result;
+}
+
+export const STATUS_TEXT = {
+  current: '与默认模板一致',
+  outdated: '默认模板有新版，库中模板未改动：运行 skills-init seed-templates --update 更新',
+  customized: '团队改过，默认模板也有新版：对比默认模板手动合并',
+  edited: '团队改过（默认模板无变化）',
+  untracked: '没有导入记录，内容与默认模板不同：如需采用新默认模板请手动对比',
+  missing: '知识库中缺失：运行 skills-init seed-templates 导入',
+};

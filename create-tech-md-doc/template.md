@@ -184,7 +184,7 @@ table_name：
 - 配置项变更 → 是否需要灰度/回滚方案
 {{#if prd_context}}
 
-### 8.x PRD 对齐缺口（来源 PRD 校验，Step 2b）
+### 8.x PRD 对齐缺口（如有 PRD，Step 2b 校验）
 
 ⚠️ **对齐缺口**（PRD 提及但 diff 未实现，请核对是否漏实现/在别的分支）：
 {{#each alignment_gaps}}

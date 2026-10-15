@@ -65,7 +65,8 @@ wiki GATE：读 `md-to-wiki/wiki-config.json`，`enabled` 非 `true` 或 `wiki.b
 
 - 路径：`docs/skills/create-tech-md-doc/tech-doc_<dev分支安全名>_<YYYYMMDD>.md`（分支名 `/` → `-`；目录不存在先创建）。
 - 同路径已存在 → 加 `_v2`、`_v3`，不覆盖。
-- 写完回读前 30 行确认格式，再把路径和摘要告诉用户。
+- 写完运行 `node <skills>/workflow/scripts/lint-doc.mjs <文档路径> --skill create-tech-md-doc` 自检：有「错误」先修正再交付（缺必填章节、残留 `{{...}}` 占位符、缺元信息行）；「警告」按实际情况处理；「提示」里的待填写位置在交付摘要中告诉用户。
+- 再把路径和摘要告诉用户。
 
 ### Step 5 — 后续（都需要用户同意）
 

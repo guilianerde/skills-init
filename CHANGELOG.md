@@ -4,6 +4,11 @@
 
 ## [Unreleased]
 
+### 新增
+- `workflow/scripts/lint-doc.mjs`：对照当前生效的模板检查生成的文档（必填章节、残留占位符、元信息行、待填写位置），文档类 skill 与 dev 的 L 规模方案交付前运行。
+- `resolve.mjs infer-profile`：按固定规则从构建文件、Makefile、依赖与配置文件、git 推断项目画像草稿，每个字段附依据。
+- DocNexus 模板版本跟踪：导入记录（版本 + sha256）保存在安装清单；`doctor` / `upgrade` 区分「默认模板有新版且库中未改动」与「团队改过」；`seed-templates --update` 只更新前者。
+
 ## [0.3.0] - 2026-10-15
 
 ### 新增

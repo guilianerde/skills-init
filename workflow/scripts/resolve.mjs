@@ -6,12 +6,14 @@
 //   node .agents/skills/workflow/scripts/resolve.mjs template <skill> <文件名>   # 该用哪份模板
 //   node .agents/skills/workflow/scripts/resolve.mjs templates                   # 所有模板的来源
 //   node .agents/skills/workflow/scripts/resolve.mjs profile                     # 项目画像与空字段
+//   node .agents/skills/workflow/scripts/resolve.mjs infer-profile               # 从仓库推断画像草稿（带依据，不写文件）
 //   node .agents/skills/workflow/scripts/resolve.mjs status                      # 能力探测（/workflow status）
 // 输出 JSON。退出码：0 正常；2 已接入 DocNexus 但知识库缺该模板（按输出的 hint 处理）；1 参数错误
 
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { inferProfile } from './infer-profile.mjs';
 
 const SKILLS_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const PROFILE_FIELDS = ['main_branch', 'build', 'test', 'test_single', 'lint', 'config_center', 'deploy.platform', 'deploy.regions', 'job_annotation'];
@@ -29,13 +31,15 @@ function skillMetas() {
   return out;
 }
 
+export const skillMeta = (name) => skillMetas().find((m) => m.name === name);
+
 export function docnexusConnected(root) {
   const bin = path.join(root, 'node_modules', '.bin', process.platform === 'win32' ? 'docnexus.cmd' : 'docnexus');
   return fs.existsSync(path.join(root, 'docnexus', 'project.json')) && fs.existsSync(bin);
 }
 
 export function resolveTemplate(root, skill, id) {
-  const meta = skillMetas().find((m) => m.name === skill);
+  const meta = skillMeta(skill);
   const t = meta?.templates.find((x) => x.id === id);
   if (!t) return { ok: false, error: 'unknown', message: `skill「${skill}」没有登记模板「${id}」（见 ${skill}/skill.json 的 templates）` };
   const lib = path.join(root, 'docnexus', 'library', 'templates', skill, id);
@@ -112,9 +116,10 @@ function main(argv) {
     }
     case 'templates': print(status(root).templates); return 0;
     case 'profile': print(readProfile(root)); return 0;
+    case 'infer-profile': print({ current: readProfile(root).profile, ...inferProfile(root) }); return 0;
     case 'status': print(status(root)); return 0;
   }
-  console.error('用法: resolve.mjs [--root <项目根>] template <skill> <文件名> | templates | profile | status');
+  console.error('用法: resolve.mjs [--root <项目根>] template <skill> <文件名> | templates | profile | infer-profile | status');
   return 1;
 }
 

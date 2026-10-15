@@ -20,7 +20,7 @@ import path from 'node:path';
 import readline from 'node:readline';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { seedTemplates } from './seed-templates.mjs';
+import { seedTemplates, updateTemplates, templateStatus, STATUS_TEXT } from './seed-templates.mjs';
 import { loadSkills, deriveMeta } from './skills.mjs';
 
 const TPL_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -36,7 +36,6 @@ const SKILLS = META.skills;
 const USER_FILES = META.userFiles;
 // 改过名的 skill：旧名 -> 新名。升级时只清理能确认是本项目安装的旧目录 / 链接（按 SKILL.md 签名判断）
 const RENAMED = META.renamed;
-const TEMPLATES = META.templates;
 const DOCNEXUS_PKG = process.env.DOCNEXUS_PKG || '@rowansenne/docnexus';
 const MANIFEST = '.skills-init.json'; // 安装清单，位于每个安装目录（单一来源时只有 .agents/skills 一份）
 
@@ -66,6 +65,8 @@ init 选项：
   --copy               不用软链接，各环境独立拷贝
   --seed-templates     安装后把文档模板导入 DocNexus；接入 DocNexus 后文档类 skill 只从知识库取模板
   --uninstall          同 uninstall 命令
+seed-templates 选项：
+  --update             同时把「导入后未改动、但默认模板有新版」的知识库模板更新为新版
 doctor 选项：
   --offline            不测试数据库连通性
 通用：
@@ -74,7 +75,7 @@ doctor 选项：
   -h, --help           显示帮助`;
 
 function parseArgs(argv) {
-  const o = { cmd: 'init', envs: '', skipDb: false, yes: false, withDocNexus: false, copy: false, seedTemplates: false, offline: false, root: process.cwd() };
+  const o = { cmd: 'init', envs: '', skipDb: false, yes: false, withDocNexus: false, copy: false, seedTemplates: false, update: false, offline: false, root: process.cwd() };
   let cmdGiven = false; // 命令可以出现在选项之间（封装脚本会先传 --project-root）
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
@@ -88,6 +89,7 @@ function parseArgs(argv) {
       case '--seed-templates': o.seedTemplates = true; break;
       case '--uninstall': o.cmd = 'uninstall'; cmdGiven = true; break;
       case '--offline': o.offline = true; break;
+      case '--update': o.update = true; break;
       case '--project-root': o.root = path.resolve(val()); break;
       case '-v': case '--version': console.log(PKG.version); process.exit(0); break;
       case '-h': case '--help': console.log(HELP); process.exit(0); break;
@@ -288,7 +290,7 @@ function pruneSkill(base, skill, prevSkill, entry, root) {
 // ctx: { root, yes, envs, mode }
 async function installSkills(base, db, ctx) {
   const prev = readManifest(base);
-  const manifest = { installer: PKG.name, version: PKG.version, installedAt: new Date().toISOString(), envs: ctx.envs, mode: ctx.mode, skills: {} };
+  const manifest = { installer: PKG.name, version: PKG.version, installedAt: new Date().toISOString(), envs: ctx.envs, mode: ctx.mode, skills: {}, templates: prev?.templates ?? {} };
   for (const skill of SKILLS) {
     const srcDir = path.join(TPL_DIR, skill);
     const dstDir = path.join(base, skill);
@@ -717,8 +719,7 @@ function doctor(root, offline) {
     if (st.profile.ok) ok('项目画像已填写'); else meh(`项目画像未完成（空字段：${st.profile.empty.join('、')}）：运行 /workflow profile`);
     if (st.wiki.ok) ok('wiki 已配置'); else console.log('    --  wiki 未配置（可选；也可能通过 wiki MCP 提供）');
     if (st.docnexus.ok) {
-      if (st.docnexus.missing_templates.length) meh(`DocNexus 缺模板：${st.docnexus.missing_templates.join('、')}：运行 skills-init seed-templates`);
-      else ok('DocNexus 已接入，文档模板齐全');
+      if (!reportTemplateStatus(root, meh)) ok('DocNexus 已接入，文档模板齐全且与默认模板同步（或为团队定制版）');
       for (const f of st.docnexus.stale_project_templates) meh(`${f} 在接入 DocNexus 后已不再生效，建议删除`);
     } else console.log('    --  DocNexus 未接入（可选）');
     if (!st.database.ok) console.log('    --  数据库未配置（可选）');
@@ -748,6 +749,22 @@ function doctor(root, offline) {
   return errors.length ? 1 : 0;
 }
 
+// ---------------------------------------------------------------- 7. DocNexus 模板导入记录（存于安装清单 templates 字段）
+function templateRecords(root) { return findManifests(root)[0]?.m.templates ?? {}; }
+function saveTemplateRecords(root, recs) {
+  if (!Object.keys(recs).length) return;
+  const found = findManifests(root)[0];
+  if (!found) return; // 没有安装清单（只单独跑了 seed-templates）：无处记录，之后 doctor 显示为 untracked
+  found.m.templates = { ...(found.m.templates ?? {}), ...recs };
+  writeFile(path.join(found.base, MANIFEST), JSON.stringify(found.m, null, 2) + '\n');
+}
+// 打印需要关注的模板状态，返回是否有需要处理的
+function reportTemplateStatus(root, say = warn) {
+  const list = templateStatus(root, TPL_DIR, templateRecords(root)).filter((s) => !['current', 'edited'].includes(s.status));
+  for (const s of list) say(`DocNexus 模板 ${s.file}：${STATUS_TEXT[s.status]}${s.status === 'customized' || s.status === 'untracked' ? `（默认模板：${s.defaultPath}）` : ''}`);
+  return list.length > 0;
+}
+
 // ================================================================= main
 async function main() {
   let o = parseArgs(process.argv.slice(2));
@@ -755,7 +772,19 @@ async function main() {
   if (o.cmd === 'doctor') return doctor(o.root, o.offline);
   if (o.cmd === 'seed-templates') {
     step('导入文档模板到 DocNexus');
-    try { return seedTemplates(o.root, TPL_DIR, { ok, warn }).failed.length ? 1 : 0; } catch (e) { warn(e.message); return 1; }
+    try {
+      const r = seedTemplates(o.root, TPL_DIR, { ok, warn, version: PKG.version });
+      saveTemplateRecords(o.root, r.records);
+      let failed = r.failed.length;
+      if (o.update) {
+        step('更新导入后未改动的模板（--update）');
+        const u = updateTemplates(o.root, TPL_DIR, templateRecords(o.root), { ok, warn, version: PKG.version });
+        saveTemplateRecords(o.root, u.records);
+        failed += u.failed.length;
+      }
+      reportTemplateStatus(o.root);
+      return failed ? 1 : 0;
+    } catch (e) { warn(e.message); return 1; }
   }
   if (o.cmd === 'upgrade') o = upgradeOptions(o);
   if (o.withDocNexus) { step('检查 DocNexus 依赖'); checkNodeForDocNexus(); }
@@ -808,7 +837,8 @@ async function main() {
   if ((o.seedTemplates || o.withDocNexus) && docnexus !== 'failed') {
     step('导入文档模板到 DocNexus（--seed-templates）');
     try {
-      const r = seedTemplates(o.root, TPL_DIR, { ok, warn });
+      const r = seedTemplates(o.root, TPL_DIR, { ok, warn, version: PKG.version });
+      saveTemplateRecords(o.root, r.records);
       seedFailed = r.failed.length > 0;
     } catch (e) { warn(e.message); seedFailed = true; }
   }
@@ -824,11 +854,8 @@ async function main() {
   warn('注意：md-to-wiki 的 wiki 连接（wiki-config.json）默认留空（enabled=false），未配置前 md-to-wiki 与 create-*-md-doc 的 --prd 增强不启动。');
   warn('        启用方法：填写 .agents/skills/md-to-wiki/wiki-config.json（enabled: true + base_url + api_token），或接入对应环境的 wiki MCP。重跑不会覆盖已填写的配置。');
   if (docnexus === 'ok') ok('DocNexus 已接入：dev / project-review 会按 docnexus-recall 查项目约定；文档类 skill 只从 docnexus/library/templates/ 取模板；任何写入 DocNexus 的操作都需你授权。');
-  // 已接入 DocNexus 但知识库缺模板时，文档类 skill 会停下来要求导入，这里提前提示
-  if (fs.existsSync(path.join(o.root, 'docnexus', 'project.json'))) {
-    const missing = TEMPLATES.filter((t) => !fs.existsSync(path.join(o.root, 'docnexus', 'library', t.file))).map((t) => t.file);
-    if (missing.length) warn(`注意：DocNexus 中缺少模板 ${missing.join('、')}；接入 DocNexus 后不再使用默认模板，运行 skills-init seed-templates 导入。`);
-  }
+  // 已接入 DocNexus：缺模板时文档类 skill 会停下来要求导入；默认模板有新版时提示更新或合并
+  if (fs.existsSync(path.join(o.root, 'docnexus', 'project.json'))) reportTemplateStatus(o.root);
   if (docnexus === 'failed') warn('注意：DocNexus 接入失败（见上方输出），其他 skills 不受影响；修复后可重跑（加 --with-docnexus）。');
   if (report.asNew.length) {
     warn('以下文件被手动修改过，已保留你的版本，新模板另存为同目录的 <文件名>.new（对比合并后删除 .new，或用新模板覆盖原文件）：');

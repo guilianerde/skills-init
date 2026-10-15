@@ -65,7 +65,7 @@ dev（需求 → 方案 → 实现 → 测试 → 自审）
 
 由 `/workflow profile` 触发，或其他 skill 首次需要某个字段但它为空时触发：
 
-1. 从仓库推断：`pom.xml` / `build.gradle`、`package.json` scripts、`go.mod`、`pyproject.toml`、`Makefile`、CI 配置（`.github/workflows`、`.gitlab-ci.yml`）、配置文件中的配置中心依赖（如 `spring-cloud-starter-alibaba-nacos-config`、`apollo-client`）、`CLAUDE.md` / `AGENTS.md` 的约定、`git symbolic-ref refs/remotes/origin/HEAD`。
+1. 运行 `node <skills>/workflow/scripts/resolve.mjs infer-profile`：按固定规则从构建文件、Makefile、依赖与配置文件、`git symbolic-ref refs/remotes/origin/HEAD` 推断草稿，`evidence` 给出每个字段的依据，`unknown` 是推断不出的字段。脚本覆盖不到的约定再补读 `CLAUDE.md` / `AGENTS.md`、CI 配置。
 2. 推断不出的字段（发布平台、Region、是否数据评审）问用户；用户不知道就留空，**不要沿用其他项目的取值**。
 3. 把拟写入的完整 JSON 给用户确认，确认后再写入；未确认则只在本次对话中使用。
 4. 只改用户确认的字段，保留其他已有字段。

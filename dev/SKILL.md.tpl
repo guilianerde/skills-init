@@ -56,7 +56,7 @@ description: "Implement a feature or fix a bug in this project end to end: under
 | **M** | 新增或修改接口、配置项、少量表字段 | 在对话中给出简要方案（方案模板的精简版），**等用户确认后再写代码** |
 | **L** | 新模块、跨服务、表结构较大变更、数据迁移 | 按方案模板写方案文档落盘（见 Artifact Location），用户确认后再写代码；完成后建议用 `create-tech-md-doc` 生成正式技术方案 |
 
-规模拿不准时按大一级处理。方案模板：在项目根运行 `node <skills>/workflow/scripts/resolve.mjs template dev plan-template.md`，读输出的 `path`；退出码 2（已接入 DocNexus 但缺模板）时停下并按 `hint` 处理。
+规模拿不准时按大一级处理。方案模板：在项目根运行 `node <skills>/workflow/scripts/resolve.mjs template dev plan-template.md`，读输出的 `path`；退出码 2（已接入 DocNexus 但缺模板）时停下并按 `hint` 处理。L 规模的方案文档落盘后运行 `node <skills>/workflow/scripts/lint-doc.mjs <方案路径> --skill dev` 自检，再请用户确认。
 
 ### F4 — 实现
 
