@@ -6,7 +6,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { classify, addLimit, maskValue, stripSql } from '../database-query/scripts/query.mjs';
+import { classify, addLimit, maskValue, stripSql, schemaSql, schemaMarkdown, mergeSchema } from '../database-query/scripts/query.mjs';
 
 const SCRIPT = fileURLToPath(new URL('../database-query/scripts/query.mjs', import.meta.url));
 const skip = process.platform === 'win32' ? '假客户端用 shebang 脚本实现，Windows 跳过' : false;
@@ -131,5 +131,57 @@ test('只读拦截、写操作需 --write、未知连接、缺密码、不支持
   assert.equal(r.status, 1); assert.match(r.stderr, /Access denied/);
   r = run(['--list']);
   assert.equal(r.status, 0); assert.match(r.stdout, /dev（默认）/); assert.doesNotMatch(r.stdout, /inline-secret/);
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test('schema：SQL 按 driver 生成、表名过滤、Markdown 与标记合并', () => {
+  assert.match(schemaSql('mysql', []), /TABLE_SCHEMA = DATABASE\(\)/);
+  assert.match(schemaSql('mysql', ['users', 'orders']), /TABLE_NAME IN \('users', 'orders'\)/);
+  assert.match(schemaSql('postgresql', ['users']), /current_schema\(\)[\s\S]*table_name IN \('users'\)/);
+  const md = schemaMarkdown('dev', { database: 'app' }, [
+    ['users', 'id', 'bigint', 'NO', 'PRI', 'NULL', '主键', '用户表'],
+    ['users', 'name', 'varchar(64)', 'YES', '', '', 'a|b', '用户表'],
+    ['orders', 'id', 'bigint', 'NO', 'PRI', '', '', ''],
+  ]);
+  assert.match(md, /^<!-- schema:begin -->/);
+  assert.match(md, /共 2 张表：`users`、`orders`/);
+  assert.match(md, /### users — 用户表/);
+  assert.match(md, /\| id \| bigint \| 否 \| PRI \|  \| 主键 \|/);
+  assert.match(md, /a\\\|b/);
+  assert.match(md, /<!-- schema:end -->$/);
+  const tpl = '# Schema\n\n## 关键表结构\n\n<!-- schema:begin -->\n旧内容\n<!-- schema:end -->\n\n## 补充说明\n\n手写说明\n';
+  const merged = mergeSchema(tpl, md);
+  assert.doesNotMatch(merged, /旧内容/);
+  assert.match(merged, /手写说明/);
+  assert.equal(merged.match(/schema:begin/g).length, 1);
+  assert.match(mergeSchema('# 用户自己写的\n', md), /# 用户自己写的\n\n## 表结构（自动导出）\n\n<!-- schema:begin -->/);
+});
+
+// 假客户端输出 information_schema 风格的列结果
+const FAKE_SCHEMA = `#!/usr/bin/env node
+const fs = require('fs');
+fs.writeFileSync(process.env.FAKE_LOG, JSON.stringify({ args: process.argv.slice(2), PGOPTIONS: process.env.PGOPTIONS }));
+process.stdout.write('TABLE_NAME\\tCOLUMN_NAME\\tCOLUMN_TYPE\\tIS_NULLABLE\\tCOLUMN_KEY\\tCOLUMN_DEFAULT\\tCOLUMN_COMMENT\\tTABLE_COMMENT\\nusers\\tid\\tbigint\\tNO\\tPRI\\tNULL\\t主键\\t用户表\\n');
+`;
+
+test('CLI --schema：可写连接也按只读会话执行；--write 写入 schema.md 标记之间', { skip }, () => {
+  const { dir, run } = setup(CFG);
+  fs.writeFileSync(path.join(dir, 'bin', 'mysql'), FAKE_SCHEMA, { mode: 0o755 });
+  let r = run(['--conn', 'rw', '--schema', '--tables', 'users'], { T_DEV_PWD: 'x' });
+  assert.equal(r.status, 0, r.stderr);
+  assert.ok(r.call.args.includes('--init-command=SET SESSION TRANSACTION READ ONLY'));
+  assert.match(r.call.args.at(-1), /TABLE_NAME IN \('users'\)/);
+  assert.match(r.stdout, /### users — 用户表/);
+  assert.ok(!fs.existsSync(path.join(dir, 'database-query/references/schema.md')));
+  r = run(['--schema', '--tables', 'users;drop'], { T_DEV_PWD: 'x' });
+  assert.equal(r.status, 2); assert.match(r.stderr, /表名不合法/);
+  const f = path.join(dir, 'database-query/references/schema.md');
+  fs.mkdirSync(path.dirname(f), { recursive: true });
+  fs.writeFileSync(f, '# Schema\n<!-- schema:begin -->\n<!-- schema:end -->\n## 补充说明\n订单表按月分表\n');
+  r = run(['--schema', '--write'], { T_DEV_PWD: 'x' });
+  assert.equal(r.status, 0, r.stderr);
+  const out = fs.readFileSync(f, 'utf8');
+  assert.match(out, /\| id \| bigint \| 否 \| PRI \|/);
+  assert.match(out, /订单表按月分表/);
   fs.rmSync(dir, { recursive: true, force: true });
 });

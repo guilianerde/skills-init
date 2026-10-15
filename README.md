@@ -291,7 +291,11 @@ npx @rowansenne/skills-init doctor
 | `workflow/scripts/resolve.mjs template <skill> <文件名>` | 判定用哪份模板：已接入 DocNexus 只用知识库，缺失时退出码 2 并给出导入来源；未接入时项目文件优先，其次默认模板 |
 | `workflow/scripts/resolve.mjs profile` | 读项目画像，列出空字段 |
 | `workflow/scripts/resolve.mjs status` | `/workflow status` 的能力探测（不输出任何凭据） |
+| `workflow/scripts/resolve.mjs infer-profile` | 按固定规则从构建文件、Makefile、依赖与配置文件、git 推断项目画像草稿，每个字段附依据；不写文件 |
+| `workflow/scripts/lint-doc.mjs <文档> --skill <skill>` | 对照当前生效的模板检查生成的文档：必填章节、残留 `{{...}}` 占位符、元信息行为错误；缺普通章节、顺序不一致为警告；列出待填写位置 |
 | `database-query/scripts/query.mjs` | 执行 SQL：选连接、取密码（只通过环境变量传给客户端）、会话层只读、拦截写语句和多语句、自动补 LIMIT、超时、脱敏敏感列；支持 mysql / psql 客户端，其他 driver 退回 JDBC |
+| `database-query/scripts/query.mjs --schema [--tables a,b] [--write]` | 按只读会话导出表结构为 Markdown；`--write` 写入 `references/schema.md` 的 `schema:begin` / `schema:end` 之间，标记外的补充说明保留 |
+| `md-to-wiki/scripts/upload.mjs info / put` | REST 上传通道：`info` 读页面标题与版本给用户确认；`put --expect-version <n>` 先校验 XHTML 良构，版本对不上就拒绝上传，上传后确认版本 +1 |
 
 ## 测试
 
@@ -300,7 +304,7 @@ npm test                                  # bash 黑盒测试 + 全部 node 测�
 node --test "tests/*.mjs"                 # 只跑 node 测试（三个平台都能跑）
 ```
 
-node 测试覆盖：skill.json 一致性、子命令（upgrade / doctor / seed-templates / uninstall）、`resolve.mjs`、`query.mjs`（用假的 mysql / psql 客户端）、md-to-wiki 转换、DocNexus 模板导入（用假的 docnexus CLI）。
+node 测试覆盖：skill.json 一致性、子命令（upgrade / doctor / seed-templates / uninstall）、`resolve.mjs` 与画像推断、`lint-doc.mjs`、`query.mjs` 与表结构导出（用假的 mysql / psql 客户端）、md-to-wiki 转换与上传（用本地假 Confluence 服务）、DocNexus 模板导入与版本跟踪（用假的 docnexus CLI）。
 
 `tests/test-init-skills.*` 是两个安装脚本的黑盒测试：每个用例在临时目录放一份 skills-init 副本，执行安装后检查生成的目录、软链接和配置文件。
 
@@ -431,13 +435,13 @@ skills-init/
 │   └── references/checklist.md.tpl
 ├── database-query/
 │   ├── SKILL.md.tpl · skill.json
-│   ├── scripts/query.mjs              # 只读查询执行脚本
+│   ├── scripts/query.mjs              # 只读查询执行与表结构导出
 │   └── references/                    # config.example.json、schema.md.tpl
 ├── md-to-wiki/
 │   ├── SKILL.md.tpl · skill.json
 │   ├── wiki-config.json.tpl
 │   ├── references/                    # upload.md（上传通道）、troubleshooting.md（脚本与排错）
-│   └── scripts/md-to-wiki.mjs
+│   └── scripts/                       # md-to-wiki.mjs（转换 + 良构校验）、upload.mjs（REST 上传）
 ├── create-tech-md-doc/
 │   ├── SKILL.md.tpl · skill.json
 │   ├── references/                    # diff-collection.md（分层采集）、prd.md（PRD 拉取）

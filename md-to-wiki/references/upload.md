@@ -19,31 +19,19 @@
 
 4. 验证：再次 `get_page`，确认 `version.number` 已 +1。
 
-## 通道 B — Confluence REST API
+## 通道 B — Confluence REST API（脚本）
 
-环境没有 wiki MCP 工具、但 `wiki-config.json` 已填 `base_url` / `api_token` 时，用 Node（≥ 18 自带 `fetch`）写一个临时脚本调用，token 在脚本里从 `wiki-config.json` 读取：
+环境没有 wiki MCP 工具、但 `wiki-config.json` 已填 `base_url` / `api_token` 时，用本 skill 的 `scripts/upload.mjs`，不要自己拼 curl / fetch：
 
-```
-GET {base_url}/rest/api/content/{pageId}?expand=version,space
-Authorization: Bearer {api_token}
-```
-
-```
-PUT {base_url}/rest/api/content/{pageId}?expand=version
-Authorization: Bearer {api_token}
-Content-Type: application/json
-
-{
-  "id": "{pageId}", "type": "page",
-  "title": "<标题>",
-  "space": {"key": "<GET 结果中的 space.key>"},
-  "version": {"number": <当前 version.number + 1>},
-  "body": {"storage": {"value": "<XHTML 全文>", "representation": "storage"}}
-}
+```bash
+node <skillDir>/scripts/upload.mjs info <pageId|url>
+node <skillDir>/scripts/upload.mjs put <html> <pageId|url> --expect-version <n> [--title <标题>]
 ```
 
-- token 从 `wiki-config.json` 读取，不要在对话、日志或命令行参数中明文输出。
-- 失败时如实报告 HTTP 状态码与响应体，不要假装成功。401 / 403 → 凭据或权限问题，停。
+1. `info`：只读，输出 `title`、`version`、`space`、`url`。把这些告诉用户，确认要覆盖这一页。
+2. `put`：`--expect-version` 填用户确认时看到的版本号。脚本会先校验 XHTML 良构（不良构退出码 3）。如果页面当前版本不是这个号，说明有人刚改过，脚本会拒绝上传（退出码 1），这时重新 `info` 并再次确认。上传后脚本会重新读取页面，确认版本号变成 n+1，并输出新的版本号和链接。
+3. 认证：`wiki.username` 非空时用 Basic（Confluence Cloud：邮箱 + API token），为空时用 Bearer（Server / DC 的个人访问令牌）。token 只在请求头里使用，不会出现在输出里。
+4. 失败时脚本输出 HTTP 状态码和响应体，如实告诉用户。401 / 403 是凭据或权限问题，直接停下，不要重试。
 
 ## 验证与反馈
 

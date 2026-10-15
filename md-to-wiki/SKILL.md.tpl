@@ -40,7 +40,7 @@ description: "Publish a local Markdown document to an existing Confluence wiki p
 2. `<mdPath>` 存在。
 3. 解析 pageId；URL 中提取不出 → 请用户重新提供，**不要猜**。
 4. 选择上传通道：环境有 wiki MCP 工具 → 通道 A；否则用 `wiki-config.json` 的 REST 参数 → 通道 B；都不可用 → 停。
-5. 读取目标页面当前的标题、版本号（细节见 `references/upload.md`）；页面不存在或无权限 → 停。
+5. 读取目标页面当前的标题、版本号：通道 A 用 MCP 的 `get_page`，通道 B 用 `node <skillDir>/scripts/upload.mjs info <pageId|url>`（细节见 `references/upload.md`）。页面不存在或无权限 → 停。
 6. 本机有 Node.js（≥ 18）；转换脚本不依赖任何第三方库。
 
 ### Step 1 — 转换并校验
@@ -54,8 +54,8 @@ node <skillDir>/scripts/md-to-wiki.mjs <mdPath> tmp/skills/md-to-wiki/_wiki_uplo
 ### Step 2 — 确认后上传
 
 1. 上传会**覆盖**目标页面正文。先告诉用户：目标页面标题、URL、当前版本号，得到确认后再上传。
-2. 按通道 A / B 上传，带上读到的版本号防止覆盖他人并发修改（请求格式见 `references/upload.md`）。
-3. 重新读取页面，确认版本号 +1；回复用户页面标题、URL、新版本号。
+2. 按通道上传，带上用户确认过的版本号，避免覆盖他人刚做的修改：通道 A 见 `references/upload.md`；通道 B 运行 `node <skillDir>/scripts/upload.mjs put <html> <pageId|url> --expect-version <确认的版本号> [--title <标题>]`，脚本会校验良构、核对版本，并在上传后确认版本号 +1。
+3. 确认版本号 +1 后，回复用户页面标题、URL、新版本号。
 
 ## Red Flags — STOP
 
