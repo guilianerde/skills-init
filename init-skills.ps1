@@ -41,13 +41,9 @@ $TplDir     = $ScriptDir
 $envNames   = @('codex','claude','doubao','qwen')
 $CanonDir   = '.agents\skills'   # 单一来源目录
 $SkillNames = @('workflow','dev','code-review','database-query','md-to-wiki','create-tech-md-doc','create-release-md-doc')
-# 各 skill 内的用户配置（相对 skill 目录），迁移旧的独立拷贝时需要保留；值为对应空模板（无则为 $null）
-$UserFiles  = [ordered]@{
-  'database-query\config.json'          = $null
-  'database-query\references\schema.md' = $null
-  'md-to-wiki\wiki-config.json'         = 'md-to-wiki\wiki-config.json.tpl'
-  'workflow\profile.json'               = 'workflow\profile.json.tpl'
-}
+# 各 skill 内的用户配置（相对 skills 目录），迁移旧的独立拷贝时需要保留
+$UserFiles  = @('database-query\config.json', 'database-query\references\schema.md',
+                'md-to-wiki\wiki-config.json', 'workflow\profile.json')
 # DocNexus 安装来源：默认 npm 包；可用环境变量 DOCNEXUS_PKG 指向本地 tarball / 目录（离线或测试用）
 $DocNexusPkg = if ($env:DOCNEXUS_PKG) { $env:DOCNEXUS_PKG } else { '@rowansenne/docnexus' }
 
@@ -182,7 +178,8 @@ function Install-Skills([string]$targetBase, $dbConfig) {
     $jsonMap = @{}
     foreach ($k in $dbConfig.Keys) {
       $v = [string]$dbConfig[$k]
-      $jsonMap[$k] = if ($k -eq 'port') { $v } else { (ConvertTo-Json $v -Compress).Trim('"') }
+      # 只去掉首尾各一个引号：Trim('"') 会把值末尾转义后的 \" 一并削掉
+      $jsonMap[$k] = if ($k -eq 'port') { $v } else { $j = ConvertTo-Json $v -Compress; $j.Substring(1, $j.Length - 2) }
     }
     Render-Template 'database-query\config.json.tpl'         "$targetBase\database-query\config.json" $jsonMap
     if (Test-Path -LiteralPath "$targetBase\database-query\references\schema.md") {
@@ -233,36 +230,49 @@ function Test-SameFile([string]$a, [string]$b) {
   return (Get-FileHash -LiteralPath $a).Hash -eq (Get-FileHash -LiteralPath $b).Hash
 }
 
+function Test-ProfileFilled([string]$path) {
+  # 画像里有任一非空字符串值 = 填写过（新旧版本的空模板字段不同，不能按模板逐字比较）；解析失败按填写过处理
+  try {
+    $p = Get-Content -LiteralPath $path -Raw | ConvertFrom-Json
+    return @($p.PSObject.Properties | Where-Object { $_.Value -is [string] -and $_.Value -ne '' }).Count -gt 0
+  } catch { return $true }
+}
+
+function Test-BlankUserFile([string]$rel, [string]$path) {
+  # 判断用户配置是否还没被填写过（空模板）
+  switch ($rel) {
+    'md-to-wiki\wiki-config.json' {
+      # 忽略换行符差异：git 在 Windows 上可能把模板检出为 CRLF
+      $a = [IO.File]::ReadAllText($path).Replace("`r", '')
+      $b = [IO.File]::ReadAllText((Join-Path $TplDir 'md-to-wiki\wiki-config.json.tpl')).Replace("`r", '')
+      return $a -ceq $b
+    }
+    'workflow\profile.json'       { return -not (Test-ProfileFilled $path) }
+  }
+  return $false
+}
+
 function Merge-OldCopy([string]$old, [string]$skill) {
   # 把旧的独立拷贝里的用户配置并入单一来源；冲突返回 $false
-  foreach ($rel in $UserFiles.Keys) {
+  foreach ($rel in $UserFiles) {
     if (-not $rel.StartsWith("$skill\")) { continue }
     $src = Join-Path $old $rel.Substring($skill.Length + 1)
     $dst = Join-Path (Join-Path $Root $CanonDir) $rel
     if (-not (Test-Path -LiteralPath $src)) { continue }
-    if ((Test-Path -LiteralPath $dst) -and -not (Test-SameFile $src $dst)) {
-      $tpl = $UserFiles[$rel]
-      if (-not $tpl -or -not (Test-SameFile $dst (Join-Path $TplDir $tpl))) {
-        Write-Warn "$old 与 $CanonDir\$skill 的 $($rel.Substring($skill.Length + 1)) 内容不同，无法自动合并：保留旧目录、未建链接。请手动合并后删除旧目录再重跑。"
-        return $false
-      }
+    if (Test-BlankUserFile $rel $src) { continue }   # 旧拷贝里没填写过：以单一来源为准
+    if ((Test-Path -LiteralPath $dst) -and -not (Test-SameFile $src $dst) -and -not (Test-BlankUserFile $rel $dst)) {
+      Write-Warn "$old 与 $CanonDir\$skill 的 $($rel.Substring($skill.Length + 1)) 内容不同，无法自动合并：保留旧目录、未建链接。请手动合并后删除旧目录再重跑。"
+      return $false
     }
     New-Item -ItemType Directory -Force -Path (Split-Path -Parent $dst) | Out-Null
     Copy-Item -LiteralPath $src -Destination $dst -Force
   }
   # 旧版本画像在 dev\profile.json：单一来源里的 workflow\profile.json 还是空模板时迁移过去
+  # 旧画像未填写过时直接忽略
   $oldProfile = Join-Path $old 'profile.json'
-  # 旧画像里没有任何非空字符串值 = 未填写过的空模板，直接忽略
-  $oldFilled = $false
-  if ($skill -eq 'dev' -and (Test-Path -LiteralPath $oldProfile)) {
-    try {
-      $p = Get-Content -LiteralPath $oldProfile -Raw | ConvertFrom-Json
-      $oldFilled = @($p.PSObject.Properties | Where-Object { $_.Value -is [string] -and $_.Value -ne '' }).Count -gt 0
-    } catch { $oldFilled = $true }
-  }
-  if ($oldFilled) {
+  if ($skill -eq 'dev' -and (Test-Path -LiteralPath $oldProfile) -and (Test-ProfileFilled $oldProfile)) {
     $dst = Join-Path (Join-Path $Root $CanonDir) 'workflow\profile.json'
-    if (-not (Test-Path -LiteralPath $dst) -or (Test-SameFile $dst (Join-Path $TplDir 'workflow\profile.json.tpl'))) {
+    if (-not (Test-Path -LiteralPath $dst) -or -not (Test-ProfileFilled $dst)) {
       New-Item -ItemType Directory -Force -Path (Split-Path -Parent $dst) | Out-Null
       Copy-Item -LiteralPath $oldProfile -Destination $dst -Force
     } elseif (-not (Test-SameFile $oldProfile $dst)) {
@@ -274,6 +284,8 @@ function Merge-OldCopy([string]$old, [string]$skill) {
 
 function New-RelLink([string]$link, [string]$target) {
   # 相对目录软链接：PowerShell 7 用 .NET API（保留相对路径），否则用 mklink /D
+  # SKILLS_INIT_NO_SYMLINK=1 模拟系统不允许建软链接（测试退回独立拷贝的分支用）
+  if ($env:SKILLS_INIT_NO_SYMLINK -eq '1') { return $false }
   try {
     if ([IO.Directory] | Get-Member -Static -Name CreateSymbolicLink) {
       [IO.Directory]::CreateSymbolicLink($link, $target) | Out-Null
@@ -288,6 +300,15 @@ function Link-Skills([string]$envName, [string]$rel, $dbConfig) {
   # 返回 $true 表示全部建链成功；建链不被系统允许时退回独立拷贝
   $dir = Join-Path $Root $rel
   New-Item -ItemType Directory -Force -Path $dir | Out-Null
+  # 先试建一个探测链接：建不了时在动任何旧目录之前就退回独立拷贝（旧拷贝里的用户配置原地保留）
+  $probe = Join-Path $dir '.skills-init-link-probe'
+  Remove-Item -LiteralPath $probe -Force -ErrorAction SilentlyContinue
+  if (-not (New-RelLink $probe "..\..\$CanonDir")) {
+    Write-Warn "$envName：系统不允许创建软链接（需开启开发者模式或以管理员运行），改为独立拷贝到 $dir"
+    Install-Skills $dir $dbConfig
+    return $false
+  }
+  (Get-Item -LiteralPath $probe -Force).Delete()
   $skipped = 0
   foreach ($skill in $SkillNames) {
     $link   = Join-Path $dir $skill

@@ -235,37 +235,34 @@ install_skills() { # $1=目标目录  $2=是否有数据库配置(1/0)
 }
 
 # ---------------- 3b. 软链接到单一来源（.claude/skills、.qwen/skills -> .agents/skills）
-user_file_tpl() { # 用户配置对应的空模板（用于判断单一来源里的文件是否还没被填写过）
+# 画像里没有任何非空字符串值 = 未填写过（新旧版本的空模板字段不同，不能按模板逐字比较）
+profile_unfilled() { ! grep -qE '"[^"]+"[[:space:]]*:[[:space:]]*"[^"]+' "$1"; }
+is_blank_user_file() { # $1=用户配置（相对 skills 目录）  $2=文件；判断单一来源里的该文件是否还没被填写过
   case "$1" in
-    md-to-wiki/wiki-config.json) echo "$TPL_DIR/md-to-wiki/wiki-config.json.tpl" ;;
-    dev/profile.json)            echo "$TPL_DIR/dev/profile.json.tpl" ;;
-    *) echo "" ;;
+    md-to-wiki/wiki-config.json) cmp -s "$2" "$TPL_DIR/md-to-wiki/wiki-config.json.tpl" ;;
+    workflow/profile.json)       profile_unfilled "$2" ;;
+    *) return 1 ;;
   esac
 }
 
 migrate_copy() { # $1=旧的独立拷贝目录  $2=skill 名；把其中用户配置并入单一来源，冲突返回 1
-  local old="$1" skill="$2" rel src dst tpl
+  local old="$1" skill="$2" rel src dst
   for rel in "${USER_FILES[@]}"; do
     [[ "$rel" == "$skill/"* ]] || continue
     src="$old/${rel#*/}"; dst="$ROOT_DIR/$CANON_DIR/$rel"
     [[ -f "$src" ]] || continue
-    if [[ ! -f "$dst" ]] || cmp -s "$src" "$dst"; then
-      :
-    else
-      tpl="$(user_file_tpl "$rel")"
-      if [[ -z "$tpl" ]] || ! cmp -s "$dst" "$tpl"; then
-        warn "$old 与 $CANON_DIR/$skill 的 ${rel#*/} 内容不同，无法自动合并：保留旧目录、未建链接。请手动合并后删除旧目录再重跑。"
-        return 1
-      fi
+    is_blank_user_file "$rel" "$src" && continue   # 旧拷贝里没填写过：以单一来源为准
+    if [[ -f "$dst" ]] && ! cmp -s "$src" "$dst" && ! is_blank_user_file "$rel" "$dst"; then
+      warn "$old 与 $CANON_DIR/$skill 的 ${rel#*/} 内容不同，无法自动合并：保留旧目录、未建链接。请手动合并后删除旧目录再重跑。"
+      return 1
     fi
     mkdir -p "$(dirname "$dst")"; cp "$src" "$dst"
   done
   # 旧版本画像在 dev/profile.json：单一来源里的 workflow/profile.json 还是空模板时迁移过去
-  # 旧画像里没有任何非空字符串值 = 未填写过的空模板，直接忽略
-  if [[ "$skill" == "dev" && -f "$old/profile.json" ]] \
-     && grep -qE '"[^"]+"[[:space:]]*:[[:space:]]*"[^"]+' "$old/profile.json"; then
+  # 旧画像未填写过时直接忽略
+  if [[ "$skill" == "dev" && -f "$old/profile.json" ]] && ! profile_unfilled "$old/profile.json"; then
     dst="$ROOT_DIR/$CANON_DIR/workflow/profile.json"
-    if [[ ! -f "$dst" ]] || cmp -s "$dst" "$TPL_DIR/workflow/profile.json.tpl"; then
+    if [[ ! -f "$dst" ]] || profile_unfilled "$dst"; then
       mkdir -p "$(dirname "$dst")"; cp "$old/profile.json" "$dst"
     elif ! cmp -s "$old/profile.json" "$dst"; then
       warn "$old/profile.json 与 $CANON_DIR/workflow/profile.json 都填写过且内容不同：未迁移，旧文件会随目录备份，请手动合并。"
