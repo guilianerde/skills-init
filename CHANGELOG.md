@@ -4,6 +4,8 @@
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-15
+
 ### 修复
 - dev 直接读 `project-review/references/checklist.md`：接入 DocNexus 后会用到默认清单而不是团队维护的版本。改为通过 `resolve.mjs template` 取；project-review 自身的配置维度说明同步修正。
 
@@ -45,6 +47,7 @@
 - 安装器改为单一 Node 实现，`init-skills.sh` / `init-skills.ps1` 只是薄封装。
 - `code-review` 改名为 `project-review`，升级时自动清理旧名。
 
-[Unreleased]: https://github.com/guilianerde/skills-init/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/guilianerde/skills-init/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/guilianerde/skills-init/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/guilianerde/skills-init/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/guilianerde/skills-init/releases/tag/v0.2.0
