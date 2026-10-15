@@ -14,7 +14,7 @@ description: "Review source code (any language; Java/Spring, Go, TypeScript, Pyt
 4. **逐项过检查清单**（在项目根运行 `node <skills>/workflow/scripts/resolve.mjs template project-review checklist.md`，读输出的 `path`；退出码 2 时停下并按 `hint` 处理）：对每个发现给出 文件+行号、问题描述、严重级别、修改建议。
 5. **影响面分析**：改动是否影响其他调用方/模块，用 grep 或精读调用链确认；查不到调用方的符号不能当作安全，要明说"未确认"。
 6. **输出结构化报告**（见下方输出模板）。
-7. **沉淀（可选，需用户授权）**：DocNexus 可用，且本次发现里有值得长期记住的——同类问题再次出现（知识库里已有类似沉淀，或本次多处出现）、新确立的编码约定、容易踩的坑——交付报告后列成简短清单，**询问用户**是否沉淀。同意后按 DocNexus 入口 skill `docnexus` 的 capture 流程写入，分类用 `node <skills>/workflow/scripts/resolve.mjs category project-review` 的结果作为调用方显式分类封存（见 `workflow` skill「写入 DocNexus 的分类」），并回报 `docnexus/library/<path>`。只沉淀问题模式和约定，不沉淀某次审查的逐条清单；知识库已有同类沉淀时更新那一篇（带 `--base-version`），不要重复新建。
+7. **沉淀（可选，需用户授权）**：DocNexus 可用，且本次发现里有值得长期记住的——同类问题再次出现（知识库里已有类似沉淀，或本次多处出现）、新确立的编码约定、容易踩的坑——交付报告后列成简短清单，**询问用户**是否沉淀。同意后按 DocNexus 入口 skill `docnexus` 的 capture 流程写入，分类用 `node <skills>/workflow/scripts/resolve.mjs category project-review` 的结果作为调用方显式分类封存（见 `<skills>/workflow/references/docnexus.md`「写入 DocNexus 的分类」），并回报 `docnexus/library/<path>`。只沉淀问题模式和约定，不沉淀某次审查的逐条清单；知识库已有同类沉淀时更新那一篇（带 `--base-version`），不要重复新建。
 
 ## Review Dimensions
 
@@ -39,6 +39,8 @@ description: "Review source code (any language; Java/Spring, Go, TypeScript, Pyt
 
 ```
 # 代码审查报告 — <范围>
+
+> 审查范围：<范围> ｜ 分支：`<dev分支>` ←→ `<基线分支>`（单文件审查写当前分支） ｜ 日期：<YYYY-MM-DD>
 
 ## 结论摘要
 <1-2 句总评：总体质量、几个关键风险、建议是否可合并>

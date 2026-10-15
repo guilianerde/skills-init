@@ -4,8 +4,15 @@
 
 ## [Unreleased]
 
+### 变更
+- workflow 的 SKILL.md 精简为路由、链路与能力探测（159 → 74 行），画像、模板来源、DocNexus 约定、status 输出格式移到 `workflow/references/`；其他 skill 直接引用对应文件，不再需要加载整篇 workflow SKILL.md。测试检查引用的 `<skills>/<skill>/references|scripts` 路径都存在。
+
 ### 新增
 - 按分类参考知识库：`workflow/scripts/knowledge.mjs <skill> [--match 词] [--limit n]` 按 skill.json 的 `docnexus.readFrom` 列出相关分类下的 DocNexus 文档（标题、摘要、路径，不含正文），补上 search / recall 不能按分类过滤的缺口；分类名跟随项目画像的覆盖。dev、project-review、两个文档 skill 开工前先看同类沉淀，再做关键词 recall。
+- 按分支串联产物：`workflow/scripts/artifacts.mjs [--branch b | --all]` 扫描 `docs/skills/` 下的开发方案、审查报告、技术方案、上线方案，按元信息行里的分支归组，给出每类最新一份、wiki 发布记录与下一步建议，不另存记录文件。上线方案没传 `--tech` 时自动引用同分支最新的技术方案；`/workflow status` 与 dev 交付时据此提示下一步。审查报告新增分支元信息行。
+- wiki 发布记录：`upload.mjs put --record <md>` 上传成功后把 pageId / 版本 / URL 写进 Markdown 第一行注释（转换时丢弃，不出现在页面上）；`upload.mjs target <md>` 读出，`/md-to-wiki` 再次发布同一文档时可省略 pageId；`upload.mjs record` 供 MCP 通道补写。
+- `lint-doc.mjs --facts [--diff base...head]`：核对正文行内代码里的类名、文件、接口、表名，在 diff 和开发分支代码里都找不到的记为警告（防编造）；两个文档 skill 自检时启用。
+- `doctor` 检查已装 DocNexus 是否支持 `draft seal --category`，不支持时提示升级。
 - project-review 支持沉淀（需用户授权）：反复出现的问题模式与新确立的约定以 `code-review` 分类写入，已有同类沉淀时更新而不是重复新建；dev 开工前会参考它。
 
 ## [0.4.0] - 2026-10-15

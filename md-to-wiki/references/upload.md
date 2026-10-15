@@ -18,6 +18,7 @@
    ```
 
 4. 验证：再次 `get_page`，确认 `version.number` 已 +1。
+5. 写回发布记录：`node <skillDir>/scripts/upload.mjs record <mdPath> <pageId> --version <新版本号> --url <页面 URL>`（只改 Markdown 第一行的注释，不访问 wiki）。
 
 ## 通道 B — Confluence REST API（脚本）
 
@@ -26,7 +27,8 @@
 ```bash
 node <skillDir>/scripts/upload.mjs info <pageId|url>
 node <skillDir>/scripts/upload.mjs get <pageId|url> [--text]      # 读正文；其他 skill 拉 PRD 也用它
-node <skillDir>/scripts/upload.mjs put <html> <pageId|url> --expect-version <n> [--title <标题>]
+node <skillDir>/scripts/upload.mjs put <html> <pageId|url> --expect-version <n> [--title <标题>] [--record <mdPath>]   # --record：成功后写回发布记录
+node <skillDir>/scripts/upload.mjs target <mdPath>                  # 读文档里的发布记录（pageId / url / 上次版本）
 ```
 
 1. `info`：只读，输出 `title`、`version`、`space`、`url`。把这些告诉用户，确认要覆盖这一页。

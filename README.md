@@ -318,10 +318,11 @@ npx @rowansenne/skills-init doctor
 | `workflow/scripts/resolve.mjs category <skill>` | 该 skill 写入 DocNexus 时的显式分类（画像 `docnexus_categories` 优先，其次 skill.json），输出 `seal_args` 与 `metadata`；未声明时退出码 1 |
 | `workflow/scripts/resolve.mjs status` | `/workflow status` 的能力探测（不输出任何凭据） |
 | `workflow/scripts/resolve.mjs infer-profile` | 按固定规则从构建文件、Makefile、依赖与配置文件、git 推断项目画像草稿，每个字段附依据；不写文件 |
-| `workflow/scripts/lint-doc.mjs <文档> --skill <skill>` | 对照当前生效的模板检查生成的文档：必填章节、残留 `{{...}}` 占位符、元信息行为错误；缺普通章节、顺序不一致为警告；列出待填写位置 |
+| `workflow/scripts/lint-doc.mjs <文档> --skill <skill> [--facts]` | 对照当前生效的模板检查生成的文档：必填章节、残留 `{{...}}` 占位符、元信息行为错误；缺普通章节、顺序不一致为警告；列出待填写位置。`--facts` 再核对正文里的类名、文件、接口、表名：在对比分支的 diff 和代码里都找不到的记为警告（防编造） |
+| `workflow/scripts/artifacts.mjs [--branch b \| --all]` | 按分支汇总 `docs/skills/` 下的开发方案、审查报告、技术方案、上线方案及其 wiki 发布记录，给出下一步建议；分支取自文档元信息行，不另存记录。上线方案没传 `--tech` 时据此自动引用同分支的技术方案 |
 | `database-query/scripts/query.mjs` | 执行 SQL：选连接、取密码（只通过环境变量传给客户端）、会话层只读、拦截写语句和多语句、自动补 LIMIT、超时、脱敏敏感列；支持 mysql / psql 客户端，其他 driver 退回 JDBC |
 | `database-query/scripts/query.mjs --schema [--tables a,b] [--write]` | 按只读会话导出表结构为 Markdown；`--write` 写入 `references/schema.md` 的 `schema:begin` / `schema:end` 之间，标记外的补充说明保留 |
-| `md-to-wiki/scripts/upload.mjs info / put` | REST 上传通道：`info` 读页面标题与版本给用户确认；`put --expect-version <n>` 先校验 XHTML 良构，版本对不上就拒绝上传，上传后确认版本 +1 |
+| `md-to-wiki/scripts/upload.mjs info / put / target / record` | REST 上传通道：`info` 读页面标题与版本给用户确认；`put --expect-version <n> [--record <md>]` 先校验 XHTML 良构，版本对不上就拒绝上传，上传后确认版本 +1，并把发布记录写回 Markdown 第一行注释（转换时丢弃，不出现在页面上）；`target` 读出记录，再次发布同一文档不必再给 pageId；`record` 供 MCP 通道上传后补写 |
 
 ## 测试
 
@@ -330,7 +331,7 @@ npm test                                  # bash 冒烟测试 + 全部 node 测�
 node --test "tests/*.mjs"                 # 只跑 node 测试（三个平台都能跑）
 ```
 
-node 测试覆盖：skill.json 一致性、子命令（upgrade / doctor / seed-templates / uninstall）、`resolve.mjs` 与画像推断、`lint-doc.mjs`、`query.mjs` 与表结构导出（用假的 mysql / psql 客户端）、md-to-wiki 转换与上传（用本地假 Confluence 服务）、DocNexus 模板导入与版本跟踪（用假的 docnexus CLI）。
+node 测试覆盖：skill.json 一致性、子命令（upgrade / doctor / seed-templates / uninstall）、`resolve.mjs` 与画像推断、`lint-doc.mjs`（含 `--facts` 核对，用临时 git 仓库）、`artifacts.mjs`、`knowledge.mjs`、`query.mjs` 与表结构导出（用假的 mysql / psql 客户端）、md-to-wiki 转换与上传（用本地假 Confluence 服务）、DocNexus 模板导入与版本跟踪（用假的 docnexus CLI）。
 
 安装器的黑盒场景都在 `tests/test-install.mjs`，三个平台共用：每个用例在临时目录放一份 skills-init 副本，执行安装后检查目录、软链接和配置。覆盖全新安装（单一来源 + 相对软链接）、`SKILLS_INIT_NO_SYMLINK=1` 退回独立拷贝、`--copy`、`--yes` 无数据库配置时退出码 1、含 `/ & | " \` 的密码、重跑保留用户配置、安装清单、手改模板另存 `.new`（含交互选覆盖 / 保留）、删除模板文件后的清理、卸载与备份、从旧版各环境独立拷贝升级（用 git 历史中 `71a23c8` 的旧脚本生成旧布局，浅克隆时先 `git fetch --unshallow`）、两边配置冲突、`.gitignore` 只追加缺失规则。
 
@@ -448,6 +449,8 @@ skills-init/
 │   ├── scripts/lint-doc.mjs           # 对照模板检查生成的文档
 │   ├── scripts/infer-profile.mjs      # 画像推断规则（resolve.mjs infer-profile 调用）
 │   ├── scripts/knowledge.mjs          # 按分类列出相关的 DocNexus 文档
+│   ├── scripts/artifacts.mjs          # 按分支汇总各 skill 产物与 wiki 发布记录
+│   ├── references/                    # profile.md、templates.md、docnexus.md、status.md（其他 skill 直接读对应文件）
 │   └── profile.json.tpl               # 空画像，首次使用时由 agent 推断并经确认后填写
 ├── dev/
 │   ├── SKILL.md.tpl · skill.json

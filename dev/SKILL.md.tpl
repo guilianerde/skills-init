@@ -27,18 +27,18 @@ description: "Implement a feature or fix a bug in this project end to end: under
 ## Step 0 — 前置检查（两种模式共用）
 
 1. **项目画像**：运行 `node <skills>/workflow/scripts/resolve.mjs profile`，读输出的 `profile` 与 `empty`（空字段列表；字段含义见 `workflow` skill）。本 skill 用到 `main_branch`、`build`、`test`、`test_single`（`{target}` 替换为测试类或文件）、`lint`、`config_center`、`notes`。
-   - 需要的字段为空 → 按 `workflow` skill「填写与更新」的步骤推断，经用户确认后写回；用户不确认就只在本次使用，不落盘。
+   - 需要的字段为空 → 按 `<skills>/workflow/references/profile.md`「填写与更新」的步骤推断，经用户确认后写回；用户不确认就只在本次使用，不落盘。
 2. **工作区状态**：`git status --short` 与当前分支。
    - 有与本需求无关的未提交改动 → 告知用户，不要混进本次改动，也不要替用户 stash / 丢弃。
    - 当前在主分支（`profile.main_branch`）上 → 建议先建特性分支，用户同意后再建。
-3. **增强能力探测**：按 `workflow` skill「增强能力探测」表判断 wiki、DocNexus、数据库是否可用。都不阻塞，不可用就跳过对应增强，并在交付说明中注明。
+3. **增强能力探测**：运行 `node <skills>/workflow/scripts/resolve.mjs status`，按输出的 `wiki` / `docnexus` / `database` 判断是否可用（wiki MCP 脚本探测不到，另看当前环境有没有 wiki 工具）。都不阻塞，不可用就跳过对应增强，并在交付说明中注明。
 
 ## 功能开发流程
 
 ### F1 — 理解需求
 
 - 需求来源是 PRD pageId/URL → 按 `references/prd-fetch.md` 拉取并提炼；wiki 不可用 → 请用户贴出关键内容。
-- DocNexus 可用 → 先运行 `node <skills>/workflow/scripts/knowledge.mjs dev --match <模块名 / 业务名词>`，看以往开发沉淀、技术方案和反复出现的审查问题里有没有相关的；再按 `docnexus-recall` 用需求里的业务名词 `search` / `recall` 补充。引用 `docnexus/library/<path>`（见 `workflow` skill「按分类参考知识库」）。
+- DocNexus 可用 → 先运行 `node <skills>/workflow/scripts/knowledge.mjs dev --match <模块名 / 业务名词>`，看以往开发沉淀、技术方案和反复出现的审查问题里有没有相关的；再按 `docnexus-recall` 用需求里的业务名词 `search` / `recall` 补充。引用 `docnexus/library/<path>`（见 `<skills>/workflow/references/docnexus.md`「按分类参考知识库」）。
 - 输出 **需求要点 + 验收标准**（可验证的行为，而不是实现手段）。
 - 存在歧义（边界、异常分支、兼容性、权限）→ **一次性**列出问题问用户，不要边做边问，也不要自行假设后继续。
 
@@ -83,8 +83,8 @@ description: "Implement a feature or fix a bug in this project end to end: under
 按 `references/delivery-template.md` 输出交付说明（小改动可压缩成「改动 + 验证 + 下一步」，但验证结果必须如实），然后**询问**下一步，不要自行执行：
 
 - 提交：给出建议的 commit message，用户同意后再 `git commit`；**不 push**，除非用户明确要求。
-- 文档：M / L 规模建议 `create-tech-md-doc`；要上线时建议 `create-release-md-doc`。
-- 沉淀：本次产生了值得长期记住的决策、约定或坑，且 DocNexus 可用 → 提议走 DocNexus 的 capture 流程；**必须用户授权后才写入**。分类用 `node <skills>/workflow/scripts/resolve.mjs category dev` 的结果作为调用方显式分类封存（见 `workflow` skill「写入 DocNexus 的分类」）。
+- 文档：运行 `node <skills>/workflow/scripts/artifacts.mjs` 看本分支已有哪些产物（开发方案、审查报告、技术方案、上线方案及 wiki 发布记录），按输出的 `next` 建议下一步：M / L 规模缺技术方案时建议 `create-tech-md-doc`，要上线时建议 `create-release-md-doc`（会自动引用本分支的技术方案）。
+- 沉淀：本次产生了值得长期记住的决策、约定或坑，且 DocNexus 可用 → 提议走 DocNexus 的 capture 流程；**必须用户授权后才写入**。分类用 `node <skills>/workflow/scripts/resolve.mjs category dev` 的结果作为调用方显式分类封存（见 `<skills>/workflow/references/docnexus.md`「写入 DocNexus 的分类」）。
 
 ## 缺陷修复流程（`--bug`）
 

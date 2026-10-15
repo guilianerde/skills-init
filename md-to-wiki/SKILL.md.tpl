@@ -1,6 +1,6 @@
 ---
 name: md-to-wiki
-description: "Publish a local Markdown document to an existing Confluence wiki page. Use when the user wants to write/upload/publish/sync a markdown file to wiki/Confluence, or invokes /md-to-wiki <mdPath> <pageId|url> [--title <title>] [--banner <bannerMdPath>] [--no-banner] [--validate-only]. Converts Markdown to Confluence Storage Format XHTML, validates it, then uploads via the environment's wiki MCP tool or the Confluence REST API. Gated on wiki-config.json: if it is missing or disabled the skill must not run. Trigger phrases: 发布到wiki / 上传到wiki / 同步到wiki / md转wiki / publish to wiki / upload to confluence. Not for generating the documents themselves (create-tech-md-doc / create-release-md-doc)."
+description: "Publish a local Markdown document to an existing Confluence wiki page. Use when the user wants to write/upload/publish/sync a markdown file to wiki/Confluence, or invokes /md-to-wiki <mdPath> [pageId|url] [--title <title>] [--banner <bannerMdPath>] [--no-banner] [--validate-only]. Converts Markdown to Confluence Storage Format XHTML, validates it, then uploads via the environment's wiki MCP tool or the Confluence REST API. Gated on wiki-config.json: if it is missing or disabled the skill must not run. Trigger phrases: 发布到wiki / 上传到wiki / 同步到wiki / md转wiki / publish to wiki / upload to confluence. Not for generating the documents themselves (create-tech-md-doc / create-release-md-doc)."
 ---
 
 # MD to Wiki
@@ -18,13 +18,13 @@ description: "Publish a local Markdown document to an existing Confluence wiki p
 ## Command Format
 
 ```
-/md-to-wiki <mdPath> <pageId|url> [--title <title>] [--banner <bannerMdPath>] [--no-banner] [--validate-only]
+/md-to-wiki <mdPath> [pageId|url] [--title <title>] [--banner <bannerMdPath>] [--no-banner] [--validate-only]
 ```
 
 | 参数 | 说明 |
 |---|---|
 | `<mdPath>` | 本地 Markdown 路径（必填） |
-| `<pageId\|url>` | 纯数字 pageId，或含 `pageId=` 的 URL（用 `[?&]pageId=(\d+)` 提取）（必填） |
+| `[pageId\|url]` | 纯数字 pageId，或含 `pageId=` 的 URL（用 `[?&]pageId=(\d+)` 提取）。文档发布过时可省略：用文档里的发布记录（见 Step 0） |
 | `--title` | 更新后的页面标题；不传保留原标题 |
 | `--banner` | 顶部 info 宏的内容来源（小 md 片段）；不传且没有 `--no-banner` 时，把正文第一个 `>` 引用块移到顶部 info 宏 |
 | `--no-banner` | 不加顶部 info 宏 |
@@ -38,7 +38,7 @@ description: "Publish a local Markdown document to an existing Confluence wiki p
 
 1. GATE 通过。
 2. `<mdPath>` 存在。
-3. 解析 pageId；URL 中提取不出 → 请用户重新提供，**不要猜**。
+3. 确定目标页面：用户给了 pageId / URL 就解析它（提取不出 → 请用户重新提供，**不要猜**）；没给就运行 `node <skillDir>/scripts/upload.mjs target <mdPath>` 读文档第一行的发布记录（`<!-- md-to-wiki: pageId=... -->`，转换时会被丢弃，不会出现在页面上）。有记录就用它，并在 Step 2 的确认里注明「沿用上次发布的页面」；没有记录 → 请用户提供 pageId，停。用户给的 pageId 与记录不同时以用户给的为准，并提醒。
 4. 选择上传通道：环境有 wiki MCP 工具 → 通道 A；否则用 `wiki-config.json` 的 REST 参数 → 通道 B；都不可用 → 停。
 5. 读取目标页面当前的标题、版本号：通道 A 用 MCP 的 `get_page`，通道 B 用 `node <skillDir>/scripts/upload.mjs info <pageId|url>`（细节见 `references/upload.md`）。页面不存在或无权限 → 停。
 6. 本机有 Node.js（≥ 18）；转换脚本不依赖任何第三方库。
@@ -54,12 +54,13 @@ node <skillDir>/scripts/md-to-wiki.mjs <mdPath> tmp/skills/md-to-wiki/_wiki_uplo
 ### Step 2 — 确认后上传
 
 1. 上传会**覆盖**目标页面正文。先告诉用户：目标页面标题、URL、当前版本号，得到确认后再上传。
-2. 按通道上传，带上用户确认过的版本号，避免覆盖他人刚做的修改：通道 A 见 `references/upload.md`；通道 B 运行 `node <skillDir>/scripts/upload.mjs put <html> <pageId|url> --expect-version <确认的版本号> [--title <标题>]`，脚本会校验良构、核对版本，并在上传后确认版本号 +1。
-3. 确认版本号 +1 后，回复用户页面标题、URL、新版本号。
+2. 按通道上传，带上用户确认过的版本号，避免覆盖他人刚做的修改：通道 A 见 `references/upload.md`；通道 B 运行 `node <skillDir>/scripts/upload.mjs put <html> <pageId|url> --expect-version <确认的版本号> [--title <标题>] --record <mdPath>`，脚本会校验良构、核对版本，在上传后确认版本号 +1，并把发布记录写回 Markdown 第一行。
+3. 通道 A 上传成功后补写发布记录：`node <skillDir>/scripts/upload.mjs record <mdPath> <pageId> --version <新版本号> --url <页面 URL>`。
+4. 确认版本号 +1 后，回复用户页面标题、URL、新版本号，并说明发布记录已写回文档（下次发布同一文档不必再给 pageId）。
 
 ## Red Flags — STOP
 
-- GATE 未通过；markdown 文件不存在；pageId 解析不出
+- GATE 未通过；markdown 文件不存在；pageId 解析不出且文档没有发布记录
 - wiki 未连接，或 REST 返回 401 / 403；目标页面不存在或无权限
 - XML 良构校验失败
 - 用户没有确认覆盖目标页面

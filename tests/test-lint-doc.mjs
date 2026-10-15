@@ -6,7 +6,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { lint, headingKey } from '../workflow/scripts/lint-doc.mjs';
+import { lint, headingKey, extractRefs, checkRefs, diffRange } from '../workflow/scripts/lint-doc.mjs';
 
 const REPO = fileURLToPath(new URL('..', import.meta.url));
 const TPL = `# 【技术方案】<在此填写需求标题>
@@ -72,5 +72,25 @@ test('CLI：自带模板生成的骨架报错；已接入 DocNexus 时改用知�
   r = cli('doc.md', '--skill', 'create-tech-md-doc');
   assert.equal(r.status, 0, r.stdout);
   assert.match(r.stdout, /docnexus/);
+  fs.rmSync(root, { recursive: true, force: true });
+});
+
+test('--facts：类名 / 文件 / 接口 / 表名在 diff 或 head 代码里找不到的记为未核实', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'facts-'));
+  const g = (...a) => { const r = spawnSync('git', a, { cwd: root, encoding: 'utf8' }); assert.equal(r.status, 0, r.stderr); };
+  const w = (rel, text) => { fs.mkdirSync(path.dirname(path.join(root, rel)), { recursive: true }); fs.writeFileSync(path.join(root, rel), text); };
+  g('init', '-q', '-b', 'main'); g('config', 'user.email', 't@example.com'); g('config', 'user.name', 't');
+  w('src/order/OrderService.java', 'class OrderService { /* select * from T_ORDER */ }\n');
+  g('add', '.'); g('commit', '-qm', 'base');
+  g('checkout', '-qb', 'feature/pay');
+  w('src/pay/PayService.java', 'class PayService { @PostMapping("/pay/notify/{id}") void notify() {} /* insert into t_pay_record */ }\n');
+  g('add', '.'); g('commit', '-qm', 'pay');
+  const doc = '# 技术方案\n> 对比分支：`feature/pay` ←→ `main`\n\n新增 `PayService.notify()`（`src/pay/PayService.java`），调用方 `OrderService` 不变。\n'
+    + '接口 `POST /pay/notify/{id}`；表 `t_pay_record`、`t_order`。\n编造的：`RefundService`、`t_refund_log`、`/refund/apply`、`src/refund/Refund.java`。\n';
+  assert.equal(diffRange(doc), 'main...feature/pay');
+  const r = checkRefs(root, extractRefs(doc), diffRange(doc));
+  assert.equal(r.ok, true, r.error);
+  assert.deepEqual(r.unverified.map((u) => u.ref).sort(), ['/refund/apply', 'RefundService', 'src/refund/Refund.java', 't_refund_log']);
+  assert.equal(checkRefs(root, [], 'main...nope').ok, false);
   fs.rmSync(root, { recursive: true, force: true });
 });

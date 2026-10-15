@@ -61,6 +61,15 @@ export function setupDocNexus(root, sel) {
   return 'ok';
 }
 
+// 已装 DocNexus 是否支持调用方显式分类（draft seal --category，0.14.0 之后）。旧版会静默忽略该参数，
+// skill 的写入仍靠 metadata.category 落到同一分类，只是不会记成调用方指定；这里只用于提示升级
+export function docnexusSupportsCategory(root) {
+  const bin = path.join(root, 'node_modules', '.bin', IS_WIN ? 'docnexus.cmd' : 'docnexus');
+  if (!fs.existsSync(bin)) return null;
+  const r = spawnSync(bin, ['--help'], { cwd: root, encoding: 'utf8', shell: IS_WIN });
+  return /--category-reason/.test(`${r.stdout}${r.stderr}`);
+}
+
 export function templateRecords(root) { return findManifests(root)[0]?.m.templates ?? {}; }
 // 已安装的 skill（有安装清单时以清单为准），模板导入与状态只针对它们
 export function installedSkills(root) { const m = findManifests(root)[0]?.m; return m ? Object.keys(m.skills ?? {}) : undefined; }

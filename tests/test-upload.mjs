@@ -7,7 +7,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { parsePageId, storageToText } from '../md-to-wiki/scripts/upload.mjs';
+import { parsePageId, storageToText, readTarget, writeTarget } from '../md-to-wiki/scripts/upload.mjs';
+import { parseWiki } from '../workflow/scripts/artifacts.mjs';
 
 const SCRIPTS = fileURLToPath(new URL('../md-to-wiki/scripts/', import.meta.url));
 
@@ -136,4 +137,39 @@ test('get：默认输出 storage，--text 输出纯文本（供其他 skill 拉 
     assert.doesNotMatch(r.out, /SECRET/);
     fs.rmSync(dir, { recursive: true, force: true });
   } finally { server.close(); }
+});
+
+test('发布记录：写在第一行注释，替换不叠加，正文不变；workflow 的 artifacts.mjs 读得懂同一格式', () => {
+  const md = '# 技术方案\n\n> 对比分支：`f` ←→ `main`\n';
+  const once = writeTarget(md, { pageId: '123', version: 8, url: 'https://w/pages/123', at: '2026-10-15T00:00:00Z' });
+  assert.ok(once.startsWith('<!-- md-to-wiki: pageId=123 version=8 url=https://w/pages/123 at=2026-10-15T00:00:00Z -->\n# 技术方案'));
+  const twice = writeTarget(once, { pageId: '123', version: 9 });
+  assert.equal(twice.match(/md-to-wiki:/g).length, 1);
+  assert.ok(twice.endsWith(md));
+  assert.deepEqual(readTarget(twice), { pageId: '123', version: 9, url: null, at: readTarget(twice).at });
+  assert.deepEqual(parseWiki(once), readTarget(once));
+  assert.equal(readTarget(md), null);
+});
+
+test('CLI：put --record 写回记录；target 读出；record 手动写入（通道 A），不需要配置', async () => {
+  const { server, base } = await fakeConfluence();
+  const { dir, run } = setup({ enabled: true, wiki: { base_url: base, api_token: 'tok' } });
+  try {
+    fs.writeFileSync(path.join(dir, 'ok.html'), '<p>ok</p>');
+    fs.writeFileSync(path.join(dir, 'doc.md'), '# 文档\n');
+    let r = await run('target', 'doc.md');
+    assert.equal(r.status, 1);
+    r = await run('put', 'ok.html', '123', '--expect-version', '7', '--record', 'doc.md');
+    assert.equal(r.status, 0, r.err);
+    assert.equal(JSON.parse(r.out).recorded_in, 'doc.md');
+    r = await run('target', 'doc.md');
+    assert.equal(r.status, 0);
+    assert.deepEqual([JSON.parse(r.out).pageId, JSON.parse(r.out).version], ['123', 8]);
+    assert.match(JSON.parse(r.out).url, /\/spaces\/DEV\/pages\/123$/);
+    fs.rmSync(path.join(dir, 'md-to-wiki', 'wiki-config.json'));
+    r = await run('record', 'doc.md', 'https://w/pages/viewpage.action?pageId=456', '--version', '3');
+    assert.equal(r.status, 0, r.err);
+    assert.equal(readTarget(fs.readFileSync(path.join(dir, 'doc.md'), 'utf8')).pageId, '456');
+    assert.equal((await run('record', 'doc.md', '456')).status, 2);
+  } finally { server.close(); fs.rmSync(dir, { recursive: true, force: true }); }
 });

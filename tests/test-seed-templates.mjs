@@ -22,7 +22,10 @@ fs.appendFileSync('calls.log', [cmd, sub, ...rest].join(' ') + '\\n');
 const REG = 'registry.json';
 const reg = fs.existsSync(REG) ? JSON.parse(fs.readFileSync(REG, 'utf8')) : {};
 const save = () => fs.writeFileSync(REG, JSON.stringify(reg));
-if (cmd === 'draft' && sub === 'new') {
+if (cmd === '--help') {
+  // 真 CLI 的帮助里列出 seal 参数；old-docnexus 标记文件模拟不支持 --category 的旧版
+  console.log(fs.existsSync('old-docnexus') ? 'docnexus draft seal --id <id> --file <path>' : 'docnexus draft seal --id <id> --file <path> [--category <name> [--category-reason <basis>]]');
+} else if (cmd === 'draft' && sub === 'new') {
   const id = 'draft_' + arg('--slug') + '_' + Date.now() + Math.random().toString(36).slice(2, 6); const dir = path.join('docnexus/drafts', id);
   fs.mkdirSync(dir, { recursive: true });
   const a = (f) => path.join(dir, f);
@@ -155,6 +158,10 @@ test('CLI：安装时导入并记录到清单；doctor 提示 outdated；seed-te
   fs.writeFileSync(mf, JSON.stringify(m));
   r = cli('doctor', '--offline');
   assert.match(r.stderr, new RegExp(`${t.file}：默认模板有新版`));
+  assert.match(r.stdout, /支持调用方显式分类/);
+  fs.writeFileSync(path.join(root, 'old-docnexus'), '');
+  assert.match(cli('doctor', '--offline').stderr, /不支持 draft seal --category/);
+  fs.rmSync(path.join(root, 'old-docnexus'));
   r = cli('upgrade');
   assert.equal(r.status, 0, r.stderr);
   assert.match(r.stderr, /seed-templates --update/, 'upgrade 后提示，不自动写 DocNexus');

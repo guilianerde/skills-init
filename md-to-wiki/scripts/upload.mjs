@@ -8,7 +8,14 @@
 //       供其他 skill 拉取 PRD，凭据只在这里使用。
 //   node <skillDir>/scripts/upload.mjs put <html> <pageId|url> --expect-version <n> [--title <标题>]
 //       上传前校验 XHTML 良构；页面当前版本必须等于用户确认过的 <n>（否则说明有人刚改过，停止）；
-//       上传后重新读取，确认版本号变为 n+1。
+//       上传后重新读取，确认版本号变为 n+1。加 --record <md> 时把页面记录写回该 Markdown（见下）。
+//   node <skillDir>/scripts/upload.mjs target <md>
+//       读出 Markdown 里记录的发布目标（pageId / url / 上次版本），没有记录退出 1。不访问 wiki、不需要配置。
+//   node <skillDir>/scripts/upload.mjs record <md> <pageId|url> --version <n> [--url <url>]
+//       手动写入发布记录（通道 A 用 MCP 上传后调用）。不访问 wiki、不需要配置。
+//
+// 发布记录是 Markdown 第一行的 HTML 注释：<!-- md-to-wiki: pageId=123 version=6 url=... at=... -->，
+// 转换时 HTML 注释会被丢弃，不会出现在 wiki 页面上；再次发布同一文档时不必再问 pageId。
 //
 // 认证：wiki.username 非空时用 Basic（username:api_token，Confluence Cloud）；否则用 Bearer（Server / DC 的 PAT）。
 // token 只在请求头里使用，不输出到任何地方。输出 JSON。
@@ -22,6 +29,24 @@ import { checkWellFormed } from './md-to-wiki.mjs';
 const SKILL_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 class UsageError extends Error {}
+
+const RECORD_RE = /^<!-- md-to-wiki: ([^\n]*?) -->\r?\n?/;
+
+// 读 Markdown 里的发布记录；没有返回 null
+export function readTarget(md) {
+  const m = RECORD_RE.exec(md);
+  if (!m) return null;
+  const kv = Object.fromEntries([...m[1].matchAll(/(\w+)=(\S+)/g)].map((x) => [x[1], x[2]]));
+  return kv.pageId ? { pageId: kv.pageId, version: kv.version ? Number(kv.version) : null, url: kv.url ?? null, at: kv.at ?? null } : null;
+}
+
+// 写入（或替换）发布记录，返回新的 Markdown 文本；正文其余部分不变
+export function writeTarget(md, { pageId, version, url, at = new Date().toISOString() }) {
+  const fields = [`pageId=${pageId}`, version != null && `version=${version}`, url && `url=${String(url).replace(/\s/g, '%20')}`, `at=${at}`].filter(Boolean);
+  return `<!-- md-to-wiki: ${fields.join(' ')} -->\n` + md.replace(RECORD_RE, '');
+}
+
+const recordFile = (file, info) => fs.writeFileSync(file, writeTarget(fs.readFileSync(file, 'utf8'), info));
 
 export function parsePageId(s) {
   if (/^\d+$/.test(String(s))) return String(s);
@@ -131,12 +156,15 @@ export async function put(w, pageId, html, { expectVersion, title }) {
 }
 
 function parseArgs(argv) {
-  const o = { cmd: argv[0], pos: [], expectVersion: null, title: '', text: false };
+  const o = { cmd: argv[0], pos: [], expectVersion: null, title: '', text: false, record: '', version: null, url: '' };
   for (let i = 1; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--expect-version') o.expectVersion = Number(argv[++i]);
     else if (a === '--title') o.title = argv[++i] ?? '';
     else if (a === '--text') o.text = true;
+    else if (a === '--record') o.record = argv[++i] ?? '';
+    else if (a === '--version') o.version = Number(argv[++i]);
+    else if (a === '--url') o.url = argv[++i] ?? '';
     else if (a.startsWith('--')) throw new UsageError(`未知参数 ${a}`);
     else o.pos.push(a);
   }
@@ -159,12 +187,28 @@ export async function main(argv) {
     if (!Number.isInteger(o.expectVersion)) throw new UsageError('put 需要 --expect-version <n>：先运行 info，把标题与版本给用户确认后再上传');
     const [htmlPath, page] = o.pos;
     if (!fs.existsSync(htmlPath)) throw new UsageError(`文件不存在：${htmlPath}`);
+    if (o.record && !fs.existsSync(o.record)) throw new UsageError(`文件不存在：${o.record}`);
     const w = loadWikiConfig();
     const r = await put(w, parsePageId(page), fs.readFileSync(htmlPath, 'utf8'), o);
-    console.log(JSON.stringify(r, null, 2));
+    if (o.record) recordFile(o.record, { pageId: r.id, version: r.version, url: r.url });
+    console.log(JSON.stringify(o.record ? { ...r, recorded_in: o.record } : r, null, 2));
     return 0;
   }
-  throw new UsageError('用法: upload.mjs info <pageId|url> | upload.mjs get <pageId|url> [--text] | upload.mjs put <html> <pageId|url> --expect-version <n> [--title <标题>]');
+  if (o.cmd === 'target' && o.pos.length === 1) {
+    if (!fs.existsSync(o.pos[0])) throw new UsageError(`文件不存在：${o.pos[0]}`);
+    const t = readTarget(fs.readFileSync(o.pos[0], 'utf8'));
+    console.log(JSON.stringify(t ? { ok: true, ...t } : { ok: false, message: '该文档没有发布记录，需要用户提供 pageId 或 URL' }, null, 2));
+    return t ? 0 : 1;
+  }
+  if (o.cmd === 'record' && o.pos.length === 2) {
+    if (!Number.isInteger(o.version)) throw new UsageError('record 需要 --version <n>（上传后的新版本号）');
+    if (!fs.existsSync(o.pos[0])) throw new UsageError(`文件不存在：${o.pos[0]}`);
+    const info = { pageId: parsePageId(o.pos[1]), version: o.version, url: o.url || null };
+    recordFile(o.pos[0], info);
+    console.log(JSON.stringify({ ok: true, ...info, recorded_in: o.pos[0] }, null, 2));
+    return 0;
+  }
+  throw new UsageError('用法: upload.mjs info <pageId|url> | get <pageId|url> [--text] | put <html> <pageId|url> --expect-version <n> [--title <标题>] [--record <md>] | target <md> | record <md> <pageId|url> --version <n> [--url <url>]');
 }
 
 const invoked = process.argv[1] && fs.realpathSync(process.argv[1]) === fs.realpathSync(fileURLToPath(import.meta.url));

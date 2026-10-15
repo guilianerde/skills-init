@@ -131,3 +131,16 @@ test('docnexus.readFrom：只引用已声明分类的 skill，且 SKILL.md 经 k
     assert.equal(md.includes(`knowledge.mjs ${s.name}`), from.length > 0, `${s.name}：readFrom 与 SKILL.md 中的 knowledge.mjs 调用不一致`);
   }
 });
+
+test('引用的 <skills>/<skill>/references|scripts 路径都存在；跨 skill 引用指向文件而不是「某 skill 的某一节」', () => {
+  const docs = skills.flatMap((s) => [`${s.name}/SKILL.md.tpl`, ...(fs.existsSync(path.join(REPO, s.name, 'references')) ? fs.readdirSync(path.join(REPO, s.name, 'references')).filter((f) => f.endsWith('.md')).map((f) => `${s.name}/references/${f}`) : [])]);
+  docs.push(...fs.readdirSync(path.join(REPO, 'shared')).map((f) => `shared/${f}`));
+  for (const d of docs) {
+    const text = read(d);
+    for (const [, skill, rel] of text.matchAll(/<skills>\/([\w-]+)\/((?:references|scripts)\/[\w.-]+\.(?:md|mjs))/g)) {
+      const shared = rel.startsWith('references/') && skills.find((s) => s.name === skill)?.shared.includes(rel.slice('references/'.length));
+      assert.ok(shared || fs.existsSync(path.join(REPO, skill, rel)), `${d} 引用了不存在的 ${skill}/${rel}`);
+    }
+    assert.doesNotMatch(text, /`[\w-]+` skill\s*「/, `${d}：跨 skill 引用请写文件路径（<skills>/<skill>/references/...），避免加载整篇 SKILL.md`);
+  }
+});
