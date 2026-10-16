@@ -59,8 +59,8 @@ npx @rowansenne/skills-init
 | 命令 | 作用 |
 | --- | --- |
 | `init`（默认，可省略） | 安装或重装 |
-| `upgrade` | 读安装清单里记录的环境与模式，非交互升级到当前版本：保留数据库配置，手改过的文件另存 `.new`；已接入 DocNexus 时顺带导入新版本新增的文档模板（只新增，不改动已有模板） |
-| `doctor` | 自检：已装版本与当前包对比、手改 / 缺失 / 待合并的文件、软链接是否断开、项目画像、DocNexus 模板是否齐全、各数据库连接能否只读 `SELECT 1`（`--offline` 跳过）、`.gitignore` 是否忽略了凭据。有错误时退出码 1 |
+| `upgrade` | 读安装清单里记录的环境与模式，非交互升级到当前版本：保留数据库配置等用户配置，skills 文件一律更新为新版（手改过的先备份到 `tmp/skills/upgrade-backup/`）；已接入 DocNexus 时顺带导入新版本新增的文档模板（只新增，不改动已有模板） |
+| `doctor` | 自检：已装版本与当前包对比、手改 / 缺失的文件、软链接是否断开、项目画像、DocNexus 模板是否齐全、各数据库连接能否只读 `SELECT 1`（`--offline` 跳过）、`.gitignore` 是否忽略了凭据。有错误时退出码 1 |
 | `uninstall` | 等价于 `--uninstall` |
 | `report` | 本地效果报告：只读统计 `docs/skills/` 下的产物（`--since YYYY-MM-DD`、`--all-branches`、`--json`；PowerShell 为 `-Since` / `-AllBranches` / `-Json`），见「workflow：入口与项目画像」 |
 | `seed-templates` | 只把默认文档模板导入 DocNexus，不重装 skills。`--update` 把导入后未改动的模板更新为新版；`--diff` 只读打印团队改过的模板与新默认模板的差异，供手动合并 |
@@ -304,16 +304,19 @@ dev、project-review、技术方案、上线方案都在对应环节调用它：
 
 ### 安装清单
 
-每次安装后在 `.agents/skills/.skills-init.json`（`--copy` 时各目标目录各一份）写入清单：安装器版本、安装时间、所选环境、安装模式，以及每个 skill 的模板文件相对路径与 sha256。用户配置（`config.json`、`schema.md`、`wiki-config.json`、`profile.json`）只记录存在与否，不记哈希。重跑时据此判断：
+每次安装后在 `.agents/skills/.skills-init.json`（`--copy` 时各目标目录各一份）写入清单：安装器版本、安装时间、所选环境、安装模式，以及每个 skill 的模板文件相对路径与 sha256。用户配置（`config.json`、`schema.md`、`wiki-config.json`、`profile.json`）只记录存在与否，不记哈希，重跑和升级都不覆盖。
 
-| 情况 | 交互模式 | `--yes` |
-| --- | --- | --- |
-| 模板文件当前内容与清单记录一致（没改过） | 直接更新 | 直接更新 |
-| 与清单记录不同（手改过） | 询问：`o` 用新模板覆盖 / `k` 保留你的版本 / 回车 = 保留并把新模板另存为同目录的 `<文件名>.new` | 保留你的版本，新模板写成 `<文件名>.new`，结尾汇总列出 |
-| 清单里有、新模板里已没有 | 没改过就删除；改过的保留并提示 | 同左 |
+**skills 目录里的其他文件（SKILL.md、skill.json、references、scripts）一律以安装包为准**，重跑和升级时总是更新为新版，不询问、不生成 `.new`：
 
-* 合并完 `.new` 后删掉它即可；你采纳了新模板（内容与新模板一致）或选了覆盖 / 保留后，下次重跑会自动清掉上次生成的 `.new`。
-* 没有清单的旧安装（本功能之前装的）无从判断是否手改过，第一次重跑仍按旧行为直接更新模板，之后就有清单了。
+| 情况 | 处理 |
+| --- | --- |
+| 当前内容与清单记录一致（没改过） | 直接更新 |
+| 与清单记录不同（手改过），或没有清单无从判断 | 原文件先备份到 `tmp/skills/upgrade-backup/<时间>/<相对项目根的路径>`，再更新为新版；结尾列出这些文件和备份目录 |
+| 清单里有、新版里已没有 | 没改过直接删除；改过的备份后删除 |
+
+* 这样 `SKILL.md`、`skill.json`、脚本始终是同一个版本，不会出现「新 SKILL.md 配旧 skill.json」的混搭。
+* 项目自己的定制不要改 skills 目录里的文件，放到不会被覆盖的地方：项目事实和约定写 `workflow/profile.json`（约定写 `notes`），文档结构用 `docs/skills/templates/<skill>/` 或 DocNexus 里的模板，通用规则写 `CLAUDE.md` / `AGENTS.md`。
+* 旧版本留下的 `<文件名>.new` 在升级时一并删除；需要找回手改内容时到备份目录里取。
 
 ### 卸载
 
@@ -403,7 +406,7 @@ node --test "tests/*.mjs"                 # 只跑 node 测试（三个平台都
 
 node 测试覆盖：skill.json 一致性、子命令（upgrade / doctor / seed-templates / uninstall）、`resolve.mjs` 与画像推断、`lint-doc.mjs`（含 `--facts` 核对，用临时 git 仓库）、`artifacts.mjs`、`knowledge.mjs`、`query.mjs` 与表结构导出（用假的 mysql / psql 客户端）、md-to-wiki 转换与上传（用本地假 Confluence 服务）、DocNexus 模板导入与版本跟踪（用假的 docnexus CLI）。
 
-安装器的黑盒场景都在 `tests/test-install.mjs`，三个平台共用：每个用例在临时目录放一份 skills-init 副本，执行安装后检查目录、软链接和配置。覆盖全新安装（单一来源 + 相对软链接）、`SKILLS_INIT_NO_SYMLINK=1` 退回独立拷贝、`--copy`、`--yes` 无数据库配置时退出码 1、含 `/ & | " \` 的密码、重跑保留用户配置、安装清单、手改模板另存 `.new`（含交互选覆盖 / 保留）、删除模板文件后的清理、卸载与备份、从旧版各环境独立拷贝升级（用 git 历史中 `71a23c8` 的旧脚本生成旧布局，浅克隆时先 `git fetch --unshallow`）、两边配置冲突、`.gitignore` 只追加缺失规则。
+安装器的黑盒场景都在 `tests/test-install.mjs`，三个平台共用：每个用例在临时目录放一份 skills-init 副本，执行安装后检查目录、软链接和配置。覆盖全新安装（单一来源 + 相对软链接）、`SKILLS_INIT_NO_SYMLINK=1` 退回独立拷贝、`--copy`、`--yes` 无数据库配置时退出码 1、含 `/ & | " \` 的密码、重跑保留用户配置、安装清单、手改的 skill 文件备份后更新为新版（含清理旧版本的 `.new`）、删除模板文件后的清理（改过的先备份）、卸载与备份、从旧版各环境独立拷贝升级（用 git 历史中 `71a23c8` 的旧脚本生成旧布局，浅克隆时先 `git fetch --unshallow`）、两边配置冲突、`.gitignore` 只追加缺失规则。
 
 `tests/test-init-skills.sh` / `.ps1` 只是封装脚本的冒烟测试：确认以上级目录为项目根、参数与子命令原样透传、stdin 交互可用。
 

@@ -3,38 +3,45 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { TPL_DIR, PKG, CANON_DIR, INSTALL_BASES, SKILLS, SKILL_LIST, USER_FILES, RENAMED, MANIFEST, ok, warn, readJson, walk, toPosix, sameFile, writeFile, render, sha256, fileHash, readManifest, removeEmptyDirs, lstat, timestamp, removeLink } from './core.mjs';
-import { ask } from './prompt.mjs';
 import { writeDbConfig } from './db.mjs';
 
-// 结尾汇总：另存为 .new 的 / 保留用户版本的 / 模板已删除但用户改过而保留的文件
-export const report = { asNew: [], kept: [], stale: [] };
-// 清单里有、新模板里已没有的文件：未被修改时删除，改过的保留并汇总提示
-export function pruneFile(file, recorded, stop, label) {
+// 结尾汇总：被手改过、已用新版覆盖（原文件已备份）的 / 模板已删除、手改过而备份后删除的文件
+export const report = { overwritten: [], removed: [], backupDir: null };
+
+// skills 目录里的文件一律以安装包为准：手改过的先备份到 <项目根>/tmp/skills/upgrade-backup/<时间>/（同一次运行共用一个目录），
+// 再覆盖或删除。项目自己的定制应放在不会被升级覆盖的地方：workflow/profile.json、docs/skills/templates/、DocNexus、CLAUDE.md / AGENTS.md
+let stamp = null;
+function backup(root, file) {
+  stamp ??= timestamp();
+  const dir = path.join(root, 'tmp', 'skills', 'upgrade-backup', stamp);
+  const rel = path.relative(root, file);
+  // 装在项目外（如 ~/.codex/skills）的文件按绝对路径放在 outside-project/ 下
+  const target = rel.startsWith('..') || path.isAbsolute(rel) ? path.join(dir, 'outside-project', file.replace(/^[A-Za-z]:/, '').replace(/^[\\/]+/, '')) : path.join(dir, rel);
+  fs.mkdirSync(path.dirname(target), { recursive: true });
+  fs.copyFileSync(file, target);
+  report.backupDir = toPosix(path.relative(root, dir));
+}
+
+// 清单里有、新模板里已没有的文件：删除；手改过的先备份
+export function pruneFile(file, recorded, stop, label, root) {
   if (!lstat(file)?.isFile()) return;
-  if (fileHash(file) !== recorded) { report.stale.push(label); return; }
+  if (fileHash(file) !== recorded) { backup(root, file); report.removed.push(label); }
   fs.rmSync(file);
   removeEmptyDirs(path.dirname(file), stop);
   ok(`已清理模板中已删除的文件 ${label}`);
 }
 
-// 模板文件：不存在或未被手改过（与清单记录的哈希一致）时直接写入；手改过的按交互选择 / --yes 另存 .new。
-// 没有清单（首次安装或旧版本装的）时无从判断，照旧覆盖。返回本次生成的 .new 文件名（没有则为 null）。
+// 模板文件：总是写成新版。和上次安装记录的哈希不同（被手改过）时先备份原文件。
+// 没有清单（首次安装或很早的版本装的）时无从判断是否手改，内容不同就备份后覆盖。旧版本留下的 <文件>.new 一并删除
 export async function installTemplate(dst, content, recorded, hasManifest, ctx, label) {
+  const legacyNew = `${dst}.new`;
+  if (lstat(legacyNew)?.isFile()) fs.rmSync(legacyNew);
   if (!fs.existsSync(dst)) { writeFile(dst, content); return null; }
   const cur = fileHash(dst);
   if (cur === sha256(content)) return null;
-  if (!hasManifest || cur === recorded) { writeFile(dst, content); return null; }
-  let choice = 'new';
-  if (!ctx.yes) {
-    const a = (await ask(`    ${label} 与上次安装的版本不同（被手动修改过）。o=用新模板覆盖 / k=保留你的版本 / 回车=保留并把新模板另存为 .new: `)).toLowerCase();
-    if (a === 'o') choice = 'overwrite';
-    else if (a === 'k') choice = 'keep';
-  }
-  if (choice === 'overwrite') { writeFile(dst, content); ok(`${label} 已用新模板覆盖`); return null; }
-  if (choice === 'keep') { report.kept.push(label); return null; }
-  writeFile(`${dst}.new`, content);
-  report.asNew.push(label);
-  return `${path.basename(dst)}.new`;
+  if (!hasManifest || cur !== recorded) { backup(ctx.root, dst); report.overwritten.push(label); }
+  writeFile(dst, content);
+  return null;
 }
 
 // entry 为 null 表示整个 skill 已从模板中移除
@@ -45,7 +52,7 @@ export function pruneSkill(base, skill, prevSkill, entry, root) {
   const stop = entry ? dir : base;
   for (const [rel, h] of Object.entries(prevSkill.files ?? {})) {
     if (entry && rel in entry.files) continue;
-    pruneFile(path.join(dir, rel), h, stop, `${toPosix(path.relative(root, dir))}/${rel}`);
+    pruneFile(path.join(dir, rel), h, stop, `${toPosix(path.relative(root, dir))}/${rel}`, root);
   }
   // 上次生成、这次不再需要的 .new（用户已处理，或这次选了覆盖 / 保留）
   for (const rel of prevSkill.pending ?? []) {

@@ -43,7 +43,7 @@ test('doctor：干净安装无错误；手改 / 缺链接 / .gitignore 缺规则
   fs.rmSync(root, { recursive: true, force: true });
 });
 
-test('upgrade：沿用清单里的环境、保留数据库配置、手改文件另存 .new', () => {
+test('upgrade：沿用清单里的环境、保留数据库配置、手改文件备份后更新', () => {
   const root = tmp();
   assert.equal(cli(root, '--envs', 'codex,claude', '--skip-db', '--yes').status, 0);
   const cfg = path.join(root, '.agents/skills/database-query/config.json');
@@ -57,7 +57,10 @@ test('upgrade：沿用清单里的环境、保留数据库配置、手改文件�
   assert.match(r.stdout, new RegExp(`升级：0\\.0\\.1 -> ${PKG.version.replace(/\./g, '\\.')}`));
   assert.match(r.stdout, /目标环境：(claude codex|codex claude)/);
   assert.equal(fs.readFileSync(cfg, 'utf8'), '{"connections":{"default":{"driver":"mysql","password":"keep"}}}');
-  assert.ok(fs.existsSync(path.join(root, '.agents/skills/workflow/SKILL.md.new')));
+  assert.ok(!fs.existsSync(path.join(root, '.agents/skills/workflow/SKILL.md.new')));
+  assert.doesNotMatch(fs.readFileSync(path.join(root, '.agents/skills/workflow/SKILL.md'), 'utf8'), /# 手改/);
+  const bk = path.join(root, 'tmp/skills/upgrade-backup');
+  assert.ok(fs.readdirSync(bk).some((d) => /# 手改/.test(fs.readFileSync(path.join(bk, d, '.agents/skills/workflow/SKILL.md'), 'utf8'))));
   assert.equal(JSON.parse(fs.readFileSync(manifestPath(root), 'utf8')).version, PKG.version);
   assert.equal(cli(root, 'uninstall').status, 0);
   assert.ok(!fs.existsSync(manifestPath(root)));

@@ -35,7 +35,7 @@ const HELP = `用法: skills-init [命令] [选项]
 
 命令：
   init（默认）         安装或重装 skills
-  upgrade              按安装清单里的环境与模式非交互升级到当前版本（保留数据库配置；手改过的文件另存 .new）；
+  upgrade              按安装清单里的环境与模式非交互升级到当前版本（保留数据库配置等用户配置；skills 文件一律更新为新版，手改过的先备份到 tmp/skills/upgrade-backup/）；
                        已接入 DocNexus 时顺带导入新增的文档模板（只新增，不覆盖已有模板）
   doctor               自检：版本、手改 / 缺失文件、软链接、项目画像、DocNexus 模板、数据库连通性、.gitignore
   uninstall            按安装清单卸载本项目装的 skills 与链接（用户配置备份到 tmp/skills/uninstall-backup/）
@@ -248,12 +248,11 @@ async function main() {
   if (fs.existsSync(path.join(o.root, 'docnexus', 'project.json'))) reportTemplateStatus(o.root);
   if (docnexus === 'failed') warn('注意：DocNexus 接入失败（见上方输出），其他 skills 不受影响；修复后可重跑（加 --with-docnexus）。');
   if (codegraph === 'failed') warn('注意：CodeGraph 接入失败（见上方输出），其他 skills 不受影响；skills 会退回 grep / 读文件；修复后可重跑（加 --with-codegraph）。');
-  if (report.asNew.length) {
-    warn('以下文件被手动修改过，已保留你的版本，新模板另存为同目录的 <文件名>.new（对比合并后删除 .new，或用新模板覆盖原文件）：');
-    for (const f of report.asNew) warn(`  ${f}  ->  ${path.basename(f)}.new`);
+  if (report.overwritten.length || report.removed.length) {
+    warn(`以下文件被手动修改过，已按新版${report.removed.length ? '覆盖或删除' : '覆盖'}，原文件备份在 ${report.backupDir}/（skills 目录里的文件以安装包为准；项目定制请放到 workflow/profile.json、docs/skills/templates/、DocNexus 或 CLAUDE.md / AGENTS.md）：`);
+    for (const f of report.overwritten) warn(`  ${f}`);
+    for (const f of report.removed) warn(`  ${f}（新版已不提供，已删除）`);
   }
-  if (report.kept.length) warn(`以下文件按你的选择保留了修改，未更新为新模板：${report.kept.join('、')}`);
-  if (report.stale.length) warn(`以下文件已不在新模板中，但被手动修改过，保留未删除：${report.stale.join('、')}`);
   console.log('先运行 /workflow profile 填写项目画像；说明见 skills-init README。');
   // skills 已装好，但显式要求的 DocNexus 未接入：返回非 0 便于自动化感知
   return docnexus === 'failed' || codegraph === 'failed' || seedFailed ? 1 : 0;

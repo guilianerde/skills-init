@@ -50,9 +50,9 @@ export function doctor(root, offline) {
         const file = path.join(dir, f);
         const label = toPosix(path.join(rel, skill, f));
         if (!fs.existsSync(file)) { missing++; meh(`缺少 ${label}：运行 skills-init upgrade 恢复`); }
-        else if (fileHash(file) !== h) { modified++; meh(`${label} 被手动修改过（升级时不会被覆盖，新模板另存 .new）`); }
+        else if (fileHash(file) !== h) { modified++; meh(`${label} 被手动修改过（升级时会被新版覆盖，原文件备份到 tmp/skills/upgrade-backup/；项目定制请放到 profile.json、docs/skills/templates/ 或 DocNexus）`); }
       }
-      for (const f of entry.pending ?? []) if (fs.existsSync(path.join(dir, f))) meh(`${toPosix(path.join(rel, skill, f))} 待合并：对比后删除`);
+      for (const f of entry.pending ?? []) if (fs.existsSync(path.join(dir, f))) meh(`${toPosix(path.join(rel, skill, f))} 是旧版本留下的 .new：运行 skills-init upgrade 会更新为新版并清理`);
     }
     if (!modified && !missing) ok(`${toPosix(rel)}：${Object.keys(man.skills).length} 个 skill 的模板文件与安装时一致`);
   }

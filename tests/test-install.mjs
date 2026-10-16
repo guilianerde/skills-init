@@ -100,6 +100,14 @@ const backups = (p, glob) => {
 };
 
 // ---------------------------------------------------------------- 用例
+
+// 升级备份：tmp/skills/upgrade-backup/<时间>/<相对项目根的路径>；返回所有备份里这个文件的内容
+function upgradeBackups(p, rel) {
+  const dir = p.at('tmp/skills/upgrade-backup');
+  if (!fs.existsSync(dir)) return [];
+  return fs.readdirSync(dir).map((d) => path.join(dir, d, rel)).filter((f) => fs.existsSync(f)).map((f) => fs.readFileSync(f, 'utf8'));
+}
+
 test('全新安装：单一来源完整文件 + 相对软链接；重跑不变', () => {
   const p = project('fresh');
   ok(p.install(['--envs', 'claude,qwen', '--yes', '--skip-db']));
@@ -171,7 +179,7 @@ test('交互输入含特殊字符的密码：config.json 合法且值一致；--
   assert.equal(p.json(cfg).connections.default.password, PASSWORD);
 });
 
-test('重跑保留用户配置；手改的模板另存 .new；--skip-db 保留 config.json', () => {
+test('重跑保留用户配置；手改的 skill 文件备份后更新为新版；--skip-db 保留 config.json', () => {
   const p = project('rerun');
   ok(p.install(['--envs', 'claude,qwen'], { input: DB_ANSWERS }));
   const c = '.agents/skills';
@@ -183,8 +191,9 @@ test('重跑保留用户配置；手改的模板另存 .new；--skip-db 保留 c
   ok(p.install(['--envs', 'claude,qwen', '--yes']));
   for (const [f, v] of Object.entries(keep)) assert.equal(p.read(`${c}/${f}`), v, f);
   assert.equal(p.read(`${c}/database-query/references/schema.md`), '# my schema\n');
-  assert.equal(p.read(`${c}/dev/SKILL.md`), 'stale\n');
-  assert.equal(p.read(`${c}/dev/SKILL.md.new`), repoFile('dev/SKILL.md.tpl'));
+  assert.equal(p.read(`${c}/dev/SKILL.md`), repoFile('dev/SKILL.md.tpl'));
+  assert.ok(!p.exists(`${c}/dev/SKILL.md.new`));
+  assert.deepEqual(upgradeBackups(p, `${c}/dev/SKILL.md`), ['stale\n']);
   ok(p.install(['--envs', 'claude,qwen', '--yes', '--skip-db']));
   assert.equal(p.read(`${c}/database-query/config.json`), keep['database-query/config.json']);
 });
@@ -207,33 +216,26 @@ test('安装清单：版本 / 环境 / sha256，用户配置只记存在与否�
   assert.equal(p.json('.qwen/skills/.skills-init.json').mode, 'copy');
 });
 
-test('手改模板：--yes 另存 .new；交互 k 保留、o 覆盖；采纳 .new 后不再提示', () => {
+test('手改的 skill 文件：一律更新为新版，原文件备份到 tmp/skills/upgrade-backup/；不再询问、不再生成 .new，旧版本留下的 .new 被清理', () => {
   const p = project('modified');
   const c = '.agents/skills';
   const args = ['--envs', 'claude,qwen', '--skip-db'];
   ok(p.install([...args, '--yes']));
   p.write(`${c}/dev/SKILL.md`, 'my edits\n');
-  let r = p.install([...args, '--yes']); ok(r);
-  assert.equal(p.read(`${c}/dev/SKILL.md`), 'my edits\n');
-  assert.equal(p.read(`${c}/dev/SKILL.md.new`), repoFile('dev/SKILL.md.tpl'));
-  assert.ok(r.log.includes(`${c}/dev/SKILL.md  ->  SKILL.md.new`));
-  ok(p.install([...args, '--yes']));
-  assert.equal(p.read(`${c}/dev/SKILL.md`), 'my edits\n');
-  ok(p.install(args, { input: 'k\n' }));
-  assert.equal(p.read(`${c}/dev/SKILL.md`), 'my edits\n');
-  assert.ok(!p.exists(`${c}/dev/SKILL.md.new`));
-  ok(p.install(args, { input: 'o\n' }));
+  p.write(`${c}/create-tech-md-doc/skill.json`, '{"name":"create-tech-md-doc","order":6,"templates":[{"id":"template.md","src":"template.md"}]}\n');
+  p.write(`${c}/workflow/SKILL.md.new`, 'left over by an old version\n');
+  let r = p.install(args); ok(r); // 交互模式也不询问（没有输入也不会卡住）
   assert.equal(p.read(`${c}/dev/SKILL.md`), repoFile('dev/SKILL.md.tpl'));
-  p.write(`${c}/dev/SKILL.md`, 'mine again\n');
-  ok(p.install([...args, '--yes']));
-  fs.renameSync(p.at(`${c}/dev/SKILL.md.new`), p.at(`${c}/dev/SKILL.md`));
+  assert.equal(p.read(`${c}/create-tech-md-doc/skill.json`), repoFile('create-tech-md-doc/skill.json'), 'skill.json 与 SKILL.md 不会新旧混搭');
+  assert.deepEqual(upgradeBackups(p, `${c}/dev/SKILL.md`), ['my edits\n']);
+  assert.ok(!p.exists(`${c}/dev/SKILL.md.new`) && !p.exists(`${c}/workflow/SKILL.md.new`));
+  assert.match(r.log, /以下文件被手动修改过，已按新版覆盖，原文件备份在 tmp\/skills\/upgrade-backup\/\d{8}-\d{6}\//);
+  assert.ok(r.log.includes(`  ${c}/dev/SKILL.md`));
   r = p.install([...args, '--yes']); ok(r);
-  assert.equal(p.read(`${c}/dev/SKILL.md`), repoFile('dev/SKILL.md.tpl'));
-  assert.ok(!p.exists(`${c}/dev/SKILL.md.new`));
-  assert.ok(!r.log.includes('SKILL.md.new'));
+  assert.ok(!r.log.includes('被手动修改过'), '没有再改过就不再提示');
 });
 
-test('新版本删掉的模板文件：未改过的清理，改过的保留并提示', () => {
+test('新版本删掉的模板文件：未改过的直接清理，改过的备份后清理', () => {
   const p = project('prune');
   const c = '.agents/skills';
   ok(p.install(['--envs', 'claude,qwen', '--yes', '--skip-db']));
@@ -248,13 +250,14 @@ test('新版本删掉的模板文件：未改过的清理，改过的保留并�
   fs.writeFileSync(p.at('skills-init/dev/skill.json'), JSON.stringify(meta));
   const r = p.install(['--envs', 'claude,qwen', '--yes', '--skip-db']); ok(r);
   assert.ok(!p.exists(`${c}/dev/references/plan-template.md`));
-  assert.equal(p.read(`${c}/dev/references/delivery-template.md`), edited);
+  assert.ok(!p.exists(`${c}/dev/references/delivery-template.md`));
+  assert.deepEqual(upgradeBackups(p, `${c}/dev/references/delivery-template.md`), [edited]);
   // skill 自带的 references 被清理；skill.json 声明的共享文件仍然装在 references/ 下
   assert.ok(!p.exists(`${c}/create-tech-md-doc/references/diff-collection.md`));
   assert.ok(!p.exists(`${c}/create-tech-md-doc/references/prd.md`));
   assert.ok(p.isFile(`${c}/create-tech-md-doc/references/prd-fetch.md`));
   assert.ok(p.isFile(`${c}/create-tech-md-doc/SKILL.md`));
-  assert.ok(r.log.includes(`${c}/dev/references/delivery-template.md`));
+  assert.ok(r.log.includes(`${c}/dev/references/delivery-template.md（新版已不提供，已删除）`));
   assert.ok(!('references/plan-template.md' in p.json(`${c}/.skills-init.json`).skills.dev.files));
 });
 
