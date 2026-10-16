@@ -4,6 +4,8 @@
 
 ## [Unreleased]
 
+## [0.8.1] - 2026-10-16
+
 ### 变更
 - project-review 的 DocNexus 沉淀对齐 dev：已接入 DocNexus 时交付报告后**每次都问**要不要沉淀（列出建议沉淀的问题模式 / 约定 / 坑，没有值得记的也照问并说明）；同意后以 `code-review` 分类写入，只沉淀问题模式和约定（不含逐条清单和「⚠ 待确认」的发现），成功后把 `docnexus/library/<path>` 记回报告新增的「DocNexus」元信息行；未接入时不提问，元信息行写「未接入」。
 - `package.json` 的 description 补上 code-graph。
@@ -120,7 +122,8 @@
 - 安装器改为单一 Node 实现，`init-skills.sh` / `init-skills.ps1` 只是薄封装。
 - `code-review` 改名为 `project-review`，升级时自动清理旧名。
 
-[Unreleased]: https://github.com/guilianerde/skills-init/compare/v0.8.0...HEAD
+[Unreleased]: https://github.com/guilianerde/skills-init/compare/v0.8.1...HEAD
+[0.8.1]: https://github.com/guilianerde/skills-init/compare/v0.8.0...v0.8.1
 [0.8.0]: https://github.com/guilianerde/skills-init/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/guilianerde/skills-init/compare/v0.6.2...v0.7.0
 [0.6.2]: https://github.com/guilianerde/skills-init/compare/v0.6.1...v0.6.2
