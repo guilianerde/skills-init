@@ -187,6 +187,7 @@ npx @rowansenne/skills-init doctor
 | `-Envs` / `--envs`      | 环境列表，逗号分隔：`codex,claude,doubao,qwen`；`all` = 全部                       |
 | `-SkipDb` / `--skip-db` | 跳过数据库连接配置（database-query 不生成 config.json）                             |
 | `-WithDocNexus` / `--with-docnexus` | 可选：接入 [DocNexus](https://www.npmjs.com/package/@rowansenne/docnexus) 项目文档库（需 Node >= 22.13），见下方「DocNexus 文档库（可选）」 |
+| `-WithCodeGraph` / `--with-codegraph` | 可选：接入 [CodeGraph](https://github.com/colbymchenry/codegraph) 代码图谱，见下方「CodeGraph 代码图谱（可选）」 |
 | `-Copy` / `--copy`      | 不建软链接，各环境独立拷贝一份完整 skills                                  |
 | `--skills <列表>` | 只装这些 skill（逗号分隔），自动带上 `requires` 依赖；之后可以再用 `--skills` 补装，已装的保留；`upgrade` 只升级装过的。不含 database-query 时不询问数据库 |
 | `-SeedTemplates` / `--seed-templates` | 把自带的文档模板导入 DocNexus（已有的不覆盖）；接入 DocNexus 后文档类 skill 只从知识库取模板。`--with-docnexus` 会自动执行 |
@@ -223,6 +224,36 @@ npx @rowansenne/skills-init doctor
 * 安装后 `dev`、`project-review` 会先按 `docnexus-recall` 查项目约定；`dev`、`create-tech-md-doc`、`create-release-md-doc` 结束时只会**提议**沉淀，**任何写入 DocNexus 的操作都必须经你授权**。
 * 离线或测试时可用环境变量指定安装来源，例如 `DOCNEXUS_PKG=/path/to/rowansenne-docnexus-0.13.0.tgz ./skills-init/init-skills.sh --with-docnexus`（PowerShell：`$env:DOCNEXUS_PKG=...`）。
 * Windows 上 qwen 的链接使用目录 junction（与 docnexus 的做法一致）；Git Bash 下 `ln -s` 是否生成真正的链接取决于 MSYS 设置，建议 Windows 用 PowerShell 版。
+
+## CodeGraph 代码图谱（可选）
+
+[CodeGraph](https://github.com/colbymchenry/codegraph)（MIT，100% 本地）把项目预先解析成代码知识图谱：符号、调用边、继承 / 实现、Spring `@GetMapping` 等路由。agent 一次查询就能拿到相关源码、调用路径和影响面，不用逐个文件 grep、读文件。
+
+加 `--with-codegraph`（PowerShell：`-WithCodeGraph`）时，装完 skills 后额外执行：
+
+1. 找不到 `codegraph` 命令时执行 `npm i -g @colbymchenry/codegraph`（全局装 CLI；它自带运行时，不依赖项目的 Node 版本）；
+2. 所选环境里有 claude / codex 时，执行 `codegraph install --target=<claude,codex> --location=local --yes`，把 MCP 配置写进本项目：
+   - claude：`.mcp.json`、`.claude/settings.json`（自动放行 `codegraph_explore`）、`.claude/CLAUDE.md`；
+   - codex：`.codex/config.toml`、`AGENTS.md`。Codex 只在受信任的项目里加载项目级配置。
+   - doubao、qwen 不在 CodeGraph 支持的 agent 里，skills 在这两个环境直接调用 `codegraph` CLI，输出和 MCP 工具一样。
+3. 执行 `codegraph init <项目根> --yes` 建索引，生成 `.codegraph/`（本地 SQLite），并把它加入 `.gitignore`。之后 agent 使用期间会自动增量同步。
+
+skills 怎么用它：见 `workflow/references/codegraph.md`。
+
+| skill | 环节 | 用法 |
+|---|---|---|
+| dev | 现状调研 | 用 `explore` 读调用链 |
+| dev | 实现 | 改公共方法前用 `impact` 看影响面 |
+| dev | 验证 | 用 `affected` 找出受影响的测试，先跑这些 |
+| project-review | 影响面分析 | 用 `callers` / `impact` |
+| 技术方案、上线方案 | 影响范围、回归接口 | 用 `impact` |
+
+图谱看不到的部分照常 grep，图谱里「没有调用方」也仍按「未确认」处理。这些部分包括：Spring 依赖注入 / AOP / 反射、MyBatis XML、MQ topic、配置 key。
+
+* 能力探测：`resolve.mjs status` 的 `codegraph`（`ok` = 有 `.codegraph/` 且 `codegraph` 命令可用）。`/workflow status` 和 `doctor` 都会显示。
+* 没有 `.codegraph/` 时，skills **不会自己建索引**，只在交付或报告里注明「未使用代码图谱」。要不要建索引由你决定。
+* 本工具调用 codegraph 时都带 `DO_NOT_TRACK=1`。但 CodeGraph 自身默认上报匿名使用统计（不含代码、路径、符号名），`--yes` 不会询问；需要关闭时运行 `codegraph telemetry off`。
+* 卸载：`codegraph uninstall` 移除 agent 配置和 CLI，`codegraph uninit` 删除本项目的索引。
 
 ## 重跑与升级
 

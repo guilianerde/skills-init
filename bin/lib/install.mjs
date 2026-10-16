@@ -241,10 +241,11 @@ export function removeRenamed(root) {
 }
 
 // ---------------------------------------------------------------- 4. .gitignore 保护
-export function updateGitignore(root, withDocNexus) {
+export function updateGitignore(root, withDocNexus, withCodeGraph = false) {
   const gi = path.join(root, '.gitignore');
   const rules = ['**/database-query/config.json', '**/wiki-config.json', '/tmp/'];
   if (withDocNexus) rules.push('node_modules/');
+  if (withCodeGraph) rules.push('.codegraph/'); // 本地索引（SQLite），各人各建
   const existing = fs.existsSync(gi) ? fs.readFileSync(gi, 'utf8').split(/\r?\n/).map((l) => l.trim()) : [];
   const missing = rules.filter((r) => !existing.includes(r));
   if (!missing.length) { ok('.gitignore 已包含全部规则'); return; }

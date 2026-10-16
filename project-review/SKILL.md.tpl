@@ -16,7 +16,7 @@ description: "Review source code (any language; Java/Spring, Go, TypeScript, Pyt
      - `latest.review` 存在 → 这是**复审**：读上次报告的问题表，并用 `git log --oneline --since=<上次报告日期> <dev分支>` 看之后改了什么。本次报告对上次的每条问题标「已修复 / 仍存在 / 不再适用」（「已修复」要看到对应改动），本次新发现的标「新增」。
 3. **分支对比**：基线默认取 `workflow/profile.json` 的 `main_branch`（未配置则 `main`）。按 `references/diff-strategy.md` 先量规模：小改动全量精读；改动多时按风险分级（P0 资金 / 事务 / 权限 / SQL / 对外接口 / MQ / 配置优先）分批精读，审不到的写进报告。只审本次改动引入的问题，同时检查改动是否破坏既有调用方。
 4. **逐项过检查清单**（在项目根运行 `node <skills>/workflow/scripts/resolve.mjs template project-review checklist.md`，读输出的 `path`；退出码 2 时停下并按 `hint` 处理）：对每个发现给出 文件+行号、问题描述、严重级别、修改建议。
-5. **影响面分析**：改动是否影响其他调用方/模块，用 grep 或精读调用链确认；查不到调用方的符号不能当作安全，要明说"未确认"。
+5. **影响面分析**：改动是否影响其他调用方/模块。CodeGraph 可用时对改动的方法 / 接口逐个 `codegraph callers` / `codegraph impact <符号> --depth 2`（MCP 下用 `codegraph_explore`），否则用 grep 或精读调用链确认。Spring 注入、AOP、MyBatis XML、MQ topic、配置 key 图谱看不到，照常 grep（见 `<skills>/workflow/references/codegraph.md`）。查不到调用方的符号不能当作安全，要明说"未确认"。
 6. **复核**：交付前逐条复核 CRITICAL / HIGH（MEDIUM 至少做第 1 条）。审查结论会被用来决定能不能合并，一条误报会让人白改代码，也会让后面的真问题不被当回事：
    1. 回到被审的代码（分支对比用 `git show <dev>:<文件>`，未提交改动读工作区）确认引用的片段和行号真实存在。
    2. 写出**触发条件**：什么输入 / 状态下会出错、错成什么样。写不出来 → 降为 MEDIUM 并标「⚠ 待确认」。

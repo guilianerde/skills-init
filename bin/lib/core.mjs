@@ -24,6 +24,7 @@ export const USER_FILES = META.userFiles;
 // 改过名的 skill：旧名 -> 新名。升级时只清理能确认是本项目安装的旧目录 / 链接（按 SKILL.md 签名判断）
 export const RENAMED = META.renamed;
 export const DOCNEXUS_PKG = process.env.DOCNEXUS_PKG || '@rowansenne/docnexus';
+export const CODEGRAPH_PKG = process.env.CODEGRAPH_PKG || '@colbymchenry/codegraph';
 // DocNexus CLI：0.17.0 起装在 docnexus/node_modules/.bin（与宿主项目的 npm 文件隔离），之前装在项目根 node_modules/.bin。
 // 两处都有时用 docnexus/ 下的。返回绝对路径或 null；workflow/scripts/resolve.mjs 的 docnexusBin 与此一致
 export const DOCNEXUS_BIN_DIRS = [['docnexus', 'node_modules', '.bin'], ['node_modules', '.bin']];

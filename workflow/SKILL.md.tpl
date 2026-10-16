@@ -53,6 +53,7 @@ dev（需求 → 方案 → 实现 → 测试 → 自审）
 | `references/templates.md` | 模板来源判定（`resolve.mjs template`）、模板随知识库更新 |
 | `references/docnexus.md` | 写入 DocNexus 的分类（`resolve.mjs category`）、按分类参考知识库（`knowledge.mjs`） |
 | `references/status.md` | `/workflow status` 的输出格式 |
+| `references/codegraph.md` | 用 CodeGraph 代码图谱读代码、查调用链与影响面（MCP 工具与 CLI 对照、图谱看不到的部分） |
 
 `/workflow profile` → 按 `references/profile.md` 执行；`/workflow status` → 按 `references/status.md` 输出。
 
@@ -65,6 +66,7 @@ dev（需求 → 方案 → 实现 → 测试 → 自审）
 | wiki | `md-to-wiki/wiki-config.json` 中 `enabled=true` 且 `wiki.base_url` 非空；或环境存在 wiki MCP 工具 | 读 PRD（各 skill 按 `references/prd-fetch.md`，REST 通道统一调 `md-to-wiki/scripts/upload.mjs get`）、发布文档 |
 | DocNexus | 项目根有 `docnexus/project.json`，且 CLI 可执行：`./docnexus/node_modules/.bin/docnexus`（0.17.0 起的装法）或 `./node_modules/.bin/docnexus`（旧装法）；`resolve.mjs status` 的 `docnexus.bin` 给出实际路径，直接调用 CLI 时用它 | 查约定与历史决策、沉淀知识、提供文档模板 |
 | 数据库 | `database-query/config.json` 存在且 `connections` 非空 | 查表结构、核对数据 |
+| 代码图谱（CodeGraph） | 项目根有 `.codegraph/` 索引，且 `codegraph` 命令可用（`resolve.mjs status` 的 `codegraph.ok`） | 读代码、查调用链与影响面、找受影响的测试；用法见 `references/codegraph.md` |
 | 项目画像 | `workflow/profile.json` 中 `main_branch` 与 `build` / `test` 非空 | dev 构建与测试 |
 
 ## Rules

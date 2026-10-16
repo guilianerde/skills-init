@@ -4,6 +4,13 @@
 
 ## [Unreleased]
 
+### 新增
+- 集成 [CodeGraph](https://github.com/colbymchenry/codegraph) 代码图谱（可选），补上「读项目源码」这一块：
+  - `--with-codegraph` / `-WithCodeGraph`：没有 `codegraph` 命令时 `npm i -g @colbymchenry/codegraph`；为 claude / codex 用 `codegraph install --location=local --yes` 写项目级 MCP 配置（doubao / qwen 不支持，skills 改走 CLI）；`codegraph init` 建本项目索引 `.codegraph/` 并加入 `.gitignore`。本工具发起的调用都带 `DO_NOT_TRACK=1`，安装结束提示如何关闭 CodeGraph 自身的匿名统计。
+  - `resolve.mjs status` 新增 `codegraph`（`ok` / `cli` / `indexed`），`/workflow status` 与 `doctor` 显示接入状态。
+  - 新增 `workflow/references/codegraph.md`：MCP 工具 `codegraph_explore` 与 CLI（`explore` / `node` / `callers` / `callees` / `impact` / `affected` / `query`）对照、结论仍需「文件:行号」出处、图谱看不到的部分（Spring 注入 / AOP / 反射、MyBatis XML、MQ、配置 key）照常 grep、「没有调用方」不等于安全、skill 不自行建索引。
+  - dev：现状调研用 `explore` 读调用链，改公共方法前 `impact`，验证时用 `affected` 先跑受影响的测试；project-review 影响面分析用 `callers` / `impact`；技术方案的影响范围、上线方案的回归接口参考 `impact`。
+
 ### 变更
 - 适配 DocNexus 0.17.0 的安装位置：CLI 从项目根 `node_modules/.bin/docnexus` 改为 `docnexus/node_modules/.bin/docnexus`（npm 清单与依赖不进宿主项目）。安装器、`seed-templates`、`doctor`、`resolve.mjs`、`knowledge.mjs` 统一按「`docnexus/` 下优先、项目根兼容」查找 CLI，之前只认项目根，新装法的项目会被当成「未接入 DocNexus」。`--with-docnexus` 新装时用 `npm install --prefix ./docnexus --save-exact`，已装在项目根的沿用原位置升级；`doctor` 的升级提示按实际装法给命令；`resolve.mjs status` 新增 `docnexus.bin`（实际 CLI 路径），SKILL 里的接入判定改为引用它。
 

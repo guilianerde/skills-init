@@ -5,6 +5,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { PKG, CANON_DIR, DOCNEXUS_PKG, docnexusUpgradeCmd, SKILLS, step, ok, warn, fail, toPosix, fileHash, readManifest, lstat, findManifests, cmpVersion } from './core.mjs';
 import { reportTemplateStatus, docnexusSupportsCategory, docnexusSupportsRecallCategory } from './docnexus.mjs';
+import { codegraphVersion } from './codegraph.mjs';
 
 // upgrade = 用清单里记录的环境与模式非交互重装；数据库配置原样保留
 export function upgradeOptions(o) {
@@ -95,6 +96,10 @@ export function doctor(root, offline) {
       if (docnexusSupportsRecallCategory(root) === false) meh(`已装的 DocNexus 不支持 recall --category：knowledge.mjs --query 只列文档，skill 改用不带分类的 recall。升级：${docnexusUpgradeCmd(root)}`);
       else ok('DocNexus 支持按分类检索（recall --category）');
     } else console.log('    --  DocNexus 未接入（可选）');
+    if (st.codegraph?.ok) ok(`CodeGraph 已接入（codegraph ${codegraphVersion(root)}，索引在 .codegraph/）`);
+    else if (st.codegraph?.indexed) meh('有 .codegraph/ 索引但找不到 codegraph 命令：npm i -g @colbymchenry/codegraph，或重跑 skills-init 并加 --with-codegraph');
+    else if (st.codegraph?.cli) console.log('    --  已装 codegraph，但本项目没有建索引（可选：在项目根运行 codegraph init）');
+    else console.log('    --  CodeGraph 未接入（可选）');
     if (!st.database.ok) console.log('    --  数据库未配置（可选）');
   }
 

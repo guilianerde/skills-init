@@ -1,6 +1,6 @@
 # `/workflow status` 输出
 
-先运行 `node <skills>/workflow/scripts/resolve.mjs status` 和 `node <skills>/workflow/scripts/artifacts.mjs`（当前分支的产物进度），前者按上表判定画像、wiki 配置、DocNexus（含缺失模板）、数据库连接（只给连接名、driver、是否只读，不含凭据），再据此填写下表。wiki MCP 脚本探测不到，需你自己看当前环境有没有 wiki 相关工具。
+先运行 `node <skills>/workflow/scripts/resolve.mjs status` 和 `node <skills>/workflow/scripts/artifacts.mjs`（当前分支的产物进度），前者按上表判定画像、wiki 配置、DocNexus（含缺失模板）、代码图谱、数据库连接（只给连接名、driver、是否只读，不含凭据），再据此填写下表。wiki MCP 脚本探测不到，需你自己看当前环境有没有 wiki 相关工具。
 
 ```
 # Workflow 状态
@@ -11,11 +11,12 @@
 | wiki | ✅ / ❌ | 填写 md-to-wiki/wiki-config.json 或接入 wiki MCP |
 | DocNexus | ✅ / ❌ | 重跑 skills-init 并加 --with-docnexus；已接入但缺模板时列出缺的模板并提示 `skills-init seed-templates` |
 | 数据库 | ✅ / ❌ | 重跑 init-skills 补配 |
+| 代码图谱 | ✅ / ⚠️ 已装未建索引 / ❌ | 重跑 skills-init 并加 --with-codegraph；已装 codegraph 但没有 .codegraph/ 时提示用户自己运行 codegraph init |
 
 ## 当前分支 <分支>
 | 环节 | 产物 | wiki |
 |---|---|---|
-| 开发方案 / 审查报告 / 技术方案 / 上线方案 | <path 或「—」> | <pageId vN 或「未发布」> |
+| 开发方案 / 交付说明 / 审查报告 / 技术方案 / 上线方案 | <path 或「—」> | <pageId vN 或「未发布」> |
 
 下一步：<artifacts.mjs 的 next>
 ```

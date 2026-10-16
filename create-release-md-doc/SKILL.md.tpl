@@ -45,7 +45,7 @@ description: "Generate a Markdown release/deployment plan (上线方案) from th
 | 一 上线服务 | ✅ | git remote + 项目结构 + 改动范围 + `profile.deploy` |
 | 二 中间件上线 | ✅ | DDL、实体、配置、构建文件、db_name；2.3 仅 `profile.data_review` 为 true 时输出 |
 | 三 灰度方案 | 有 PRD 时 | `prd_context.grayRelease`；否则留「待人工补充」 |
-| 四 上线后技术验证 | ✅ | 接口层 / `tech_context`；有 PRD 时追加业务场景 |
+| 四 上线后技术验证 | ✅ | 接口层 / `tech_context`；有 PRD 时追加业务场景；CodeGraph 可用时用改动符号的 `codegraph impact` 补全要回归的接口（见 `<skills>/workflow/references/codegraph.md`） |
 | 五 监控方案 | ✅ | 变更类名 / 方法名 + 定时任务 + topic |
 | 六 回滚 / 止损 | ✅ | DDL / 配置 / 服务回滚推断；有 PRD 时追加对齐缺口 |
 

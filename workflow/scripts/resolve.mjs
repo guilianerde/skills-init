@@ -13,6 +13,7 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
+import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { inferProfile } from './infer-profile.mjs';
 
@@ -41,6 +42,17 @@ export function docnexusBin(root) {
   const name = process.platform === 'win32' ? 'docnexus.cmd' : 'docnexus';
   for (const dir of DOCNEXUS_BIN_DIRS) if (fs.existsSync(path.join(root, ...dir, name))) return path.join(...dir, name);
   return null;
+}
+
+// CodeGraph 代码图谱：本项目建过索引（.codegraph/）且 codegraph 命令可用。索引是否建立由用户决定，skill 不自行 codegraph init
+export function codegraphStatus(root) {
+  const indexed = fs.existsSync(path.join(root, '.codegraph'));
+  const r = spawnSync('codegraph', ['--version'], { cwd: root, encoding: 'utf8', shell: process.platform === 'win32', env: { ...process.env, DO_NOT_TRACK: '1' }, timeout: 30000 });
+  const cli = r.status === 0;
+  return {
+    ok: indexed && cli, cli, indexed,
+    how: cli && indexed ? null : !cli ? '重跑 skills-init 并加 --with-codegraph（或 npm i -g @colbymchenry/codegraph）' : '在项目根运行 codegraph init 建索引（由用户决定）',
+  };
 }
 
 export function docnexusConnected(root) {
@@ -128,6 +140,8 @@ export function status(root) {
       categories: Object.fromEntries(skillMetas().map((m) => [m.name, resolveCategory(root, m.name)]).filter(([, c]) => c.ok).map(([n, c]) => [n, c.category])),
       how: dn ? '缺模板时运行 skills-init seed-templates' : '重跑 skills-init 并加 --with-docnexus',
     },
+    // 代码图谱：可用时读代码、查调用链与影响面优先用它（见 workflow/references/codegraph.md）
+    codegraph: codegraphStatus(root),
     database: {
       ok: !!db?.connections && Object.keys(db.connections).length > 0,
       default: db?.default_connection ?? (db?.connections?.default ? 'default' : null),

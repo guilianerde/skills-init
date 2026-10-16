@@ -24,6 +24,7 @@ import { TPL_DIR, PKG, ENV_NAMES, CANON_DIR, SKILLS, resolveSkillSelection, step
 import { ask, closePrompt } from './lib/prompt.mjs';
 import { findExistingDbConfig, getDb } from './lib/db.mjs';
 import { report, installSkills, linkSkills, removeRenamed, updateGitignore } from './lib/install.mjs';
+import { setupCodeGraph } from './lib/codegraph.mjs';
 import { uninstall } from './lib/uninstall.mjs';
 import { checkNodeForDocNexus, setupDocNexus, templateRecords, saveTemplateRecords, reportTemplateStatus, installedSkills, docnexusConnected, printTemplateDiffs } from './lib/docnexus.mjs';
 import { upgradeOptions, doctor } from './lib/doctor.mjs';
@@ -45,6 +46,7 @@ init 选项：
   --skip-db            跳过数据库连接配置
   --yes                非交互：使用已有数据库配置；都没有且未 --skip-db 时报错退出
   --with-docnexus      同时接入 DocNexus 文档库（需 Node >= 22.13 与 npm），并导入文档模板
+  --with-codegraph     同时接入 CodeGraph 代码图谱：没有 codegraph 命令时 npm 全局安装，为 claude / codex 写项目级 MCP 配置，并建本项目索引（.codegraph/）
   --copy               不用软链接，各环境独立拷贝
   --skills <列表>      只装这些 skill（逗号分隔），自动带上 skill.json 里 requires 声明的依赖；缺省为全部
   --seed-templates     安装后把文档模板导入 DocNexus；接入 DocNexus 后文档类 skill 只从知识库取模板
@@ -60,7 +62,7 @@ doctor 选项：
   -h, --help           显示帮助`;
 
 function parseArgs(argv) {
-  const o = { cmd: 'init', envs: '', skipDb: false, yes: false, withDocNexus: false, copy: false, seedTemplates: false, update: false, diff: false, skills: '', offline: false, root: process.cwd() };
+  const o = { cmd: 'init', envs: '', skipDb: false, yes: false, withDocNexus: false, withCodeGraph: false, copy: false, seedTemplates: false, update: false, diff: false, skills: '', offline: false, root: process.cwd() };
   let cmdGiven = false; // 命令可以出现在选项之间（封装脚本会先传 --project-root）
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
@@ -70,6 +72,7 @@ function parseArgs(argv) {
       case '--skip-db': o.skipDb = true; break;
       case '--yes': o.yes = true; break;
       case '--with-docnexus': o.withDocNexus = true; break;
+      case '--with-codegraph': o.withCodeGraph = true; break;
       case '--copy': o.copy = true; break;
       case '--skills': o.skills = val(); break;
       case '--seed-templates': o.seedTemplates = true; break;
@@ -196,8 +199,9 @@ async function main() {
   }
   closePrompt(); // 模板冲突时可能还要询问，装完再关
 
-  updateGitignore(o.root, o.withDocNexus);
+  updateGitignore(o.root, o.withDocNexus, o.withCodeGraph);
   const docnexus = o.withDocNexus ? setupDocNexus(o.root, sel) : 'skipped';
+  const codegraph = o.withCodeGraph ? setupCodeGraph(o.root, sel) : 'skipped';
   let seedFailed = false;
   // 接入 DocNexus 后文档类 skill 只从知识库取模板，所以 --with-docnexus 时一并导入（已有的不覆盖）；
   // upgrade 时新版本可能新增了模板（缺了 skill 会停下），已接入就顺带导入缺的，不改动已有模板
@@ -229,6 +233,7 @@ async function main() {
   // 已接入 DocNexus：缺模板时文档类 skill 会停下来要求导入；默认模板有新版时提示更新或合并
   if (fs.existsSync(path.join(o.root, 'docnexus', 'project.json'))) reportTemplateStatus(o.root);
   if (docnexus === 'failed') warn('注意：DocNexus 接入失败（见上方输出），其他 skills 不受影响；修复后可重跑（加 --with-docnexus）。');
+  if (codegraph === 'failed') warn('注意：CodeGraph 接入失败（见上方输出），其他 skills 不受影响；skills 会退回 grep / 读文件；修复后可重跑（加 --with-codegraph）。');
   if (report.asNew.length) {
     warn('以下文件被手动修改过，已保留你的版本，新模板另存为同目录的 <文件名>.new（对比合并后删除 .new，或用新模板覆盖原文件）：');
     for (const f of report.asNew) warn(`  ${f}  ->  ${path.basename(f)}.new`);
@@ -237,7 +242,7 @@ async function main() {
   if (report.stale.length) warn(`以下文件已不在新模板中，但被手动修改过，保留未删除：${report.stale.join('、')}`);
   console.log('先运行 /workflow profile 填写项目画像；说明见 skills-init README。');
   // skills 已装好，但显式要求的 DocNexus 未接入：返回非 0 便于自动化感知
-  return docnexus === 'failed' || seedFailed ? 1 : 0;
+  return docnexus === 'failed' || codegraph === 'failed' || seedFailed ? 1 : 0;
 }
 
 main().then((code) => process.exit(code), (e) => {
