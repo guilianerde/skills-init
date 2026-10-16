@@ -1,6 +1,6 @@
 {
   "name": "@rowansenne/skills-init",
-  "version": "0.12.0",
+  "version": "0.13.0",
   "description": "项目级 Agent Skills 一键初始化：workflow / dev / project-review / code-graph / database-query / md-to-wiki / 技术与上线方案生成",
   "keywords": [
     "agent-skills",

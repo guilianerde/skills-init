@@ -4,6 +4,8 @@
 
 ## [Unreleased]
 
+## [0.13.0] - 2026-10-16
+
 ### 新增
 - **项目文档视图**：`/workflow view` 或 `skills-init view [--out <文件>] [--open]`（PowerShell `-Out` / `-Open`），脚本 `workflow/scripts/view.mjs`。读需求目录（以及旧布局，标为「未归档」）里的产物，生成单个本地 HTML（默认 `tmp/skills/view/index.html`）：左侧需求列表（搜索、各阶段完成情况），右侧该需求的阶段进度（含 wiki 页面）、审查记录（每轮 CRITICAL / HIGH / MEDIUM / LOW 数量、复核、与上次对比的修复情况、DocNexus 沉淀）、交付记录（类型、规模、确认的决定、未验证项），以及各份文档的渲染正文；顶部是效果报告的关键数字。数据内嵌、正文转义，只读、不联网，支持明暗主题与窄屏。
 
@@ -176,7 +178,8 @@
 - 安装器改为单一 Node 实现，`init-skills.sh` / `init-skills.ps1` 只是薄封装。
 - `code-review` 改名为 `project-review`，升级时自动清理旧名。
 
-[Unreleased]: https://github.com/guilianerde/skills-init/compare/v0.12.0...HEAD
+[Unreleased]: https://github.com/guilianerde/skills-init/compare/v0.13.0...HEAD
+[0.13.0]: https://github.com/guilianerde/skills-init/compare/v0.12.0...v0.13.0
 [0.12.0]: https://github.com/guilianerde/skills-init/compare/v0.11.0...v0.12.0
 [0.11.0]: https://github.com/guilianerde/skills-init/compare/v0.10.1...v0.11.0
 [0.10.1]: https://github.com/guilianerde/skills-init/compare/v0.10.0...v0.10.1
