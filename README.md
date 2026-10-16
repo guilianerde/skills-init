@@ -392,6 +392,7 @@ dev、project-review、技术方案、上线方案都在对应环节调用它：
 | `workflow/scripts/lint-doc.mjs <文档> --skill <skill> [--facts]` | 对照当前生效的模板检查生成的文档：必填章节、残留 `{{...}}` 占位符、元信息行为错误；缺普通章节、顺序不一致为警告；列出待填写位置。`--facts` 再核对正文里的类名、文件、接口、表名：在对比分支的 diff 和代码里都找不到的记为警告（防编造） |
 | `workflow/scripts/artifacts.mjs [--branch b \| --all]` | 按分支汇总 `docs/skills/` 下的开发方案、交付说明、审查报告、技术方案、上线方案及其 wiki 发布记录，给出下一步建议；分支取自文档元信息行，不另存记录。上线方案没传 `--tech` 时据此自动引用同分支的技术方案；project-review 据此对照本分支方案、识别复审 |
 | `workflow/scripts/report.mjs [--since d] [--all-branches] [--json]` | 本地效果报告（`/workflow report`、`skills-init report`）：审查发现与修复率、复核率、需求澄清、沉淀率、知识引用、各分支链路 |
+| `workflow/scripts/template.mjs list / draft / check / save <模板>` | 修改 / 创建模板（`/workflow template`）：把当前模板复制成草稿（或 `--from <样例>` 抽骨架），`check` 校验格式、列出章节变化、拿最近几份已生成文档试跑 lint 看影响，`save` 备份旧模板后写入项目模板并确认生效；已接入 DocNexus 时 `save` 给出 capture 指引，不直接写知识库 |
 | `workflow/scripts/pr-desc.mjs [--branch b] [--base m] [--out f]` | 按本分支产物生成 PR / MR 描述；没有交付说明时退回用 git 记录 |
 | `database-query/scripts/query.mjs` | 执行 SQL：选连接、取密码（只通过环境变量传给客户端）、会话层只读、拦截写语句和多语句、自动补 LIMIT、超时、脱敏敏感列；支持 mysql / psql 客户端，其他 driver 退回 JDBC |
 | `database-query/scripts/query.mjs --schema [--tables a,b] [--write]` | 按只读会话导出表结构为 Markdown；`--write` 写入 `references/schema.md` 的 `schema:begin` / `schema:end` 之间，标记外的补充说明保留 |
@@ -525,6 +526,8 @@ skills-init/
 │   ├── scripts/artifacts.mjs          # 按分支汇总各 skill 产物与 wiki 发布记录
 │   ├── scripts/report.mjs             # 本地效果报告
 │   ├── scripts/pr-desc.mjs            # 按本分支产物生成 PR / MR 描述
+│   ├── scripts/template.mjs           # 修改 / 创建模板：草稿 → 校验与影响 → 保存
+│   ├── scripts/make-template.mjs      # 从样例文档抽模板骨架
 │   ├── scripts/doc-sections.mjs       # 读产物的章节、表格、元信息（report / pr-desc 共用，标题解析复用 lint-doc）
 │   ├── references/                    # profile.md、templates.md、docnexus.md、status.md（其他 skill 直接读对应文件）
 │   └── profile.json.tpl               # 空画像，首次使用时由 agent 推断并经确认后填写
@@ -583,6 +586,14 @@ skills-init/
 | project-review | `report.md` | 审查报告模板 | 有 |
 
 **技术方案、上线方案的模板按团队自己的格式创建**：各团队发到 wiki 的文档格式不同，skills 不再自带固定格式。第一次生成时 skill 会停下来，请你给一份团队现有的同类文档（本地 Markdown，或 wiki 的 pageId / URL）作样例，用 `workflow/scripts/make-template.mjs` 抽出章节和表格结构，把正文换成填写说明，你确认后保存：未接入 DocNexus 时存到 `docs/skills/templates/<skill>/template.md`（建议提交，团队共用），已接入时经你授权写入 DocNexus。之后想换格式，直接说「重新生成技术方案模板」。
+
+**修改模板**：说「改技术方案模板，加一节回滚方案」或 `/workflow template release 去掉灰度那节`，agent 会一路走完：
+
+1. 把当前生效的模板复制成草稿 `tmp/skills/template-draft/<skill>/<文件名>`，只改草稿；
+2. `template.mjs check` 校验格式（必填 ` *`、可选「（如有）」、占位符），列出新增 / 删除的章节、必填变化，并拿最近几份已生成的文档试跑，告诉你新模板下它们会多出哪些错误；
+3. 你确认后 `template.mjs save`：旧模板备份到 `tmp/skills/template-backup/<时间>/`，写入 `docs/skills/templates/<skill>/`，再确认生效；已接入 DocNexus 时经你授权按 capture 流程写入知识库。
+
+模板别名：`tech`、`release`、`plan`、`delivery`、`review`、`checklist`。改带默认版本的模板（开发方案、交付说明、审查报告、审查清单）也走这条路，保存后项目文件优先，升级不会覆盖。
 
 * 老项目升级时，如果还在用原来自带的默认模板（项目和 DocNexus 里都没有自己的版本），安装器会先把它保存到 `docs/skills/templates/<skill>/template.md`，生成效果不变。
 * `doctor` 和 `/workflow status` 会列出还没创建的模板。
