@@ -4,6 +4,8 @@
 
 ## [Unreleased]
 
+## [0.10.1] - 2026-10-16
+
 ### 变更
 - **skills 目录里的文件一律以安装包为准**：重跑与升级时 `SKILL.md`、`skill.json`、references、scripts 总是更新为新版，不再询问、不再保留旧版本并另存 `.new`。手改过的（或没有清单无从判断的）先备份到 `tmp/skills/upgrade-backup/<时间>/`，结尾列出；新版已删除的文件，改过的同样备份后删除。旧版本留下的 `.new` 升级时清理。避免出现「新 SKILL.md 配旧 skill.json」这类新旧混搭（例如 0.10.0 升级时技术方案 / 上线方案的 `skill.json` 被保留，新的按需创建模板逻辑不生效）。用户配置（`config.json`、`schema.md`、`wiki-config.json`、`profile.json`）照旧不覆盖。`doctor` 的提示同步调整。
 
@@ -151,7 +153,8 @@
 - 安装器改为单一 Node 实现，`init-skills.sh` / `init-skills.ps1` 只是薄封装。
 - `code-review` 改名为 `project-review`，升级时自动清理旧名。
 
-[Unreleased]: https://github.com/guilianerde/skills-init/compare/v0.10.0...HEAD
+[Unreleased]: https://github.com/guilianerde/skills-init/compare/v0.10.1...HEAD
+[0.10.1]: https://github.com/guilianerde/skills-init/compare/v0.10.0...v0.10.1
 [0.10.0]: https://github.com/guilianerde/skills-init/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/guilianerde/skills-init/compare/v0.8.1...v0.9.0
 [0.8.1]: https://github.com/guilianerde/skills-init/compare/v0.8.0...v0.8.1
