@@ -4,6 +4,8 @@
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-10-16
+
 ### 新增
 - **`/workflow template [<模板>] [怎么改]`：修改 / 创建模板一条命令走完**。新脚本 `workflow/scripts/template.mjs`：`draft` 把当前生效的模板复制成草稿 `tmp/skills/template-draft/<skill>/<文件名>`（还没有模板或 `--from <样例>` 时用 make-template 抽骨架）；`check` 校验草稿格式（标题、`{{ }}` 成对、`{{fact:}}`、重名章节、没有必填章节），列出与当前模板相比新增 / 删除的章节、必填与可选标记变化、顺序变化，并拿最近 5 份已生成的文档按新旧模板各跑一次 lint，列出新模板下多出的错误；`save` 在校验通过后备份旧模板到 `tmp/skills/template-backup/<时间>/`、写入 `docs/skills/templates/<skill>/`、重新判定确认生效；已接入 DocNexus 时退出码 2 并给出 capture 指引（写入需授权）。`list` 列出各模板来源与未完成的草稿。别名 `tech` / `release` / `plan` / `delivery` / `review` / `checklist`。`workflow/references/templates.md` 新增「修改模板」流程，「创建模板」改为同一套草稿 / 校验 / 保存；技术方案、上线方案 skill 的改模板与模板回写指向它。
 
@@ -156,7 +158,8 @@
 - 安装器改为单一 Node 实现，`init-skills.sh` / `init-skills.ps1` 只是薄封装。
 - `code-review` 改名为 `project-review`，升级时自动清理旧名。
 
-[Unreleased]: https://github.com/guilianerde/skills-init/compare/v0.10.1...HEAD
+[Unreleased]: https://github.com/guilianerde/skills-init/compare/v0.11.0...HEAD
+[0.11.0]: https://github.com/guilianerde/skills-init/compare/v0.10.1...v0.11.0
 [0.10.1]: https://github.com/guilianerde/skills-init/compare/v0.10.0...v0.10.1
 [0.10.0]: https://github.com/guilianerde/skills-init/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/guilianerde/skills-init/compare/v0.8.1...v0.9.0
