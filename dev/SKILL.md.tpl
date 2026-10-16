@@ -12,7 +12,7 @@ description: "Implement a feature or fix a bug in this project end to end: under
 | 需求背景 | wiki 中的 PRD（按 `references/prd-fetch.md` 拉取） | 只用对话中的需求描述 |
 | 项目约定 / 历史决策 | DocNexus（`docnexus-recall` skill） | 读 `CLAUDE.md` / `AGENTS.md` 与代码 |
 | 读代码 / 调用链 / 影响面 | CodeGraph（见 `<skills>/workflow/references/codegraph.md`） | grep / 读文件 |
-| 数据核对 | `database-query`（只读） | 给出 SQL 让用户执行 |
+| 涉及哪些表 / 实际表结构 / 数据核对 | `workflow/scripts/tables.mjs` 定位表 → `database-query`（`query.mjs --schema --tables … --indexes`，只读） | 读 `schema.md` 与 DDL 脚本，注明「未与实际库核对」 |
 | 自审 | `project-review` | 按审查清单手动过（`node <skills>/workflow/scripts/resolve.mjs template project-review checklist.md` 给出路径） |
 | 交付文档 | `create-tech-md-doc` / `create-release-md-doc` | 只在对话中汇总 |
 
@@ -46,7 +46,7 @@ description: "Implement a feature or fix a bug in this project end to end: under
 
 - 从入口（Controller / Handler / CLI / 页面）沿调用链读到持久层，理清数据流；不凭文件名猜内容。CodeGraph 可用时（`resolve.mjs status` 的 `codegraph.ok`）先用 `codegraph_explore` / `codegraph explore "<问题>"` 一次拿到链路上的源码和调用路径，再按需补读；Spring 注入、MyBatis XML、MQ、配置 key 这些图谱看不到的照常 grep（见 `<skills>/workflow/references/codegraph.md`）。
 - 找到同类功能的既有实现，作为风格与结构的参照（命名、分层、异常、日志、事务、DTO 转换方式）。
-- 涉及表结构 → 先看 `database-query/references/schema.md`，需要时用 `database-query` 只读 `DESCRIBE` / 抽样核对。
+- 涉及数据库 → 按 `<skills>/workflow/references/tables.md` 先确定涉及哪些表（`tables.mjs --files <读到的实体 / Mapper>`），数据库已配置时用 `query.mjs --schema --tables <表> --indexes` 只读拉取实际字段、索引与行数；方案里的字段名、类型、索引和 DDL 以查到的为准，不凭实体类推测。
 
 ### F3 — 需求澄清
 
@@ -80,13 +80,13 @@ description: "Implement a feature or fix a bug in this project end to end: under
 - **改动前看影响面**：要改公共方法、接口签名、DTO 字段时，先 `node <skills>/code-graph/scripts/cg.mjs entry <Class.method>`（code-graph skill；退出码 2 时用 grep），把会被波及的入口和调用方纳入本次改动或写进交付说明。
 - **贴合现有代码**：沿用参照实现的写法；不顺手重构、不改无关代码、不升级依赖。看到范围外的问题记进交付说明，不在本次修。
 - **配置**：新增配置项记入配置清单（key、位置、用途、建议默认值、上线前需下发的环境），按 `profile.config_center` 与审查清单的配置维度处理（清单路径用 `node <skills>/workflow/scripts/resolve.mjs template project-review checklist.md` 取，接入 DocNexus 时是团队维护的版本）。
-- **数据库变更**：DDL / 数据修正写成 SQL 脚本放进项目约定的目录（没有约定则放进交付说明），**不在任何环境直接执行**。
+- **数据库变更**：DDL / 数据修正写成 SQL 脚本放进项目约定的目录（没有约定则放进交付说明），**不在任何环境直接执行**。写之前按 `<skills>/workflow/references/tables.md` 核对实际表结构：要加的列 / 索引是否已存在、新查询条件有没有索引、表有多大（大表 DDL 写进上线注意事项）。
 - **敏感信息**：不硬编码密钥、密码、内网地址；日志不打印敏感字段。
 
 ### F6 — 验证
 
 - 按验收标准补充或更新单元测试 / 集成测试，测试放在项目既有测试目录、沿用既有测试框架。
-- 运行 `profile.test`（或只跑相关测试的 `profile.test_single`）。有 `profile.lint` 时一并运行。代码图谱可用时先跑 `node <skills>/code-graph/scripts/cg.mjs impact --base <main_branch>` 输出的 `tests`，再跑全量；`impact` 的 `entry_points`、`sql`、`config_keys` 写进交付说明（受影响的接口 / 消费者 / 定时任务、表、配置）。
+- 运行 `profile.test`（或只跑相关测试的 `profile.test_single`）。有 `profile.lint` 时一并运行。代码图谱可用时先跑 `node <skills>/code-graph/scripts/cg.mjs impact --base <main_branch>` 输出的 `tests`，再跑全量；`impact` 的 `entry_points`、`sql`、`config_keys` 写进交付说明（受影响的接口 / 消费者 / 定时任务、表、配置）。改动碰到 SQL、实体或 DDL 时运行 `node <skills>/workflow/scripts/tables.mjs --base <main_branch>`，对其中的表再核对一次实际表结构（见 `<skills>/workflow/references/tables.md`），结果写进交付说明的 SQL 节。
 - 如实报告结果：失败就给出失败输出并继续修；环境跑不了（缺依赖、缺中间件）就明确写「未验证」以及用户该如何验证。**不得声称未运行的测试已通过。**
 
 ### F7 — 自审

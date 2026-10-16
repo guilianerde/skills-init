@@ -6,7 +6,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { classify, addLimit, maskValue, stripSql, schemaSql, schemaMarkdown, mergeSchema } from '../database-query/scripts/query.mjs';
+import { classify, addLimit, maskValue, stripSql, schemaSql, schemaMarkdown, mergeSchema, indexSql, indexMarkdown } from '../database-query/scripts/query.mjs';
 
 const SCRIPT = fileURLToPath(new URL('../database-query/scripts/query.mjs', import.meta.url));
 const skip = process.platform === 'win32' ? '假客户端用 shebang 脚本实现，Windows 跳过' : false;
@@ -183,5 +183,46 @@ test('CLI --schema：可写连接也按只读会话执行；--write 写入 schem
   const out = fs.readFileSync(f, 'utf8');
   assert.match(out, /\| id \| bigint \| 否 \| PRI \|/);
   assert.match(out, /订单表按月分表/);
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test('--indexes：索引 SQL 按 driver 生成；Markdown 列出索引、估算行数与库里不存在的表', () => {
+  assert.match(indexSql('mysql', ['t_order']).indexes, /information_schema\.STATISTICS[\s\S]*TABLE_NAME IN \('t_order'\)/);
+  assert.match(indexSql('mysql', ['t_order']).rows, /TABLE_ROWS/);
+  assert.match(indexSql('postgresql', ['t_order']).indexes, /pg_indexes/);
+  assert.match(indexSql('postgresql', ['t_order']).rows, /reltuples/);
+  const { markdown, missing } = indexMarkdown(['t_order', 't_new'], ['t_order'], [['t_order', 'PRIMARY', '1', 'id'], ['t_order', 'idx_uid_time', '0', 'uid,created_at']], [['t_order', '1234567']]);
+  assert.deepEqual(missing, ['t_new']);
+  assert.match(markdown, /库里不存在的表：`t_new`/);
+  assert.match(markdown, /### t_order（估算 1,234,567 行）/);
+  assert.match(markdown, /\| idx_uid_time \| 否 \| uid,created_at \|/);
+  assert.match(indexMarkdown(['a'], ['a'], [], []).markdown, /### a（估算 未知）\n\n无索引/);
+});
+
+// 按 SQL 内容返回不同结果的假客户端：列 / 索引 / 行数
+const FAKE_INDEX = `#!/usr/bin/env node
+const fs = require('fs');
+const sql = process.argv.at(-1);
+fs.appendFileSync(process.env.FAKE_LOG + '.sql', sql + '\\n---\\n');
+fs.writeFileSync(process.env.FAKE_LOG, JSON.stringify({ args: process.argv.slice(2) }));
+if (/STATISTICS/.test(sql)) process.stdout.write('TABLE_NAME\\tINDEX_NAME\\tU\\tCOLS\\nt_order\\tPRIMARY\\t1\\tid\\n');
+else if (/TABLE_ROWS/.test(sql)) process.stdout.write('TABLE_NAME\\tTABLE_ROWS\\nt_order\\t800000\\n');
+else process.stdout.write('TABLE_NAME\\tCOLUMN_NAME\\tCOLUMN_TYPE\\tIS_NULLABLE\\tCOLUMN_KEY\\tCOLUMN_DEFAULT\\tCOLUMN_COMMENT\\tTABLE_COMMENT\\nt_order\\tid\\tbigint\\tNO\\tPRI\\tNULL\\t\\t订单\\n');
+`;
+
+test('CLI --schema --indexes：三条只读查询，输出索引、行数和缺失的表；参数组合校验', { skip }, () => {
+  const { dir, run } = setup(CFG);
+  fs.writeFileSync(path.join(dir, 'bin', 'mysql'), FAKE_INDEX, { mode: 0o755 });
+  let r = run(['--schema', '--tables', 't_order,t_new', '--indexes'], { T_DEV_PWD: 'x' });
+  assert.equal(r.status, 0, r.stderr);
+  assert.ok(r.call.args.includes('--init-command=SET SESSION TRANSACTION READ ONLY'));
+  assert.equal(fs.readFileSync(path.join(dir, 'calls.json.sql'), 'utf8').split('---').length - 1, 3);
+  assert.match(r.stdout, /### t_order — 订单/);
+  assert.match(r.stdout, /### t_order（估算 800,000 行）/);
+  assert.match(r.stdout, /库里不存在的表：`t_new`/);
+  r = run(['--schema', '--tables', 't_order,t_new'], { T_DEV_PWD: 'x' });
+  assert.match(r.stdout, /库里不存在的表：`t_new`/, '不加 --indexes 也标出缺失的表');
+  assert.equal(run(['--schema', '--indexes'], { T_DEV_PWD: 'x' }).status, 2, '--indexes 需要 --tables');
+  assert.equal(run(['--schema', '--tables', 't_order', '--indexes', '--write'], { T_DEV_PWD: 'x' }).status, 2);
   fs.rmSync(dir, { recursive: true, force: true });
 });

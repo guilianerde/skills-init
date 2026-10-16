@@ -4,6 +4,11 @@
 
 ## [Unreleased]
 
+### 新增
+- **dev / project-review 用实际表结构核对数据库相关改动**。新脚本 `workflow/scripts/tables.mjs`（`--diff <base>...<head>` / `--base <分支>` / `--files a,b`）找出改动涉及哪些表：实体注解 `@TableName` / `@Table`（没写表名时按类名转下划线并标 `inferred`）、Mapper XML 与代码里的 SQL 字符串、SQL 脚本里的 DDL（标 `ddl`），并标出是否已在 `schema.md` 里、给出拉表结构的命令。`database-query` 的 `query.mjs --schema --tables a,b --indexes` 另外列出索引（唯一与否、列顺序）、估算行数，并标出库里不存在的表（不加 `--indexes` 时也标）。新共用说明 `workflow/references/tables.md`：先定位表，数据库已配置时只读拉实际结构核对字段、索引支撑、DDL 锁表与回填，没有连接时退回 `schema.md` / DDL 脚本并注明「未与实际库核对」。
+  - dev：F2 调研、F5 写 DDL 前、F6 自检时按它核对；交付说明的 SQL 节写明涉及的表与核对结果。
+  - project-review：第 2 步 diff 涉及 SQL / Mapper / 实体 / DDL 时先拉实际表结构，作为索引支撑、字段存在与类型、锁表与滚动发布兼容的判断依据；查不了库写进「未覆盖与待确认」，这类发现不凭推测升到 HIGH。`skill.json` 的 optional 加上 `database-query`，审查清单第 12 节同步。
+
 ## [0.11.0] - 2026-10-16
 
 ### 新增

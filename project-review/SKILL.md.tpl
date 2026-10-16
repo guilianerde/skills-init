@@ -14,13 +14,14 @@ description: "Review source code (any language; Java/Spring, Go, TypeScript, Pyt
      - `latest.plan` 或 `latest.tech` 存在 → 读其中的验收标准、改动设计、接口 / 数据 / 配置变更，第 3 步审 diff 时做**需求对照**：方案里有、diff 里找不到的 → 漏实现（属于验收标准的按 HIGH，其余 MEDIUM）；diff 里有、方案里没提的接口 / 表结构 / 配置 / 依赖变更 → 列出请作者确认（不一定是问题）。只对照能在 diff 里核对的项，不推测业务语义。
      - `latest.delivery` 存在（dev 的交付说明）→ 其中「已确认的决定」并入需求对照的依据；「配置清单」「SQL 脚本」和 diff 对照，diff 里有而交付说明漏列的配置 key / DDL 记为 MEDIUM（上线时会被漏掉）。
      - `latest.review` 存在 → 这是**复审**：读上次报告的问题表，并用 `git log --oneline --since=<上次报告日期> <dev分支>` 看之后改了什么。本次报告对上次的每条问题标「已修复 / 仍存在 / 不再适用」（「已修复」要看到对应改动），本次新发现的标「新增」。
+   - **涉及数据库**：diff 里有 SQL、Mapper、实体或 DDL 时，按 `<skills>/workflow/references/tables.md` 运行 `node <skills>/workflow/scripts/tables.mjs --diff <基线>...<dev>`（未提交改动用 `--base <基线>`）找出涉及的表；数据库已配置（`resolve.mjs status` 的 `database.ok`）时用 `query.mjs --schema --tables <表> --indexes` 只读拉取实际字段、索引与估算行数，作为第 4、6 步判断索引支撑、字段存在与类型、DDL 锁表与滚动发布兼容的依据。查不了库时注明「未与实际库核对」写进「未覆盖与待确认」，这类发现不升到 HIGH 以上，除非 diff 本身就能证明。
 3. **分支对比**：基线默认取 `workflow/profile.json` 的 `main_branch`（未配置则 `main`）。按 `references/diff-strategy.md` 先量规模：小改动全量精读；改动多时按风险分级（P0 资金 / 事务 / 权限 / SQL / 对外接口 / MQ / 配置优先）分批精读，审不到的写进报告。只审本次改动引入的问题，同时检查改动是否破坏既有调用方。
 4. **逐项过检查清单**（在项目根运行 `node <skills>/workflow/scripts/resolve.mjs template project-review checklist.md`，读输出的 `path`；退出码 2 时停下并按 `hint` 处理）：对每个发现给出 文件+行号、问题描述、严重级别、修改建议。
 5. **影响面分析**：改动是否影响其他调用方/模块。先运行 `node <skills>/code-graph/scripts/cg.mjs impact --diff <基线>...<dev>`（code-graph skill；未提交改动用 `--base <基线>`）：列出受影响的接口、MQ 消费者、定时任务、测试、表和配置 key，报告「影响面」按入口归纳并带文件:行号；退出码 2（没有索引等）时用 grep 或精读调用链确认。Spring 注入、AOP、MyBatis XML、MQ topic、配置 key 图谱看不到，照常 grep（见 `<skills>/workflow/references/codegraph.md`）。查不到调用方的符号不能当作安全，要明说"未确认"。
 6. **复核**：交付前逐条复核 CRITICAL / HIGH（MEDIUM 至少做第 1 条）。审查结论会被用来决定能不能合并，一条误报会让人白改代码，也会让后面的真问题不被当回事：
    1. 回到被审的代码（分支对比用 `git show <dev>:<文件>`，未提交改动读工作区）确认引用的片段和行号真实存在。
    2. 写出**触发条件**：什么输入 / 状态下会出错、错成什么样。写不出来 → 降为 MEDIUM 并标「⚠ 待确认」。
-   3. 找有没有别处已经兜住：调用方校验、`@Validated` / 全局异常处理、数据库约束、框架默认行为、配置。已兜住 → 删掉或降级，并在说明里写依据。
+   3. 找有没有别处已经兜住：调用方校验、`@Validated` / 全局异常处理、数据库约束、框架默认行为、配置。涉及索引、字段、唯一约束、表大小的发现，以第 2 步拉到的实际表结构为准（复核列写「已与 <连接名> 核对」）。已兜住 → 删掉或降级，并在说明里写依据。
    4. 确认是本次改动引入的：改动前就存在的问题移到「未覆盖与待确认」，不计入合并结论。
    复核通过的在报告「复核」列标「✅」，否则标「⚠」。
 7. **输出报告**：按报告模板输出（`node <skills>/workflow/scripts/resolve.mjs template project-review report.md` 取 `path`；退出码 2 时停下并按 `hint` 处理），落盘规则见 Artifact Location。
@@ -39,7 +40,7 @@ description: "Review source code (any language; Java/Spring, Go, TypeScript, Pyt
 - 性能（N+1、循环内查询、大对象、无谓复制）
 - 一致性 / 命名 / 风格
 - 幂等与消息一致性（重复消费 / 回调、事务内发消息）
-- 数据库变更安全（锁表、滚动发布兼容、索引支撑）
+- 数据库变更安全（锁表、滚动发布兼容、索引支撑；以实际表结构为准，见第 2 步「涉及数据库」）
 - 测试（改动有没有被测试覆盖、断言是否有效）
 - 语言专项（Java / Go / TS / Python / SQL 各自的常见坑，按改动涉及的语言选读）
 - 配置（见第 4 步取到的审查清单中的配置维度；项目使用的配置中心取自 `workflow/profile.json` 的 `config_center`——配置相关发现按配置清单输出）

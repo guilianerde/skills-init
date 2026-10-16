@@ -392,10 +392,12 @@ dev、project-review、技术方案、上线方案都在对应环节调用它：
 | `workflow/scripts/lint-doc.mjs <文档> --skill <skill> [--facts]` | 对照当前生效的模板检查生成的文档：必填章节、残留 `{{...}}` 占位符、元信息行为错误；缺普通章节、顺序不一致为警告；列出待填写位置。`--facts` 再核对正文里的类名、文件、接口、表名：在对比分支的 diff 和代码里都找不到的记为警告（防编造） |
 | `workflow/scripts/artifacts.mjs [--branch b \| --all]` | 按分支汇总 `docs/skills/` 下的开发方案、交付说明、审查报告、技术方案、上线方案及其 wiki 发布记录，给出下一步建议；分支取自文档元信息行，不另存记录。上线方案没传 `--tech` 时据此自动引用同分支的技术方案；project-review 据此对照本分支方案、识别复审 |
 | `workflow/scripts/report.mjs [--since d] [--all-branches] [--json]` | 本地效果报告（`/workflow report`、`skills-init report`）：审查发现与修复率、复核率、需求澄清、沉淀率、知识引用、各分支链路 |
+| `workflow/scripts/tables.mjs [--diff b...h \| --base b \| --files a,b]` | 找出改动涉及哪些表：实体注解（`@TableName` / `@Table`，没写表名时按类名推断）、Mapper XML 与代码里的 SQL、DDL 脚本；标出 DDL、是否在 `schema.md` 里，并给出拉表结构的命令。dev 调研 / 自检与 project-review 审 SQL / DDL 时使用 |
 | `workflow/scripts/template.mjs list / draft / check / save <模板>` | 修改 / 创建模板（`/workflow template`）：把当前模板复制成草稿（或 `--from <样例>` 抽骨架），`check` 校验格式、列出章节变化、拿最近几份已生成文档试跑 lint 看影响，`save` 备份旧模板后写入项目模板并确认生效；已接入 DocNexus 时 `save` 给出 capture 指引，不直接写知识库 |
 | `workflow/scripts/pr-desc.mjs [--branch b] [--base m] [--out f]` | 按本分支产物生成 PR / MR 描述；没有交付说明时退回用 git 记录 |
 | `database-query/scripts/query.mjs` | 执行 SQL：选连接、取密码（只通过环境变量传给客户端）、会话层只读、拦截写语句和多语句、自动补 LIMIT、超时、脱敏敏感列；支持 mysql / psql 客户端，其他 driver 退回 JDBC |
-| `database-query/scripts/query.mjs --schema [--tables a,b] [--write]` | 按只读会话导出表结构为 Markdown；`--write` 写入 `references/schema.md` 的 `schema:begin` / `schema:end` 之间，标记外的补充说明保留 |
+| `database-query/scripts/query.mjs --schema [--tables a,b] [--write]` | 按只读会话导出表结构为 Markdown；`--write` 写入 `references/schema.md` 的 `schema:begin` / `schema:end` 之间，标记外的补充说明保留；指定的表在库里不存在时标出 |
+| `database-query/scripts/query.mjs --schema --tables a,b --indexes` | 另外列出索引（唯一与否、列顺序）和估算行数，供 dev / project-review 核对字段、索引支撑和 DDL 锁表风险 |
 | `md-to-wiki/scripts/upload.mjs info / put / target / record` | REST 上传通道：`info` 读页面标题与版本给用户确认；`put --expect-version <n> [--record <md>]` 先校验 XHTML 良构，版本对不上就拒绝上传，上传后确认版本 +1，并把发布记录写回 Markdown 第一行注释（转换时丢弃，不出现在页面上）；`target` 读出记录，再次发布同一文档不必再给 pageId；`record` 供 MCP 通道上传后补写 |
 
 ## 测试
@@ -527,9 +529,10 @@ skills-init/
 │   ├── scripts/report.mjs             # 本地效果报告
 │   ├── scripts/pr-desc.mjs            # 按本分支产物生成 PR / MR 描述
 │   ├── scripts/template.mjs           # 修改 / 创建模板：草稿 → 校验与影响 → 保存
+│   ├── scripts/tables.mjs             # 找出改动涉及的数据库表
 │   ├── scripts/make-template.mjs      # 从样例文档抽模板骨架
 │   ├── scripts/doc-sections.mjs       # 读产物的章节、表格、元信息（report / pr-desc 共用，标题解析复用 lint-doc）
-│   ├── references/                    # profile.md、templates.md、docnexus.md、status.md（其他 skill 直接读对应文件）
+│   ├── references/                    # profile.md、templates.md、docnexus.md、status.md、tables.md、codegraph.md（其他 skill 直接读对应文件）
 │   └── profile.json.tpl               # 空画像，首次使用时由 agent 推断并经确认后填写
 ├── dev/
 │   ├── SKILL.md.tpl · skill.json

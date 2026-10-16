@@ -59,6 +59,7 @@ dev（需求 → 方案 → 实现 → 测试 → 自审）
 | `references/templates.md` | 模板来源判定（`resolve.mjs template`）、创建与修改模板（`/workflow template`）、模板随知识库更新 |
 | `references/docnexus.md` | 写入 DocNexus 的分类（`resolve.mjs category`）、按分类参考知识库（`knowledge.mjs`） |
 | `references/status.md` | `/workflow status` 的输出格式 |
+| `references/tables.md` | 确定改动涉及哪些表（`tables.mjs`）、只读拉取实际表结构 / 索引 / 行数核对（`query.mjs --schema --indexes`），没有库连接时怎么退回 |
 | `references/codegraph.md` | 用 CodeGraph 代码图谱读代码、查调用链与影响面（MCP 工具与 CLI 对照、图谱看不到的部分） |
 
 `/workflow profile` → 按 `references/profile.md` 执行；`/workflow status` → 按 `references/status.md` 输出；`/workflow report` → 运行 `node <skills>/workflow/scripts/report.mjs [--since YYYY-MM-DD]`，原样给出输出的 Markdown，再用两三句话指出最值得关注的数字（例如修复率低、带未验证项的交付多、从不沉淀），不要编造报告里没有的数据。`/workflow template` → 按 `references/templates.md`「修改模板」一路走完：起草稿、按用户的要求改、校验并说明影响、用户确认后保存并确认生效；没说改哪份模板时先运行 `template.mjs list` 问用户。

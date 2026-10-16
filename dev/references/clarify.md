@@ -22,7 +22,7 @@
 
 ## 事实自己查，决定交给用户
 
-- **事实**：代码现在怎么做、表里有什么字段、配置怎么设、PRD / DocNexus 里写过什么、git 历史里为什么这样改——都自己查（读代码、`database-query` 只读查表结构、`knowledge.mjs`、`git log -L`），不要问用户。
+- **事实**：代码现在怎么做、表里有什么字段、配置怎么设、PRD / DocNexus 里写过什么、git 历史里为什么这样改——都自己查（读代码、`tables.mjs` 定位表、`database-query` 只读查表结构与索引（见 `<skills>/workflow/references/tables.md`）、`knowledge.mjs`、`git log -L`），不要问用户。
 - **决定**：业务规则、取舍、范围、上线方式——交给用户，每个问题都等用户回答，不要替用户回答。
 - 命名、分层、异常写法这类实现细节按项目既有写法自己定，不拿来问用户。
 

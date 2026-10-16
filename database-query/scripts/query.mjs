@@ -14,6 +14,7 @@
 //   --no-mask         不脱敏（仅在用户明确要求时使用）
 //   --list            列出连接（不含凭据）
 //   --schema [--tables a,b] [--write]   导出表结构为 Markdown；--write 写入 references/schema.md（begin/end 标记之间，先经用户确认）
+//   --schema --tables a,b --indexes     另外列出索引与估算行数，并标出库里不存在的表（dev / project-review 核对改动涉及的表；不能与 --write 同用）
 // 退出码：0 成功；1 执行失败；2 参数 / 配置 / 只读拦截；3 本机没有对应客户端（改用 SKILL.md 中的 JDBC 方式）
 
 import fs from 'node:fs';
@@ -143,7 +144,7 @@ function render(fmt, res) {
 }
 
 function parseArgs(argv) {
-  const o = { conn: '', limit: 200, timeout: 30, format: 'md', write: false, mask: true, list: false, schema: false, tables: '', sql: '' };
+  const o = { conn: '', limit: 200, timeout: 30, format: 'md', write: false, mask: true, list: false, schema: false, tables: '', indexes: false, sql: '' };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     const val = () => { if (i + 1 >= argv.length) throw new UsageError(`${a} 需要一个值`); return argv[++i]; };
@@ -157,6 +158,7 @@ function parseArgs(argv) {
       case '--list': o.list = true; break;
       case '--schema': o.schema = true; break;
       case '--tables': o.tables = val(); break;
+      case '--indexes': o.indexes = true; break;
       default:
         if (a.startsWith('--')) throw new UsageError(`未知参数 ${a}`);
         o.sql = o.sql ? `${o.sql} ${a}` : a;
@@ -165,6 +167,8 @@ function parseArgs(argv) {
   if (!Number.isInteger(o.limit) || o.limit < 0) throw new UsageError('--limit 需为非负整数');
   if (!(o.timeout > 0)) throw new UsageError('--timeout 需为正数');
   if (!['md', 'tsv', 'json'].includes(o.format)) throw new UsageError('--format 只支持 md / tsv / json');
+  if (o.indexes && (!o.schema || !o.tables)) throw new UsageError('--indexes 需与 --schema --tables <表> 一起用');
+  if (o.indexes && o.write) throw new UsageError('--indexes 只输出到终端，不能与 --write 同用');
   return o;
 }
 
@@ -202,6 +206,41 @@ ORDER BY c.table_name, c.ordinal_position`;
 FROM information_schema.COLUMNS c JOIN information_schema.TABLES t ON t.TABLE_SCHEMA = c.TABLE_SCHEMA AND t.TABLE_NAME = c.TABLE_NAME
 WHERE c.TABLE_SCHEMA = DATABASE()${tables.length ? ` AND c.TABLE_NAME IN (${list})` : ''}
 ORDER BY c.TABLE_NAME, c.ORDINAL_POSITION`;
+}
+
+// 索引与估算行数（--indexes）：每行 [表, 索引名, 是否唯一(1/0), 列（逗号分隔）]；行数 [表, 估算行数]
+export function indexSql(driver, tables) {
+  const list = tables.map((t) => `'${t}'`).join(', ');
+  if (/^(postgres|postgresql|pg)$/i.test(driver)) {
+    return {
+      indexes: `SELECT tablename, indexname, CASE WHEN indexdef LIKE 'CREATE UNIQUE%' THEN 1 ELSE 0 END, regexp_replace(indexdef, '^.*\\((.*)\\).*$', '\\1') FROM pg_indexes WHERE schemaname = current_schema() AND tablename IN (${list}) ORDER BY tablename, indexname`,
+      rows: `SELECT c.relname, c.reltuples::bigint FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace WHERE n.nspname = current_schema() AND c.relkind IN ('r', 'p') AND c.relname IN (${list})`,
+    };
+  }
+  return {
+    indexes: `SELECT TABLE_NAME, INDEX_NAME, 1 - NON_UNIQUE, GROUP_CONCAT(COLUMN_NAME ORDER BY SEQ_IN_INDEX SEPARATOR ',') FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME IN (${list}) GROUP BY TABLE_NAME, INDEX_NAME, NON_UNIQUE ORDER BY TABLE_NAME, INDEX_NAME = 'PRIMARY' DESC, INDEX_NAME`,
+    rows: `SELECT TABLE_NAME, TABLE_ROWS FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME IN (${list})`,
+  };
+}
+
+// 索引、行数、缺失的表 -> Markdown（接在表结构后面）
+export function indexMarkdown(tables, found, indexRows, countRows) {
+  const lower = new Set(found.map((t) => t.toLowerCase()));
+  const missing = tables.filter((t) => !lower.has(t.toLowerCase()));
+  const out = ['', '## 索引与行数（--indexes）', ''];
+  if (missing.length) out.push(`库里不存在的表：${missing.map((t) => `\`${t}\``).join('、')}（新建表、表名写错，或不在这个连接的库里）`, '');
+  const counts = new Map(countRows.map(([t, n]) => [t.toLowerCase(), n]));
+  for (const t of found) {
+    const n = counts.get(t.toLowerCase());
+    out.push(`### ${t}（估算 ${n == null || n === 'NULL' || n === '' ? '未知' : `${Number(n) < 0 ? '未知' : Number(n).toLocaleString('en-US')} 行`}）`, '');
+    const idx = indexRows.filter((r) => r[0].toLowerCase() === t.toLowerCase());
+    if (!idx.length) { out.push('无索引', ''); continue; }
+    out.push('| 索引 | 唯一 | 列 |', '|---|---|---|');
+    for (const [, name, uniq, cols] of idx) out.push(`| ${name} | ${String(uniq) === '1' ? '是' : '否'} | ${cols} |`);
+    out.push('');
+  }
+  out.push('估算行数来自统计信息（MySQL TABLE_ROWS / PostgreSQL reltuples），只用来判断量级。');
+  return { markdown: out.join('\n'), missing };
 }
 
 // 列结果 -> Markdown：每张表一节（表注释、字段表）
@@ -252,7 +291,21 @@ export function main(argv) {
     if (r.code) { console.error(r.error); return r.code; }
     if (!r.rows.length) { console.error(tables.length ? `没有找到表：${tables.join('、')}` : '当前库 / schema 下没有表'); return 1; }
     const block = schemaMarkdown(name, conn, r.rows);
-    if (!o.write) { console.log(block); return 0; }
+    if (o.indexes) {
+      const q = indexSql(conn.driver || 'mysql', tables);
+      const ix = execute(conn, true, q.indexes, o.timeout);
+      if (ix.code) { console.error(ix.error); return ix.code; }
+      const rc = execute(conn, true, q.rows, o.timeout);
+      if (rc.code) { console.error(rc.error); return rc.code; }
+      console.log(block + indexMarkdown(tables, [...new Set(r.rows.map((x) => x[0]))], ix.rows, rc.rows).markdown);
+      return 0;
+    }
+    if (!o.write) {
+      const found = new Set(r.rows.map((x) => String(x[0]).toLowerCase()));
+      const missing = tables.filter((t) => !found.has(t.toLowerCase()));
+      console.log(block + (missing.length ? `\n\n库里不存在的表：${missing.map((t) => `\`${t}\``).join('、')}` : ''));
+      return 0;
+    }
     const f = path.join(SKILL_DIR, 'references', 'schema.md');
     fs.mkdirSync(path.dirname(f), { recursive: true });
     fs.writeFileSync(f, mergeSchema(fs.existsSync(f) ? fs.readFileSync(f, 'utf8') : '# Schema Notes\n', block));
