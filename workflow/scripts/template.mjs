@@ -21,7 +21,7 @@ import { fileURLToPath } from 'node:url';
 import { resolveTemplate, skillMeta } from './resolve.mjs';
 import { headings, lint } from './lint-doc.mjs';
 import { skeleton } from './make-template.mjs';
-import { KINDS } from './artifacts.mjs';
+import { collect } from './artifacts.mjs';
 
 const ALIASES = {
   tech: ['create-tech-md-doc', 'template.md'],
@@ -95,10 +95,9 @@ export function compare(oldText, newText) {
 
 // 最近几份用这个模板生成的文档，按旧模板、新模板各 lint 一次，列出新模板下多出来的错误
 function impact(root, t, oldText, newText) {
-  const kind = KINDS.find((k) => k.kind === PRODUCES[`${t.skill}/${t.id}`]);
+  const kind = PRODUCES[`${t.skill}/${t.id}`];
   if (!kind) return { docs: 0, affected: [] };
-  const dir = path.join(root, 'docs', 'skills', kind.skill);
-  const files = fs.existsSync(dir) ? fs.readdirSync(dir).filter((n) => n.startsWith(kind.prefix) && n.endsWith('.md')).map((n) => path.join(dir, n)) : [];
+  const files = collect(root).filter((a) => a.kind === kind).map((a) => path.join(root, a.path));
   files.sort((x, y) => fs.statSync(y).mtimeMs - fs.statSync(x).mtimeMs);
   const requiredMeta = skillMeta(t.skill)?.templates.find((x) => x.id === t.id)?.lint?.requiredMeta ?? [];
   const affected = [];

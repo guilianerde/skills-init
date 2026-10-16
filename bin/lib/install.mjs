@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { TPL_DIR, PKG, CANON_DIR, INSTALL_BASES, SKILLS, SKILL_LIST, USER_FILES, RENAMED, MANIFEST, ok, warn, readJson, walk, toPosix, sameFile, writeFile, render, sha256, fileHash, readManifest, removeEmptyDirs, lstat, timestamp, removeLink } from './core.mjs';
 import { writeDbConfig } from './db.mjs';
+import { migrate as migrateArtifacts, ensureIgnore, REQ_DIR } from '../../workflow/scripts/requirement.mjs';
 
 // 结尾汇总：被手改过、已用新版覆盖（原文件已备份）的 / 模板已删除、手改过而备份后删除的文件
 export const report = { overwritten: [], removed: [], backupDir: null };
@@ -258,6 +259,16 @@ export function updateGitignore(root, withDocNexus, withCodeGraph = false) {
   if (!missing.length) { ok('.gitignore 已包含全部规则'); return; }
   fs.appendFileSync(gi, `\n# Agent skills generated rules (credentials + tmp artifacts; do not commit)\n${missing.join('\n')}\n`);
   ok(`.gitignore 已追加：${missing.join(' ')}`);
+}
+
+// 产物按需求归档（docs/skills/requirements/<需求名>/）：旧版 docs/skills/<skill>/ 下的产物按「对比分支」搬进需求目录（git mv 保留历史），
+// 项目根 .ignore 加上需求目录（不参与代码搜索）。认不出分支的文件留在原处并列出。返回迁移结果
+export function organizeArtifacts(root) {
+  const r = migrateArtifacts(root);
+  for (const q of r.requirements) ok(`产物已按需求归档：${q.moves.length} 份 → ${q.dir}/（分支 ${q.branch}${q.existing ? '' : `，需求名「${q.name}」，可在 meta.json 里改`}）`);
+  if (r.left_in_place.length) warn(`以下产物的元信息里没有分支，留在原处：${r.left_in_place.join('、')}`);
+  if (ensureIgnore(root)) ok(`.ignore 已加上 ${REQ_DIR}/（需求产物不参与代码搜索）`);
+  return r;
 }
 
 // 不再随 skills 提供默认版本的模板（skill.json 里没有 src 的：技术方案、上线方案）。老项目还在用装进 skills 目录的默认版本时，

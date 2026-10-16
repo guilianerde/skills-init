@@ -23,7 +23,7 @@ import { seedTemplates, updateTemplates } from './seed-templates.mjs';
 import { TPL_DIR, PKG, ENV_NAMES, CANON_DIR, SKILLS, resolveSkillSelection, step, ok, warn, CliError, fail, isAdminTerminal } from './lib/core.mjs';
 import { ask, closePrompt } from './lib/prompt.mjs';
 import { findExistingDbConfig, getDb } from './lib/db.mjs';
-import { report, installSkills, linkSkills, removeRenamed, updateGitignore, preserveRetiredTemplates } from './lib/install.mjs';
+import { report, installSkills, linkSkills, removeRenamed, updateGitignore, preserveRetiredTemplates, organizeArtifacts } from './lib/install.mjs';
 import { setupCodeGraph } from './lib/codegraph.mjs';
 import { uninstall } from './lib/uninstall.mjs';
 import { checkNodeForDocNexus, setupDocNexus, templateRecords, saveTemplateRecords, reportTemplateStatus, installedSkills, docnexusConnected, printTemplateDiffs } from './lib/docnexus.mjs';
@@ -214,6 +214,7 @@ async function main() {
   closePrompt(); // 模板冲突时可能还要询问，装完再关
 
   updateGitignore(o.root, o.withDocNexus, o.withCodeGraph);
+  organizeArtifacts(o.root);
   const docnexus = o.withDocNexus ? setupDocNexus(o.root, sel) : 'skipped';
   const codegraph = o.withCodeGraph ? setupCodeGraph(o.root, sel) : 'skipped';
   let seedFailed = false;

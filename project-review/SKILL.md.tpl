@@ -60,16 +60,12 @@ description: "Review source code (any language; Java/Spring, Go, TypeScript, Pyt
 
 ## Artifact Location
 
-审查报告默认保存到项目统一产物目录（各环境一致）：
+审查报告按需求归档在 `docs/skills/requirements/<需求名>/`，规则见 `<skills>/workflow/references/requirements.md`：
 
-```
-docs/skills/project-review/review-<范围安全名>-<YYYYMMDD>.md
-```
-
-- `<范围安全名>`：分支对比用 `<dev分支>`（`/` → `-`），单文件用类名/文件名（`/` → `-`）
-- 同路径已存在 → 加 `_v2`、`_v3`，不要覆盖
+- 路径用 `node <skills>/workflow/scripts/requirement.mjs path review`（分支对比按 dev 分支加 `--branch <dev分支>`），写到输出的 `path`；已有报告时自动给出 `review_v2.md`、`review_v3.md`，不覆盖（复审对照上次报告靠它）。
+- 退出码 2（这个分支还没绑定需求）：问用户这个需求叫什么，默认值用输出的 `suggested_name`，再 `requirement.mjs bind --name "<需求名>" [--branch <dev分支>]`；用户不给名字时 `bind` 按分支名生成。
 - 报告同时完整输出到对话；落盘文件与对话内容一致
-- 项目无 `docs/skills/` 目录时先创建
+- 写完运行 `requirement.mjs sync <path>` 更新 `meta.json`
 - 写完运行 `node <skills>/workflow/scripts/lint-doc.mjs <报告路径> --skill project-review --facts` 自检：「错误」（缺必填章节、缺元信息行、残留 `{{...}}`）先修正；「在 diff 和代码里都找不到」的名字逐个核实，写错了就改成真实的名字
 
 ## Verification

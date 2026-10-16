@@ -67,8 +67,10 @@ description: "Generate a Markdown technical design doc (技术方案) from the d
 
 ### Step 4 — 写文件
 
-- 路径：`docs/skills/create-tech-md-doc/tech-doc_<dev分支安全名>_<YYYYMMDD>.md`（分支名 `/` → `-`；目录不存在先创建）。
-- 同路径已存在 → 加 `_v2`、`_v3`，不覆盖。
+- 路径：运行 `node <skills>/workflow/scripts/requirement.mjs path tech --branch <dev分支>`，写到输出的 `path`（`docs/skills/requirements/<需求名>/tech-doc.md`，已有旧版时给出 `_v2`、`_v3`，不覆盖）。规则见 `<skills>/workflow/references/requirements.md`。
+  - 退出码 2（这个分支还没绑定需求）：问用户这个需求叫什么，默认值用输出的 `suggested_name`，再 `requirement.mjs bind --name "<需求名>" --branch <dev分支>`；用户不给名字时 `bind` 按分支名生成。
+  - `wiki_record` 非空：上一版已发布到 wiki，新版第一行原样写这条记录，重新发布时更新同一页面。
+- 写完运行 `requirement.mjs sync <path>` 更新 `meta.json`。
 - 写完运行 `node <skills>/workflow/scripts/lint-doc.mjs <文档路径> --skill create-tech-md-doc --facts` 自检（`--facts` 按元信息行的对比分支核对正文里的类名、文件、接口、表名）：有「错误」先修正再交付（缺必填章节、残留 `{{...}}` 占位符、缺元信息行）；「警告」按实际情况处理，其中「在 diff 和代码里都找不到」的名字逐个核实：确属编造就改成 diff 里的真实名字或写「待补充」，是外部系统 / 配置中心的名字就保留；「提示」里的待填写位置在交付摘要中告诉用户。
 - 再把路径和摘要告诉用户。
 

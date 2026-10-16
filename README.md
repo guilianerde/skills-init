@@ -187,7 +187,7 @@ npx @rowansenne/skills-init doctor
 /dev --bug <现象 | 报错 | 日志>       # 缺陷修复
 ```
 
-* **功能开发**：理解需求（可读 PRD、查 DocNexus 历史决策）→ 调研现有代码 → 需求澄清（借鉴 grill-me：按决策树分轮提问，每题给推荐答案；事实自己查、决定交给用户；S 规模无未定决定时跳过）→ 按规模出方案（S 直接做；M 对话内方案待确认；L 落盘方案文档待确认）→ 小步实现并编译 → 补测试并运行 → 用 project-review 自审 → 交付说明落盘到 `docs/skills/dev/delivery-<需求>-<日期>.md`（带分支元信息；改动、验证结果、配置清单、未执行的 SQL），已接入 DocNexus 时每次都问要不要沉淀（同意后以 `dev-notes` 分类写入，并把库内路径记回交付说明）。审查和上线方案会按分支自动读取这份交付说明。
+* **功能开发**：理解需求（可读 PRD、查 DocNexus 历史决策）→ 调研现有代码 → 需求澄清（借鉴 grill-me：按决策树分轮提问，每题给推荐答案；事实自己查、决定交给用户；S 规模无未定决定时跳过）→ 按规模出方案（S 直接做；M 对话内方案待确认；L 落盘方案文档待确认）→ 小步实现并编译 → 补测试并运行 → 用 project-review 自审 → 交付说明落盘到 `docs/skills/requirements/<需求名>/delivery.md`（带分支元信息；改动、验证结果、配置清单、未执行的 SQL），已接入 DocNexus 时每次都问要不要沉淀（同意后以 `dev-notes` 分类写入，并把库内路径记回交付说明）。审查和上线方案会按分支自动读取这份交付说明。
 * **S 规模快速通道**：S 规模且不涉及配置、SQL / DDL、对外接口、表结构，也没有需要澄清的决定时，编译、测试、自审照常，但只在对话里交付，不落盘交付说明、不问沉淀；实现中碰到上述任何一项或改动超过 3 个文件，就退回完整流程。缺陷修复同样适用（根因仍须在对话里写清楚）。
 * **缺陷修复**：收集现象 → 用失败测试复现 → 用证据定位根因 → 最小修复让测试转绿 → 自审 → 交付（必须写明根因）。
 * 守则：不写库、不改凭据、不擅自 commit / push、不装新依赖；测试没跑就写「未验证」。
@@ -390,7 +390,8 @@ dev、project-review、技术方案、上线方案都在对应环节调用它：
 | `workflow/scripts/resolve.mjs status` | `/workflow status` 的能力探测（不输出任何凭据） |
 | `workflow/scripts/resolve.mjs infer-profile` | 按固定规则从构建文件、Makefile、依赖与配置文件、git 推断项目画像草稿，每个字段附依据；不写文件 |
 | `workflow/scripts/lint-doc.mjs <文档> --skill <skill> [--facts]` | 对照当前生效的模板检查生成的文档：必填章节、残留 `{{...}}` 占位符、元信息行为错误；缺普通章节、顺序不一致为警告；列出待填写位置。`--facts` 再核对正文里的类名、文件、接口、表名：在对比分支的 diff 和代码里都找不到的记为警告（防编造） |
-| `workflow/scripts/artifacts.mjs [--branch b \| --all]` | 按分支汇总 `docs/skills/` 下的开发方案、交付说明、审查报告、技术方案、上线方案及其 wiki 发布记录，给出下一步建议；分支取自文档元信息行，不另存记录。上线方案没传 `--tech` 时据此自动引用同分支的技术方案；project-review 据此对照本分支方案、识别复审 |
+| `workflow/scripts/requirement.mjs which / bind / path / sync / list / migrate` | 产物按需求归档：查当前分支绑定的需求（没绑定时给出按分支名生成的建议名）、绑定需求名、给出本次落盘路径（不覆盖，带上一版的 wiki 记录）、重建 `meta.json`、列出所有需求、把旧布局的产物迁进需求目录 |
+| `workflow/scripts/artifacts.mjs [--branch b \| --all]` | 按分支汇总 `docs/skills/requirements/`（及旧版 `docs/skills/<skill>/`）下的开发方案、交付说明、审查报告、技术方案、上线方案及其 wiki 发布记录，给出下一步建议；分支取自文档元信息行，不另存记录。上线方案没传 `--tech` 时据此自动引用同分支的技术方案；project-review 据此对照本分支方案、识别复审 |
 | `workflow/scripts/report.mjs [--since d] [--all-branches] [--json]` | 本地效果报告（`/workflow report`、`skills-init report`）：审查发现与修复率、复核率、需求澄清、沉淀率、知识引用、各分支链路 |
 | `workflow/scripts/tables.mjs [--diff b...h \| --base b \| --files a,b]` | 找出改动涉及哪些表：实体注解（`@TableName` / `@Table`，没写表名时按类名推断）、Mapper XML 与代码里的 SQL、DDL 脚本；标出 DDL、是否在 `schema.md` 里，并给出拉表结构的命令。dev 调研 / 自检与 project-review 审 SQL / DDL 时使用 |
 | `workflow/scripts/template.mjs list / draft / check / save <模板>` | 修改 / 创建模板（`/workflow template`）：把当前模板复制成草稿（或 `--from <样例>` 抽骨架），`check` 校验格式、列出章节变化、拿最近几份已生成文档试跑 lint 看影响，`save` 备份旧模板后写入项目模板并确认生效；已接入 DocNexus 时 `save` 给出 capture 指引，不直接写知识库 |
@@ -472,32 +473,35 @@ CI（`.github/workflows/test.yml`）在 push 到 main 和每个 PR 上运行：�
 
 ## 产物输出规范（统一落位）
 
-所有技能生成的**文档产物**统一按 `<根>/技能名/` 落位（四环境一致，不再依赖 `.claude/`）：
+一个需求的文档产物放在**同一个需求目录**里，开发方案、交付说明、审查报告、技术方案、上线方案一起看：
 
+```
+docs/skills/requirements/<需求名>/
+├── meta.json        # 需求名、绑定的分支、各产物（版本、日期、wiki 发布记录、DocNexus 沉淀），给以后的可视化用
+├── plan.md          # 开发方案（dev，L 规模）
+├── delivery.md      # 交付说明（dev，每次完整交付都写）
+├── review.md        # 审查报告（project-review）；复审 review_v2.md、review_v3.md
+├── tech-doc.md      # 技术方案
+└── release-doc.md   # 上线方案
+```
 
+* **需求名由你定**：dev 确定是 M / L 规模（要落盘）时，或从 `/workflow` 完整链路开始时，如果当前分支还没有绑定需求，会问你这个需求叫什么（默认值按分支名生成；也可以选已有的需求，例如修 bug 的新分支挂到原需求下）。你不起名就按分支名生成。绑定后，同一分支上的各 skill 都写到这个目录，不再问。一个需求可以绑定多个分支。
+* 路径由 `workflow/scripts/requirement.mjs path <种类>` 给出，同种产物已存在时加 `_v2`、`_v3`，不覆盖旧文件；上一版发布过 wiki 时，新版沿用同一个页面。
+* 需求目录写在项目根的 `.ignore` 里，ripgrep 和 agent 的代码搜索会跳过它，产物多了不会污染搜索结果（找历史决策用 DocNexus）。git 不受影响，建议随代码提交。
+* 升级时安装器会把旧版 `docs/skills/<skill>/` 下的产物按「对比分支」搬进需求目录（`git mv`，保留历史）。需求名取交付说明或开发方案里的需求短名，没有就用分支名，可以在 `meta.json` 里改。元信息里没有分支的文件留在原处。
 
-| 技能                    | 产物         | 规范路径                                                               |
-| --------------------- | ---------- | ------------------------------------------------------------------ |
-| project-review           | 审查报告（md）   | `docs/skills/project-review/review-<范围>-<YYYYMMDD>.md`                |
-| create-tech-md-doc    | 技术方案（md）   | `docs/skills/create-tech-md-doc/tech-doc_<分支>_<YYYYMMDD>.md`       |
-| create-release-md-doc | 上线方案（md）   | `docs/skills/create-release-md-doc/release-doc_<分支>_<YYYYMMDD>.md` |
-| database-query        | 查询结果       | 默认对话输出；导出时 `tmp/skills/database-query/result-<时间戳>.csv`            |
-| dev                   | L 规模方案、交付说明（md） | `docs/skills/dev/plan-<需求短名>-<YYYYMMDD>.md`；`docs/skills/dev/delivery-<需求短名>-<YYYYMMDD>.md`（每次交付都写） |
-| md-to-wiki            | 转换临时 XHTML | `tmp/skills/md-to-wiki/_wiki_upload_<时间戳>.html`（上传后可删）             |
+其他产物：
+
+| 技能 | 产物 | 位置 |
+| --- | --- | --- |
+| database-query | 查询结果 | 默认对话输出；导出时 `tmp/skills/database-query/result-<时间戳>.csv` |
+| md-to-wiki | 转换临时 XHTML | `tmp/skills/md-to-wiki/_wiki_upload_<时间戳>.html`（上传后可删） |
+| 各文档类 skill | 项目模板 | `docs/skills/templates/<skill>/`（见下文「模板」） |
 
 规则：
 
-
-
 * `docs/skills/` 是**持久产物**目录，可提交 git，团队共享。
-
 * `tmp/skills/` 是**临时产物**目录，`init-skills` 自动把 `/tmp/` 加入 `.gitignore`，不入库。
-
-* 同路径已存在时加 `_v2`、`_v3`，不覆盖旧文件。
-
-* 存量历史产物（项目根 `code-review-*.md`、`.claude/docs/` 下的 `tech-doc_*` / `release-doc_*`）
-
-  属此前规范遗留，新产物按上表落位；需要归档迁移可自行移动，不影响本规范。
 
 ## 自定义模板
 
@@ -530,9 +534,10 @@ skills-init/
 │   ├── scripts/pr-desc.mjs            # 按本分支产物生成 PR / MR 描述
 │   ├── scripts/template.mjs           # 修改 / 创建模板：草稿 → 校验与影响 → 保存
 │   ├── scripts/tables.mjs             # 找出改动涉及的数据库表
+│   ├── scripts/requirement.mjs        # 产物按需求归档：绑定需求名、落盘路径、meta.json、旧布局迁移
 │   ├── scripts/make-template.mjs      # 从样例文档抽模板骨架
 │   ├── scripts/doc-sections.mjs       # 读产物的章节、表格、元信息（report / pr-desc 共用，标题解析复用 lint-doc）
-│   ├── references/                    # profile.md、templates.md、docnexus.md、status.md、tables.md、codegraph.md（其他 skill 直接读对应文件）
+│   ├── references/                    # profile.md、templates.md、docnexus.md、status.md、tables.md、requirements.md、codegraph.md（其他 skill 直接读对应文件）
 │   └── profile.json.tpl               # 空画像，首次使用时由 agent 推断并经确认后填写
 ├── dev/
 │   ├── SKILL.md.tpl · skill.json

@@ -119,7 +119,7 @@ export function buildReport(root, { since = null, allBranches = false } = {}) {
     const items = all.filter((a) => a.branch === b);
     const has = Object.fromEntries(KINDS.map((k) => [k.kind, items.some((a) => a.kind === k.kind)]));
     const docs = items.filter((a) => a.kind === 'tech' || a.kind === 'release');
-    return { branch: b, has, reviews: items.filter((a) => a.kind === 'review').length, unpublished: docs.filter((a) => !a.wiki).map((a) => a.path) };
+    return { branch: b, requirements: [...new Set(items.map((a) => a.requirement).filter(Boolean))], has, reviews: items.filter((a) => a.kind === 'review').length, unpublished: docs.filter((a) => !a.wiki).map((a) => a.path) };
   });
 
   return {
@@ -158,11 +158,11 @@ export function toMarkdown(r) {
   L.push(`- 交付与审查问过沉淀的 ${c.captured + c.not_captured} 次中，沉淀 ${c.captured} 次（${show(c.capture_rate)}）；未接入 DocNexus ${c.not_connected}，元信息缺失 ${c.missing}`);
   L.push(`- 正文引用知识库文档的产物：${r.knowledge.citing} 份（${show(r.knowledge.rate)}）`, '');
   L.push('## 各分支链路', '');
-  L.push(`| 分支 | ${KINDS.map((k) => k.label).join(' | ')} | 未发布到 wiki |`);
+  L.push(`| 分支（需求） | ${KINDS.map((k) => k.label).join(' | ')} | 未发布到 wiki |`);
   L.push(`|---|${KINDS.map(() => '---').join('|')}|---|`);
   for (const b of r.branches) {
     const cell = (k) => (b.has[k.kind] ? (k.kind === 'review' && b.reviews > 1 ? `✓×${b.reviews}` : '✓') : '');
-    L.push(`| \`${b.branch}\` | ${KINDS.map(cell).join(' | ')} | ${b.unpublished.length ? b.unpublished.map((p) => `\`${path.basename(p)}\``).join('<br>') : ''} |`);
+    L.push(`| \`${b.branch}\`${b.requirements.length ? `（${b.requirements.join('、')}）` : ''} | ${KINDS.map(cell).join(' | ')} | ${b.unpublished.length ? b.unpublished.map((p) => `\`${path.basename(p)}\``).join('<br>') : ''} |`);
   }
   if (r.without_branch.length) L.push('', `元信息里没有分支、未归组的产物：${r.without_branch.map((p) => `\`${p}\``).join('、')}`);
   return L.join('\n');

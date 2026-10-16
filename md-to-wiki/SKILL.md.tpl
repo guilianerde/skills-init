@@ -70,4 +70,4 @@ node <skillDir>/scripts/md-to-wiki.mjs <mdPath> tmp/skills/md-to-wiki/_wiki_uplo
 - `references/upload.md`：通道 A / B 的调用细节与验证
 - `references/troubleshooting.md`：转换脚本说明、XHTML 规则、校验命令、常见错误
 
-典型串联：`create-tech-md-doc` / `create-release-md-doc` 生成 `docs/skills/...` 下的 md → 本 skill 发布。
+典型串联：`create-tech-md-doc` / `create-release-md-doc` 生成 `docs/skills/requirements/<需求名>/` 下的 md → 本 skill 发布。

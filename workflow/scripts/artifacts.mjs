@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // 按分支汇总各 skill 的产物：开发方案、交付说明、审查报告、技术方案、上线方案，以及它们的 wiki 发布记录。
-// 不另存记录文件：直接扫描 docs/skills/<skill>/ 下的 Markdown，从元信息行读分支（「分支：」「对比分支：」），
+// 产物按需求归档在 docs/skills/requirements/<需求>/（见 requirement.mjs）；旧版布局 docs/skills/<skill>/ 照常识别。
+// 直接扫描 Markdown，从元信息行读分支（「分支：」「对比分支：」），
 // 从第一行的 <!-- md-to-wiki: ... --> 读发布记录（md-to-wiki 上传后写入）。只读。
 //
 // 用法（在项目根执行；--root 可指定项目根）：
@@ -12,6 +13,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { REQ_DIR, parseFile } from './requirement.mjs';
 
 // 产物种类 → 产出它的 skill 目录与文件名前缀；顺序即链路顺序
 export const KINDS = [
@@ -41,9 +43,17 @@ export function parseWiki(text) {
 
 const fileDate = (name) => { const m = name.match(/(\d{4})(\d{2})(\d{2})(?:_v(\d+))?\.md$/); return m ? `${m[1]}-${m[2]}-${m[3]}${m[4] ? `#${m[4].padStart(3, '0')}` : ''}` : ''; };
 
-// docs/skills/<skill>/<文件> → 产物条目；不是已知产物返回 null
+const headerDate = (text) => /(\d{4}-\d{2}-\d{2})/.exec(text.split(/\r?\n/).slice(0, 8).join('\n'))?.[1] ?? '';
+
+// docs/skills/requirements/<需求>/<文件> 或旧版 docs/skills/<skill>/<文件> → 产物条目；不是已知产物返回 null
 function entry(rel, text, mtime) {
   const parts = rel.split('/');
+  if (parts.length === 5 && `${parts.slice(0, 3).join('/')}` === REQ_DIR) {
+    const p = parseFile(parts[4]);
+    const k = p && KINDS.find((x) => x.kind === p.kind);
+    // 排序键：文档头里的日期 + 版本号（需求目录里的文件名不带日期）
+    return k ? { kind: k.kind, label: k.label, path: rel, requirement: parts[3], branch: parseBranch(text), date: `${headerDate(text)}#${String(p.version).padStart(3, '0')}`, mtime, wiki: parseWiki(text) } : null;
+  }
   if (parts.length !== 4 || parts[0] !== 'docs' || parts[1] !== 'skills') return null;
   const [, , skill, name] = parts;
   const k = KINDS.find((x) => x.skill === skill && name.startsWith(x.prefix) && name.endsWith('.md'));
@@ -54,7 +64,18 @@ const byDate = (a, b) => a.date.localeCompare(b.date) || a.mtime - b.mtime;
 
 export function collect(root) {
   const out = [];
-  for (const skill of new Set(KINDS.map((k) => k.skill))) { // dev 有方案与交付两类，目录只扫一次
+  const reqBase = path.join(root, REQ_DIR);
+  if (fs.existsSync(reqBase)) {
+    for (const d of fs.readdirSync(reqBase, { withFileTypes: true }).filter((x) => x.isDirectory())) {
+      for (const name of fs.readdirSync(path.join(reqBase, d.name))) {
+        const file = path.join(reqBase, d.name, name);
+        if (!name.endsWith('.md')) continue;
+        const e = entry(toPosix(path.relative(root, file)), fs.readFileSync(file, 'utf8'), fs.statSync(file).mtimeMs);
+        if (e) out.push(e);
+      }
+    }
+  }
+  for (const skill of new Set(KINDS.map((k) => k.skill))) { // 旧版布局；dev 有方案与交付两类，目录只扫一次
     const dir = path.join(root, 'docs', 'skills', skill);
     if (!fs.existsSync(dir)) continue;
     for (const name of fs.readdirSync(dir)) {

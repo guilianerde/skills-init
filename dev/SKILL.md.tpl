@@ -70,6 +70,8 @@ description: "Implement a feature or fix a bug in this project end to end: under
 
 规模拿不准时按大一级处理。
 
+**M / L 规模先定需求名**：规模定下来、确定要落盘时，按 Artifact Location 运行 `requirement.mjs which`，当前分支没绑定需求就在这一轮问用户这个需求叫什么（可以和澄清问题一起问），之后的方案、交付、审查、技术方案、上线方案都归到这个需求下。
+
 **S 规模快速通道**：S 规模，且改动**不涉及**配置项、SQL / DDL、对外接口（HTTP 接口签名、MQ 消息体、对外 DTO）、表结构，也没有 F3 中确认过的决定 → 走快速通道：F5～F7 照常（编译、测试、自审都不省），F8 只在对话里交付，不落盘交付说明、不问 DocNexus 沉淀（见 F8「快速通道交付」）。开工时用一句话告诉用户「按快速通道处理，不落盘交付说明」。实现中一旦碰到上面任何一项、改动超过 3 个文件，或用户要求落盘 → 退出快速通道，按完整 F8 交付。小改动也要走完整流程是用户绕开 dev 的主要原因，所以只在上面这些会影响上线和团队的情况下才落盘。
 
 方案模板：在项目根运行 `node <skills>/workflow/scripts/resolve.mjs template dev plan-template.md`，读输出的 `path`；退出码 2（已接入 DocNexus 但缺模板）时停下并按 `hint` 处理。L 规模的方案文档落盘后运行 `node <skills>/workflow/scripts/lint-doc.mjs <方案路径> --skill dev` 自检，再请用户确认。
@@ -101,7 +103,7 @@ description: "Implement a feature or fix a bug in this project end to end: under
 
 完整流程：
 
-1. **落盘交付说明**：模板路径用 `node <skills>/workflow/scripts/resolve.mjs template dev delivery-template.md` 取（退出码 2 时停下并按 `hint` 处理），写到 `docs/skills/dev/delivery-<需求短名>-<YYYYMMDD>.md`（见 Artifact Location）。元信息行的「对比分支」写当前分支和 `profile.main_branch`，`artifacts.mjs`、project-review、上线方案靠它找到这份交付；有开发方案时「参考产物」写方案路径。小改动每节一两行即可，不适用的节写「无」，但验证结果必须如实。
+1. **落盘交付说明**：模板路径用 `node <skills>/workflow/scripts/resolve.mjs template dev delivery-template.md` 取（退出码 2 时停下并按 `hint` 处理），写到 `requirement.mjs path delivery` 给出的路径（见 Artifact Location）。元信息行的「对比分支」写当前分支和 `profile.main_branch`，`artifacts.mjs`、project-review、上线方案靠它找到这份交付；有开发方案时「参考产物」写方案路径。小改动每节一两行即可，不适用的节写「无」，但验证结果必须如实。
 2. **自检**：运行 `node <skills>/workflow/scripts/lint-doc.mjs <交付路径> --skill dev --template delivery-template.md`，有「错误」先修正。
 3. **对话里给摘要**：结果、验证（含未验证项）、配置 / SQL 有无、交付文件路径；不必把全文贴进对话。
 4. **询问下一步**，不要自行执行：
@@ -150,17 +152,8 @@ description: "Implement a feature or fix a bug in this project end to end: under
 
 ## Artifact Location
 
-- 交付说明（功能开发和缺陷修复都落盘；S 规模快速通道除外）：
+产物按需求归档在 `docs/skills/requirements/<需求名>/`，规则见 `<skills>/workflow/references/requirements.md`：
 
-  ```
-  docs/skills/dev/delivery-<需求短名>-<YYYYMMDD>.md
-  ```
-
-  有开发方案时 `<需求短名>` 与方案一致；缺陷修复用缺陷短名（如 `fix-order-npe`）。
-- L 规模的方案文档（或用户要求落盘的 M 规模方案）：
-
-  ```
-  docs/skills/dev/plan-<需求短名>-<YYYYMMDD>.md
-  ```
-
-  `<需求短名>` 用小写字母、数字和 `-`；同路径已存在 → 加 `_v2`、`_v3`，不覆盖。项目无 `docs/skills/` 目录时先创建。
+- **需求名**：确定规模为 M / L（要落盘）时，先运行 `node <skills>/workflow/scripts/requirement.mjs which`；当前分支还没绑定需求就问用户这个需求叫什么（默认值用输出的 `suggested_name`），再 `requirement.mjs bind --name "<需求名>"`；用户不给名字时 `bind` 按分支名生成。S 规模快速通道不落盘，不问。缺陷修复同样处理（可以选择挂到原需求下）。
+- **路径**：交付说明用 `requirement.mjs path delivery`，L 规模方案（或用户要求落盘的 M 规模方案）用 `requirement.mjs path plan`，写到输出的 `path`；已有旧版时自动给出 `_v2`、`_v3`，不覆盖。
+- 写完运行 `requirement.mjs sync <path>` 更新 `meta.json`。
