@@ -224,7 +224,7 @@ npx @rowansenne/skills-init doctor
 * DocNexus 的 skills 不在本仓库中，始终以安装的 npm 包为准；重跑脚本会按包版本重新同步与链接（`docnexus init` 可重复执行，不影响已有记忆）。
 * `.qwen/skills/` 下已存在的同名**真实目录**不会被替换，脚本会提示跳过。
 * npm 安装或 `docnexus init` 失败时只跳过 DocNexus，本仓库的 skills 照常安装，脚本最后以退出码 1 结束；修好后重跑即可。
-* 安装后 `dev`、`project-review` 会先按 `docnexus-recall` 查项目约定；`dev`、`create-tech-md-doc`、`create-release-md-doc` 结束时只会**提议**沉淀，**任何写入 DocNexus 的操作都必须经你授权**。
+* 安装后 `dev`、`project-review` 会先按 `docnexus-recall` 查项目约定；`dev`、`project-review` 交付时**每次都问**要不要沉淀（写入后把库内路径记回交付说明 / 审查报告的「DocNexus」元信息行），`create-tech-md-doc`、`create-release-md-doc` 结束时有值得记的内容才**提议**沉淀；**任何写入 DocNexus 的操作都必须经你授权**。
 * 离线或测试时可用环境变量指定安装来源，例如 `DOCNEXUS_PKG=/path/to/rowansenne-docnexus-0.13.0.tgz ./skills-init/init-skills.sh --with-docnexus`（PowerShell：`$env:DOCNEXUS_PKG=...`）。
 * Windows 上 qwen 的链接使用目录 junction（与 docnexus 的做法一致）；Git Bash 下 `ln -s` 是否生成真正的链接取决于 MSYS 设置，建议 Windows 用 PowerShell 版。
 

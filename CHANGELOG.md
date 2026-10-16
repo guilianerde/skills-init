@@ -4,6 +4,10 @@
 
 ## [Unreleased]
 
+### 变更
+- project-review 的 DocNexus 沉淀对齐 dev：已接入 DocNexus 时交付报告后**每次都问**要不要沉淀（列出建议沉淀的问题模式 / 约定 / 坑，没有值得记的也照问并说明）；同意后以 `code-review` 分类写入，只沉淀问题模式和约定（不含逐条清单和「⚠ 待确认」的发现），成功后把 `docnexus/library/<path>` 记回报告新增的「DocNexus」元信息行；未接入时不提问，元信息行写「未接入」。
+- `package.json` 的 description 补上 code-graph。
+
 ## [0.8.0] - 2026-10-16
 
 ### 新增
