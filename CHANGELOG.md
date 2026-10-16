@@ -4,6 +4,8 @@
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-10-16
+
 ### 新增
 - 新 skill **code-graph**：在 CodeGraph 代码图谱之上封装本工作流需要的查询，脚本 `code-graph/scripts/cg.mjs` 直接调用 CodeGraph 的库（`CodeGraph.openSync` / `getNodesInFile` / `getCallers` / `getCallees`），并补上它看不到的 Java / Spring 关联：
   - `impact --diff <main>...<dev>` / `--base <main>`：diff → 改动的方法 / 配置常量 / XML 语句 → 向上追调用方，一次给出受影响的 HTTP 接口、MQ 消费者（含 topic，方法或类上的 `@KafkaListener` / `@RabbitListener` / `@RocketMQMessageListener` 等）、定时任务（`@Scheduled` / `@XxlJob`）、受影响与改动过的测试、向下调用到的 MyBatis 语句及表、改动的 `@Value` 配置 key、删除的文件；索引落后于工作区时先 `codegraph sync`。
@@ -114,7 +116,8 @@
 - 安装器改为单一 Node 实现，`init-skills.sh` / `init-skills.ps1` 只是薄封装。
 - `code-review` 改名为 `project-review`，升级时自动清理旧名。
 
-[Unreleased]: https://github.com/guilianerde/skills-init/compare/v0.7.0...HEAD
+[Unreleased]: https://github.com/guilianerde/skills-init/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/guilianerde/skills-init/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/guilianerde/skills-init/compare/v0.6.2...v0.7.0
 [0.6.2]: https://github.com/guilianerde/skills-init/compare/v0.6.1...v0.6.2
 [0.6.1]: https://github.com/guilianerde/skills-init/compare/v0.6.0...v0.6.1
