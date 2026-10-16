@@ -4,6 +4,8 @@
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-10-16
+
 ### 新增
 - 本地效果报告：`/workflow report` 或 `skills-init report [--since YYYY-MM-DD] [--json]`，脚本 `workflow/scripts/report.mjs` 只读统计 `docs/skills/` 下的产物，不上报：审查各级别发现、严重问题复核通过率、复审时上次问题的修复率；交付的类型与规模、需求澄清确认的决定条数、带未验证项的交付；DocNexus 沉淀率与正文引用知识库的产物占比；各分支产物链路是否齐全、哪些文档未发布到 wiki。
 - PR / MR 描述：`workflow/scripts/pr-desc.mjs` 把本分支的交付说明（做了什么、已确认的决定、改动、验证、配置 / SQL）、审查报告（结论、CRITICAL / HIGH、影响面）和相关文档汇总成描述；没有交付说明时退回用提交记录和改动文件。dev 交付后要提 PR 时调用；workflow 路由新增「写 PR / MR 描述」。
@@ -136,7 +138,8 @@
 - 安装器改为单一 Node 实现，`init-skills.sh` / `init-skills.ps1` 只是薄封装。
 - `code-review` 改名为 `project-review`，升级时自动清理旧名。
 
-[Unreleased]: https://github.com/guilianerde/skills-init/compare/v0.8.1...HEAD
+[Unreleased]: https://github.com/guilianerde/skills-init/compare/v0.9.0...HEAD
+[0.9.0]: https://github.com/guilianerde/skills-init/compare/v0.8.1...v0.9.0
 [0.8.1]: https://github.com/guilianerde/skills-init/compare/v0.8.0...v0.8.1
 [0.8.0]: https://github.com/guilianerde/skills-init/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/guilianerde/skills-init/compare/v0.6.2...v0.7.0
