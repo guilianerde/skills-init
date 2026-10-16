@@ -4,6 +4,8 @@
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-10-16
+
 ### 变更
 - **技术方案、上线方案的模板不再随 skills 提供**：各团队发到 wiki 的格式不同，`create-tech-md-doc` / `create-release-md-doc` 改为按项目自己的模板生成。还没有模板时（`resolve.mjs template` 退出码 2，输出 `on_demand: true` 与 `expected`），skill 停下来请用户给一份团队现有的同类文档作样例（本地 Markdown，或 wiki pageId / URL），生成模板、用户确认后保存：未接入 DocNexus 时存到 `docs/skills/templates/<skill>/template.md`，已接入时经授权写入 DocNexus（`doc-template` 分类）。用户也可以随时要求重新生成模板。两个 skill 的填充改为按章节含义放事实，不再依赖固定的模块编号；元信息行「填充模块」改为「待补充章节」。
 - 老项目升级时，还在用原自带默认模板的（项目和 DocNexus 里都没有自己的版本），安装器先把它保存到 `docs/skills/templates/<skill>/template.md`，生成效果不变。
@@ -146,7 +148,8 @@
 - 安装器改为单一 Node 实现，`init-skills.sh` / `init-skills.ps1` 只是薄封装。
 - `code-review` 改名为 `project-review`，升级时自动清理旧名。
 
-[Unreleased]: https://github.com/guilianerde/skills-init/compare/v0.9.0...HEAD
+[Unreleased]: https://github.com/guilianerde/skills-init/compare/v0.10.0...HEAD
+[0.10.0]: https://github.com/guilianerde/skills-init/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/guilianerde/skills-init/compare/v0.8.1...v0.9.0
 [0.8.1]: https://github.com/guilianerde/skills-init/compare/v0.8.0...v0.8.1
 [0.8.0]: https://github.com/guilianerde/skills-init/compare/v0.7.0...v0.8.0
