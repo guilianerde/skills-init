@@ -26,5 +26,7 @@
   {"query": "帮我看看这份上线方案写得清不清楚 docs/skills/create-release-md-doc/release-doc_feature-coupon-v2_20261015.md，措辞上提提意见", "expect": ["none"]},
   {"query": "把 feature/coupon-v2 合并到 master 然后推送", "expect": ["none"]},
   {"query": "我改了 OrderServiceImpl.markPaid，帮我看看会影响哪些接口、MQ 消费者和定时任务", "expect": ["code-graph"]},
-  {"query": "pay-callback 这个 topic 现在是谁在发、谁在消费？", "expect": ["code-graph"]}
+  {"query": "pay-callback 这个 topic 现在是谁在发、谁在消费？", "expect": ["code-graph"]},
+  {"query": "feature/pay 这个分支开发完了，帮我按交付说明和审查报告写一份 MR 描述", "expect": ["workflow"]},
+  {"query": "这套 skills 用了一个月了，帮我看看效果怎么样，审查发现的问题修了多少", "expect": ["workflow"]}
 ]

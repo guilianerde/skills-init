@@ -62,6 +62,7 @@ npx @rowansenne/skills-init
 | `upgrade` | 读安装清单里记录的环境与模式，非交互升级到当前版本：保留数据库配置，手改过的文件另存 `.new`；已接入 DocNexus 时顺带导入新版本新增的文档模板（只新增，不改动已有模板） |
 | `doctor` | 自检：已装版本与当前包对比、手改 / 缺失 / 待合并的文件、软链接是否断开、项目画像、DocNexus 模板是否齐全、各数据库连接能否只读 `SELECT 1`（`--offline` 跳过）、`.gitignore` 是否忽略了凭据。有错误时退出码 1 |
 | `uninstall` | 等价于 `--uninstall` |
+| `report` | 本地效果报告：只读统计 `docs/skills/` 下的产物（`--since YYYY-MM-DD`、`--json`），见「workflow：入口与项目画像」 |
 | `seed-templates` | 只把默认文档模板导入 DocNexus，不重装 skills。`--update` 把导入后未改动的模板更新为新版；`--diff` 只读打印团队改过的模板与新默认模板的差异，供手动合并 |
 
 ```
@@ -139,7 +140,17 @@ npx @rowansenne/skills-init doctor
 /workflow            # 按请求路由到对应 skill；无具体请求时输出能力地图 + 状态
 /workflow status     # 检查项目画像、wiki、DocNexus、数据库是否可用
 /workflow profile    # 从仓库推断并经你确认后填写 workflow/profile.json
+/workflow report     # 本地效果报告（也可以直接运行 npx @rowansenne/skills-init report）
 ```
+
+**效果报告**（`/workflow report` 或 `skills-init report [--since YYYY-MM-DD] [--json]`）只读统计 `docs/skills/` 下已落盘的产物，不上报、不另存记录，用来回答「用了以后有没有更好」：
+
+* 审查：各级别发现条数、严重问题复核通过率、复审时上次问题的修复率；
+* 交付：功能 / 缺陷、S / M / L、开工前经需求澄清确认的决定条数、带「未验证项」的交付；
+* 知识：交付与审查的 DocNexus 沉淀率、正文引用了知识库文档的产物占比；
+* 各分支链路：开发方案、交付说明、审查报告、技术方案、上线方案齐不齐，哪些文档还没发布到 wiki。
+
+**PR / MR 描述**：`node <skills>/workflow/scripts/pr-desc.mjs [--branch b] [--base main] [--out 文件]` 把本分支的交付说明（做了什么、已确认的决定、改动、验证、配置 / SQL）、审查报告（结论、CRITICAL / HIGH、影响面）和相关文档路径汇总成描述；没有交付说明时退回用提交记录和改动文件列表。dev 交付后要提 PR 时会调用它；创建 PR 要你同意。
 
 `workflow/profile.json` 是所有 skill 共用的项目事实，模板里不再写死任何公司或项目约定。缺失字段视为空，文档中对应位置写「待填写」。示例：
 
@@ -177,6 +188,7 @@ npx @rowansenne/skills-init doctor
 ```
 
 * **功能开发**：理解需求（可读 PRD、查 DocNexus 历史决策）→ 调研现有代码 → 需求澄清（借鉴 grill-me：按决策树分轮提问，每题给推荐答案；事实自己查、决定交给用户；S 规模无未定决定时跳过）→ 按规模出方案（S 直接做；M 对话内方案待确认；L 落盘方案文档待确认）→ 小步实现并编译 → 补测试并运行 → 用 project-review 自审 → 交付说明落盘到 `docs/skills/dev/delivery-<需求>-<日期>.md`（带分支元信息；改动、验证结果、配置清单、未执行的 SQL），已接入 DocNexus 时每次都问要不要沉淀（同意后以 `dev-notes` 分类写入，并把库内路径记回交付说明）。审查和上线方案会按分支自动读取这份交付说明。
+* **S 规模快速通道**：S 规模且不涉及配置、SQL / DDL、对外接口、表结构，也没有需要澄清的决定时，编译、测试、自审照常，但只在对话里交付，不落盘交付说明、不问沉淀；实现中碰到上述任何一项或改动超过 3 个文件，就退回完整流程。缺陷修复同样适用（根因仍须在对话里写清楚）。
 * **缺陷修复**：收集现象 → 用失败测试复现 → 用证据定位根因 → 最小修复让测试转绿 → 自审 → 交付（必须写明根因）。
 * 守则：不写库、不改凭据、不擅自 commit / push、不装新依赖；测试没跑就写「未验证」。
 * 其他 skill 都是可选增强：wiki、DocNexus、数据库没配置时自动跳过，并在交付说明中注明。
@@ -376,6 +388,8 @@ dev、project-review、技术方案、上线方案都在对应环节调用它：
 | `workflow/scripts/resolve.mjs infer-profile` | 按固定规则从构建文件、Makefile、依赖与配置文件、git 推断项目画像草稿，每个字段附依据；不写文件 |
 | `workflow/scripts/lint-doc.mjs <文档> --skill <skill> [--facts]` | 对照当前生效的模板检查生成的文档：必填章节、残留 `{{...}}` 占位符、元信息行为错误；缺普通章节、顺序不一致为警告；列出待填写位置。`--facts` 再核对正文里的类名、文件、接口、表名：在对比分支的 diff 和代码里都找不到的记为警告（防编造） |
 | `workflow/scripts/artifacts.mjs [--branch b \| --all]` | 按分支汇总 `docs/skills/` 下的开发方案、交付说明、审查报告、技术方案、上线方案及其 wiki 发布记录，给出下一步建议；分支取自文档元信息行，不另存记录。上线方案没传 `--tech` 时据此自动引用同分支的技术方案；project-review 据此对照本分支方案、识别复审 |
+| `workflow/scripts/report.mjs [--since d] [--json]` | 本地效果报告（`/workflow report`、`skills-init report`）：审查发现与修复率、复核率、需求澄清、沉淀率、知识引用、各分支链路 |
+| `workflow/scripts/pr-desc.mjs [--branch b] [--base m] [--out f]` | 按本分支产物生成 PR / MR 描述；没有交付说明时退回用 git 记录 |
 | `database-query/scripts/query.mjs` | 执行 SQL：选连接、取密码（只通过环境变量传给客户端）、会话层只读、拦截写语句和多语句、自动补 LIMIT、超时、脱敏敏感列；支持 mysql / psql 客户端，其他 driver 退回 JDBC |
 | `database-query/scripts/query.mjs --schema [--tables a,b] [--write]` | 按只读会话导出表结构为 Markdown；`--write` 写入 `references/schema.md` 的 `schema:begin` / `schema:end` 之间，标记外的补充说明保留 |
 | `md-to-wiki/scripts/upload.mjs info / put / target / record` | REST 上传通道：`info` 读页面标题与版本给用户确认；`put --expect-version <n> [--record <md>]` 先校验 XHTML 良构，版本对不上就拒绝上传，上传后确认版本 +1，并把发布记录写回 Markdown 第一行注释（转换时丢弃，不出现在页面上）；`target` 读出记录，再次发布同一文档不必再给 pageId；`record` 供 MCP 通道上传后补写 |
@@ -488,7 +502,7 @@ CI（`.github/workflows/test.yml`）在 push 到 main 和每个 PR 上运行：�
 ```
 skills-init/
 ├── bin/
-│   ├── skills-init.mjs                # 安装器入口（唯一实现，Node >= 18）：参数解析与 init / upgrade / doctor / uninstall / seed-templates 调度
+│   ├── skills-init.mjs                # 安装器入口（唯一实现，Node >= 18）：参数解析与 init / upgrade / doctor / uninstall / seed-templates / report 调度
 │   ├── lib/                           # core / prompt / db / install / uninstall / docnexus / doctor
 │   ├── skills.mjs                     # 读取各 skill 的 skill.json
 │   └── seed-templates.mjs             # 把文档模板导入 DocNexus
@@ -506,6 +520,9 @@ skills-init/
 │   ├── scripts/infer-profile.mjs      # 画像推断规则（resolve.mjs infer-profile 调用）
 │   ├── scripts/knowledge.mjs          # 按分类列出相关的 DocNexus 文档
 │   ├── scripts/artifacts.mjs          # 按分支汇总各 skill 产物与 wiki 发布记录
+│   ├── scripts/report.mjs             # 本地效果报告
+│   ├── scripts/pr-desc.mjs            # 按本分支产物生成 PR / MR 描述
+│   ├── scripts/doc-sections.mjs       # 读产物的章节、表格、元信息（report / pr-desc 共用）
 │   ├── references/                    # profile.md、templates.md、docnexus.md、status.md（其他 skill 直接读对应文件）
 │   └── profile.json.tpl               # 空画像，首次使用时由 agent 推断并经确认后填写
 ├── dev/

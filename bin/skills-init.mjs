@@ -30,7 +30,7 @@ import { checkNodeForDocNexus, setupDocNexus, templateRecords, saveTemplateRecor
 import { upgradeOptions, doctor } from './lib/doctor.mjs';
 
 // ---------------------------------------------------------------- 参数
-const COMMANDS = ['init', 'upgrade', 'doctor', 'uninstall', 'seed-templates'];
+const COMMANDS = ['init', 'upgrade', 'doctor', 'uninstall', 'seed-templates', 'report'];
 const HELP = `用法: skills-init [命令] [选项]
 
 命令：
@@ -40,6 +40,7 @@ const HELP = `用法: skills-init [命令] [选项]
   doctor               自检：版本、手改 / 缺失文件、软链接、项目画像、DocNexus 模板、数据库连通性、.gitignore
   uninstall            按安装清单卸载本项目装的 skills 与链接（用户配置备份到 tmp/skills/uninstall-backup/）
   seed-templates       只把自带的文档模板导入 DocNexus（docnexus/library/templates/，已有的不覆盖）
+  report               本地效果报告：只读统计 docs/skills/ 下的产物（审查发现与修复率、需求澄清、DocNexus 沉淀与复用、各分支链路）
 
 init 选项：
   --envs <列表>        环境，逗号分隔：codex,claude,doubao,qwen；all = 全部（不传则交互选择）
@@ -56,6 +57,9 @@ seed-templates 选项：
   --diff               不写入，只打印团队改过的模板与新默认模板的差异（customized / untracked），供手动合并
 doctor 选项：
   --offline            不测试数据库连通性
+report 选项：
+  --since <YYYY-MM-DD> 只统计该日期起的产物
+  --json               输出 JSON
 通用：
   --project-root <dir> 项目根目录（默认当前目录）
   -v, --version        显示版本
@@ -80,6 +84,8 @@ function parseArgs(argv) {
       case '--offline': o.offline = true; break;
       case '--update': o.update = true; break;
       case '--diff': o.diff = true; break;
+      case '--since': o.since = val(); break;
+      case '--json': o.json = true; break;
       case '--project-root': o.root = path.resolve(val()); break;
       case '-v': case '--version': console.log(PKG.version); process.exit(0); break;
       case '-h': case '--help': console.log(HELP); process.exit(0); break;
@@ -119,6 +125,10 @@ async function main() {
   let o = parseArgs(process.argv.slice(2));
   if (o.cmd === 'uninstall') { step(`按安装清单卸载 ${o.root} 中的 skills`); return uninstall(o.root); }
   if (o.cmd === 'doctor') return doctor(o.root, o.offline);
+  if (o.cmd === 'report') {
+    const { main: report } = await import(new URL('../workflow/scripts/report.mjs', import.meta.url));
+    return report(['--root', o.root, ...(o.since ? ['--since', o.since] : []), ...(o.json ? ['--json'] : [])]);
+  }
   if (o.cmd === 'seed-templates' && o.diff) {
     step('团队改过的模板与新默认模板的差异（只读，不写入 DocNexus）');
     printTemplateDiffs(o.root);
