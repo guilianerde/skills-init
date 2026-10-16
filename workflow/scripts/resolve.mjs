@@ -34,9 +34,17 @@ function skillMetas() {
 
 export const skillMeta = (name) => skillMetas().find((m) => m.name === name);
 
+// DocNexus CLI 的位置（相对项目根）：0.17.0 起装在 docnexus/ 下（docnexus/node_modules/.bin），之前装在项目根。
+// 两处都有时用 docnexus/ 下的；都没有返回 null。bin/lib/core.mjs 的 docnexusBin 与此一致
+export const DOCNEXUS_BIN_DIRS = [['docnexus', 'node_modules', '.bin'], ['node_modules', '.bin']];
+export function docnexusBin(root) {
+  const name = process.platform === 'win32' ? 'docnexus.cmd' : 'docnexus';
+  for (const dir of DOCNEXUS_BIN_DIRS) if (fs.existsSync(path.join(root, ...dir, name))) return path.join(...dir, name);
+  return null;
+}
+
 export function docnexusConnected(root) {
-  const bin = path.join(root, 'node_modules', '.bin', process.platform === 'win32' ? 'docnexus.cmd' : 'docnexus');
-  return fs.existsSync(path.join(root, 'docnexus', 'project.json')) && fs.existsSync(bin);
+  return fs.existsSync(path.join(root, 'docnexus', 'project.json')) && docnexusBin(root) !== null;
 }
 
 export function resolveTemplate(root, skill, id) {
@@ -112,6 +120,8 @@ export function status(root) {
     },
     docnexus: {
       ok: dn,
+      // 调用 DocNexus CLI 时用这个路径（在项目根执行）
+      bin: dn ? `./${docnexusBin(root).split(path.sep).join('/')}` : null,
       missing_templates: dn ? templates.filter((t) => !t.ok).map((t) => t.expected) : [],
       stale_project_templates: dn ? templates.map((t) => t.stale_project_file).filter(Boolean) : [],
       // 各 skill 写入时使用的显式分类（没声明的 skill 不列出）

@@ -44,3 +44,25 @@ test('symlinkSupported：探测链接用完即删，并清掉之前异常退出�
   assert.deepEqual(fs.readdirSync(dir), []);
   fs.rmSync(dir, { recursive: true, force: true });
 });
+
+test('DocNexus CLI 位置：0.17.0 起的 docnexus/node_modules/.bin 优先，旧装法的项目根 node_modules/.bin 兼容；安装器与 skill 脚本判断一致', async () => {
+  const { docnexusBin, docnexusUpgradeCmd } = await import('../bin/lib/core.mjs');
+  const { docnexusBin: skillBin, docnexusConnected } = await import('../workflow/scripts/resolve.mjs');
+  const name = process.platform === 'win32' ? 'docnexus.cmd' : 'docnexus';
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'dnbin-'));
+  const put = (...p) => { fs.mkdirSync(path.join(root, ...p.slice(0, -1)), { recursive: true }); fs.writeFileSync(path.join(root, ...p), ''); };
+  assert.equal(docnexusBin(root), null);
+  assert.equal(skillBin(root), null);
+  put('docnexus', 'project.json');
+  assert.equal(docnexusConnected(root), false, '只有工作区没有 CLI');
+  put('node_modules', '.bin', name);
+  assert.equal(path.relative(root, docnexusBin(root)), path.join('node_modules', '.bin', name));
+  assert.equal(skillBin(root), path.join('node_modules', '.bin', name));
+  assert.equal(docnexusConnected(root), true);
+  assert.match(docnexusUpgradeCmd(root), /^npm i -D /, '旧装法沿用项目根');
+  put('docnexus', 'node_modules', '.bin', name);
+  assert.equal(path.relative(root, docnexusBin(root)), path.join('docnexus', 'node_modules', '.bin', name), '两处都有时用 docnexus/ 下的');
+  assert.equal(skillBin(root), path.join('docnexus', 'node_modules', '.bin', name));
+  assert.match(docnexusUpgradeCmd(root), /^npm install --prefix \.\/docnexus --save-exact /);
+  fs.rmSync(root, { recursive: true, force: true });
+});

@@ -74,7 +74,7 @@ description: "Generate a Markdown technical design doc (技术方案) from the d
 - 发布到 wiki：`/md-to-wiki <文档路径> [pageId]`（发布过的文档有发布记录，可省略 pageId）。
 - 模板回写：用户对生成的文档做了结构性调整、且项目已接入 DocNexus 时，按 `<skills>/workflow/references/templates.md`「模板随知识库更新」提议同步回模板。
 - 要上线：`/create-release-md-doc <dev> <main> --tech <文档路径>` 复用本文档的事实。
-- 沉淀到 DocNexus（项目根有 `docnexus/project.json` 且 `./node_modules/.bin/docnexus` 可执行时）：列出值得长期记住的决策、约定、配置 / 依赖变化、风险，**询问用户**；同意后按 DocNexus 入口 skill `docnexus` 的 capture 流程写入，分类用 `node <skills>/workflow/scripts/resolve.mjs category create-tech-md-doc` 的结果作为调用方显式分类封存（见 `<skills>/workflow/references/docnexus.md`「写入 DocNexus 的分类」），并回报 `docnexus/library/<path>`。只沉淀确认过的事实，不沉淀「待补充」「待人工确认」的推断。未检测到 DocNexus 就跳过，不提示安装。
+- 沉淀到 DocNexus（DocNexus 可用时，判定见 `<skills>/workflow/SKILL.md`「增强能力探测」）：列出值得长期记住的决策、约定、配置 / 依赖变化、风险，**询问用户**；同意后按 DocNexus 入口 skill `docnexus` 的 capture 流程写入，分类用 `node <skills>/workflow/scripts/resolve.mjs category create-tech-md-doc` 的结果作为调用方显式分类封存（见 `<skills>/workflow/references/docnexus.md`「写入 DocNexus 的分类」），并回报 `docnexus/library/<path>`。只沉淀确认过的事实，不沉淀「待补充」「待人工确认」的推断。未检测到 DocNexus 就跳过，不提示安装。
 
 ## Red Flags — STOP
 

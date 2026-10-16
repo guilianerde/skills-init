@@ -15,11 +15,11 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { skillMeta, resolveCategory, docnexusConnected } from './resolve.mjs';
+import { skillMeta, resolveCategory, docnexusConnected, docnexusBin } from './resolve.mjs';
 
 const IS_WIN = process.platform === 'win32';
 
-const docnexus = (root, args) => spawnSync(path.join(root, 'node_modules', '.bin', IS_WIN ? 'docnexus.cmd' : 'docnexus'), args,
+const docnexus = (root, args) => spawnSync(path.join(root, docnexusBin(root) ?? path.join('node_modules', '.bin', 'docnexus')), args,
   { cwd: root, encoding: 'utf8', shell: IS_WIN, maxBuffer: 256 * 1024 * 1024 });
 
 function runJson(root, args, what) {

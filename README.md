@@ -202,8 +202,8 @@ npx @rowansenne/skills-init doctor
 加 `--with-docnexus`（PowerShell：`-WithDocNexus`）时，脚本在装完本仓库的 skills 后额外执行：
 
 1. 检查 Node >= 22.13 与 npm（不满足时**在安装任何文件之前**报错退出）；
-2. 在项目根执行 `npm i -D @rowansenne/docnexus`（项目根没有 `package.json` 时 npm 会新建一个）；
-3. 执行 `./node_modules/.bin/docnexus init --agent <claude|codex|all>`：创建 `docnexus/` 工作区，把 DocNexus 的 skills 同步到 `docnexus/skills/`，并软链接到对应环境目录、写入 `CLAUDE.md` / `AGENTS.md` 的 DocNexus 段落；
+2. 执行 `npm install --prefix ./docnexus --save-exact @rowansenne/docnexus`：按 DocNexus 0.17.0 起的装法装在 `docnexus/` 下，npm 清单、锁文件和依赖不进宿主项目的 `package.json`。之前已经装在项目根（`node_modules/.bin/docnexus`）的项目沿用原位置升级；skills 两种位置都认，都有时用 `docnexus/` 下的；
+3. 执行 `./docnexus/node_modules/.bin/docnexus init --agent <claude|codex|all>`：创建 `docnexus/` 工作区，把 DocNexus 的 skills 同步到 `docnexus/skills/`，并软链接到对应环境目录、写入 `CLAUDE.md` / `AGENTS.md` 的 DocNexus 段落；
 4. `.gitignore` 追加 `node_modules/`。
 
 环境映射：
@@ -519,7 +519,7 @@ skills-init/
 ```
 
 * 只导入 DocNexus 里还没有的模板，已有的不覆盖；项目已接入但缺模板时，安装结束会列出缺哪几份。
-* 之后模板随知识库更新：直接编辑 `docnexus/library/templates/...` 后执行 `./node_modules/.bin/docnexus document sync --id <id>` 采纳；或者在生成文档后，skill 发现你做了结构性调整时会提议同步回模板（你确认后才写入）。每次变更都记录在 DocNexus 的 timeline 里，可追溯。
+* 之后模板随知识库更新：直接编辑 `docnexus/library/templates/...` 后执行 `./docnexus/node_modules/.bin/docnexus document sync --id <id>`（旧装法为 `./node_modules/.bin/docnexus`）采纳；或者在生成文档后，skill 发现你做了结构性调整时会提议同步回模板（你确认后才写入）。每次变更都记录在 DocNexus 的 timeline 里，可追溯。
 * 模板里的 `{{...}}` 是给 agent 的填写提示，DocNexus 原样保存；不要写成单独一行的 `{{fact:...}}`（那是 DocNexus 的事实引用语法）。
 * 没接入 DocNexus 时，可用 `docs/skills/templates/` 下的同名文件覆盖默认模板；之后接入 DocNexus，skill 会提示你把这些文件导入知识库（导入后它们不再生效）。
 

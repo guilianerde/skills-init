@@ -64,8 +64,9 @@ function project() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'seed-'));
   fs.mkdirSync(path.join(root, 'docnexus'), { recursive: true });
   fs.writeFileSync(path.join(root, 'docnexus', 'project.json'), '{}');
-  fs.mkdirSync(path.join(root, 'node_modules', '.bin'), { recursive: true });
-  fs.writeFileSync(path.join(root, 'node_modules', '.bin', 'docnexus'), FAKE, { mode: 0o755 });
+  // DocNexus 0.17.0 起的装法：CLI 在 docnexus/node_modules/.bin（旧装法在项目根，见 test-links / test-resolve）
+  fs.mkdirSync(path.join(root, 'docnexus', 'node_modules', '.bin'), { recursive: true });
+  fs.writeFileSync(path.join(root, 'docnexus', 'node_modules', '.bin', 'docnexus'), FAKE, { mode: 0o755 });
   return root;
 }
 const quiet = { ok() {}, warn() {} };

@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { templateStatus, STATUS_TEXT, TEMPLATES } from '../seed-templates.mjs';
-import { TPL_DIR, IS_WIN, DOCNEXUS_PKG, MANIFEST, PKG, step, ok, warn, fail, writeFile, lstat, findManifests, removeLink } from './core.mjs';
+import { TPL_DIR, IS_WIN, DOCNEXUS_PKG, MANIFEST, PKG, step, ok, warn, fail, writeFile, lstat, findManifests, removeLink, docnexusBin } from './core.mjs';
 
 export function run(cmd, args, cwd, quiet = false) {
   const r = spawnSync(cmd, args, { cwd, stdio: quiet ? ['ignore', 'ignore', 'inherit'] : 'inherit', shell: IS_WIN });
@@ -39,13 +39,18 @@ export function linkQwenDocNexus(root) {
 }
 export function setupDocNexus(root, sel) {
   const agent = docnexusAgent(sel);
-  step(`接入 DocNexus（npm i -D ${DOCNEXUS_PKG}；docnexus init --agent ${agent}）`);
-  if (!fs.existsSync(path.join(root, 'package.json'))) warn('项目根没有 package.json，npm 会新建一个（仅记录 devDependency）');
-  if (!run(IS_WIN ? 'npm.cmd' : 'npm', ['i', '-D', DOCNEXUS_PKG], root)) { warn('npm 安装 DocNexus 失败，已跳过 DocNexus 接入（skills 已正常安装）'); return 'failed'; }
-  const bin = path.join(root, 'node_modules', '.bin', IS_WIN ? 'docnexus.cmd' : 'docnexus');
-  if (!fs.existsSync(bin)) { warn('未找到 node_modules/.bin/docnexus，已跳过 DocNexus 接入'); return 'failed'; }
+  // 0.17.0 起 DocNexus 装在 docnexus/ 下，npm 清单、锁文件与依赖不进宿主项目；之前装在项目根的沿用原位置升级
+  const existing = docnexusBin(root);
+  const legacyRoot = existing && path.relative(root, existing).startsWith('node_modules');
+  const npmArgs = legacyRoot ? ['i', '-D', DOCNEXUS_PKG] : ['install', '--prefix', './docnexus', '--save-exact', DOCNEXUS_PKG];
+  step(`接入 DocNexus（npm ${npmArgs.join(' ')}；docnexus init --agent ${agent}）`);
+  if (legacyRoot) warn('检测到项目根已装 DocNexus（旧装法），沿用该位置升级；新装法见 DocNexus README（装在 docnexus/ 下）');
+  if (!run(IS_WIN ? 'npm.cmd' : 'npm', npmArgs, root)) { warn('npm 安装 DocNexus 失败，已跳过 DocNexus 接入（skills 已正常安装）'); return 'failed'; }
+  const bin = docnexusBin(root);
+  if (!bin) { warn('安装后未找到 docnexus/node_modules/.bin/docnexus，已跳过 DocNexus 接入'); return 'failed'; }
+  const rel = `./${path.relative(root, bin).split(path.sep).join('/')}`;
   if (!run(bin, ['init', '--agent', agent], root, true)) {
-    warn(`docnexus init 失败，已跳过 DocNexus 接入（可在项目根手动执行 ./node_modules/.bin/docnexus init --agent ${agent}）`);
+    warn(`docnexus init 失败，已跳过 DocNexus 接入（可在项目根手动执行 ${rel} init --agent ${agent}）`);
     return 'failed';
   }
   ok('docnexus init 完成：docnexus/ 工作区 + skills（docnexus/skills）');
@@ -56,7 +61,7 @@ export function setupDocNexus(root, sel) {
     linkQwenDocNexus(root);
     warn(agent === 'codex' || agent === 'all'
       ? 'qwen：docnexus 不会写 QWEN.md；需要自动召回时可在 QWEN.md 引用 AGENTS.md 中的 DocNexus 段落，或在 .qwen/settings.json 的 context.fileName 加入 AGENTS.md'
-      : 'qwen：docnexus 不会写 QWEN.md；需要自动召回时可执行 ./node_modules/.bin/docnexus init --agent codex 生成 AGENTS.md 的 DocNexus 段落，再在 QWEN.md 引用它或在 .qwen/settings.json 的 context.fileName 加入 AGENTS.md（会同时链接到 .agents/skills）');
+      : 'qwen：docnexus 不会写 QWEN.md；需要自动召回时可执行 ./docnexus/node_modules/.bin/docnexus init --agent codex 生成 AGENTS.md 的 DocNexus 段落，再在 QWEN.md 引用它或在 .qwen/settings.json 的 context.fileName 加入 AGENTS.md（会同时链接到 .agents/skills）');
   }
   return 'ok';
 }
@@ -64,8 +69,8 @@ export function setupDocNexus(root, sel) {
 // 已装 DocNexus 是否支持调用方显式分类（draft seal --category，0.14.0 之后）。旧版会静默忽略该参数，
 // skill 的写入仍靠 metadata.category 落到同一分类，只是不会记成调用方指定；这里只用于提示升级
 function docnexusHelp(root) {
-  const bin = path.join(root, 'node_modules', '.bin', IS_WIN ? 'docnexus.cmd' : 'docnexus');
-  if (!fs.existsSync(bin)) return null;
+  const bin = docnexusBin(root);
+  if (!bin) return null;
   const r = spawnSync(bin, ['--help'], { cwd: root, encoding: 'utf8', shell: IS_WIN });
   return `${r.stdout}${r.stderr}`;
 }
@@ -97,7 +102,7 @@ export function reportTemplateStatus(root, say = warn) {
 }
 
 export function docnexusConnected(root) {
-  return fs.existsSync(path.join(root, 'docnexus', 'project.json')) && fs.existsSync(path.join(root, 'node_modules', '.bin', IS_WIN ? 'docnexus.cmd' : 'docnexus'));
+  return fs.existsSync(path.join(root, 'docnexus', 'project.json')) && docnexusBin(root) !== null;
 }
 
 // 团队改过的模板（customized / untracked）与当前默认模板的差异：只读，不写 DocNexus。

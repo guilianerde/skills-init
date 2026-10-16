@@ -35,8 +35,9 @@ function project({ connect = true } = {}) {
   if (connect) {
     fs.mkdirSync(path.join(root, 'docnexus'), { recursive: true });
     fs.writeFileSync(path.join(root, 'docnexus', 'project.json'), '{}');
-    fs.mkdirSync(path.join(root, 'node_modules', '.bin'), { recursive: true });
-    fs.writeFileSync(path.join(root, 'node_modules', '.bin', 'docnexus'), FAKE, { mode: 0o755 });
+    // DocNexus 0.17.0 起的装法：CLI 在 docnexus/node_modules/.bin
+    fs.mkdirSync(path.join(root, 'docnexus', 'node_modules', '.bin'), { recursive: true });
+    fs.writeFileSync(path.join(root, 'docnexus', 'node_modules', '.bin', 'docnexus'), FAKE, { mode: 0o755 });
   }
   const doc = (id, category, title, updated_at, extra = {}) => ({ id, category, title, summary: `${title} 摘要`, file_path: `notes/${id}.md`, updated_at, tags: [], body: `${title} 正文`, ...extra });
   fs.writeFileSync(path.join(root, 'docs.json'), JSON.stringify([

@@ -24,6 +24,21 @@ export const USER_FILES = META.userFiles;
 // 改过名的 skill：旧名 -> 新名。升级时只清理能确认是本项目安装的旧目录 / 链接（按 SKILL.md 签名判断）
 export const RENAMED = META.renamed;
 export const DOCNEXUS_PKG = process.env.DOCNEXUS_PKG || '@rowansenne/docnexus';
+// DocNexus CLI：0.17.0 起装在 docnexus/node_modules/.bin（与宿主项目的 npm 文件隔离），之前装在项目根 node_modules/.bin。
+// 两处都有时用 docnexus/ 下的。返回绝对路径或 null；workflow/scripts/resolve.mjs 的 docnexusBin 与此一致
+export const DOCNEXUS_BIN_DIRS = [['docnexus', 'node_modules', '.bin'], ['node_modules', '.bin']];
+export function docnexusBin(root) {
+  const name = IS_WIN ? 'docnexus.cmd' : 'docnexus';
+  for (const dir of DOCNEXUS_BIN_DIRS) { const p = path.join(root, ...dir, name); if (fs.existsSync(p)) return p; }
+  return null;
+}
+// 升级 DocNexus 的命令：按现有装法给出（项目根旧装法沿用 npm i -D）
+export function docnexusUpgradeCmd(root) {
+  const b = docnexusBin(root);
+  return b && path.relative(root, b).startsWith('node_modules')
+    ? `npm i -D ${DOCNEXUS_PKG}@latest`
+    : `npm install --prefix ./docnexus --save-exact ${DOCNEXUS_PKG}@latest`;
+}
 export const MANIFEST = '.skills-init.json'; // 安装清单，位于每个安装目录（单一来源时只有 .agents/skills 一份）
 
 // ---------------------------------------------------------------- 输出

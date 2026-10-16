@@ -4,6 +4,9 @@
 
 ## [Unreleased]
 
+### 变更
+- 适配 DocNexus 0.17.0 的安装位置：CLI 从项目根 `node_modules/.bin/docnexus` 改为 `docnexus/node_modules/.bin/docnexus`（npm 清单与依赖不进宿主项目）。安装器、`seed-templates`、`doctor`、`resolve.mjs`、`knowledge.mjs` 统一按「`docnexus/` 下优先、项目根兼容」查找 CLI，之前只认项目根，新装法的项目会被当成「未接入 DocNexus」。`--with-docnexus` 新装时用 `npm install --prefix ./docnexus --save-exact`，已装在项目根的沿用原位置升级；`doctor` 的升级提示按实际装法给命令；`resolve.mjs status` 新增 `docnexus.bin`（实际 CLI 路径），SKILL 里的接入判定改为引用它。
+
 ## [0.7.0] - 2026-10-15
 
 ### 变更

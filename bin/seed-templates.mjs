@@ -16,6 +16,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { loadSkills, deriveMeta, TEMPLATE_CATEGORY, TEMPLATE_CATEGORY_REASON } from './skills.mjs';
+import { docnexusBin } from './lib/core.mjs';
 
 // 模板清单来自各 skill 的 skill.json（templates 字段）
 export const TEMPLATES = deriveMeta(loadSkills(path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'))).templates;
@@ -23,7 +24,7 @@ export { TEMPLATE_CATEGORY };
 
 const IS_WIN = process.platform === 'win32';
 const sha256 = (s) => crypto.createHash('sha256').update(s).digest('hex');
-const binPath = (root) => path.join(root, 'node_modules', '.bin', IS_WIN ? 'docnexus.cmd' : 'docnexus');
+const binPath = (root) => docnexusBin(root) ?? path.join(root, 'docnexus', 'node_modules', '.bin', IS_WIN ? 'docnexus.cmd' : 'docnexus');
 
 function docnexus(root, args) {
   const r = spawnSync(binPath(root), args, { cwd: root, encoding: 'utf8', shell: IS_WIN, maxBuffer: 64 * 1024 * 1024 });
@@ -33,8 +34,8 @@ function docnexus(root, args) {
 }
 
 function requireDocNexus(root) {
-  if (!fs.existsSync(path.join(root, 'docnexus', 'project.json')) || !fs.existsSync(binPath(root))) {
-    throw new Error('未检测到 DocNexus（需要 docnexus/project.json 与 node_modules/.bin/docnexus）。先加 --with-docnexus 接入，或在项目根执行 npx docnexus init。');
+  if (!fs.existsSync(path.join(root, 'docnexus', 'project.json')) || !docnexusBin(root)) {
+    throw new Error('未检测到 DocNexus（需要 docnexus/project.json，以及 docnexus/node_modules/.bin/docnexus 或旧装法的 node_modules/.bin/docnexus）。先加 --with-docnexus 接入。');
   }
 }
 
