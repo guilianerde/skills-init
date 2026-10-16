@@ -1,24 +1,29 @@
 // 读 skill 产物（交付说明、审查报告等）的小工具：按二级标题切节、取表格行、取元信息行。
-// report.mjs 与 pr-desc.mjs 共用；只做文本解析，不读写文件。
+// report.mjs 与 pr-desc.mjs 共用；标题识别与归一化复用 lint-doc.mjs（跳过代码块、去编号 / 必填 / 「如有」标记），
+// 模板标题的写法只在一处定义。只做文本解析，不读写文件。
+
+import { headings, headingKey } from './lint-doc.mjs';
 
 const stripComments = (s) => s.replace(/<!--[\s\S]*?-->/g, '');
 
-// 二级标题 → 正文（去掉 HTML 注释与首尾空行）；标题去掉必填标记「 *」
+// 二级标题（归一化后的 key）→ 正文（去掉 HTML 注释与首尾空行）
 export function sections(text) {
+  const lines = text.split(/\r?\n/);
+  const hs = headings(text);
   const out = new Map();
-  let key = null; let buf = [];
-  const flush = () => { if (key !== null) out.set(key, stripComments(buf.join('\n')).trim()); };
-  for (const line of text.split(/\r?\n/)) {
-    const m = /^##\s+(.+?)\s*\*?\s*$/.exec(line);
-    if (m && !line.startsWith('###')) { flush(); key = m[1].trim(); buf = []; } else if (key !== null) buf.push(line);
-  }
-  flush();
+  hs.forEach((h, i) => {
+    if (h.level !== 2) return;
+    const next = hs.slice(i + 1).find((x) => x.level <= 2);
+    const body = lines.slice(h.line, next ? next.line - 1 : lines.length).join('\n');
+    if (!out.has(h.key)) out.set(h.key, stripComments(body).trim());
+  });
   return out;
 }
 
-// 按标题前缀取一节（「严重问题」匹配「严重问题（CRITICAL / HIGH）」）
+// 按标题前缀取一节（「严重问题」匹配「严重问题（CRITICAL / HIGH）」），前缀同样归一化
 export function section(secs, prefix) {
-  for (const [k, v] of secs) if (k.startsWith(prefix)) return v;
+  const key = headingKey(prefix);
+  for (const [k, v] of secs) if (k.startsWith(key)) return v;
   return null;
 }
 

@@ -21,7 +21,7 @@
 
 ## 快速开始
 
-需要 **Node.js >= 18**（接入 DocNexus 时需 >= 22.13）。安装逻辑只有一份实现 `bin/skills-init.mjs`，两个脚本只是薄封装：
+需要 **Node.js >= 22**（接入 DocNexus 时需 >= 22.13，code-graph 的 `impact` / `entry` 需 >= 22.5）。安装逻辑只有一份实现 `bin/skills-init.mjs`，两个脚本只是薄封装：
 
 ```
 # 仓库放在 <项目根>/skills-init/ 时，在项目根执行
@@ -62,7 +62,7 @@ npx @rowansenne/skills-init
 | `upgrade` | 读安装清单里记录的环境与模式，非交互升级到当前版本：保留数据库配置，手改过的文件另存 `.new`；已接入 DocNexus 时顺带导入新版本新增的文档模板（只新增，不改动已有模板） |
 | `doctor` | 自检：已装版本与当前包对比、手改 / 缺失 / 待合并的文件、软链接是否断开、项目画像、DocNexus 模板是否齐全、各数据库连接能否只读 `SELECT 1`（`--offline` 跳过）、`.gitignore` 是否忽略了凭据。有错误时退出码 1 |
 | `uninstall` | 等价于 `--uninstall` |
-| `report` | 本地效果报告：只读统计 `docs/skills/` 下的产物（`--since YYYY-MM-DD`、`--json`），见「workflow：入口与项目画像」 |
+| `report` | 本地效果报告：只读统计 `docs/skills/` 下的产物（`--since YYYY-MM-DD`、`--all-branches`、`--json`；PowerShell 为 `-Since` / `-AllBranches` / `-Json`），见「workflow：入口与项目画像」 |
 | `seed-templates` | 只把默认文档模板导入 DocNexus，不重装 skills。`--update` 把导入后未改动的模板更新为新版；`--diff` 只读打印团队改过的模板与新默认模板的差异，供手动合并 |
 
 ```
@@ -143,7 +143,7 @@ npx @rowansenne/skills-init doctor
 /workflow report     # 本地效果报告（也可以直接运行 npx @rowansenne/skills-init report）
 ```
 
-**效果报告**（`/workflow report` 或 `skills-init report [--since YYYY-MM-DD] [--json]`）只读统计 `docs/skills/` 下已落盘的产物，不上报、不另存记录，用来回答「用了以后有没有更好」：
+**效果报告**（`/workflow report` 或 `skills-init report [--since YYYY-MM-DD] [--all-branches] [--json]`）只读统计 `docs/skills/` 下已落盘的产物，不上报、不另存记录，用来回答「用了以后有没有更好」。默认只看工作区；产物随特性分支提交、还没合并时加 `--all-branches`，用 git 只读扫描所有本地分支（同一路径以工作区为准）。统计内容：
 
 * 审查：各级别发现条数、严重问题复核通过率、复审时上次问题的修复率；
 * 交付：功能 / 缺陷、S / M / L、开工前经需求澄清确认的决定条数、带「未验证项」的交付；
@@ -388,7 +388,7 @@ dev、project-review、技术方案、上线方案都在对应环节调用它：
 | `workflow/scripts/resolve.mjs infer-profile` | 按固定规则从构建文件、Makefile、依赖与配置文件、git 推断项目画像草稿，每个字段附依据；不写文件 |
 | `workflow/scripts/lint-doc.mjs <文档> --skill <skill> [--facts]` | 对照当前生效的模板检查生成的文档：必填章节、残留 `{{...}}` 占位符、元信息行为错误；缺普通章节、顺序不一致为警告；列出待填写位置。`--facts` 再核对正文里的类名、文件、接口、表名：在对比分支的 diff 和代码里都找不到的记为警告（防编造） |
 | `workflow/scripts/artifacts.mjs [--branch b \| --all]` | 按分支汇总 `docs/skills/` 下的开发方案、交付说明、审查报告、技术方案、上线方案及其 wiki 发布记录，给出下一步建议；分支取自文档元信息行，不另存记录。上线方案没传 `--tech` 时据此自动引用同分支的技术方案；project-review 据此对照本分支方案、识别复审 |
-| `workflow/scripts/report.mjs [--since d] [--json]` | 本地效果报告（`/workflow report`、`skills-init report`）：审查发现与修复率、复核率、需求澄清、沉淀率、知识引用、各分支链路 |
+| `workflow/scripts/report.mjs [--since d] [--all-branches] [--json]` | 本地效果报告（`/workflow report`、`skills-init report`）：审查发现与修复率、复核率、需求澄清、沉淀率、知识引用、各分支链路 |
 | `workflow/scripts/pr-desc.mjs [--branch b] [--base m] [--out f]` | 按本分支产物生成 PR / MR 描述；没有交付说明时退回用 git 记录 |
 | `database-query/scripts/query.mjs` | 执行 SQL：选连接、取密码（只通过环境变量传给客户端）、会话层只读、拦截写语句和多语句、自动补 LIMIT、超时、脱敏敏感列；支持 mysql / psql 客户端，其他 driver 退回 JDBC |
 | `database-query/scripts/query.mjs --schema [--tables a,b] [--write]` | 按只读会话导出表结构为 Markdown；`--write` 写入 `references/schema.md` 的 `schema:begin` / `schema:end` 之间，标记外的补充说明保留 |
@@ -502,7 +502,7 @@ CI（`.github/workflows/test.yml`）在 push 到 main 和每个 PR 上运行：�
 ```
 skills-init/
 ├── bin/
-│   ├── skills-init.mjs                # 安装器入口（唯一实现，Node >= 18）：参数解析与 init / upgrade / doctor / uninstall / seed-templates / report 调度
+│   ├── skills-init.mjs                # 安装器入口（唯一实现，Node >= 22）：参数解析与 init / upgrade / doctor / uninstall / seed-templates / report 调度
 │   ├── lib/                           # core / prompt / db / install / uninstall / docnexus / doctor
 │   ├── skills.mjs                     # 读取各 skill 的 skill.json
 │   └── seed-templates.mjs             # 把文档模板导入 DocNexus
@@ -522,7 +522,7 @@ skills-init/
 │   ├── scripts/artifacts.mjs          # 按分支汇总各 skill 产物与 wiki 发布记录
 │   ├── scripts/report.mjs             # 本地效果报告
 │   ├── scripts/pr-desc.mjs            # 按本分支产物生成 PR / MR 描述
-│   ├── scripts/doc-sections.mjs       # 读产物的章节、表格、元信息（report / pr-desc 共用）
+│   ├── scripts/doc-sections.mjs       # 读产物的章节、表格、元信息（report / pr-desc 共用，标题解析复用 lint-doc）
 │   ├── references/                    # profile.md、templates.md、docnexus.md、status.md（其他 skill 直接读对应文件）
 │   └── profile.json.tpl               # 空画像，首次使用时由 agent 推断并经确认后填写
 ├── dev/

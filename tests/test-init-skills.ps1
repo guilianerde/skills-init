@@ -1,4 +1,4 @@
-# =====================================================================
+﻿# =====================================================================
 # init-skills.ps1 冒烟测试（PowerShell 7 / Windows）：只验证封装脚本本身——以上级目录为项目根、
 # 开关与子命令（位置参数）正确转成 CLI 参数、stdin 交互可用。安装逻辑的完整场景在 tests/test-install.mjs。
 #
@@ -150,6 +150,8 @@ function Test-SubcommandsPassThrough {
   if (-not (Select-String -LiteralPath $script:Log -SimpleMatch '0 个错误' -Quiet)) { Fail 'doctor 输出缺少汇总' }
   Invoke-Install @('upgrade'); Expect-Rc 0
   if (-not (Select-String -LiteralPath $script:Log -SimpleMatch '升级：' -Quiet)) { Fail 'upgrade 输出缺少版本信息' }
+  Invoke-Install @('report', '-Since', '2026-01-01', '-Json'); Expect-Rc 0
+  if (-not (Select-String -LiteralPath $script:Log -SimpleMatch '"since": "2026-01-01"' -Quiet)) { Fail 'report 未按 -Since / -Json 输出' }
   Invoke-Install @('-Uninstall'); Expect-Rc 0
   Assert-Missing '.agents\skills\workflow'
   Assert-Missing '.claude\skills\workflow'

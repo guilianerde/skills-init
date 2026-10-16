@@ -7,15 +7,16 @@
 //   - 知识复用：正文里引用 docnexus/library/ 的产物（开工前召回到并用上了）
 //   - 链路完整度：每个分支有哪些产物、文档有没有发布到 wiki
 // S 规模走快速通道的交付不落盘，不在统计内。
+// 默认只看工作区；产物随特性分支提交、还没合并时，加 --all-branches 用 git 只读扫描所有本地分支（同一路径以工作区为准）。
 //
 // 用法（在项目根执行；--root 可指定项目根）：
-//   node .agents/skills/workflow/scripts/report.mjs [--since YYYY-MM-DD] [--json]
+//   node .agents/skills/workflow/scripts/report.mjs [--since YYYY-MM-DD] [--all-branches] [--json]
 // 默认输出 Markdown，--json 输出 JSON。退出码：0 正常；1 参数错误
 
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { collect, KINDS } from './artifacts.mjs';
+import { collect, collectGit, localBranches, KINDS } from './artifacts.mjs';
 import { sections, section, tableRows, listItems, meta, isEmpty } from './doc-sections.mjs';
 
 const LEVELS = ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'];
@@ -67,9 +68,20 @@ export function parseDelivery(text) {
   };
 }
 
-export function buildReport(root, { since = null } = {}) {
-  const all = collect(root).filter((a) => !since || !a.date || a.date.slice(0, 10) >= since);
-  const read = (a) => fs.readFileSync(path.join(root, a.path), 'utf8');
+// 工作区 + （可选）各本地分支提交过的产物；同一路径只取第一次见到的（工作区优先）
+export function gather(root, allBranches) {
+  const seen = new Set(); const out = [];
+  const add = (list) => { for (const a of list) if (!seen.has(a.path)) { seen.add(a.path); out.push(a); } };
+  add(collect(root));
+  const branches = allBranches ? localBranches(root) : [];
+  for (const b of branches) add(collectGit(root, b));
+  return { items: out, scanned: branches };
+}
+
+export function buildReport(root, { since = null, allBranches = false } = {}) {
+  const g = gather(root, allBranches);
+  const all = g.items.filter((a) => !since || !a.date || a.date.slice(0, 10) >= since);
+  const read = (a) => a.text ?? fs.readFileSync(path.join(root, a.path), 'utf8');
   const counts = Object.fromEntries(KINDS.map((k) => [k.kind, all.filter((a) => a.kind === k.kind).length]));
 
   const review = { reports: 0, rereviews: 0, levels: Object.fromEntries(LEVELS.map((l) => [l, 0])), verified: 0, pending: 0, follow_up: { fixed: 0, open: 0, obsolete: 0 } };
@@ -111,7 +123,7 @@ export function buildReport(root, { since = null } = {}) {
   });
 
   return {
-    since, artifacts: all.length, counts, review, delivery, capture,
+    since, scanned_branches: g.scanned, from_branches: all.filter((a) => a.ref).length, artifacts: all.length, counts, review, delivery, capture,
     knowledge: { citing: cites, rate: pct(cites, all.length) },
     branches,
     without_branch: all.filter((a) => !a.branch).map((a) => a.path),
@@ -123,6 +135,9 @@ const show = (v) => (v == null ? '—' : `${v}%`);
 export function toMarkdown(r) {
   const L = [];
   L.push(`# 工作流效果报告${r.since ? `（${r.since} 起）` : ''}`, '');
+  L.push(r.scanned_branches.length
+    ? `范围：工作区 + ${r.scanned_branches.length} 个本地分支（其中 ${r.from_branches} 份只在分支里）。`
+    : '范围：只看工作区。随特性分支提交、还没合并的产物不在内，加 `--all-branches` 一起统计。', '');
   if (!r.artifacts) {
     L.push('`docs/skills/` 下还没有产物。dev 交付（M / L 规模）、审查报告、技术方案、上线方案落盘后，这里才有数据。');
     return L.join('\n');
@@ -154,15 +169,16 @@ export function toMarkdown(r) {
 }
 
 function main(argv) {
-  let root = process.cwd(); let since = null; let json = false;
+  let root = process.cwd(); let since = null; let json = false; let allBranches = false;
   for (let i = 0; i < argv.length; i++) {
     if (argv[i] === '--root') root = path.resolve(argv[++i] ?? '.');
     else if (argv[i] === '--since') since = argv[++i] ?? '';
     else if (argv[i] === '--json') json = true;
-    else { console.error('用法: report.mjs [--root <项目根>] [--since YYYY-MM-DD] [--json]'); return 1; }
+    else if (argv[i] === '--all-branches') allBranches = true;
+    else { console.error('用法: report.mjs [--root <项目根>] [--since YYYY-MM-DD] [--all-branches] [--json]'); return 1; }
   }
   if (since !== null && !/^\d{4}-\d{2}-\d{2}$/.test(since)) { console.error('--since 需要 YYYY-MM-DD'); return 1; }
-  const r = buildReport(root, { since });
+  const r = buildReport(root, { since, allBranches });
   console.log(json ? JSON.stringify(r, null, 2) : toMarkdown(r));
   return 0;
 }

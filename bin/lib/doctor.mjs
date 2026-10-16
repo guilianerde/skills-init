@@ -30,7 +30,7 @@ export function doctor(root, offline) {
   step(`skills-init doctor（${PKG.version}）  ${root}`);
 
   const [maj] = process.versions.node.split('.').map(Number);
-  if (maj < 18) bad(`Node v${process.versions.node} 低于 18`); else ok(`Node v${process.versions.node}`);
+  if (maj < 22) bad(`Node v${process.versions.node} 低于 22（skills-init 只在 Node 22 / 24 上测试；18、20 已停止维护）`); else ok(`Node v${process.versions.node}`);
 
   const found = findManifests(root);
   if (!found.length) { bad('未找到安装清单：本项目还没用 skills-init 安装过（或是清单功能之前的旧版本安装，重跑 init 即可生成）'); return 1; }

@@ -105,6 +105,8 @@ test_subcommands_pass_through() {
   grep -qF '0 个错误' "$LOG" || fail "doctor 输出缺少汇总"
   run_install upgrade </dev/null; expect_rc 0
   grep -qF '升级：' "$LOG" || fail "upgrade 输出缺少版本信息"
+  run_install report --since 2026-01-01 --json </dev/null; expect_rc 0
+  grep -qF '"since": "2026-01-01"' "$LOG" || fail "report 未按 --since / --json 输出"
   run_install uninstall </dev/null; expect_rc 0
   assert_missing .agents/skills/workflow
   assert_missing .claude/skills/workflow

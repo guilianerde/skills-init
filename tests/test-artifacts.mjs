@@ -48,6 +48,7 @@ test('按当前分支归组：最新一份、wiki 记录、下一步建议；其
   assert.ok(r.out.next.some((s) => s.includes('自动引用 docs/skills/create-tech-md-doc/tech-doc_feature-pay_20261015_v2.md')));
   assert.ok(!r.out.next.some((s) => s.startsWith('create-tech-md-doc')));
   assert.ok(!r.out.next.some((s) => s.includes('tech-doc') && s.startsWith('md-to-wiki')));
+  assert.ok(!r.out.next.some((s) => s.includes('pr-desc')), '没有交付说明和审查报告时不建议提 PR');
   // 发布后又改过 → 建议重新发布到同一页面
   put('create-tech-md-doc/tech-doc_feature-pay_20261015_v2.md', fs.readFileSync(path.join(root, 'docs/skills/create-tech-md-doc/tech-doc_feature-pay_20261015_v2.md'), 'utf8'), Date.parse('2026-10-15T02:00:00Z'));
   assert.ok(run().out.next.some((s) => s.includes('重新发布到 pageId 99')));
@@ -75,6 +76,7 @@ test('交付说明（dev 的 delivery-*）按对比分支归到 latest.delivery�
   assert.equal(r.out.latest.delivery.path, 'docs/skills/dev/delivery-pay-20261015.md');
   assert.equal(r.out.latest.delivery.label, '交付说明');
   assert.equal(r.out.latest.plan.path, 'docs/skills/dev/plan-pay-20261014.md');
+  assert.ok(r.out.next.some((s) => s.startsWith('提 PR / MR') && s.includes('pr-desc.mjs')));
   const tpl = fs.readFileSync(fileURLToPath(new URL('../dev/references/delivery-template.md', import.meta.url)), 'utf8');
   assert.equal(parseBranch(tpl), null, '未填写的交付模板不算任何分支');
   fs.rmSync(root, { recursive: true, force: true });

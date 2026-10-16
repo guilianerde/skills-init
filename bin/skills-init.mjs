@@ -60,6 +60,7 @@ doctor 选项：
 report 选项：
   --since <YYYY-MM-DD> 只统计该日期起的产物
   --json               输出 JSON
+  --all-branches       同时用 git 只读扫描所有本地分支里提交过的产物（默认只看工作区）
 通用：
   --project-root <dir> 项目根目录（默认当前目录）
   -v, --version        显示版本
@@ -86,6 +87,7 @@ function parseArgs(argv) {
       case '--diff': o.diff = true; break;
       case '--since': o.since = val(); break;
       case '--json': o.json = true; break;
+      case '--all-branches': o.allBranches = true; break;
       case '--project-root': o.root = path.resolve(val()); break;
       case '-v': case '--version': console.log(PKG.version); process.exit(0); break;
       case '-h': case '--help': console.log(HELP); process.exit(0); break;
@@ -123,11 +125,12 @@ async function resolveEnvs(o) {
 // ================================================================= main
 async function main() {
   let o = parseArgs(process.argv.slice(2));
+  if (Number(process.versions.node.split('.')[0]) < 22) warn(`当前 Node v${process.versions.node} 低于 22：skills-init 只在 Node 22 / 24 上测试（18、20 已停止维护），建议升级`);
   if (o.cmd === 'uninstall') { step(`按安装清单卸载 ${o.root} 中的 skills`); return uninstall(o.root); }
   if (o.cmd === 'doctor') return doctor(o.root, o.offline);
   if (o.cmd === 'report') {
     const { main: report } = await import(new URL('../workflow/scripts/report.mjs', import.meta.url));
-    return report(['--root', o.root, ...(o.since ? ['--since', o.since] : []), ...(o.json ? ['--json'] : [])]);
+    return report(['--root', o.root, ...(o.since ? ['--since', o.since] : []), ...(o.json ? ['--json'] : []), ...(o.allBranches ? ['--all-branches'] : [])]);
   }
   if (o.cmd === 'seed-templates' && o.diff) {
     step('团队改过的模板与新默认模板的差异（只读，不写入 DocNexus）');

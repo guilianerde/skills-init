@@ -14,7 +14,7 @@
   "type": "module",
   "license": "MIT",
   "engines": {
-    "node": ">=18"
+    "node": ">=22"
   },
   "bin": {
     "skills-init": "bin/skills-init.mjs"

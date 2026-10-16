@@ -41,23 +41,50 @@ export function parseWiki(text) {
 
 const fileDate = (name) => { const m = name.match(/(\d{4})(\d{2})(\d{2})(?:_v(\d+))?\.md$/); return m ? `${m[1]}-${m[2]}-${m[3]}${m[4] ? `#${m[4].padStart(3, '0')}` : ''}` : ''; };
 
+// docs/skills/<skill>/<文件> → 产物条目；不是已知产物返回 null
+function entry(rel, text, mtime) {
+  const parts = rel.split('/');
+  if (parts.length !== 4 || parts[0] !== 'docs' || parts[1] !== 'skills') return null;
+  const [, , skill, name] = parts;
+  const k = KINDS.find((x) => x.skill === skill && name.startsWith(x.prefix) && name.endsWith('.md'));
+  return k ? { kind: k.kind, label: k.label, path: rel, branch: parseBranch(text), date: fileDate(name), mtime, wiki: parseWiki(text) } : null;
+}
+
+const byDate = (a, b) => a.date.localeCompare(b.date) || a.mtime - b.mtime;
+
 export function collect(root) {
   const out = [];
-  for (const k of KINDS) {
-    const dir = path.join(root, 'docs', 'skills', k.skill);
+  for (const skill of new Set(KINDS.map((k) => k.skill))) { // dev 有方案与交付两类，目录只扫一次
+    const dir = path.join(root, 'docs', 'skills', skill);
     if (!fs.existsSync(dir)) continue;
     for (const name of fs.readdirSync(dir)) {
-      if (!name.endsWith('.md') || !name.startsWith(k.prefix)) continue;
       const file = path.join(dir, name);
-      const text = fs.readFileSync(file, 'utf8');
-      out.push({
-        kind: k.kind, label: k.label, path: toPosix(path.relative(root, file)), branch: parseBranch(text),
-        date: fileDate(name), mtime: fs.statSync(file).mtimeMs, wiki: parseWiki(text),
-      });
+      const e = entry(toPosix(path.relative(root, file)), fs.readFileSync(file, 'utf8'), fs.statSync(file).mtimeMs);
+      if (e) out.push(e);
     }
   }
   // 同一天的多版（_v2、_v3）与无日期文件按修改时间排
-  return out.sort((a, b) => a.date.localeCompare(b.date) || a.mtime - b.mtime);
+  return out.sort(byDate);
+}
+
+// 只读扫描一个 git 引用（分支）里提交过的产物；条目带 ref 与 text（正文），mtime 取 0
+export function collectGit(root, ref) {
+  const ls = spawnSync('git', ['ls-tree', '-r', '--name-only', ref, '--', 'docs/skills'], { cwd: root, encoding: 'utf8' });
+  if (ls.status !== 0) return [];
+  const out = [];
+  for (const rel of ls.stdout.split('\n').filter(Boolean)) {
+    const show = spawnSync('git', ['show', `${ref}:${rel}`], { cwd: root, encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 });
+    if (show.status !== 0) continue;
+    const e = entry(rel, show.stdout, 0);
+    if (e) out.push({ ...e, ref, text: show.stdout });
+  }
+  return out.sort(byDate);
+}
+
+// 本地分支名列表
+export function localBranches(root) {
+  const r = spawnSync('git', ['for-each-ref', '--format=%(refname:short)', 'refs/heads'], { cwd: root, encoding: 'utf8' });
+  return r.status === 0 ? r.stdout.split('\n').filter(Boolean) : [];
 }
 
 // 下一步建议：按链路顺序找第一个缺的环节，再看哪些文档还没发布到 wiki
@@ -71,6 +98,8 @@ export function nextSteps(latest) {
     if (a && !a.wiki) steps.push(`md-to-wiki：发布 ${a.path}（尚无发布记录）`);
     else if (a && a.wiki && a.wiki.at && a.mtime > Date.parse(a.wiki.at) + 1000) steps.push(`md-to-wiki：${a.path} 在上次发布后改过，可重新发布到 pageId ${a.wiki.pageId}`);
   }
+  // 有交付说明或审查报告就能汇总出 PR / MR 描述
+  if (latest.delivery || latest.review) steps.push('提 PR / MR：运行 workflow/scripts/pr-desc.mjs 按本分支产物生成描述（创建 PR 需用户同意）');
   return steps;
 }
 

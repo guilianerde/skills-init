@@ -7,9 +7,16 @@
 ### 新增
 - 本地效果报告：`/workflow report` 或 `skills-init report [--since YYYY-MM-DD] [--json]`，脚本 `workflow/scripts/report.mjs` 只读统计 `docs/skills/` 下的产物，不上报：审查各级别发现、严重问题复核通过率、复审时上次问题的修复率；交付的类型与规模、需求澄清确认的决定条数、带未验证项的交付；DocNexus 沉淀率与正文引用知识库的产物占比；各分支产物链路是否齐全、哪些文档未发布到 wiki。
 - PR / MR 描述：`workflow/scripts/pr-desc.mjs` 把本分支的交付说明（做了什么、已确认的决定、改动、验证、配置 / SQL）、审查报告（结论、CRITICAL / HIGH、影响面）和相关文档汇总成描述；没有交付说明时退回用提交记录和改动文件。dev 交付后要提 PR 时调用；workflow 路由新增「写 PR / MR 描述」。
+- `report --all-branches`（PowerShell `-AllBranches`）：用 git 只读扫描所有本地分支里提交过、还没合并的产物，同一路径以工作区为准；默认只看工作区时报告会提示这一点。
+- `artifacts.mjs` 的下一步建议：本分支有交付说明或审查报告时提示用 `pr-desc.mjs` 生成 PR / MR 描述；`/workflow status` 末尾提示 `/workflow report`。
 
 ### 变更
 - dev 新增 **S 规模快速通道**：S 规模且不涉及配置、SQL / DDL、对外接口、表结构，也没有需要澄清的决定时，编译、测试、自审照常，只在对话里交付，不落盘交付说明、不问 DocNexus 沉淀；实现中碰到上述任何一项、改动超过 3 个文件或用户要求落盘时退回完整流程。缺陷修复同样适用，根因仍须在对话里写清楚。
+- Node 要求从 >= 18 提到 >= 22（`engines`、封装脚本、README）：18、20 已停止维护，CI 只在 Node 22 / 24 上测试；低于 22 时安装器给出警告，`doctor` 记为错误。
+- `doc-sections.mjs` 的标题识别改为复用 `lint-doc.mjs`（跳过代码块、统一归一化编号 / 必填 / 「如有」标记），模板标题的写法只在一处定义。
+
+### 修复
+- `init-skills.ps1` 不认 `report` 子命令（`ValidateSet` 缺失），新增 `-Since` / `-Json` / `-AllBranches`。
 
 ## [0.8.1] - 2026-10-16
 

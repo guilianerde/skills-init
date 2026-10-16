@@ -194,3 +194,27 @@ test('pr-desc：有交付说明与审查报告时汇总；没有时退回用 git
   assert.match(fs.readFileSync(path.join(root, 'tmp/pr.md'), 'utf8'), /## 做了什么/);
   fs.rmSync(root, { recursive: true, force: true });
 });
+
+test('report --all-branches：只读扫描本地分支里提交过、还没合并的产物；同一路径以工作区为准', () => {
+  const { root, put, g } = project();
+  const commit = (m) => g('-c', 'user.name=t', '-c', 'user.email=t@example.com', 'commit', '-q', '-m', m);
+  put('dev/delivery-pay-20261015.md', DELIVERY);
+  g('add', '-A'); commit('main 上已合并的交付');
+  g('checkout', '-q', '-b', 'feature/coupon');
+  put('project-review/review-feature-coupon-20261016.md', REVIEW(false).replaceAll('feature/pay', 'feature/coupon'));
+  g('add', '-A'); commit('特性分支上的审查报告');
+  g('checkout', '-q', 'main');
+  put('dev/delivery-pay-20261015.md', DELIVERY.replace('规模：M', '规模：L')); // 工作区里改过，未提交
+  const only = buildReport(root);
+  assert.deepEqual([only.artifacts, only.review.reports, only.scanned_branches.length], [1, 0, 0]);
+  const all = buildReport(root, { allBranches: true });
+  assert.deepEqual([all.artifacts, all.review.reports, all.from_branches], [2, 1, 1]);
+  assert.equal(all.delivery.scale.L, 1, '同一路径取工作区版本');
+  assert.ok(all.branches.some((b) => b.branch === 'feature/coupon' && b.has.review));
+  assert.equal(fs.readFileSync(path.join(root, 'docs/skills/dev/delivery-pay-20261015.md'), 'utf8').includes('规模：L'), true, '不改工作区');
+  const cli = node([path.join(REPO, 'bin/skills-init.mjs'), 'report', '--all-branches', '--project-root', root], root);
+  assert.equal(cli.status, 0, cli.stderr);
+  assert.match(cli.stdout, /范围：工作区 \+ 2 个本地分支（其中 1 份只在分支里）/);
+  assert.match(node([path.join(REPO, 'workflow/scripts/report.mjs')], root).stdout, /加 `--all-branches` 一起统计/);
+  fs.rmSync(root, { recursive: true, force: true });
+});
