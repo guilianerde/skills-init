@@ -96,6 +96,7 @@ export function doctor(root, offline) {
       if (docnexusSupportsRecallCategory(root) === false) meh(`已装的 DocNexus 不支持 recall --category：knowledge.mjs --query 只列文档，skill 改用不带分类的 recall。升级：${docnexusUpgradeCmd(root)}`);
       else ok('DocNexus 支持按分类检索（recall --category）');
     } else console.log('    --  DocNexus 未接入（可选）');
+    for (const t of st.templates_to_create ?? []) console.log(`    --  ${t.skill} 的模板 ${t.id} 还没有创建（不随 skills 提供）：第一次生成文档时会请你给一份样例文档来创建，保存到 ${t.expected}`);
     if (st.codegraph?.ok) ok(`CodeGraph 已接入（codegraph ${codegraphVersion(root)}，索引在 .codegraph/）`);
     else if (st.codegraph?.indexed) meh('有 .codegraph/ 索引但找不到 codegraph 命令：npm i -g @colbymchenry/codegraph，或重跑 skills-init 并加 --with-codegraph');
     else if (st.codegraph?.cli) console.log('    --  已装 codegraph，但本项目没有建索引（可选：在项目根运行 codegraph init）');

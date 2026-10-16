@@ -75,6 +75,7 @@ test('导入全部模板，内容与自带模板一致，元数据分类为 doc-
   const root = project();
   const r = seedTemplates(root, REPO, quiet);
   assert.deepEqual(r.seeded, TEMPLATES.map((t) => t.file));
+  assert.ok(!r.seeded.some((f) => /create-(tech|release)-md-doc/.test(f)), '技术方案、上线方案没有默认模板，不导入');
   assert.equal(r.failed.length, 0);
   for (const t of TEMPLATES) {
     assert.equal(fs.readFileSync(path.join(root, 'docnexus/library', t.file), 'utf8'), fs.readFileSync(path.join(REPO, t.src), 'utf8'));
@@ -86,18 +87,18 @@ test('导入全部模板，内容与自带模板一致，元数据分类为 doc-
     assert.ok(r.metadata.tags.includes('skills-init-template'));
   }
   const calls = fs.readFileSync(path.join(root, 'calls.log'), 'utf8');
-  assert.match(calls, /draft seal --id draft_template-create-tech-md-doc\S* --file templates\/create-tech-md-doc\/template.md --base-version new --category doc-template --category-reason \S/);
+  assert.match(calls, /draft seal --id draft_template-dev\S* --file templates\/dev\/plan-template.md --base-version new --category doc-template --category-reason \S/);
   assert.doesNotMatch(calls, /--replace/);
   fs.rmSync(root, { recursive: true, force: true });
 });
 
 test('已存在的模板不覆盖', { skip }, () => {
   const root = project();
-  const existing = path.join(root, 'docnexus/library/templates/create-tech-md-doc/template.md');
+  const existing = path.join(root, 'docnexus/library/templates/dev/plan-template.md');
   fs.mkdirSync(path.dirname(existing), { recursive: true });
   fs.writeFileSync(existing, '# 团队改过的模板\n');
   const r = seedTemplates(root, REPO, quiet);
-  assert.deepEqual(r.skipped, ['templates/create-tech-md-doc/template.md']);
+  assert.deepEqual(r.skipped, ['templates/dev/plan-template.md']);
   assert.equal(r.seeded.length, TEMPLATES.length - 1);
   assert.equal(fs.readFileSync(existing, 'utf8'), '# 团队改过的模板\n');
   fs.rmSync(root, { recursive: true, force: true });

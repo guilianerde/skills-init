@@ -1,11 +1,11 @@
 ---
 name: create-tech-md-doc
-description: "Generate a Markdown technical design doc (技术方案) from the diff between two git branches. Use when the user invokes /create-tech-md-doc <devBranch> <mainBranch> [--prd <pageId|url>], or asks to generate a tech plan / technical design document / 技术方案 / 技术文档 from a branch diff against master/main, optionally merging a Confluence PRD. Not for release/deployment plans (create-release-md-doc), for writing code (dev), or for reviewing code (project-review)."
+description: "Generate a Markdown technical design doc (技术方案) from the diff between two git branches. Use when the user invokes /create-tech-md-doc <devBranch> <mainBranch> [--prd <pageId|url>], or asks to generate a tech plan / technical design document / 技术方案 / 技术文档 from a branch diff against master/main, optionally merging a Confluence PRD. The doc follows the project's own template; when none exists yet, or the user asks to create / regenerate it (创建技术方案模板 / 按这份文档生成模板 / 换个模板), build it from a sample doc the user provides. Not for release/deployment plans (create-release-md-doc), for writing code (dev), or for reviewing code (project-review)."
 ---
 
 # Create Tech MD Doc
 
-对比开发分支与主分支的 diff，按 8 模块技术方案模板生成 Markdown（固定填充模块 2 / 3 / 4 / 5 / 6 / 8；有 PRD 时再填 1 / 7）。
+对比开发分支与主分支的 diff，按项目自己的技术方案模板生成 Markdown。模板不随 skills 提供：第一次使用时请用户给一份团队现有的技术方案作样例来创建（见 Step 3）。
 
 ## Command Format
 
@@ -24,7 +24,7 @@ description: "Generate a Markdown technical design doc (技术方案) from the d
 1. `git rev-parse --is-inside-work-tree` 为 `true`，否则停。
 2. 两个分支都能 `git rev-parse --verify`（或 `origin/<branch>`）；不存在 → 列出 `git branch -a | grep -i <关键词>` 的候选让用户挑，停。
 3. 读 `workflow/profile.json`：发布平台、Region、配置中心、定时任务注解、是否需要数据评审都取自这里；未配置的写「待填写」，**不要沿用其他项目的取值**。
-4. DocNexus 可用时运行 `node <skills>/workflow/scripts/knowledge.mjs create-tech-md-doc --match <模块名 / 业务名词> --query "<一句话：本次改动做了什么>"`（模块名取分支名或 diff 涉及的模块），看以往技术方案沉淀的决策与约定、相关开发沉淀；相关的在文档对应模块引用 `docnexus/library/<path>`（见 `<skills>/workflow/references/docnexus.md`「按分类参考知识库」）。未接入就跳过。
+4. DocNexus 可用时运行 `node <skills>/workflow/scripts/knowledge.mjs create-tech-md-doc --match <模块名 / 业务名词> --query "<一句话：本次改动做了什么>"`（模块名取分支名或 diff 涉及的模块），看以往技术方案沉淀的决策与约定、相关开发沉淀；相关的在文档对应章节引用 `docnexus/library/<path>`（见 `<skills>/workflow/references/docnexus.md`「按分类参考知识库」）。未接入就跳过。
 
 ### Step 1 — PRD（仅传入 `--prd` 时）
 
@@ -36,19 +36,22 @@ description: "Generate a Markdown technical design doc (技术方案) from the d
 
 ### Step 3 — 选模板并填充
 
-- 模板：在项目根运行 `node <skills>/workflow/scripts/resolve.mjs template create-tech-md-doc template.md`（`<skills>` 是本 skill 所在的 skills 目录，如 `.agents/skills`），读输出的 `path`，并把 `source` 写进元数据行。退出码 2 表示已接入 DocNexus 但知识库缺这份模板：**停下这一步**，按输出的 `hint` 处理，不要回退到默认模板。规则说明见 `<skills>/workflow/references/templates.md`。
-- 填充来源：
+- 模板：在项目根运行 `node <skills>/workflow/scripts/resolve.mjs template create-tech-md-doc template.md`（`<skills>` 是本 skill 所在的 skills 目录，如 `.agents/skills`），读输出的 `path`，并把 `source` 写进元数据行。技术方案模板**不随 skills 提供**，由各团队按自己 wiki 上的格式创建：
+  - 退出码 2 且 `on_demand: true` → 还没有创建模板：**停下这一步**，按 `<skills>/workflow/references/templates.md`「创建模板」请用户给一份团队现有的技术方案作样例，生成模板、用户确认后保存到输出的 `expected`，再继续。不要自己编一份通用模板凑数。
+  - 退出码 2 且没有 `on_demand` → 已接入 DocNexus 但知识库缺模板，按输出的 `hint` 处理。
+  - 用户说「重新生成 / 换一份技术方案模板」时也走「创建模板」，覆盖前把旧模板的路径告诉用户。
+- 填充：模板的章节和编号因团队而异，**按章节含义**放事实，不按编号。下表是事实的来源，放进模板里含义对应的章节；模板里没有对应章节的事实不擅自加章节，在交付摘要里列出「模板中没有位置的事实」；模板有、但 diff 和 PRD 都给不出内容的章节写「待补充」。
 
-| 模块 | 填充 | 来源 |
-|---|---|---|
-| 1 需求背景 | 有 PRD 时 | `prd_context`；无 PRD 留「待补充」 |
-| 2 影响范围 | ✅ | 各层命中的模块 / 包名；代码图谱可用时补上 `cg.mjs impact --diff <main>...<dev>` 的受影响入口与模块（见 `<skills>/code-graph/SKILL.md`） |
-| 3 详细方案 | ✅ | Service 变更；有 PRD 时补业务语义并标注来源 |
-| 4 接口文档 | ✅ | 接口与消息层 |
-| 5 涉及服务 | ✅ | git remote + 项目结构 + `profile.deploy` |
-| 6 中间件变更 | ✅ | SQL、实体、配置、构建文件、定时任务 |
-| 7 数据链路 | 有 PRD 且提及表名，或 `profile.data_review` 为 true | `prd_context.tables` / diff 推断 |
-| 8 兼容问题&方案 | ✅ | diff 推断 + PRD 对齐缺口 |
+| 事实 | 来源 |
+|---|---|
+| 需求背景 | 有 PRD 时取 `prd_context`；无 PRD 写「待补充」 |
+| 影响范围 | 各层命中的模块 / 包名；代码图谱可用时补上 `cg.mjs impact --diff <main>...<dev>` 的受影响入口与模块（见 `<skills>/code-graph/SKILL.md`） |
+| 详细方案 | Service 变更；有 PRD 时补业务语义并标注来源 |
+| 接口 / 消息协议 / 字段变更 | 接口与消息层、DTO / VO |
+| 涉及服务 | git remote + 项目结构 + `profile.deploy` |
+| 中间件变更（DB / 配置 / 依赖 / 定时任务） | SQL、实体、配置、构建文件、定时任务；代码图谱可用时对照 `impact` 的 `sql` / `config_keys` |
+| 数据链路 / 数据评审 | 有 PRD 且提及表名，或 `profile.data_review` 为 true 时；`prd_context.tables` / diff 推断 |
+| 兼容问题与方案、PRD 对齐缺口 | diff 推断 + PRD 对齐缺口（见 `references/prd.md`） |
 
 - 文档开头写元信息：
 
@@ -57,8 +60,8 @@ description: "Generate a Markdown technical design doc (技术方案) from the d
 > 对比分支：`<dev>` ←→ `<main>`（主分支为基线）
 > diff 概览：<files> files changed, <ins> insertions(+), <del> deletions(-)
 > PRD 参考：<pageId 或 URL 或「无」/「PRD 增强已跳过」>
-> 模板来源：<DocNexus / 项目文件 / skill 默认>
-> 填充模块：2/3/4/5/6/8 +（有 PRD 时）1/7
+> 模板来源：<DocNexus / 项目文件>
+> 待补充章节：<diff 和 PRD 都给不出内容的章节，没有写「无」>
 > ⚠️ 内容基于代码 diff 推断，业务语义需人工校对后补充。
 ```
 
@@ -72,7 +75,7 @@ description: "Generate a Markdown technical design doc (技术方案) from the d
 ### Step 5 — 后续（都需要用户同意）
 
 - 发布到 wiki：`/md-to-wiki <文档路径> [pageId]`（发布过的文档有发布记录，可省略 pageId）。
-- 模板回写：用户对生成的文档做了结构性调整、且项目已接入 DocNexus 时，按 `<skills>/workflow/references/templates.md`「模板随知识库更新」提议同步回模板。
+- 模板回写：用户对生成的文档做了结构性调整（新增 / 删除 / 重排章节、改表格列）时，问要不要同步回模板：未接入 DocNexus 时直接改 `docs/skills/templates/create-tech-md-doc/template.md`（用户确认后）；已接入时按 `<skills>/workflow/references/templates.md`「模板随知识库更新」提议同步回模板。
 - 要上线：`/create-release-md-doc <dev> <main> --tech <文档路径>` 复用本文档的事实。
 - 沉淀到 DocNexus（DocNexus 可用时，判定见 `<skills>/workflow/SKILL.md`「增强能力探测」）：列出值得长期记住的决策、约定、配置 / 依赖变化、风险，**询问用户**；同意后按 DocNexus 入口 skill `docnexus` 的 capture 流程写入，分类用 `node <skills>/workflow/scripts/resolve.mjs category create-tech-md-doc` 的结果作为调用方显式分类封存（见 `<skills>/workflow/references/docnexus.md`「写入 DocNexus 的分类」），并回报 `docnexus/library/<path>`。只沉淀确认过的事实，不沉淀「待补充」「待人工确认」的推断。未检测到 DocNexus 就跳过，不提示安装。
 

@@ -2,7 +2,7 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { TPL_DIR, PKG, CANON_DIR, SKILLS, SKILL_LIST, USER_FILES, RENAMED, MANIFEST, ok, warn, readJson, walk, toPosix, sameFile, writeFile, render, sha256, fileHash, readManifest, removeEmptyDirs, lstat, timestamp, removeLink } from './core.mjs';
+import { TPL_DIR, PKG, CANON_DIR, INSTALL_BASES, SKILLS, SKILL_LIST, USER_FILES, RENAMED, MANIFEST, ok, warn, readJson, walk, toPosix, sameFile, writeFile, render, sha256, fileHash, readManifest, removeEmptyDirs, lstat, timestamp, removeLink } from './core.mjs';
 import { ask } from './prompt.mjs';
 import { writeDbConfig } from './db.mjs';
 
@@ -251,4 +251,24 @@ export function updateGitignore(root, withDocNexus, withCodeGraph = false) {
   if (!missing.length) { ok('.gitignore 已包含全部规则'); return; }
   fs.appendFileSync(gi, `\n# Agent skills generated rules (credentials + tmp artifacts; do not commit)\n${missing.join('\n')}\n`);
   ok(`.gitignore 已追加：${missing.join(' ')}`);
+}
+
+// 不再随 skills 提供默认版本的模板（skill.json 里没有 src 的：技术方案、上线方案）。老项目还在用装进 skills 目录的默认版本时，
+// 升级 / 重装前把它复制到项目模板目录 docs/skills/templates/<skill>/<id>，生成效果不变；之后安装清单会按「模板已删除」清理 skills 目录里那份。
+// 项目里已有自己的模板、或 DocNexus 知识库里已有这份时不动。返回复制了哪些
+export function preserveRetiredTemplates(root) {
+  const kept = [];
+  for (const s of SKILL_LIST) {
+    for (const t of s.templates.filter((x) => !x.src)) {
+      const project = path.join(root, 'docs', 'skills', 'templates', s.name, t.id);
+      const lib = path.join(root, 'docnexus', 'library', 'templates', s.name, t.id);
+      if (fs.existsSync(project) || fs.existsSync(lib)) continue;
+      const old = INSTALL_BASES.map((b) => path.join(root, b, s.name, t.id)).find((f) => fs.existsSync(f) && fs.statSync(f).isFile());
+      if (!old) continue;
+      writeFile(project, fs.readFileSync(old, 'utf8'));
+      kept.push(toPosix(path.relative(root, project)));
+      ok(`${s.name} 的模板 ${t.id} 不再随 skills 提供，已把项目在用的版本保存到 ${toPosix(path.relative(root, project))}（之后生成文档用它）`);
+    }
+  }
+  return kept;
 }

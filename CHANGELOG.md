@@ -4,6 +4,14 @@
 
 ## [Unreleased]
 
+### 变更
+- **技术方案、上线方案的模板不再随 skills 提供**：各团队发到 wiki 的格式不同，`create-tech-md-doc` / `create-release-md-doc` 改为按项目自己的模板生成。还没有模板时（`resolve.mjs template` 退出码 2，输出 `on_demand: true` 与 `expected`），skill 停下来请用户给一份团队现有的同类文档作样例（本地 Markdown，或 wiki pageId / URL），生成模板、用户确认后保存：未接入 DocNexus 时存到 `docs/skills/templates/<skill>/template.md`，已接入时经授权写入 DocNexus（`doc-template` 分类）。用户也可以随时要求重新生成模板。两个 skill 的填充改为按章节含义放事实，不再依赖固定的模块编号；元信息行「填充模块」改为「待补充章节」。
+- 老项目升级时，还在用原自带默认模板的（项目和 DocNexus 里都没有自己的版本），安装器先把它保存到 `docs/skills/templates/<skill>/template.md`，生成效果不变。
+- `seed-templates` 只导入、跟踪有默认版本的模板；`resolve.mjs status` 新增 `templates_to_create`，`doctor` 列出还没创建的模板。
+
+### 新增
+- `workflow/scripts/make-template.mjs <样例.md | ->`：从样例文档抽模板骨架，保留标题层级与表格列，正文换成 `{{...}}` 填写提示，去掉标题前的元信息块；wiki 页面的纯文本（`upload.mjs get --text`）也能直接用。`workflow/references/templates.md` 新增「创建模板」流程。
+
 ## [0.9.0] - 2026-10-16
 
 ### 新增

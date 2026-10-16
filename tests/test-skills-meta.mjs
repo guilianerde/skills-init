@@ -25,7 +25,12 @@ test('order 不重复', () => {
 });
 
 test('模板与用户文件的源路径都存在，模板 id 在 skill 内唯一', () => {
-  for (const t of meta.templates) assert.ok(fs.existsSync(path.join(REPO, t.src)), t.src);
+  for (const t of meta.templates) if (t.src) assert.ok(fs.existsSync(path.join(REPO, t.src)), t.src);
+  // 技术方案、上线方案的模板不随 skills 提供（按样例创建），skill 目录里也不能残留旧的默认模板
+  for (const s of ['create-tech-md-doc', 'create-release-md-doc']) {
+    assert.ok(meta.templates.some((t) => t.skill === s && !t.src), `${s} 的模板应为按需创建`);
+    assert.ok(!fs.existsSync(path.join(REPO, s, 'template.md')), `${s}/template.md 应已移除`);
+  }
   for (const [key, blank] of Object.entries(meta.userFiles)) if (blank) assert.ok(fs.existsSync(path.join(REPO, blank)), `${key} -> ${blank}`);
   for (const s of skills) assert.equal(new Set(s.templates.map((t) => t.id)).size, s.templates.length, s.name);
 });

@@ -47,5 +47,5 @@
 | dev | F6 验证 | `cg.mjs impact --base <main>` 的 `tests` 先跑（`profile.test_single`），再跑全量 |
 | project-review | 第 3 步分批 | `cg.mjs impact --diff` 的入口和 `sql` 帮助排 P0 / P1 |
 | project-review | 第 5 步影响面 | `cg.mjs impact --diff` 列受影响的接口 / 消费者 / 定时任务 / 表；Spring 注入、AOP、反射照常 grep |
-| create-tech-md-doc | 模块 2 / 4 / 6 | `cg.mjs impact --diff` 的入口、`sql`、`config_keys` 归并到影响范围、接口、中间件变更 |
-| create-release-md-doc | 二 / 四 / 五 | `cg.mjs impact --diff` 的 `sql` / `config_keys` 对照中间件上线，入口用于上线后验证和监控 |
+| create-tech-md-doc | 影响范围 / 接口 / 中间件类章节 | `cg.mjs impact --diff` 的入口、`sql`、`config_keys` 归并到影响范围、接口、中间件变更 |
+| create-release-md-doc | 中间件上线 / 上线后验证 / 监控类章节 | `cg.mjs impact --diff` 的 `sql` / `config_keys` 对照中间件上线，入口用于上线后验证和监控 |

@@ -12,9 +12,8 @@
   "templates": [
     {
       "id": "template.md",
-      "src": "template.md",
       "title": "上线方案模板",
-      "summary": "create-release-md-doc 生成上线方案时使用的 6 模块 Markdown 模板。",
+      "summary": "create-release-md-doc 生成上线方案时使用的模板。不随 skills 提供：第一次生成时按用户给的样例文档创建（见 workflow/references/templates.md「创建模板」）。",
       "lint": {
         "requiredMeta": [
           "自动生成",

@@ -23,7 +23,7 @@ import { seedTemplates, updateTemplates } from './seed-templates.mjs';
 import { TPL_DIR, PKG, ENV_NAMES, CANON_DIR, SKILLS, resolveSkillSelection, step, ok, warn, CliError, fail, isAdminTerminal } from './lib/core.mjs';
 import { ask, closePrompt } from './lib/prompt.mjs';
 import { findExistingDbConfig, getDb } from './lib/db.mjs';
-import { report, installSkills, linkSkills, removeRenamed, updateGitignore } from './lib/install.mjs';
+import { report, installSkills, linkSkills, removeRenamed, updateGitignore, preserveRetiredTemplates } from './lib/install.mjs';
 import { setupCodeGraph } from './lib/codegraph.mjs';
 import { uninstall } from './lib/uninstall.mjs';
 import { checkNodeForDocNexus, setupDocNexus, templateRecords, saveTemplateRecords, reportTemplateStatus, installedSkills, docnexusConnected, printTemplateDiffs } from './lib/docnexus.mjs';
@@ -200,6 +200,7 @@ async function main() {
   }
 
   removeRenamed(o.root);
+  preserveRetiredTemplates(o.root);
   const ctx = { root: o.root, yes: o.yes, envs: sel, mode: o.copy ? 'copy' : 'symlink', skills };
   for (const [name, dir] of targets) {
     const abs = path.resolve(o.root, dir);

@@ -1,11 +1,11 @@
 ---
 name: create-release-md-doc
-description: "Generate a Markdown release/deployment plan (上线方案) from the diff between two git branches. Use when the user invokes /create-release-md-doc <devBranch> <mainBranch> [--prd <pageId|url>] [--tech <path>], or asks for a release plan / deployment plan / 上线方案 / 上线文档 / 发布方案 from a branch diff against master/main. --tech reuses an already-generated tech design doc; --prd merges a Confluence PRD for gray-release and verification scenarios. Not for technical design docs (create-tech-md-doc) or code changes (dev)."
+description: "Generate a Markdown release/deployment plan (上线方案) from the diff between two git branches. Use when the user invokes /create-release-md-doc <devBranch> <mainBranch> [--prd <pageId|url>] [--tech <path>], or asks for a release plan / deployment plan / 上线方案 / 上线文档 / 发布方案 from a branch diff against master/main. --tech reuses an already-generated tech design doc; --prd merges a Confluence PRD for gray-release and verification scenarios. The doc follows the project's own template; when none exists yet, or the user asks to create / regenerate it (创建上线方案模板 / 按这份文档生成模板 / 换个模板), build it from a sample doc the user provides. Not for technical design docs (create-tech-md-doc) or code changes (dev)."
 ---
 
 # Create Release MD Doc
 
-对比开发分支与主分支的 diff，按 6 模块上线方案模板生成 Markdown（固定填充模块一 / 二 / 四 / 五 / 六；有 PRD 时再填三）。技术方案回答「怎么开发」，上线方案回答「怎么上线」。
+对比开发分支与主分支的 diff，按项目自己的上线方案模板生成 Markdown。模板不随 skills 提供：第一次使用时请用户给一份团队现有的上线方案作样例来创建（见 Step 3）。技术方案回答「怎么开发」，上线方案回答「怎么上线」。
 
 ## Command Format
 
@@ -25,7 +25,7 @@ description: "Generate a Markdown release/deployment plan (上线方案) from th
 1. `git rev-parse --is-inside-work-tree` 为 `true`，否则停。
 2. 两个分支都能 `git rev-parse --verify`（或 `origin/<branch>`）；不存在 → 列出候选让用户挑，停。
 3. 读 `workflow/profile.json`：发布平台、Region、配置中心、定时任务注解、是否需要数据评审都取自这里；未配置的写「待填写」，**不要沿用其他项目的取值**。
-4. DocNexus 可用时运行 `node <skills>/workflow/scripts/knowledge.mjs create-release-md-doc --match <模块名 / 业务名词> --query "<一句话：本次上线改了什么>"`（模块名取分支名或 diff 涉及的模块），看以往上线方案沉淀的风险、回滚要点与技术方案沉淀；相关的在文档对应模块引用 `docnexus/library/<path>`（见 `<skills>/workflow/references/docnexus.md`「按分类参考知识库」）。未接入就跳过。
+4. DocNexus 可用时运行 `node <skills>/workflow/scripts/knowledge.mjs create-release-md-doc --match <模块名 / 业务名词> --query "<一句话：本次上线改了什么>"`（模块名取分支名或 diff 涉及的模块），看以往上线方案沉淀的风险、回滚要点与技术方案沉淀；相关的在文档对应章节引用 `docnexus/library/<path>`（见 `<skills>/workflow/references/docnexus.md`「按分类参考知识库」）。未接入就跳过。
 
 ### Step 1 — PRD（仅传入 `--prd` 时）
 
@@ -37,17 +37,20 @@ description: "Generate a Markdown release/deployment plan (上线方案) from th
 
 ### Step 3 — 选模板并填充
 
-- 模板：在项目根运行 `node <skills>/workflow/scripts/resolve.mjs template create-release-md-doc template.md`（`<skills>` 是本 skill 所在的 skills 目录，如 `.agents/skills`），读输出的 `path`，并把 `source` 写进元数据行。退出码 2 表示已接入 DocNexus 但知识库缺这份模板：**停下这一步**，按输出的 `hint` 处理，不要回退到默认模板。规则说明见 `<skills>/workflow/references/templates.md`。
-- 填充来源：
+- 模板：在项目根运行 `node <skills>/workflow/scripts/resolve.mjs template create-release-md-doc template.md`（`<skills>` 是本 skill 所在的 skills 目录，如 `.agents/skills`），读输出的 `path`，并把 `source` 写进元数据行。上线方案模板**不随 skills 提供**，由各团队按自己 wiki 上的格式创建：
+  - 退出码 2 且 `on_demand: true` → 还没有创建模板：**停下这一步**，按 `<skills>/workflow/references/templates.md`「创建模板」请用户给一份团队现有的上线方案作样例，生成模板、用户确认后保存到输出的 `expected`，再继续。不要自己编一份通用模板凑数。
+  - 退出码 2 且没有 `on_demand` → 已接入 DocNexus 但知识库缺模板，按输出的 `hint` 处理。
+  - 用户说「重新生成 / 换一份上线方案模板」时也走「创建模板」，覆盖前把旧模板的路径告诉用户。
+- 填充：模板的章节和编号因团队而异，**按章节含义**放事实，不按编号。下表是事实的来源，放进模板里含义对应的章节；模板里没有对应章节的事实不擅自加章节，在交付摘要里列出「模板中没有位置的事实」；模板有、但 diff 和 PRD 都给不出内容的章节写「待补充」。
 
-| 模块 | 填充 | 来源 |
-|---|---|---|
-| 一 上线服务 | ✅ | git remote + 项目结构 + 改动范围 + `profile.deploy` |
-| 二 中间件上线 | ✅ | DDL、实体、配置、构建文件、db_name；2.3 仅 `profile.data_review` 为 true 时输出 |
-| 三 灰度方案 | 有 PRD 时 | `prd_context.grayRelease`；否则留「待人工补充」 |
-| 四 上线后技术验证 | ✅ | 接口层 / `tech_context`；有 PRD 时追加业务场景；代码图谱可用时用 `cg.mjs impact --diff <main>...<dev>` 的 `entry_points` 补全要回归的接口 / 消费者 / 定时任务，`sql` / `config_keys` 对照二 中间件上线（见 `<skills>/code-graph/SKILL.md`） |
-| 五 监控方案 | ✅ | 变更类名 / 方法名 + 定时任务 + topic |
-| 六 回滚 / 止损 | ✅ | DDL / 配置 / 服务回滚推断；有 PRD 时追加对齐缺口 |
+| 事实 | 来源 |
+|---|---|
+| 上线服务 / 改动范围 | git remote + 项目结构 + 改动范围 + `profile.deploy` |
+| 中间件上线（DDL / 配置 / 依赖） | DDL、实体、配置、构建文件；数据评审类章节仅 `profile.data_review` 为 true 时输出 |
+| 灰度方案 | 有 PRD 时取 `prd_context.grayRelease`；否则写「待人工补充」 |
+| 上线后验证 | 接口层 / `tech_context`；有 PRD 时追加业务场景；代码图谱可用时用 `cg.mjs impact --diff <main>...<dev>` 的 `entry_points` 补全要回归的接口 / 消费者 / 定时任务，`sql` / `config_keys` 对照中间件上线（见 `<skills>/code-graph/SKILL.md`） |
+| 监控 | 变更类名 / 方法名 + 定时任务 + topic |
+| 回滚 / 止损 | DDL / 配置 / 服务回滚推断；有 PRD 时追加对齐缺口 |
 
 - 灰度、回滚策略属于推断内容，必须标「待人工确认」，不要写成已确定的方案。
 - 文档开头写元信息：
@@ -57,10 +60,10 @@ description: "Generate a Markdown release/deployment plan (上线方案) from th
 > 对比分支：`<dev>` ←→ `<main>`（主分支为基线）
 > diff 概览：<files> files changed, <ins> insertions(+), <del> deletions(-)
 > PRD 参考：<pageId 或 URL 或「无」/「PRD 增强已跳过」>
-> 模板来源：<DocNexus / 项目文件 / skill 默认>
+> 模板来源：<DocNexus / 项目文件>
 > 技术方案引用：<path 或「无」>
 > 交付说明引用：<path 或「无」>
-> 填充模块：1/2/4/5/6 +（有 PRD 时）3
+> 待补充章节：<diff、PRD、技术方案都给不出内容的章节，没有写「无」>
 > ⚠️ 灰度 / 回滚策略基于 diff 推断，需人工校对后补充。
 ```
 
@@ -74,7 +77,7 @@ description: "Generate a Markdown release/deployment plan (上线方案) from th
 ### Step 5 — 后续（都需要用户同意）
 
 - 发布到 wiki：`/md-to-wiki <文档路径> [pageId]`（发布过的文档有发布记录，可省略 pageId）。
-- 模板回写：用户对生成的文档做了结构性调整、且项目已接入 DocNexus 时，按 `<skills>/workflow/references/templates.md`「模板随知识库更新」提议同步回模板。
+- 模板回写：用户对生成的文档做了结构性调整（新增 / 删除 / 重排章节、改表格列）时，问要不要同步回模板：未接入 DocNexus 时直接改 `docs/skills/templates/create-release-md-doc/template.md`（用户确认后）；已接入时按 `<skills>/workflow/references/templates.md`「模板随知识库更新」提议同步回模板。
 - 沉淀到 DocNexus（DocNexus 可用时，判定见 `<skills>/workflow/SKILL.md`「增强能力探测」）：列出值得长期记住的决策、配置 / 依赖变化、风险与坑，**询问用户**；同意后按 DocNexus 入口 skill `docnexus` 的 capture 流程写入，分类用 `node <skills>/workflow/scripts/resolve.mjs category create-release-md-doc` 的结果作为调用方显式分类封存（见 `<skills>/workflow/references/docnexus.md`「写入 DocNexus 的分类」），并回报 `docnexus/library/<path>`。只沉淀确认过的事实，不沉淀「待补充」「待人工确认」的推断。未检测到 DocNexus 就跳过，不提示安装。
 
 ## Red Flags — STOP

@@ -46,7 +46,7 @@ export function deriveMeta(skills) {
     for (const [rel, blank] of Object.entries(s.userFiles)) userFiles[`${s.name}/${rel}`] = blank ? `${s.name}/${blank}` : null;
     for (const [old, sig] of Object.entries(s.renamedFrom)) renamed[old] = { to: s.name, signature: new RegExp(sig, 'm') };
     for (const t of s.templates) {
-      templates.push({ skill: s.name, id: t.id, src: `${s.name}/${t.src}`, file: `templates/${s.name}/${t.id}`, title: t.title, summary: t.summary });
+      templates.push({ skill: s.name, id: t.id, src: t.src ? `${s.name}/${t.src}` : null, file: `templates/${s.name}/${t.id}`, title: t.title, summary: t.summary });
     }
   }
   return { skills: skills.map((s) => s.name), userFiles, renamed, templates };

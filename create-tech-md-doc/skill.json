@@ -12,9 +12,8 @@
   "templates": [
     {
       "id": "template.md",
-      "src": "template.md",
       "title": "技术方案模板",
-      "summary": "create-tech-md-doc 生成技术方案时使用的 8 模块 Markdown 模板。",
+      "summary": "create-tech-md-doc 生成技术方案时使用的模板。不随 skills 提供：第一次生成时按用户给的样例文档创建（见 workflow/references/templates.md「创建模板」）。",
       "lint": {
         "requiredMeta": [
           "自动生成",

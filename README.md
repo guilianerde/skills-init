@@ -123,10 +123,10 @@ npx @rowansenne/skills-init doctor
 │   ├── SKILL.md                      # GATE：wiki 未配置则禁止启动
 │   ├── wiki-config.json              # wiki 连接（init 生成，默认 enabled=false，已 gitignore）
 │   └── scripts/md-to-wiki.mjs        # md → Confluence Storage Format XHTML 转换 + 良构校验（Node，无依赖）
-├── create-tech-md-doc/               # 从分支 diff 生成技术方案 md（8 模块）
+├── create-tech-md-doc/               # 从分支 diff 生成技术方案 md（按项目模板，没有就用样例创建）
 │   ├── SKILL.md
 │   └── template.md
-├── create-release-md-doc/            # 从分支 diff 生成上线方案 md（6 模块）
+├── create-release-md-doc/            # 从分支 diff 生成上线方案 md（按项目模板，没有就用样例创建）
 │   ├── SKILL.md
 │   └── template.md
 └── dev/                              # 开发 / 修 bug：需求→调研→方案→实现→测试→自审→交付
@@ -545,12 +545,10 @@ skills-init/
 │   └── scripts/                       # md-to-wiki.mjs（转换 + 良构校验）、upload.mjs（REST 上传）
 ├── create-tech-md-doc/
 │   ├── SKILL.md.tpl · skill.json
-│   ├── references/                    # diff-collection.md（分层采集）、prd.md（PRD 拉取）
-│   └── template.md                    # 8 模块文档模板
+│   └── references/                    # diff-collection.md（分层采集）、prd.md（PRD 拉取）；模板不随包提供
 └── create-release-md-doc/
     ├── SKILL.md.tpl · skill.json
-    ├── references/                    # diff-collection.md、prd.md
-    └── template.md                    # 6 模块文档模板
+    └── references/                    # diff-collection.md、prd.md；模板不随包提供
 ```
 
 
@@ -572,14 +570,19 @@ skills-init/
 * **已接入 DocNexus：只用知识库里的模板** `docnexus/library/templates/<skill>/<文件名>`（分类 `doc-template`）。不再使用 skill 自带的默认模板，也不使用 `docs/skills/templates/` 下的文件。库里缺模板时 skill 会停下来，提示你导入后再继续，不会悄悄回退到默认模板。
 * **未接入 DocNexus**：依次取项目文件 `docs/skills/templates/<skill>/<文件名>`、skill 自带默认模板。
 
-| skill | 文件名 | 用途 |
-| --- | --- | --- |
-| create-tech-md-doc | `template.md` | 技术方案模板 |
-| create-release-md-doc | `template.md` | 上线方案模板 |
-| dev | `plan-template.md` | 开发方案模板 |
-| dev | `delivery-template.md` | 交付说明模板 |
-| project-review | `checklist.md` | 审查清单 |
-| project-review | `report.md` | 审查报告模板 |
+| skill | 文件名 | 用途 | 默认模板 |
+| --- | --- | --- | --- |
+| create-tech-md-doc | `template.md` | 技术方案模板 | **不提供**，第一次用时按样例创建 |
+| create-release-md-doc | `template.md` | 上线方案模板 | **不提供**，第一次用时按样例创建 |
+| dev | `plan-template.md` | 开发方案模板 | 有 |
+| dev | `delivery-template.md` | 交付说明模板 | 有 |
+| project-review | `checklist.md` | 审查清单 | 有 |
+| project-review | `report.md` | 审查报告模板 | 有 |
+
+**技术方案、上线方案的模板按团队自己的格式创建**：各团队发到 wiki 的文档格式不同，skills 不再自带固定格式。第一次生成时 skill 会停下来，请你给一份团队现有的同类文档（本地 Markdown，或 wiki 的 pageId / URL）作样例，用 `workflow/scripts/make-template.mjs` 抽出章节和表格结构，把正文换成填写说明，你确认后保存：未接入 DocNexus 时存到 `docs/skills/templates/<skill>/template.md`（建议提交，团队共用），已接入时经你授权写入 DocNexus。之后想换格式，直接说「重新生成技术方案模板」。
+
+* 老项目升级时，如果还在用原来自带的默认模板（项目和 DocNexus 里都没有自己的版本），安装器会先把它保存到 `docs/skills/templates/<skill>/template.md`，生成效果不变。
+* `doctor` 和 `/workflow status` 会列出还没创建的模板。
 
 **模板导入 DocNexus**：
 
@@ -590,7 +593,7 @@ skills-init/
 ./skills-init/init-skills.sh seed-templates --diff               # 团队改过的模板：打印与新默认模板的差异，手动合并
 ```
 
-* 只导入 DocNexus 里还没有的模板，已有的不覆盖；项目已接入但缺模板时，安装结束会列出缺哪几份。
+* 只导入 DocNexus 里还没有的、有默认版本的模板（技术方案、上线方案不在内），已有的不覆盖；项目已接入但缺模板时，安装结束会列出缺哪几份。
 * 之后模板随知识库更新：直接编辑 `docnexus/library/templates/...` 后执行 `./docnexus/node_modules/.bin/docnexus document sync --id <id>`（旧装法为 `./node_modules/.bin/docnexus`）采纳；或者在生成文档后，skill 发现你做了结构性调整时会提议同步回模板（你确认后才写入）。每次变更都记录在 DocNexus 的 timeline 里，可追溯。
 * 模板里的 `{{...}}` 是给 agent 的填写提示，DocNexus 原样保存；不要写成单独一行的 `{{fact:...}}`（那是 DocNexus 的事实引用语法）。
 * 没接入 DocNexus 时，可用 `docs/skills/templates/` 下的同名文件覆盖默认模板；之后接入 DocNexus，skill 会提示你把这些文件导入知识库（导入后它们不再生效）。

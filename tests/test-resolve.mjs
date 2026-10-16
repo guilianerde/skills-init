@@ -24,13 +24,17 @@ function project() {
 }
 const connect = (put) => { put('docnexus/project.json', '{}'); put('node_modules/.bin/docnexus', ''); put('node_modules/.bin/docnexus.cmd', ''); };
 
-test('未接入 DocNexus：项目文件优先，其次默认模板', () => {
+test('未接入 DocNexus：项目文件优先，其次默认模板；技术方案没有默认模板，缺失时退出 2 引导按样例创建', () => {
   const { root, resolve, put } = project();
   let r = resolve('template', 'create-tech-md-doc', 'template.md');
-  assert.equal(r.status, 0);
-  assert.equal(r.out.source, 'default');
-  assert.equal(r.out.path, '.agents/skills/create-tech-md-doc/template.md');
+  assert.equal(r.status, 2);
+  assert.deepEqual([r.out.error, r.out.on_demand, r.out.docnexus, r.out.expected], ['missing', true, false, 'docs/skills/templates/create-tech-md-doc/template.md']);
+  assert.match(r.out.hint, /创建模板/);
+  assert.match(r.out.hint, /make-template\.mjs/);
   assert.equal(resolve('template', 'project-review', 'checklist.md').out.path, '.agents/skills/project-review/references/checklist.md');
+  assert.equal(resolve('template', 'dev', 'plan-template.md').out.source, 'default');
+  const s0 = resolve('status').out;
+  assert.deepEqual(s0.templates_to_create.map((t) => t.skill).sort(), ['create-release-md-doc', 'create-tech-md-doc']);
   put('docs/skills/templates/create-tech-md-doc/template.md', '# 团队模板');
   r = resolve('template', 'create-tech-md-doc', 'template.md');
   assert.deepEqual([r.out.source, r.out.path], ['project', 'docs/skills/templates/create-tech-md-doc/template.md']);
@@ -55,8 +59,15 @@ test('已接入 DocNexus：只用知识库，缺失退出 2 并给出导入来�
   assert.equal(r.out.stale_project_file, 'docs/skills/templates/dev/plan-template.md');
   const s = resolve('status').out;
   assert.equal(s.docnexus.ok, true);
-  assert.ok(s.docnexus.missing_templates.includes('docnexus/library/templates/create-tech-md-doc/template.md'));
+  assert.ok(s.docnexus.missing_templates.includes('docnexus/library/templates/dev/delivery-template.md'));
   assert.ok(!s.docnexus.missing_templates.includes('docnexus/library/templates/dev/plan-template.md'));
+  // 没有默认版本的模板不算「缺失待导入」，而是待创建；创建位置是知识库
+  assert.ok(!s.docnexus.missing_templates.includes('docnexus/library/templates/create-tech-md-doc/template.md'));
+  assert.ok(s.templates_to_create.some((t) => t.expected === 'docnexus/library/templates/create-tech-md-doc/template.md'));
+  put('docs/skills/templates/create-release-md-doc/template.md', '# 项目里的上线方案模板');
+  r = resolve('template', 'create-release-md-doc', 'template.md');
+  assert.deepEqual([r.status, r.out.on_demand, r.out.import_from], [2, true, 'docs/skills/templates/create-release-md-doc/template.md']);
+  assert.doesNotMatch(r.out.hint, /seed-templates/);
   fs.rmSync(root, { recursive: true, force: true });
 });
 

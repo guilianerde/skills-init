@@ -18,8 +18,9 @@ import { fileURLToPath } from 'node:url';
 import { loadSkills, deriveMeta, TEMPLATE_CATEGORY, TEMPLATE_CATEGORY_REASON } from './skills.mjs';
 import { docnexusBin } from './lib/core.mjs';
 
-// 模板清单来自各 skill 的 skill.json（templates 字段）
-export const TEMPLATES = deriveMeta(loadSkills(path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'))).templates;
+// 模板清单来自各 skill 的 skill.json（templates 字段）。没有 src 的（技术方案、上线方案）不随 skills 提供默认版本，
+// 由用户第一次使用时按样例创建，不在导入与版本跟踪之列
+export const TEMPLATES = deriveMeta(loadSkills(path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'))).templates.filter((t) => t.src);
 export { TEMPLATE_CATEGORY };
 
 const IS_WIN = process.platform === 'win32';
