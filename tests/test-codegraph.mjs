@@ -65,7 +65,7 @@ test('--with-codegraph：没有 CLI 时 npm 全局安装；只选 qwen 时不写
   const t = setup({ installed: false });
   const r = t.cli('--envs', 'qwen', '--yes', '--skip-db', '--with-codegraph');
   assert.equal(r.status, 0, r.log);
-  assert.deepEqual(t.npm(), ['i -g @colbymchenry/codegraph']);
+  assert.deepEqual(t.npm(), ['i -g @colbymchenry/codegraph@1'], '按 1.x 安装（code-graph skill 按 1.x 的库接口编写）');
   assert.ok(!t.cg().some((l) => l.includes(' install ')), '没有可写 MCP 配置的环境');
   assert.ok(t.cg().includes(`1 init ${t.root} --yes`));
   fs.rmSync(t.base, { recursive: true, force: true });

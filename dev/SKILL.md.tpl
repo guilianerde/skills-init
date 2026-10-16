@@ -73,7 +73,7 @@ description: "Implement a feature or fix a bug in this project end to end: under
 ### F5 — 实现
 
 - **小步推进**：每完成一个可编译的单元，就运行 `profile.build`（没有则用对应构建工具的编译命令）确认通过，再进入下一步。
-- **改动前看影响面**：要改公共方法、接口签名、DTO 字段时，CodeGraph 可用就先 `codegraph impact <符号>`，把会被波及的调用方纳入本次改动或写进交付说明。
+- **改动前看影响面**：要改公共方法、接口签名、DTO 字段时，先 `node <skills>/code-graph/scripts/cg.mjs entry <Class.method>`（code-graph skill；退出码 2 时用 grep），把会被波及的入口和调用方纳入本次改动或写进交付说明。
 - **贴合现有代码**：沿用参照实现的写法；不顺手重构、不改无关代码、不升级依赖。看到范围外的问题记进交付说明，不在本次修。
 - **配置**：新增配置项记入配置清单（key、位置、用途、建议默认值、上线前需下发的环境），按 `profile.config_center` 与审查清单的配置维度处理（清单路径用 `node <skills>/workflow/scripts/resolve.mjs template project-review checklist.md` 取，接入 DocNexus 时是团队维护的版本）。
 - **数据库变更**：DDL / 数据修正写成 SQL 脚本放进项目约定的目录（没有约定则放进交付说明），**不在任何环境直接执行**。
@@ -82,7 +82,7 @@ description: "Implement a feature or fix a bug in this project end to end: under
 ### F6 — 验证
 
 - 按验收标准补充或更新单元测试 / 集成测试，测试放在项目既有测试目录、沿用既有测试框架。
-- 运行 `profile.test`（或只跑相关测试的 `profile.test_single`）。有 `profile.lint` 时一并运行。CodeGraph 可用时先用 `git diff --name-only <main_branch>...HEAD | codegraph affected --stdin` 找出受影响的测试优先跑，再跑全量。
+- 运行 `profile.test`（或只跑相关测试的 `profile.test_single`）。有 `profile.lint` 时一并运行。代码图谱可用时先跑 `node <skills>/code-graph/scripts/cg.mjs impact --base <main_branch>` 输出的 `tests`，再跑全量；`impact` 的 `entry_points`、`sql`、`config_keys` 写进交付说明（受影响的接口 / 消费者 / 定时任务、表、配置）。
 - 如实报告结果：失败就给出失败输出并继续修；环境跑不了（缺依赖、缺中间件）就明确写「未验证」以及用户该如何验证。**不得声称未运行的测试已通过。**
 
 ### F7 — 自审

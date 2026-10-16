@@ -1,0 +1,8 @@
+{
+  "name": "code-graph",
+  "order": 8,
+  "requires": [
+    "workflow"
+  ],
+  "optional": []
+}

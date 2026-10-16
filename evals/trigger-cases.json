@@ -24,5 +24,7 @@
   {"query": "把 docs/skills/create-tech-md-doc/tech-doc_feature-risk-callback_20261015.md 转成 PDF 发我", "expect": ["none"]},
   {"query": "Confluence 上 pageId=160998757 那个技术方案页面，帮我总结一下要点", "expect": ["none"]},
   {"query": "帮我看看这份上线方案写得清不清楚 docs/skills/create-release-md-doc/release-doc_feature-coupon-v2_20261015.md，措辞上提提意见", "expect": ["none"]},
-  {"query": "把 feature/coupon-v2 合并到 master 然后推送", "expect": ["none"]}
+  {"query": "把 feature/coupon-v2 合并到 master 然后推送", "expect": ["none"]},
+  {"query": "我改了 OrderServiceImpl.markPaid，帮我看看会影响哪些接口、MQ 消费者和定时任务", "expect": ["code-graph"]},
+  {"query": "pay-callback 这个 topic 现在是谁在发、谁在消费？", "expect": ["code-graph"]}
 ]

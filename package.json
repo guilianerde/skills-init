@@ -29,6 +29,7 @@
     "md-to-wiki",
     "create-tech-md-doc",
     "create-release-md-doc",
+    "code-graph",
     "init-skills.sh",
     "init-skills.ps1",
     "README.md",

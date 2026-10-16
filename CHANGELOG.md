@@ -5,6 +5,13 @@
 ## [Unreleased]
 
 ### 新增
+- 新 skill **code-graph**：在 CodeGraph 代码图谱之上封装本工作流需要的查询，脚本 `code-graph/scripts/cg.mjs` 直接调用 CodeGraph 的库（`CodeGraph.openSync` / `getNodesInFile` / `getCallers` / `getCallees`），并补上它看不到的 Java / Spring 关联：
+  - `impact --diff <main>...<dev>` / `--base <main>`：diff → 改动的方法 / 配置常量 / XML 语句 → 向上追调用方，一次给出受影响的 HTTP 接口、MQ 消费者（含 topic，方法或类上的 `@KafkaListener` / `@RabbitListener` / `@RocketMQMessageListener` 等）、定时任务（`@Scheduled` / `@XxlJob`）、受影响与改动过的测试、向下调用到的 MyBatis 语句及表、改动的 `@Value` 配置 key、删除的文件；索引落后于工作区时先 `codegraph sync`。
+  - `entry <Class.method>`：方法向上能到达的入口与覆盖它的测试。
+  - `mq` / `jobs` / `tables`：topic 生产方与消费方、定时任务入口、XML 语句涉及的表；只扫源码，没有索引也能用。
+  - 没有 `.codegraph/` 索引、找不到库或 Node < 22.5 时退出码 2 并说明原因，skill 退回 grep / 读文件；不替用户建索引。
+  - dev（改公共方法前看入口、先跑受影响的测试、交付写受影响的接口 / 表 / 配置）、project-review（影响面按入口归纳）、技术方案与上线方案（影响范围、中间件上线、回归验证）改为调用它；workflow 路由新增 code-graph。
+  - `--with-codegraph` 改为安装 `@colbymchenry/codegraph@1`（skill 按 1.x 的库接口编写）。
 - 集成 [CodeGraph](https://github.com/colbymchenry/codegraph) 代码图谱（可选），补上「读项目源码」这一块：
   - `--with-codegraph` / `-WithCodeGraph`：没有 `codegraph` 命令时 `npm i -g @colbymchenry/codegraph`；为 claude / codex 用 `codegraph install --location=local --yes` 写项目级 MCP 配置（doubao / qwen 不支持，skills 改走 CLI）；`codegraph init` 建本项目索引 `.codegraph/` 并加入 `.gitignore`。本工具发起的调用都带 `DO_NOT_TRACK=1`，安装结束提示如何关闭 CodeGraph 自身的匿名统计。
   - `resolve.mjs status` 新增 `codegraph`（`ok` / `cli` / `indexed`），`/workflow status` 与 `doctor` 显示接入状态。

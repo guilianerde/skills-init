@@ -42,7 +42,7 @@ description: "Generate a Markdown technical design doc (技术方案) from the d
 | 模块 | 填充 | 来源 |
 |---|---|---|
 | 1 需求背景 | 有 PRD 时 | `prd_context`；无 PRD 留「待补充」 |
-| 2 影响范围 | ✅ | 各层命中的模块 / 包名；CodeGraph 可用时补上改动符号 `codegraph impact` 波及的模块（见 `<skills>/workflow/references/codegraph.md`） |
+| 2 影响范围 | ✅ | 各层命中的模块 / 包名；代码图谱可用时补上 `cg.mjs impact --diff <main>...<dev>` 的受影响入口与模块（见 `<skills>/code-graph/SKILL.md`） |
 | 3 详细方案 | ✅ | Service 变更；有 PRD 时补业务语义并标注来源 |
 | 4 接口文档 | ✅ | 接口与消息层 |
 | 5 涉及服务 | ✅ | git remote + 项目结构 + `profile.deploy` |

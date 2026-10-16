@@ -1,6 +1,6 @@
 ---
 name: workflow
-description: "Entry point for this project's personal dev workflow skills. Routes a request to the right skill (dev, project-review, database-query, create-tech-md-doc, create-release-md-doc, md-to-wiki, DocNexus), owns the shared project profile (workflow/profile.json: main branch, build/test commands, config center, deploy platform) and the capability check for wiki / DocNexus / database. Use when the user invokes /workflow, asks what the workflow can do, wants to set up or update the project profile, check which integrations are configured, or hands over a multi-stage task such as 从需求到上线 / 这个需求从头到尾帮我搞定 / 现在 skills 配好了吗 / 项目画像 / workflow status. Other skills in this project read workflow/profile.json and follow the capability check defined here. When a request clearly belongs to a single skill, use that skill directly instead."
+description: "Entry point for this project's personal dev workflow skills. Routes a request to the right skill (dev, project-review, database-query, code-graph, create-tech-md-doc, create-release-md-doc, md-to-wiki, DocNexus), owns the shared project profile (workflow/profile.json: main branch, build/test commands, config center, deploy platform) and the capability check for wiki / DocNexus / database. Use when the user invokes /workflow, asks what the workflow can do, wants to set up or update the project profile, check which integrations are configured, or hands over a multi-stage task such as 从需求到上线 / 这个需求从头到尾帮我搞定 / 现在 skills 配好了吗 / 项目画像 / workflow status. Other skills in this project read workflow/profile.json and follow the capability check defined here. When a request clearly belongs to a single skill, use that skill directly instead."
 ---
 
 # Workflow
@@ -23,6 +23,7 @@ description: "Entry point for this project's personal dev workflow skills. Route
 | 修 bug、排查报错、线上问题 | `dev --bug` | 先复现再修 |
 | 审代码、审分支、合并前检查 | `project-review` | |
 | 查库、跑 SQL、核对数据 | `database-query` | 只读优先 |
+| 影响面、谁调用了、从哪些入口进来、topic 谁发谁收、定时任务、表在哪些 SQL 里 | `code-graph` | 需 CodeGraph 索引；`mq` / `jobs` / `tables` 不需要 |
 | 根据分支 diff 出技术方案 | `create-tech-md-doc` | 可带 `--prd` |
 | 根据分支 diff 出上线方案 | `create-release-md-doc` | 可带 `--tech` 复用技术方案 |
 | 把 md 发布到 wiki | `md-to-wiki` | 需 wiki 已配置 |

@@ -9,7 +9,8 @@
     "database-query",
     "md-to-wiki",
     "create-tech-md-doc",
-    "create-release-md-doc"
+    "create-release-md-doc",
+    "code-graph"
   ],
   "templates": [
     {

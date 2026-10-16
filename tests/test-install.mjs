@@ -12,7 +12,7 @@ import { fileURLToPath } from 'node:url';
 
 const REPO = fileURLToPath(new URL('..', import.meta.url));
 const IS_WIN = process.platform === 'win32';
-const SKILLS = ['workflow', 'dev', 'project-review', 'database-query', 'md-to-wiki', 'create-tech-md-doc', 'create-release-md-doc'];
+const SKILLS = ['workflow', 'dev', 'project-review', 'database-query', 'md-to-wiki', 'create-tech-md-doc', 'create-release-md-doc', 'code-graph'];
 const OLD_REV = '71a23c8'; // 单一来源之前的版本：各环境独立拷贝，画像在 dev/profile.json
 const PASSWORD = 'p/a&s|s"w\\o\\"rd\\';
 const DB_ANSWERS = `mysql\n127.0.0.1\n3307\nappdb\nroot\n${PASSWORD}\n`;

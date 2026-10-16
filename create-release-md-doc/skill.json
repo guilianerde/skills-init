@@ -6,7 +6,8 @@
   ],
   "optional": [
     "md-to-wiki",
-    "create-tech-md-doc"
+    "create-tech-md-doc",
+    "code-graph"
   ],
   "templates": [
     {

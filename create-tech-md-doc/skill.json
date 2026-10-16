@@ -6,7 +6,8 @@
   ],
   "optional": [
     "md-to-wiki",
-    "create-release-md-doc"
+    "create-release-md-doc",
+    "code-graph"
   ],
   "templates": [
     {
