@@ -45,4 +45,4 @@ node <skills>/workflow/scripts/requirement.mjs path <plan|delivery|review|tech|r
 - `wiki_record` 非空：上一版已经发布到 wiki。新版的**第一行原样写这条记录**，md-to-wiki 再发布时会更新同一个页面，不会新建页面。
 - 写完运行 `requirement.mjs sync <path>`，更新 `meta.json`。md-to-wiki 发布后改了第一行的记录，或补写了 DocNexus 元信息行，也要再 sync 一次。
 
-`artifacts.mjs`、`report.mjs`、`pr-desc.mjs` 同时识别需求目录和旧版的 `docs/skills/<skill>/` 布局。升级时安装器会把旧文件按「对比分支」搬进需求目录（用 `git mv`，保留历史）；认不出分支的文件留在原处。
+`artifacts.mjs`、`report.mjs`、`pr-desc.mjs` 同时识别需求目录和旧版的 `docs/skills/<skill>/` 布局。升级时安装器会把旧文件按「对比分支」搬进需求目录（用 `git mv`，保留历史），并把文档里引用的旧路径改成新路径（搬迁记录在 `meta.json` 的 `migrated_from`）；认不出分支的文件留在原处。

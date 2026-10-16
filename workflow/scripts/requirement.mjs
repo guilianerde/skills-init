@@ -114,6 +114,7 @@ export function sync(root, dirRel) {
   const meta = {
     name: old.name ?? path.basename(dir), named_by: old.named_by ?? 'user', branches, base: old.base ?? null,
     created: old.created ?? now(), updated: changed || !old.updated ? now() : old.updated, latest, artifacts,
+    ...(old.migrated_from ? { migrated_from: old.migrated_from } : {}),
   };
   const out = `${JSON.stringify(meta, null, 2)}\n`;
   if (!fs.existsSync(f) || fs.readFileSync(f, 'utf8') !== out) fs.writeFileSync(f, out);
@@ -233,28 +234,62 @@ export function planMigration(root) {
   return { requirements: plan, left_in_place: left };
 }
 
+// 旧路径 → 新路径：本次要搬的，加上以前迁移时记在各需求 meta.json 的 migrated_from（其他分支后来合进来的文档也能改对）
+function pathMap(root, plan) {
+  const map = new Map();
+  for (const r of requirements(root)) for (const [file, from] of Object.entries(r.meta.migrated_from ?? {})) map.set(from, `${r.dir}/${file}`);
+  for (const r of plan.requirements) for (const m of r.moves) map.set(m.from, m.to);
+  return map;
+}
+
+// 产物正文里引用的旧路径（「参考产物」、正文提到的方案 / 报告路径）换成新路径；返回改了哪些文件
+function rewriteRefs(root, map, dryRun) {
+  if (!map.size) return [];
+  const pairs = [...map].sort((a, b) => b[0].length - a[0].length);
+  const files = [];
+  const base = path.join(root, REQ_DIR);
+  if (fs.existsSync(base)) for (const d of fs.readdirSync(base)) { const dir = path.join(base, d); if (fs.statSync(dir).isDirectory()) for (const n of fs.readdirSync(dir)) if (n.endsWith('.md')) files.push(path.join(dir, n)); }
+  for (const k of new Set(LEGACY.map((x) => x.skill))) { const dir = path.join(root, 'docs', 'skills', k); if (fs.existsSync(dir)) for (const n of fs.readdirSync(dir)) if (n.endsWith('.md')) files.push(path.join(dir, n)); }
+  const changed = [];
+  for (const f of files) {
+    const text = fs.readFileSync(f, 'utf8');
+    let out = text;
+    for (const [from, to] of pairs) if (out.includes(from)) out = out.split(from).join(to);
+    if (out === text) continue;
+    if (!dryRun) fs.writeFileSync(f, out);
+    changed.push(toPosix(path.relative(root, f)));
+  }
+  return changed;
+}
+
 export function migrate(root, { dryRun = false } = {}) {
   const p = planMigration(root);
-  if (dryRun) return { ...p, moved: 0, dry_run: true };
+  const map = pathMap(root, p);
+  // dry-run 时文件还在原处：按原位置检查哪些会被改
+  if (dryRun) return { ...p, moved: 0, rewritten: rewriteRefs(root, map, true), dry_run: true };
   let moved = 0;
   for (const r of p.requirements) {
     fs.mkdirSync(path.join(root, r.dir), { recursive: true });
     const f = path.join(root, r.dir, 'meta.json');
-    if (!fs.existsSync(f)) fs.writeFileSync(f, `${JSON.stringify({ name: r.name, named_by: 'migrated', branches: [r.branch], base: null, created: now() }, null, 2)}\n`);
+    const meta = readJson(f) ?? { name: r.name, named_by: 'migrated', branches: [r.branch], base: null, created: now() };
+    meta.migrated_from = { ...(meta.migrated_from ?? {}) };
     for (const m of r.moves) {
       // 已跟踪的文件用 git mv 保留历史；不在 git 里就直接移动
       git(root, ['mv', '-k', m.from, m.to]);
       if (!fs.existsSync(path.join(root, m.to))) fs.renameSync(path.join(root, m.from), path.join(root, m.to));
+      meta.migrated_from[path.basename(m.to)] = m.from;
       moved++;
     }
-    sync(root, r.dir);
+    fs.writeFileSync(f, `${JSON.stringify(meta, null, 2)}\n`);
   }
+  const rewritten = rewriteRefs(root, map, false);
+  for (const r of p.requirements) sync(root, r.dir);
   // 搬空的旧目录删掉（只删空目录）
   for (const k of new Set(LEGACY.map((x) => x.skill))) {
     const d = path.join(root, 'docs', 'skills', k);
     if (fs.existsSync(d) && !fs.readdirSync(d).length) fs.rmdirSync(d);
   }
-  return { ...p, moved, dry_run: false };
+  return { ...p, moved, rewritten, dry_run: false };
 }
 
 // ------------------------------------------------------------------ CLI

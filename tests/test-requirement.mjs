@@ -166,3 +166,36 @@ test('CLI：which / bind / path / sync；安装与升级时迁移旧产物并写
   assert.ok(fs.existsSync(path.join(root, '.agents/skills/workflow/scripts/requirement.mjs')));
   fs.rmSync(root, { recursive: true, force: true });
 });
+
+test('migrate：文档里引用的旧路径改成新路径（含 dry-run 预告、之后合进来的文档按 meta.json 记录补改）', () => {
+  const { root, put } = repo();
+  const oldDelivery = 'docs/skills/dev/delivery-order-export-20261015.md';
+  const oldPlan = 'docs/skills/dev/plan-order-export-20261014.md';
+  put(oldPlan, '# 方案\n\n> 分支：feature/order-export ｜ 日期：2026-10-14\n');
+  put(oldDelivery, doc('交付', 'feature/order-export').replace('## 结果', `> 参考产物：${oldPlan}\n\n## 结果`));
+  put('docs/skills/project-review/review-feature-order-export-20261015.md', doc('审查', 'feature/order-export').replace('## 结果', `> 参考产物：${oldDelivery}、${oldPlan}\n\n## 结果`));
+  put('docs/skills/dev/plan-orphan-20261001.md', `# 没有分支\n\n见 ${oldDelivery}\n`);
+
+  const dry = migrate(root, { dryRun: true });
+  assert.deepEqual(dry.rewritten.sort(), [oldDelivery, 'docs/skills/dev/plan-orphan-20261001.md', 'docs/skills/project-review/review-feature-order-export-20261015.md'].sort());
+  assert.match(fs.readFileSync(path.join(root, oldDelivery), 'utf8'), /参考产物：docs\/skills\/dev\/plan-/, 'dry-run 不改文件');
+
+  const r = migrate(root);
+  const dir = 'docs/skills/requirements/order-export';
+  assert.equal(r.rewritten.length, 3);
+  assert.match(fs.readFileSync(path.join(root, dir, 'review.md'), 'utf8'), new RegExp(`参考产物：${dir}/delivery\\.md、${dir}/plan\\.md`));
+  assert.match(fs.readFileSync(path.join(root, dir, 'delivery.md'), 'utf8'), new RegExp(`参考产物：${dir}/plan\\.md`));
+  assert.match(fs.readFileSync(path.join(root, 'docs/skills/dev/plan-orphan-20261001.md'), 'utf8'), new RegExp(`见 ${dir}/delivery\\.md`), '留在原处的文档也改');
+  const meta = JSON.parse(fs.readFileSync(path.join(root, dir, 'meta.json'), 'utf8'));
+  assert.equal(meta.migrated_from['delivery.md'], oldDelivery);
+  assert.equal(meta.artifacts.length, 3, 'sync 保留 migrated_from 的同时照常汇总');
+
+  // 另一个分支后来合进来的新文档还引用旧路径：再跑一次 migrate 按 meta.json 的记录补改
+  put(`${dir}/tech-doc.md`, doc('技术', 'feature/order-export').replace('## 结果', `> 参考产物：${oldDelivery}\n\n## 结果`));
+  const again = migrate(root);
+  assert.equal(again.moved, 0);
+  assert.deepEqual(again.rewritten, [`${dir}/tech-doc.md`]);
+  assert.match(fs.readFileSync(path.join(root, dir, 'tech-doc.md'), 'utf8'), new RegExp(`参考产物：${dir}/delivery\\.md`));
+  assert.deepEqual(migrate(root).rewritten, [], '改完不再重复改');
+  fs.rmSync(root, { recursive: true, force: true });
+});

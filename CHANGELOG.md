@@ -13,7 +13,7 @@
 ### 变更
 - **产物按需求归档**：开发方案、交付说明、审查报告、技术方案、上线方案不再按 skill 分目录，改为一个需求一个目录 `docs/skills/requirements/<需求名>/`（`plan.md`、`delivery.md`、`review.md` / `review_v2.md`、`tech-doc.md`、`release-doc.md`），`meta.json` 汇总需求名、绑定的分支、各产物的版本、日期、wiki 发布记录与 DocNexus 沉淀，供以后的可视化直接读取。需求名由用户在流程开始（dev 确定 M / L 规模、`/workflow` 完整链路开始）或第一次落盘时给出，不给时按分支名生成；同一分支后续各 skill 沿用，一个需求可绑定多个分支。新脚本 `workflow/scripts/requirement.mjs`（`which` / `bind` / `path` / `sync` / `list` / `migrate`），新共用说明 `workflow/references/requirements.md`；dev、project-review、技术方案、上线方案的落盘改用 `requirement.mjs path`，同种产物不覆盖、自动加版本，上一版发布过 wiki 时新版沿用同一页面。
 - 需求目录写入项目根 `.ignore`，ripgrep 与 agent 的代码搜索跳过它，产物多了不污染搜索（检索交给 DocNexus）。
-- 升级时自动把旧版 `docs/skills/<skill>/` 下的产物按「对比分支」搬进需求目录（`git mv` 保留历史），需求名取交付说明 / 开发方案的需求短名，没有就用分支名；元信息里没有分支的留在原处并列出。`artifacts.mjs`、`report.mjs`（分支链路表标出需求）、`pr-desc.mjs`、`template.mjs check` 同时识别新旧布局。
+- 升级时自动把旧版 `docs/skills/<skill>/` 下的产物按「对比分支」搬进需求目录（`git mv` 保留历史），需求名取交付说明 / 开发方案的需求短名，没有就用分支名；元信息里没有分支的留在原处并列出。文档里引用的旧路径（「参考产物」等）一并改成新路径，搬迁记录写进 `meta.json` 的 `migrated_from`，之后合进来、仍引用旧路径的文档再次迁移时按记录补改。`artifacts.mjs`、`report.mjs`（分支链路表标出需求）、`pr-desc.mjs`、`template.mjs check` 同时识别新旧布局。
 
 ## [0.12.0] - 2026-10-16
 

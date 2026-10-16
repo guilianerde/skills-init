@@ -266,6 +266,7 @@ export function updateGitignore(root, withDocNexus, withCodeGraph = false) {
 export function organizeArtifacts(root) {
   const r = migrateArtifacts(root);
   for (const q of r.requirements) ok(`产物已按需求归档：${q.moves.length} 份 → ${q.dir}/（分支 ${q.branch}${q.existing ? '' : `，需求名「${q.name}」，可在 meta.json 里改`}）`);
+  if (r.rewritten.length) ok(`已把 ${r.rewritten.length} 份文档里引用的旧路径（参考产物等）改成新路径`);
   if (r.left_in_place.length) warn(`以下产物的元信息里没有分支，留在原处：${r.left_in_place.join('、')}`);
   if (ensureIgnore(root)) ok(`.ignore 已加上 ${REQ_DIR}/（需求产物不参与代码搜索）`);
   return r;
