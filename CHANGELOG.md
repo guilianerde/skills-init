@@ -4,6 +4,12 @@
 
 ## [Unreleased]
 
+### 新增
+- **项目文档视图**：`/workflow view` 或 `skills-init view [--out <文件>] [--open]`（PowerShell `-Out` / `-Open`），脚本 `workflow/scripts/view.mjs`。读需求目录（以及旧布局，标为「未归档」）里的产物，生成单个本地 HTML（默认 `tmp/skills/view/index.html`）：左侧需求列表（搜索、各阶段完成情况），右侧该需求的阶段进度（含 wiki 页面）、审查记录（每轮 CRITICAL / HIGH / MEDIUM / LOW 数量、复核、与上次对比的修复情况、DocNexus 沉淀）、交付记录（类型、规模、确认的决定、未验证项），以及各份文档的渲染正文；顶部是效果报告的关键数字。数据内嵌、正文转义，只读、不联网，支持明暗主题与窄屏。
+
+### 修复
+- workflow skill 的 description 超过 Agent Skills 规范的 1024 字符上限（0.10.1 起），在会校验长度的环境里可能无法加载；精简到 920 字符，并加测试约束所有 skill。
+
 ### 变更
 - **产物按需求归档**：开发方案、交付说明、审查报告、技术方案、上线方案不再按 skill 分目录，改为一个需求一个目录 `docs/skills/requirements/<需求名>/`（`plan.md`、`delivery.md`、`review.md` / `review_v2.md`、`tech-doc.md`、`release-doc.md`），`meta.json` 汇总需求名、绑定的分支、各产物的版本、日期、wiki 发布记录与 DocNexus 沉淀，供以后的可视化直接读取。需求名由用户在流程开始（dev 确定 M / L 规模、`/workflow` 完整链路开始）或第一次落盘时给出，不给时按分支名生成；同一分支后续各 skill 沿用，一个需求可绑定多个分支。新脚本 `workflow/scripts/requirement.mjs`（`which` / `bind` / `path` / `sync` / `list` / `migrate`），新共用说明 `workflow/references/requirements.md`；dev、project-review、技术方案、上线方案的落盘改用 `requirement.mjs path`，同种产物不覆盖、自动加版本，上一版发布过 wiki 时新版沿用同一页面。
 - 需求目录写入项目根 `.ignore`，ripgrep 与 agent 的代码搜索跳过它，产物多了不污染搜索（检索交给 DocNexus）。

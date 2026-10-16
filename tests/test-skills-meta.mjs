@@ -19,6 +19,14 @@ test('每个 skill 有 SKILL.md.tpl，frontmatter name 与目录名一致', () =
   }
 });
 
+test('description 不超过 1024 字符（Agent Skills 规范上限，超出的环境会拒绝加载或截断）', () => {
+  for (const s of skills) {
+    const d = /^description: "([^"]*)"/m.exec(read(`${s.name}/SKILL.md.tpl`))?.[1];
+    assert.ok(d, `${s.name}：缺少 description`);
+    assert.ok(d.length <= 1024, `${s.name}：description ${d.length} 字符`);
+  }
+});
+
 test('order 不重复', () => {
   const orders = skills.map((s) => s.order);
   assert.equal(new Set(orders).size, orders.length);

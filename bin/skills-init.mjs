@@ -30,7 +30,7 @@ import { checkNodeForDocNexus, setupDocNexus, templateRecords, saveTemplateRecor
 import { upgradeOptions, doctor } from './lib/doctor.mjs';
 
 // ---------------------------------------------------------------- 参数
-const COMMANDS = ['init', 'upgrade', 'doctor', 'uninstall', 'seed-templates', 'report'];
+const COMMANDS = ['init', 'upgrade', 'doctor', 'uninstall', 'seed-templates', 'report', 'view'];
 const HELP = `用法: skills-init [命令] [选项]
 
 命令：
@@ -41,6 +41,7 @@ const HELP = `用法: skills-init [命令] [选项]
   uninstall            按安装清单卸载本项目装的 skills 与链接（用户配置备份到 tmp/skills/uninstall-backup/）
   seed-templates       只把自带的文档模板导入 DocNexus（docnexus/library/templates/，已有的不覆盖）
   report               本地效果报告：只读统计 docs/skills/ 下的产物（审查发现与修复率、需求澄清、DocNexus 沉淀与复用、各分支链路）
+  view                 项目文档视图：按需求浏览方案、交付、审查（含复审修复情况）、技术 / 上线方案，生成本地静态页面
 
 init 选项：
   --envs <列表>        环境，逗号分隔：codex,claude,doubao,qwen；all = 全部（不传则交互选择）
@@ -61,6 +62,9 @@ report 选项：
   --since <YYYY-MM-DD> 只统计该日期起的产物
   --json               输出 JSON
   --all-branches       同时用 git 只读扫描所有本地分支里提交过的产物（默认只看工作区）
+view 选项：
+  --out <文件>         页面写到哪里（默认 tmp/skills/view/index.html）
+  --open               生成后用默认浏览器打开
 通用：
   --project-root <dir> 项目根目录（默认当前目录）
   -v, --version        显示版本
@@ -88,6 +92,8 @@ function parseArgs(argv) {
       case '--since': o.since = val(); break;
       case '--json': o.json = true; break;
       case '--all-branches': o.allBranches = true; break;
+      case '--out': o.out = val(); break;
+      case '--open': o.open = true; break;
       case '--project-root': o.root = path.resolve(val()); break;
       case '-v': case '--version': console.log(PKG.version); process.exit(0); break;
       case '-h': case '--help': console.log(HELP); process.exit(0); break;
@@ -131,6 +137,10 @@ async function main() {
   if (o.cmd === 'report') {
     const { main: report } = await import(new URL('../workflow/scripts/report.mjs', import.meta.url));
     return report(['--root', o.root, ...(o.since ? ['--since', o.since] : []), ...(o.json ? ['--json'] : []), ...(o.allBranches ? ['--all-branches'] : [])]);
+  }
+  if (o.cmd === 'view') {
+    const { main: view } = await import(new URL('../workflow/scripts/view.mjs', import.meta.url));
+    return view(['--root', o.root, ...(o.out ? ['--out', o.out] : []), ...(o.open ? ['--open'] : [])]);
   }
   if (o.cmd === 'seed-templates' && o.diff) {
     step('团队改过的模板与新默认模板的差异（只读，不写入 DocNexus）');

@@ -1,6 +1,6 @@
 ---
 name: workflow
-description: "Entry point for this project's personal dev workflow skills. Routes a request to the right skill (dev, project-review, database-query, code-graph, create-tech-md-doc, create-release-md-doc, md-to-wiki, DocNexus), owns the shared project profile (workflow/profile.json: main branch, build/test commands, config center, deploy platform) and the capability check for wiki / DocNexus / database. Use when the user invokes /workflow, asks what the workflow can do, wants to set up or update the project profile, check which integrations are configured, wants a PR / MR description assembled from this branch's delivery note, review report and docs, wants a local report of how well the workflow is working (review findings and fix rate, clarified decisions, DocNexus capture and reuse), wants to modify or create a doc template (tech / release plan, delivery note, review report), or hands over a multi-stage task such as 从需求到上线 / 这个需求从头到尾帮我搞定 / 现在 skills 配好了吗 / 项目画像 / workflow status / 写 PR 描述 / 生成 MR 描述 / 提个 PR / 工作流效果怎么样 / workflow report / 改模板 / 修改技术方案模板 / 上线方案模板加一节 / workflow template. Other skills in this project read workflow/profile.json and follow the capability check defined here. When a request clearly belongs to a single skill, use that skill directly instead."
+description: "Entry point for this project's dev workflow skills: routes a request to the right skill (dev, project-review, database-query, code-graph, create-tech-md-doc, create-release-md-doc, md-to-wiki, DocNexus), owns the shared project profile (workflow/profile.json) and the wiki / DocNexus / database capability check, and keeps per-requirement artifacts. Use when the user invokes /workflow, asks what the workflow can do, sets up the project profile, checks integrations, wants a PR / MR description from this branch's artifacts, a local report of how well the workflow works, a local page to browse docs per requirement, or to change a doc template, or hands over a multi-stage task. Triggers: 从需求到上线 / 这个需求从头到尾帮我搞定 / skills 配好了吗 / 项目画像 / workflow status / 写 PR 描述 / 提个 PR / 工作流效果怎么样 / workflow report / 看看项目文档 / workflow view / 改模板 / workflow template. When a request clearly belongs to one skill, use that skill directly."
 ---
 
 # Workflow
@@ -14,6 +14,7 @@ description: "Entry point for this project's personal dev workflow skills. Route
 /workflow status          # 能力探测报告
 /workflow profile         # 填写或更新项目画像
 /workflow report          # 本地效果报告（审查发现与修复率、需求澄清、沉淀与复用、各分支链路）
+/workflow view            # 项目文档视图：按需求浏览方案、交付、审查、技术 / 上线方案（本地静态页面）
 /workflow template [<模板>] [怎么改]   # 修改 / 创建文档模板：tech、release、plan、delivery、review、checklist
 ```
 
@@ -31,6 +32,7 @@ description: "Entry point for this project's personal dev workflow skills. Route
 | 把 md 发布到 wiki | `md-to-wiki` | 需 wiki 已配置 |
 | 写 PR / MR 描述、提 PR | `workflow/scripts/pr-desc.mjs` | 汇总本分支交付说明、审查报告、技术 / 上线方案；创建 PR 需用户同意 |
 | 这套工作流效果怎么样、用得怎么样 | `/workflow report` | 只读统计 `docs/skills/` 下的产物 |
+| 看看项目文档、某个需求留下了哪些文档、审查记录 | `/workflow view` | 生成本地静态页面，按需求浏览 |
 | 改技术方案 / 上线方案 / 交付说明 / 审查报告的模板，按样例建模板 | `/workflow template` | 草稿 → 校验与影响 → 用户确认后保存 |
 | 记住 / 查找项目决策与约定 | DocNexus（入口 skill `docnexus`） | 需已接入；写入必须用户授权 |
 
@@ -65,7 +67,7 @@ dev（需求 → 方案 → 实现 → 测试 → 自审）
 | `references/tables.md` | 确定改动涉及哪些表（`tables.mjs`）、只读拉取实际表结构 / 索引 / 行数核对（`query.mjs --schema --indexes`），没有库连接时怎么退回 |
 | `references/codegraph.md` | 用 CodeGraph 代码图谱读代码、查调用链与影响面（MCP 工具与 CLI 对照、图谱看不到的部分） |
 
-`/workflow profile` → 按 `references/profile.md` 执行；`/workflow status` → 按 `references/status.md` 输出；`/workflow report` → 运行 `node <skills>/workflow/scripts/report.mjs [--since YYYY-MM-DD]`，原样给出输出的 Markdown，再用两三句话指出最值得关注的数字（例如修复率低、带未验证项的交付多、从不沉淀），不要编造报告里没有的数据。`/workflow template` → 按 `references/templates.md`「修改模板」一路走完：起草稿、按用户的要求改、校验并说明影响、用户确认后保存并确认生效；没说改哪份模板时先运行 `template.mjs list` 问用户。
+`/workflow profile` → 按 `references/profile.md` 执行；`/workflow status` → 按 `references/status.md` 输出；`/workflow report` → 运行 `node <skills>/workflow/scripts/report.mjs [--since YYYY-MM-DD]`，原样给出输出的 Markdown，再用两三句话指出最值得关注的数字（例如修复率低、带未验证项的交付多、从不沉淀），不要编造报告里没有的数据。`/workflow view` → 运行 `node <skills>/workflow/scripts/view.mjs`（用户要直接打开时加 `--open`），把生成的页面路径告诉用户；页面只读、不联网，数据是生成那一刻的快照，产物有更新时重新生成。`/workflow template` → 按 `references/templates.md`「修改模板」一路走完：起草稿、按用户的要求改、校验并说明影响、用户确认后保存并确认生效；没说改哪份模板时先运行 `template.mjs list` 问用户。
 
 ## 增强能力探测
 
