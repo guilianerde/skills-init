@@ -4,6 +4,8 @@
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-10-16
+
 ### 新增
 - **dev / project-review 用实际表结构核对数据库相关改动**。新脚本 `workflow/scripts/tables.mjs`（`--diff <base>...<head>` / `--base <分支>` / `--files a,b`）找出改动涉及哪些表：实体注解 `@TableName` / `@Table`（没写表名时按类名转下划线并标 `inferred`）、Mapper XML 与代码里的 SQL 字符串、SQL 脚本里的 DDL（标 `ddl`），并标出是否已在 `schema.md` 里、给出拉表结构的命令。`database-query` 的 `query.mjs --schema --tables a,b --indexes` 另外列出索引（唯一与否、列顺序）、估算行数，并标出库里不存在的表（不加 `--indexes` 时也标）。新共用说明 `workflow/references/tables.md`：先定位表，数据库已配置时只读拉实际结构核对字段、索引支撑、DDL 锁表与回填，没有连接时退回 `schema.md` / DDL 脚本并注明「未与实际库核对」。
   - dev：F2 调研、F5 写 DDL 前、F6 自检时按它核对；交付说明的 SQL 节写明涉及的表与核对结果。
@@ -163,7 +165,8 @@
 - 安装器改为单一 Node 实现，`init-skills.sh` / `init-skills.ps1` 只是薄封装。
 - `code-review` 改名为 `project-review`，升级时自动清理旧名。
 
-[Unreleased]: https://github.com/guilianerde/skills-init/compare/v0.11.0...HEAD
+[Unreleased]: https://github.com/guilianerde/skills-init/compare/v0.12.0...HEAD
+[0.12.0]: https://github.com/guilianerde/skills-init/compare/v0.11.0...v0.12.0
 [0.11.0]: https://github.com/guilianerde/skills-init/compare/v0.10.1...v0.11.0
 [0.10.1]: https://github.com/guilianerde/skills-init/compare/v0.10.0...v0.10.1
 [0.10.0]: https://github.com/guilianerde/skills-init/compare/v0.9.0...v0.10.0
