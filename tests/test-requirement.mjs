@@ -6,7 +6,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { dirName, parseFile, which, bind, nextPath, sync, migrate, ensureIgnore, list, provenance } from '../workflow/scripts/requirement.mjs';
+import { dirName, parseFile, which, bind, nextPath, sync, migrate, ensureIgnore, list } from '../workflow/scripts/requirement.mjs';
 import { collect, branchView } from '../workflow/scripts/artifacts.mjs';
 
 const REPO = fileURLToPath(new URL('..', import.meta.url));
@@ -200,38 +200,13 @@ test('migrate：文档里引用的旧路径改成新路径（含 dry-run 预告�
   fs.rmSync(root, { recursive: true, force: true });
 });
 
-test('provenance：需求目录用 meta.json 的需求名；缺 meta.json 用目录名；日期跳过 wiki 记录取文档头', () => {
-  const { root, put, cli } = repo();
-  const b = 'feature/order-export';
-  const { dir } = bind(root, { name: '订单导出支持按渠道筛选', branch: b });
-  put(`${dir}/delivery.md`, doc('交付', b, '<!-- md-to-wiki: pageId=42 version=3 at=2026-10-20T08:00:00Z -->\n'));
-  const r = provenance(root, `${dir}/delivery.md`);
-  assert.equal(r.provenance, `交付说明 · 需求「订单导出支持按渠道筛选」· 分支 feature/order-export · 2026-10-15 · ${dir}/delivery.md`);
-  assert.deepEqual([r.kind, r.requirement, r.date], ['delivery', '订单导出支持按渠道筛选', '2026-10-15']);
 
-  put('docs/skills/requirements/no-meta/review_v2.md', doc('复审', 'feature/x'));
-  assert.equal(provenance(root, 'docs/skills/requirements/no-meta/review_v2.md').provenance,
-    '审查报告 · 需求「no-meta」· 分支 feature/x · 2026-10-15 · docs/skills/requirements/no-meta/review_v2.md');
-
-  const t = spawnSync(process.execPath, [SCRIPT, '--root', root, 'provenance', `${dir}/delivery.md`, '--text'], { encoding: 'utf8' });
-  assert.equal(t.status, 0);
-  assert.equal(t.stdout.trim(), r.provenance, '--text 只输出来源字符串');
-  assert.equal(cli('provenance', `${dir}/delivery.md`).out.provenance, r.provenance);
-  assert.equal(spawnSync(process.execPath, [SCRIPT, '--root', root, 'provenance', 'README.md'], { encoding: 'utf8' }).status, 1);
-  fs.rmSync(root, { recursive: true, force: true });
-});
-
-test('provenance：旧布局取不到需求名就只写分支，日期可从文件名补；已绑定的分支用需求名；非产物报错', () => {
+test('日期取文档头，跳过第一行 md-to-wiki 发布记录里的 at=（meta.json 与 artifacts.mjs 一致）', () => {
   const { root, put } = repo();
-  put('docs/skills/project-review/review-feature-old-20260901.md', '# 审查\n\n> 对比分支：`feature/old` ←→ `main`\n');
-  assert.equal(provenance(root, 'docs/skills/project-review/review-feature-old-20260901.md').provenance,
-    '审查报告 · 分支 feature/old · 2026-09-01 · docs/skills/project-review/review-feature-old-20260901.md');
-  bind(root, { name: '老需求', branch: 'feature/old' });
-  assert.match(provenance(root, 'docs/skills/project-review/review-feature-old-20260901.md').provenance, /^审查报告 · 需求「老需求」· 分支 feature\/old/);
-  put('docs/skills/dev/plan-x-20261001.md', '# 方案\n');
-  assert.equal(provenance(root, 'docs/skills/dev/plan-x-20261001.md').provenance, '开发方案 · 2026-10-01 · docs/skills/dev/plan-x-20261001.md');
-  put('README.md', '# x\n');
-  assert.equal(provenance(root, 'README.md').ok, false);
-  assert.equal(provenance(root, 'nope.md').ok, false);
+  const b = 'feature/order-export';
+  const { dir } = bind(root, { name: '订单导出', branch: b });
+  put(`${dir}/tech-doc.md`, doc('技术', b, '<!-- md-to-wiki: pageId=42 version=3 at=2026-10-20T08:00:00Z -->\n'));
+  assert.equal(sync(root, dir).artifacts[0].date, '2026-10-15');
+  assert.match(collect(root)[0].date, /^2026-10-15#/);
   fs.rmSync(root, { recursive: true, force: true });
 });

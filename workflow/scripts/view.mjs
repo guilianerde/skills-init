@@ -12,7 +12,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { collect, KINDS } from './artifacts.mjs';
-import { requirements } from './requirement.mjs';
+import { requirements, parseDocnexus } from './requirement.mjs';
 import { parseReview, parseDelivery, captureState, buildReport } from './report.mjs';
 
 const DEFAULT_OUT = 'tmp/skills/view/index.html';
@@ -37,15 +37,29 @@ export function viewData(root) {
     if (a.kind === 'review') item.review = parseReview(text);
     if (a.kind === 'delivery') item.delivery = parseDelivery(text);
     if (a.kind === 'review' || a.kind === 'delivery') item.docnexus = captureState(text);
+    item.knowledge = parseDocnexus(text) ?? []; // 产物里「DocNexus：docnexus/library/<path>」行：沉淀到的知识文档
     g.artifacts.push(item);
   }
   const list = [...groups.values()].map((g) => {
     const latest = (k) => g.artifacts.filter((a) => a.kind === k).at(-1)?.date ?? null;
     const dates = g.artifacts.map((a) => a.date).filter(Boolean).sort();
-    return { ...g, branches: [...g.branches], first: dates[0] ?? null, last: dates.at(-1) ?? null, stages: Object.fromEntries(KINDS.map((k) => [k.kind, g.artifacts.filter((a) => a.kind === k.kind).length])), latest_review: latest('review') };
+    // 沉淀到的知识文档：汇总各产物的「DocNexus：」行，去重，注明来自哪些产物
+    const docnexus = new Map();
+    for (const a of g.artifacts) for (const k of a.knowledge) {
+      if (!docnexus.has(k)) docnexus.set(k, []);
+      docnexus.get(k).push({ path: a.path, file: a.file, label: a.label });
+    }
+    return { ...g, branches: [...g.branches], first: dates[0] ?? null, last: dates.at(-1) ?? null, stages: Object.fromEntries(KINDS.map((k) => [k.kind, g.artifacts.filter((a) => a.kind === k.kind).length])), latest_review: latest('review'), docnexus: [...docnexus].map(([path, from]) => ({ path, from })) };
   });
   list.sort((a, b) => String(b.last).localeCompare(String(a.last)) || a.name.localeCompare(b.name));
+  // 反向索引：知识文档 → 来源产物（跨需求）
+  const index = new Map();
+  for (const r of list) for (const d of r.docnexus) {
+    if (!index.has(d.path)) index.set(d.path, []);
+    for (const f of d.from) index.get(d.path).push({ requirement: r.id, name: r.name, ...f });
+  }
   return {
+    knowledge: [...index].sort((a, b) => a[0].localeCompare(b[0])).map(([path, sources]) => ({ path, sources })),
     project: path.basename(path.resolve(root)),
     generated: new Date().toISOString(),
     kinds: KINDS.map(({ kind, label }) => ({ kind, label })),
@@ -120,11 +134,11 @@ th{background:var(--code);font-weight:600}
 .empty{color:var(--muted);padding:40px 0;text-align:center}
 section.block{margin-top:18px}
 section.block h3{font-size:14px;margin:0 0 8px}
-@media (max-width:820px){header .meta{display:none}header button{margin-left:auto}.layout{grid-template-columns:1fr}aside{position:static;max-height:none;border-right:0;border-bottom:1px solid var(--line)}main{padding:16px}.doc{padding:8px 14px 16px}}
+@media (max-width:820px){header .meta{display:none}#kb{margin-left:auto}.layout{grid-template-columns:1fr}aside{position:static;max-height:none;border-right:0;border-bottom:1px solid var(--line)}main{padding:16px}.doc{padding:8px 14px 16px}}
 </style>
 </head>
 <body>
-<header><h1>项目文档视图</h1><span class="meta" id="meta"></span><button id="theme" title="切换明暗">◐</button></header>
+<header><h1>项目文档视图</h1><span class="meta" id="meta"></span><button id="kb" title="知识文档 → 来源产物">知识文档</button><button id="theme" title="切换明暗">◐</button></header>
 <div class="layout"><aside><input id="q" placeholder="搜索需求、分支"><div id="list"></div></aside><main id="main"></main></div>
 <script id="data" type="application/json">${embed(data)}</script>
 <script>
@@ -203,6 +217,25 @@ function reviewBlock(r) {
   return '<section class="block"><h3>审查记录</h3><table><thead><tr><th>报告</th><th>日期</th><th>轮次</th><th>CRITICAL · HIGH · MEDIUM / LOW</th><th>复核</th><th>与上次对比</th><th>DocNexus</th></tr></thead><tbody>' + rs.map(row).join('') + '</tbody></table></section>';
 }
 
+function knowledgeBlock(r) {
+  if (!r.docnexus.length) return '';
+  return '<section class="block"><h3>沉淀到的知识文档</h3><table><thead><tr><th>知识文档</th><th>来自产物</th></tr></thead><tbody>' + r.docnexus.map((d) => '<tr><td><code>' + esc(d.path) + '</code></td><td>' + d.from.map((f) => '<a href="#" data-doc="' + esc(f.path) + '">' + esc(f.label + ' · ' + f.file) + '</a>').join('<br>') + '</td></tr>').join('') + '</tbody></table></section>';
+}
+
+// 知识文档 → 来源产物：跨需求的反向索引，可按路径 / 需求名过滤
+function knowledgeView() {
+  current = null; renderList();
+  try { history.replaceState(null, '', '#knowledge'); } catch {}
+  const draw = () => {
+    const q = ($('#kq').value || '').trim().toLowerCase();
+    const rows = D.knowledge.filter((k) => !q || (k.path + ' ' + k.sources.map((s) => s.name).join(' ')).toLowerCase().includes(q));
+    $('#kt').innerHTML = rows.length ? rows.map((k) => '<tr><td><code>' + esc(k.path) + '</code></td><td>' + k.sources.map((s) => '<a href="#" data-req="' + esc(s.requirement) + '" data-doc="' + esc(s.path) + '">' + esc(s.name + ' · ' + s.label + ' · ' + s.file) + '</a>').join('<br>') + '</td></tr>').join('') : '<tr><td colspan="2" class="empty">' + (D.knowledge.length ? '没有匹配的知识文档' : '还没有产物记录沉淀（产物里的「DocNexus：」行写了 docnexus/library/… 才会出现在这里）') + '</td></tr>';
+    document.querySelectorAll('#kt [data-req]').forEach((el) => (el.onclick = (e) => { e.preventDefault(); select(el.dataset.req, el.dataset.doc); }));
+  };
+  $('#main').innerHTML = overview() + '<h2>知识文档 → 来源产物</h2><div class="sub">汇总各产物里的「DocNexus：」行，看每篇知识文档是从哪个需求、哪份产物沉淀的</div><input id="kq" placeholder="按知识文档路径或需求名过滤" style="width:100%;max-width:420px;padding:7px 10px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--text);font:inherit;margin-bottom:10px"><table><thead><tr><th>知识文档</th><th>来源产物</th></tr></thead><tbody id="kt"></tbody></table>';
+  $('#kq').oninput = draw; draw();
+}
+
 function deliveryBlock(r) {
   const ds = r.artifacts.filter((a) => a.kind === 'delivery');
   if (!ds.length) return '';
@@ -220,7 +253,7 @@ function select(id, docPath) {
   const order = D.kinds.map((k) => k.kind);
   const files = '<div class="files">' + r.artifacts.slice().sort((x, y) => order.indexOf(x.kind) - order.indexOf(y.kind)).map((a) => '<button data-doc="' + esc(a.path) + '">' + esc(a.label) + ' · ' + esc(a.file) + '</button>').join('') + '</div>';
   $('#main').innerHTML = overview() + '<h2>' + esc(r.name) + '</h2><div class="sub">' + (r.archived ? esc(r.dir) : '旧布局（未归档），运行 requirement.mjs migrate 归档') + ' · 分支 ' + esc(r.branches.join('、') || '无') + (r.named_by === 'migrated' || r.named_by === 'branch' ? ' · <span class="tag">需求名由' + (r.named_by === 'branch' ? '分支名' : '迁移') + '生成，可在 meta.json 改</span>' : '') + '</div>'
-    + pipeline + reviewBlock(r) + deliveryBlock(r) + files + '<div class="doc" id="doc"></div>';
+    + pipeline + reviewBlock(r) + deliveryBlock(r) + knowledgeBlock(r) + files + '<div class="doc" id="doc"></div>';
   document.querySelectorAll('[data-doc]').forEach((el) => (el.onclick = (e) => { e.preventDefault(); showDoc(r, el.dataset.doc); }));
   showDoc(r, docPath || (latest('review') || r.artifacts.at(-1)).path);
   renderList();
@@ -234,8 +267,10 @@ function showDoc(r, p) {
 }
 
 $('#q').oninput = renderList;
+$('#kb').onclick = knowledgeView;
 const fromHash = decodeURIComponent(location.hash.slice(1));
-if (D.requirements.length) select(D.requirements.some((r) => r.id === fromHash) ? fromHash : D.requirements[0].id);
+if (fromHash === 'knowledge') knowledgeView();
+else if (D.requirements.length) select(D.requirements.some((r) => r.id === fromHash) ? fromHash : D.requirements[0].id);
 else { $('#main').innerHTML = overview() + '<div class="empty">还没有产物。dev 交付、审查报告、技术方案、上线方案落盘到 docs/skills/requirements/&lt;需求名&gt;/ 后，重新生成这个页面。</div>'; renderList(); }
 </script>
 </body>

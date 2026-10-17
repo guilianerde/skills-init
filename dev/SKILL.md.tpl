@@ -111,7 +111,7 @@ description: "Implement a feature or fix a bug in this project end to end: under
    - PR / MR：用户要提 PR / MR 时，运行 `node <skills>/workflow/scripts/pr-desc.mjs`（缺省当前分支、基线 `profile.main_branch`），它把本分支的交付说明、审查报告、技术方案、上线方案汇总成描述（没有交付说明时退回用提交记录和改动文件），把输出给用户；用 `gh pr create` / `glab mr create` 创建要用户明确同意。
    - 文档：运行 `node <skills>/workflow/scripts/artifacts.mjs` 看本分支已有哪些产物（开发方案、交付说明、审查报告、技术方案、上线方案及 wiki 发布记录），按输出的 `next` 建议下一步：M / L 规模缺技术方案时建议 `create-tech-md-doc`，要上线时建议 `create-release-md-doc`（会自动引用本分支的技术方案和交付说明）。
    - **沉淀到 DocNexus**（`resolve.mjs status` 的 `docnexus.ok` 为 true 时**每次都问**）：明确问用户「要不要启动 DocNexus 流程，把本次交付沉淀到 DocNexus？」，并从交付说明里列出建议沉淀的内容（已确认的决定、新约定、踩到的坑、缺陷根因、配置 / 表结构变化）；没有特别值得记的也照问，并说明这一点。
-     - 用户同意 → 以交付说明为来源，按 DocNexus 入口 skill `docnexus` 的 capture 流程写入；先运行 `node <skills>/workflow/scripts/requirement.mjs provenance <交付说明路径>`，把输出的 `provenance` 原样写进每条 fact 的 provenance，并写进沉淀正文末尾的「来源」一节（见 `<skills>/workflow/references/docnexus.md`「沉淀的来源」）；分类用 `node <skills>/workflow/scripts/resolve.mjs category dev` 的结果作为调用方显式分类封存（见 `<skills>/workflow/references/docnexus.md`「写入 DocNexus 的分类」）。只沉淀确认过的事实，不沉淀「未验证」「待确认」的内容；知识库已有同主题的沉淀时更新那一篇（带 `--base-version`），不重复新建。写入成功后把交付说明的「DocNexus」元信息行改成 `docnexus/library/<path>`，并回报给用户。
+     - 用户同意 → 以交付说明为来源，按 DocNexus 入口 skill `docnexus` 的 capture 流程写入；正文只写知识，不写分支、路径；有 facts 时按 `<skills>/workflow/references/docnexus.md`「沉淀的来源」的格式写 provenance；分类用 `node <skills>/workflow/scripts/resolve.mjs category dev` 的结果作为调用方显式分类封存（见 `<skills>/workflow/references/docnexus.md`「写入 DocNexus 的分类」）。只沉淀确认过的事实，不沉淀「未验证」「待确认」的内容；知识库已有同主题的沉淀时更新那一篇（带 `--base-version`），不重复新建。写入成功后把交付说明的「DocNexus」元信息行改成 `docnexus/library/<path>`，并回报给用户。
      - 用户不同意 → 元信息行保持「未沉淀」，不再追问。
      - 未接入 DocNexus → 元信息行写「未接入」，不提问、不提示安装。
 

@@ -17,7 +17,8 @@ function project() {
   const dir = 'docs/skills/requirements/订单导出';
   put(`${dir}/meta.json`, JSON.stringify({ name: '订单导出（按渠道）', named_by: 'user', branches: ['feature/export'] }));
   put(`${dir}/review.md`, '# 审查\n\n> 审查范围：分支对比 ｜ 日期：2026-10-15\n> 对比分支：`feature/export` ←→ `main`\n> DocNexus：未沉淀\n\n## 严重问题（CRITICAL / HIGH） *\n\n| # | 级别 | 位置 | 问题 | 触发条件 | 建议 | 复核 |\n|---|---|---|---|---|---|---|\n| 1 | HIGH | A.java:1 | 未分页 | 大渠道 | 分页 | ✅ |\n');
-  put(`${dir}/review_v2.md`, '# 复审\n\n> 日期：2026-10-16\n> 对比分支：`feature/export` ←→ `main`\n\n## 与上次审查对比（如有）\n\n| 上次 # | 问题 | 状态 | 依据 |\n|---|---|---|---|\n| 1 | 未分页 | 已修复 | abc |\n');
+  put(`${dir}/delivery.md`, '# 交付\n\n> 类型：功能开发 ｜ 日期：2026-10-15\n> 对比分支：`feature/export` ←→ `main`\n> DocNexus：docnexus/library/dev-notes/export.md、docnexus/library/code-review/paging.md\n');
+  put(`${dir}/review_v2.md`, '# 复审\n\n> 日期：2026-10-16\n> 对比分支：`feature/export` ←→ `main`\n> DocNexus：docnexus/library/code-review/paging.md\n\n## 与上次审查对比（如有）\n\n| 上次 # | 问题 | 状态 | 依据 |\n|---|---|---|---|\n| 1 | 未分页 | 已修复 | abc |\n');
   put(`${dir}/tech-doc.md`, '<!-- md-to-wiki: pageId=42 version=2 -->\n# 技术方案 </script><img src=x onerror=alert(1)>\n\n> 对比分支：`feature/export` ←→ `main`\n');
   put('docs/skills/project-review/review-feature-old-20260901.md', '# 旧审查\n\n> 对比分支：`feature/old` ←→ `main`\n');
   return root;
@@ -35,8 +36,13 @@ test('viewData：需求目录按需求分组（用 meta.json 的名字），旧�
   assert.equal(first.review.levels.HIGH, 1);
   assert.equal(second.review.follow_up.fixed, 1);
   assert.equal(r.artifacts.find((a) => a.kind === 'tech').wiki.pageId, '42');
+  assert.deepEqual(r.docnexus.map((k) => k.path), ['docnexus/library/dev-notes/export.md', 'docnexus/library/code-review/paging.md']);
+  assert.deepEqual(r.docnexus[1].from.map((f) => f.file), ['delivery.md', 'review_v2.md'], '同一篇知识文档来自两份产物，去重后都列出');
+  assert.deepEqual(d.knowledge.map((k) => k.path), ['docnexus/library/code-review/paging.md', 'docnexus/library/dev-notes/export.md']);
+  assert.deepEqual(d.knowledge[0].sources.map((s) => [s.name, s.label]), [['订单导出（按渠道）', '交付说明'], ['订单导出（按渠道）', '审查报告']]);
   const legacy = d.requirements.find((x) => !x.archived);
   assert.equal(legacy.name, 'feature/old');
+  assert.deepEqual(legacy.docnexus, []);
   assert.equal(d.report.review.reports, 3);
   fs.rmSync(root, { recursive: true, force: true });
 });
@@ -59,7 +65,7 @@ test('CLI：skills-init view 默认写到 tmp/skills/view/index.html，--out 指
   const before = fs.readFileSync(path.join(root, 'docs/skills/requirements/订单导出/meta.json'), 'utf8');
   let r = spawnSync(process.execPath, [path.join(REPO, 'bin/skills-init.mjs'), 'view', '--project-root', root], { encoding: 'utf8' });
   assert.equal(r.status, 0, r.stderr);
-  assert.match(r.stdout, /已生成 tmp\/skills\/view\/index\.html（2 个需求，4 份产物）/);
+  assert.match(r.stdout, /已生成 tmp\/skills\/view\/index\.html（2 个需求，5 份产物）/);
   assert.ok(fs.existsSync(path.join(root, 'tmp/skills/view/index.html')));
   r = spawnSync(process.execPath, [path.join(REPO, 'workflow/scripts/view.mjs'), '--root', root, '--out', 'out/v.html'], { encoding: 'utf8' });
   assert.equal(r.status, 0);

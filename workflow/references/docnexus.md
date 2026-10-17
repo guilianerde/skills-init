@@ -17,31 +17,10 @@ node <skills>/workflow/scripts/resolve.mjs category <skill>
 
 ## 沉淀的来源
 
-DocNexus 入库时存的是内容副本，不记原始文件路径。为了从知识库能追溯回产物（交付说明、审查报告等），各 skill 沉淀前在项目根运行：
+DocNexus 按它自己的设计使用：沉淀文档的正文只写知识（约定、决定、坑、根因），不写分支名、产物路径这类工作流信息，免得进入 recall 的检索索引造成干扰，也免得知识文档和工作流的目录结构绑在一起。
 
-```
-node <skills>/workflow/scripts/requirement.mjs provenance <产物路径>
-```
-
-输出的 `provenance` 是统一格式的来源，包含产物种类、需求名、分支、日期和路径，例如：
-
-```
-交付说明 · 需求「订单导出支持按渠道筛选」· 分支 feature/order-export · 2026-10-15 · docs/skills/requirements/订单导出支持按渠道筛选/delivery.md
-```
-
-- 原样写进每条 fact 的 `provenance`（`metadata.facts[].provenance`），不要改写或缩短。
-- 同时写进沉淀文档正文末尾固定的一节：
-
-  ```
-  ## 来源
-
-  - <provenance 原文>
-  ```
-
-  facts 是可选的，正文这一节保证一定有来源记录。一篇沉淀综合了多份产物（例如交付说明加审查报告）时，每份各写一行。更新已有沉淀时保留原来的来源行，再追加本次的。
-- 路径以后可能变（迁移、改名），所以需求名、种类和日期也一并写进去，靠它们在 `/workflow view` 里还能找回原文件。
-- 旧布局的产物（`docs/skills/<skill>/`）也能用：取不到需求名时只写分支。
-- 反向链接不变：沉淀成功后，产物的「DocNexus」元信息行写 `docnexus/library/<path>`。
+- 有 facts 时，每条 fact 的 `provenance` 写一条简单的来源，由你按这个格式写：`<产物种类> <产物路径>（<产物日期>）`，例如 `交付说明 docs/skills/requirements/订单导出支持按渠道筛选/delivery.md（2026-10-15）`。没有 facts 就不写。
+- 从知识库追溯回产物，靠的是产物里的「DocNexus：docnexus/library/<path>」元信息行（沉淀成功后写入）反查，`/workflow view` 会按需求列出沉淀到的知识文档，以及每篇来自哪份产物。不往 DocNexus 里多写内容。
 
 ## 按分类参考知识库
 

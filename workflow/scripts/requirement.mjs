@@ -12,7 +12,6 @@
 //   node .agents/skills/workflow/scripts/requirement.mjs sync [<需求目录或其中的文件> | --all]   # 按目录里的文件重建 meta.json
 //   node .agents/skills/workflow/scripts/requirement.mjs list                            # 所有需求（名称、分支、产物数、更新时间）
 //   node .agents/skills/workflow/scripts/requirement.mjs migrate [--dry-run]             # 把旧版 docs/skills/<skill>/ 下的产物按分支搬进需求目录
-//   node .agents/skills/workflow/scripts/requirement.mjs provenance <产物路径> [--text]   # 沉淀到 DocNexus 时的统一来源：种类 · 需求 · 分支 · 日期 · 路径
 // 输出 JSON。退出码：0 正常；1 参数错误 / git 失败；2 当前分支还没绑定需求（path 时：先问用户需求名再 bind）
 
 import fs from 'node:fs';
@@ -73,7 +72,7 @@ function parseWiki(text) {
   const kv = Object.fromEntries([...m[1].matchAll(/(\w+)=(\S+)/g)].map((x) => [x[1], x[2]]));
   return kv.pageId ? { pageId: kv.pageId, version: kv.version ? Number(kv.version) : null, url: kv.url ?? null, at: kv.at ?? null } : null;
 }
-function parseDocnexus(text) {
+export function parseDocnexus(text) {
   const v = /DocNexus[：:]\s*([^｜\n]*)/.exec(head(text))?.[1]?.trim();
   return v && /docnexus\/library\//.test(v) ? v.split(/[、,，]\s*/).map((s) => s.trim()).filter(Boolean) : null;
 }
@@ -294,36 +293,8 @@ export function migrate(root, { dryRun = false } = {}) {
   return { ...p, moved, rewritten, dry_run: false };
 }
 
-// ------------------------------------------------------------------ 沉淀来源
-const LABELS = { plan: '开发方案', delivery: '交付说明', review: '审查报告', tech: '技术方案', release: '上线方案' };
-
-// 产物 → 写进 DocNexus 的来源字符串（facts[].provenance 与沉淀正文的「来源」一节）。DocNexus 不记原始路径，
-// 这里把种类、需求名、分支、日期和路径写在一起：路径以后变了，靠需求名 + 种类 + 日期还能在视图里找回原文件
-export function provenance(root, file) {
-  const rel = toPosix(path.relative(root, path.resolve(root, file)));
-  const abs = path.join(root, rel);
-  if (!fs.existsSync(abs) || !fs.statSync(abs).isFile()) return { ok: false, error: `找不到产物 ${rel}` };
-  const parts = rel.split('/');
-  let kind = null;
-  let name = null;
-  if (parts.length === REQ_DIR.split('/').length + 2 && parts.slice(0, -2).join('/') === REQ_DIR) {
-    kind = parseFile(parts.at(-1))?.kind ?? null;
-    name = readJson(path.join(root, parts.slice(0, -1).join('/'), 'meta.json'))?.name ?? parts.at(-2);
-  } else if (parts.length === 4 && parts[0] === 'docs' && parts[1] === 'skills') {
-    kind = LEGACY.find((k) => k.skill === parts[2] && parts[3].startsWith(k.prefix) && parts[3].endsWith('.md'))?.kind ?? null;
-  }
-  if (!kind) return { ok: false, error: `${rel} 不是 dev / project-review / 技术方案 / 上线方案的产物（应在 ${REQ_DIR}/<需求>/ 或旧版 docs/skills/<skill>/ 下）` };
-  const text = fs.readFileSync(abs, 'utf8');
-  const branch = parseBranch(text);
-  if (!name && branch) name = find(root, branch)?.name ?? null; // 旧布局：分支已绑定需求时用需求名
-  const fromName = /(\d{4})(\d{2})(\d{2})(?:_v\d+)?\.md$/.exec(parts.at(-1));
-  const date = headerDate(text) ?? (fromName ? `${fromName[1]}-${fromName[2]}-${fromName[3]}` : null);
-  const segs = [LABELS[kind], name ? `需求「${name}」` : null, branch ? `分支 ${branch}` : null, date, rel].filter(Boolean);
-  return { ok: true, provenance: segs.join(' · ').replace(/」 · /g, '」· '), kind, label: LABELS[kind], requirement: name, branch, date, path: rel };
-}
-
 // ------------------------------------------------------------------ CLI
-const USAGE = '用法: requirement.mjs which | bind [--name <需求名>] | path <plan|delivery|review|tech|release> | sync [<目录|文件> | --all] | list | migrate [--dry-run] | provenance <产物路径> [--text]  （通用：--root <项目根> --branch <分支>）';
+const USAGE = '用法: requirement.mjs which | bind [--name <需求名>] | path <plan|delivery|review|tech|release> | sync [<目录|文件> | --all] | list | migrate [--dry-run]  （通用：--root <项目根> --branch <分支>）';
 
 function main(argv) {
   let root = process.cwd();
@@ -333,7 +304,7 @@ function main(argv) {
     const a = argv[i];
     if (a === '--root') root = path.resolve(argv[++i] ?? '.');
     else if (['--name', '--branch', '--base'].includes(a)) o[a.slice(2)] = argv[++i] ?? null;
-    else if (a === '--all' || a === '--dry-run' || a === '--text') o[a.slice(2)] = true;
+    else if (a === '--all' || a === '--dry-run') o[a.slice(2)] = true;
     else if (a.startsWith('--')) { console.error(USAGE); return 1; }
     else pos.push(a);
   }
@@ -346,13 +317,6 @@ function main(argv) {
     case 'path': { const r = nextPath(root, arg, branch); return print(r.out, r.code); }
     case 'list': return print(list(root));
     case 'migrate': return print(migrate(root, { dryRun: !!o['dry-run'] }));
-    case 'provenance': {
-      if (!arg) { console.error(USAGE); return 1; }
-      const r = provenance(root, arg);
-      if (!r.ok) { console.error(r.error); return 1; }
-      if (o.text) { console.log(r.provenance); return 0; }
-      return print(r);
-    }
     case 'sync': {
       if (o.all) return print(requirements(root).map((r) => ({ dir: r.dir, artifacts: sync(root, r.dir).artifacts.length })));
       let rel = arg ? toPosix(path.relative(root, path.resolve(root, arg))) : find(root, branch)?.dir;

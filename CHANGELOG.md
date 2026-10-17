@@ -4,11 +4,14 @@
 
 ## [Unreleased]
 
+### 变更
+- **沉淀到 DocNexus 时只写知识**：dev 和 project-review 的沉淀正文不再写分支名、产物路径等工作流信息（避免进入 recall 的检索索引、避免知识文档和工作流目录结构绑定）。有 facts 时，每条 fact 的 provenance 写一条简单来源，格式为「<产物种类> <产物路径>（<日期>）」，没有 facts 就不写。从知识库追溯产物，靠产物里已有的「DocNexus：docnexus/library/<path>」行反查，不往 DocNexus 多写内容。规则见 `workflow/references/docnexus.md`「沉淀的来源」。
+
 ### 新增
-- **DocNexus 沉淀统一记录来源**：`requirement.mjs provenance <产物路径> [--text]` 按产物生成统一的来源字符串，例如「交付说明 · 需求「订单导出支持按渠道筛选」· 分支 feature/order-export · 2026-10-15 · docs/skills/requirements/…/delivery.md」（需求名取 meta.json，取不到时只写分支；日期取文档头，旧布局可从文件名补）。dev 和 project-review 沉淀时把它原样写进每条 fact 的 provenance，并写进沉淀正文末尾固定的「来源」一节（facts 可选，正文保证有记录）；规则见 `workflow/references/docnexus.md`「沉淀的来源」。DocNexus 本身不改，产物里「DocNexus：docnexus/library/<path>」的反向链接不变。
+- 项目文档视图显示知识沉淀的反向关联：每个需求列出「沉淀到的知识文档」（汇总各产物的「DocNexus：」行，去重，注明来自哪份产物）；顶部「知识文档」入口列出所有知识文档 → 来源产物，可按路径或需求名过滤，点击跳到对应产物。
 
 ### 修复
-- 需求目录产物的日期会误取第一行 md-to-wiki 发布记录里的 `at=`（发布时间），影响 `meta.json`、视图与排序；改为跳过 HTML 注释取文档头的日期。
+- 需求目录产物的日期会误取第一行 md-to-wiki 发布记录里的 `at=`（发布时间），影响 `meta.json`、视图与排序；改为跳过 HTML 注释，取文档头的日期。
 
 ## [0.13.0] - 2026-10-16
 

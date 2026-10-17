@@ -391,8 +391,8 @@ dev、project-review、技术方案、上线方案都在对应环节调用它：
 | `workflow/scripts/resolve.mjs status` | `/workflow status` 的能力探测（不输出任何凭据） |
 | `workflow/scripts/resolve.mjs infer-profile` | 按固定规则从构建文件、Makefile、依赖与配置文件、git 推断项目画像草稿，每个字段附依据；不写文件 |
 | `workflow/scripts/lint-doc.mjs <文档> --skill <skill> [--facts]` | 对照当前生效的模板检查生成的文档：必填章节、残留 `{{...}}` 占位符、元信息行为错误；缺普通章节、顺序不一致为警告；列出待填写位置。`--facts` 再核对正文里的类名、文件、接口、表名：在对比分支的 diff 和代码里都找不到的记为警告（防编造） |
-| `workflow/scripts/requirement.mjs which / bind / path / sync / list / migrate / provenance` | 产物按需求归档：查当前分支绑定的需求（没绑定时给出按分支名生成的建议名）、绑定需求名、给出本次落盘路径（不覆盖，带上一版的 wiki 记录）、重建 `meta.json`、列出所有需求、把旧布局的产物迁进需求目录；`provenance <产物>` 生成沉淀到 DocNexus 时的统一来源（种类 · 需求 · 分支 · 日期 · 路径），dev / project-review 写进 facts 的 provenance 和沉淀正文的「来源」一节 |
-| `workflow/scripts/view.mjs [--out f] [--open]` | 项目文档视图（`/workflow view`、`skills-init view`）：读需求目录（和旧布局）里的产物，生成单个 HTML，按需求列出各阶段、审查记录（各级别数量、复核、与上次对比）、交付记录，正文直接渲染；数据内嵌，只读、不联网，默认写到 `tmp/skills/view/index.html` |
+| `workflow/scripts/requirement.mjs which / bind / path / sync / list / migrate` | 产物按需求归档：查当前分支绑定的需求（没绑定时给出按分支名生成的建议名）、绑定需求名、给出本次落盘路径（不覆盖，带上一版的 wiki 记录）、重建 `meta.json`、列出所有需求、把旧布局的产物迁进需求目录 |
+| `workflow/scripts/view.mjs [--out f] [--open]` | 项目文档视图（`/workflow view`、`skills-init view`）：读需求目录（和旧布局）里的产物，生成单个 HTML，按需求列出各阶段、审查记录（各级别数量、复核、与上次对比）、交付记录、沉淀到的知识文档，正文直接渲染；顶部「知识文档」列出每篇知识文档来自哪个需求、哪份产物；数据内嵌，只读、不联网，默认写到 `tmp/skills/view/index.html` |
 | `workflow/scripts/artifacts.mjs [--branch b \| --all]` | 按分支汇总 `docs/skills/requirements/`（及旧版 `docs/skills/<skill>/`）下的开发方案、交付说明、审查报告、技术方案、上线方案及其 wiki 发布记录，给出下一步建议；分支取自文档元信息行，不另存记录。上线方案没传 `--tech` 时据此自动引用同分支的技术方案；project-review 据此对照本分支方案、识别复审 |
 | `workflow/scripts/report.mjs [--since d] [--all-branches] [--json]` | 本地效果报告（`/workflow report`、`skills-init report`）：审查发现与修复率、复核率、需求澄清、沉淀率、知识引用、各分支链路 |
 | `workflow/scripts/tables.mjs [--diff b...h \| --base b \| --files a,b]` | 找出改动涉及哪些表：实体注解（`@TableName` / `@Table`，没写表名时按类名推断）、Mapper XML 与代码里的 SQL、DDL 脚本；标出 DDL、是否在 `schema.md` 里，并给出拉表结构的命令。dev 调研 / 自检与 project-review 审 SQL / DDL 时使用 |
