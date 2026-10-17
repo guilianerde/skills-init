@@ -16,6 +16,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { inferProfile } from './infer-profile.mjs';
+import { layout } from './requirement.mjs';
 
 const SKILLS_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const PROFILE_FIELDS = ['main_branch', 'build', 'test', 'test_single', 'lint', 'config_center', 'deploy.platform', 'deploy.regions', 'job_annotation'];
@@ -155,6 +156,8 @@ export function status(root) {
       categories: Object.fromEntries(skillMetas().map((m) => [m.name, resolveCategory(root, m.name)]).filter(([, c]) => c.ok).map(([n, c]) => [n, c.category])),
       how: dn ? '缺模板时运行 skills-init seed-templates' : '重跑 skills-init 并加 --with-docnexus',
     },
+    // 产物位置：项目里（默认）或独立文档仓库（workflow/references/requirements.md）
+    artifacts: (() => { const L = layout(root); return { mode: L.mode, ok: L.ok, ...(L.mode === 'repo' ? { repo: L.repo_rel, project: L.project, commit_prompt: L.commit_prompt } : { dir: 'docs/skills/requirements' }), how: L.ok ? null : L.hint }; })(),
     // 代码图谱：可用时读代码、查调用链与影响面优先用它（见 workflow/references/codegraph.md）
     codegraph: codegraphStatus(root),
     database: {

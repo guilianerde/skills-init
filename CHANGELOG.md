@@ -4,6 +4,11 @@
 
 ## [Unreleased]
 
+### 新增
+- **产物可放到独立文档仓库**（可选，默认仍放在项目里）：`workflow/profile.json` 配置 `artifacts.repo`（文档仓库相对项目根的位置）与 `artifacts.project`（项目名，只配一次；没配时 skill 问一次，默认取 git 远端仓库名），产物写到 `<文档仓库>/<需求名>/<项目名>/`，跨服务的需求共用一个需求目录（`which` 列出其他服务已有的需求，同名 `bind` 即加入）。文档里引用产物用 `cite`（「文档仓库名:仓库内路径」）。新命令 `requirement.mjs config`（查看 / 修改配置）、`requirement.mjs pending`（文档仓库里未提交的产物）。
+- **写完提示提交文档仓库**：文档仓库模式下 `requirement.mjs sync` 输出 `commit`（未提交的文件、建议的提交信息、命令），skill 给用户看、用户确认后才提交，推送另外问。`artifacts.commit_prompt: false` 关闭提示；个人设置写 `workflow/profile.local.json`（`config --commit-prompt off --local`，已加入 `.gitignore`），不影响团队。
+- `requirement.mjs migrate` 在文档仓库模式下把项目里的需求目录和旧布局产物搬到文档仓库，引用改成 `cite`；升级时只提示，不自动跨仓库搬。`/workflow view` 在此模式下显示文档仓库里所有项目的需求，一个需求下按项目区分；`resolve.mjs status` 输出产物位置。
+
 ### 变更
 - **沉淀到 DocNexus 时只写知识**：dev 和 project-review 的沉淀正文不再写分支名、产物路径等工作流信息（避免进入 recall 的检索索引、避免知识文档和工作流目录结构绑定）。有 facts 时，每条 fact 的 provenance 写一条简单来源，格式为「<产物种类> <产物路径>（<日期>）」，没有 facts 就不写。从知识库追溯产物，靠产物里已有的「DocNexus：docnexus/library/<path>」行反查，不往 DocNexus 多写内容。规则见 `workflow/references/docnexus.md`「沉淀的来源」。
 

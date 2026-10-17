@@ -65,7 +65,7 @@ description: "Review source code (any language; Java/Spring, Go, TypeScript, Pyt
 - 路径用 `node <skills>/workflow/scripts/requirement.mjs path review`（分支对比按 dev 分支加 `--branch <dev分支>`），写到输出的 `path`；已有报告时自动给出 `review_v2.md`、`review_v3.md`，不覆盖（复审对照上次报告靠它）。
 - 退出码 2（这个分支还没绑定需求）：问用户这个需求叫什么，默认值用输出的 `suggested_name`，再 `requirement.mjs bind --name "<需求名>" [--branch <dev分支>]`；用户不给名字时 `bind` 按分支名生成。
 - 报告同时完整输出到对话；落盘文件与对话内容一致
-- 写完运行 `requirement.mjs sync <path>` 更新 `meta.json`
+- 写完运行 `requirement.mjs sync <path>` 更新 `meta.json`；输出里 `commit` 非空（独立文档仓库模式）时按 `<skills>/workflow/references/requirements.md`「文档仓库的提交」处理。文档里引用其他产物（「参考产物」等）写 `requirement.mjs path` 输出的 `cite`
 - 写完运行 `node <skills>/workflow/scripts/lint-doc.mjs <报告路径> --skill project-review --facts` 自检：「错误」（缺必填章节、缺元信息行、残留 `{{...}}`）先修正；「在 diff 和代码里都找不到」的名字逐个核实，写错了就改成真实的名字
 
 ## Verification

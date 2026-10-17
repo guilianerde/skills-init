@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // 按分支汇总各 skill 的产物：开发方案、交付说明、审查报告、技术方案、上线方案，以及它们的 wiki 发布记录。
-// 产物按需求归档在 docs/skills/requirements/<需求>/（见 requirement.mjs）；旧版布局 docs/skills/<skill>/ 照常识别。
+// 产物按需求归档在 docs/skills/requirements/<需求>/，或独立文档仓库的 <需求>/<项目>/（见 requirement.mjs）；旧版布局 docs/skills/<skill>/ 照常识别。
 // 直接扫描 Markdown，从元信息行读分支（「分支：」「对比分支：」），
 // 从第一行的 <!-- md-to-wiki: ... --> 读发布记录（md-to-wiki 上传后写入）。只读。
 //
@@ -13,7 +13,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { REQ_DIR, parseFile } from './requirement.mjs';
+import { REQ_DIR, parseFile, artifactFiles } from './requirement.mjs';
 
 // 产物种类 → 产出它的 skill 目录与文件名前缀；顺序即链路顺序
 export const KINDS = [
@@ -62,18 +62,14 @@ function entry(rel, text, mtime) {
 
 const byDate = (a, b) => a.date.localeCompare(b.date) || a.mtime - b.mtime;
 
-export function collect(root) {
+// allProjects：文档仓库模式下连同其他项目的产物一起读（跨服务视图）
+export function collect(root, { allProjects = false } = {}) {
   const out = [];
-  const reqBase = path.join(root, REQ_DIR);
-  if (fs.existsSync(reqBase)) {
-    for (const d of fs.readdirSync(reqBase, { withFileTypes: true }).filter((x) => x.isDirectory())) {
-      for (const name of fs.readdirSync(path.join(reqBase, d.name))) {
-        const file = path.join(reqBase, d.name, name);
-        if (!name.endsWith('.md')) continue;
-        const e = entry(toPosix(path.relative(root, file)), fs.readFileSync(file, 'utf8'), fs.statSync(file).mtimeMs);
-        if (e) out.push(e);
-      }
-    }
+  for (const f of artifactFiles(root, { allProjects })) {
+    const k = KINDS.find((x) => x.kind === f.kind);
+    const text = fs.readFileSync(f.abs, 'utf8');
+    // 排序键：文档头里的日期 + 版本号（需求目录里的文件名不带日期）
+    out.push({ kind: k.kind, label: k.label, path: f.rel, cite: f.cite, requirement: f.slug, project: f.project, branch: parseBranch(text), date: `${headerDate(text)}#${String(f.version).padStart(3, '0')}`, mtime: fs.statSync(f.abs).mtimeMs, wiki: parseWiki(text) });
   }
   for (const skill of new Set(KINDS.map((k) => k.skill))) { // 旧版布局；dev 有方案与交付两类，目录只扫一次
     const dir = path.join(root, 'docs', 'skills', skill);

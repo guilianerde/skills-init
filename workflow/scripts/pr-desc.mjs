@@ -50,13 +50,14 @@ export function buildDescription(root, branch, base) {
     const s = sections(read(review));
     const open = tableRows(section(s, '严重问题')).filter((c) => LEVEL_RE.test(c[1] ?? ''));
     const summary = keep(section(s, '结论摘要'));
-    const lines = [summary, open.length ? `报告中的 CRITICAL / HIGH（${open.length} 条）：\n\n${open.map((c) => `- ${c[1]} ${c[2]}：${c[3]}`).join('\n')}` : '没有 CRITICAL / HIGH。', `完整报告：\`${review.path}\``].filter(Boolean);
+    const lines = [summary, open.length ? `报告中的 CRITICAL / HIGH（${open.length} 条）：\n\n${open.map((c) => `- ${c[1]} ${c[2]}：${c[3]}`).join('\n')}` : '没有 CRITICAL / HIGH。', `完整报告：\`${review.cite ?? review.path}\``].filter(Boolean);
     add('代码审查', lines.join('\n\n'));
     add('影响面', keep(section(s, '影响面')));
   }
 
   const docs = [['开发方案', plan], ['交付说明', delivery], ['审查报告', review], ['技术方案', tech], ['上线方案', release]]
-    .filter(([, a]) => a).map(([label, a]) => `- ${label}：\`${a.path}\`${a.wiki?.url ? `（wiki：${a.wiki.url}）` : a.wiki ? `（wiki pageId ${a.wiki.pageId}）` : ''}`);
+    
+    .filter(([, a]) => a).map(([label, a]) => `- ${label}：\`${a.cite ?? a.path}\`${a.wiki?.url ? `（wiki：${a.wiki.url}）` : a.wiki ? `（wiki pageId ${a.wiki.pageId}）` : ''}`);
   add('相关文档', docs.length ? docs.join('\n') : null);
   return { branch, base, sources: Object.fromEntries(Object.entries(view.latest).map(([k, a]) => [k, a?.path ?? null])), markdown: L.join('\n').trim() + '\n' };
 }

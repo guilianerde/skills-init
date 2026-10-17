@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { TPL_DIR, PKG, CANON_DIR, INSTALL_BASES, SKILLS, SKILL_LIST, USER_FILES, RENAMED, MANIFEST, ok, warn, readJson, walk, toPosix, sameFile, writeFile, render, sha256, fileHash, readManifest, removeEmptyDirs, lstat, timestamp, removeLink } from './core.mjs';
 import { writeDbConfig } from './db.mjs';
-import { migrate as migrateArtifacts, ensureIgnore, REQ_DIR } from '../../workflow/scripts/requirement.mjs';
+import { migrate as migrateArtifacts, planMigration, layout, ensureIgnore, REQ_DIR } from '../../workflow/scripts/requirement.mjs';
 
 // 结尾汇总：被手改过、已用新版覆盖（原文件已备份）的 / 模板已删除、手改过而备份后删除的文件
 export const report = { overwritten: [], removed: [], backupDir: null };
@@ -251,7 +251,7 @@ export function removeRenamed(root) {
 // ---------------------------------------------------------------- 4. .gitignore 保护
 export function updateGitignore(root, withDocNexus, withCodeGraph = false) {
   const gi = path.join(root, '.gitignore');
-  const rules = ['**/database-query/config.json', '**/wiki-config.json', '/tmp/'];
+  const rules = ['**/database-query/config.json', '**/wiki-config.json', '**/workflow/profile.local.json', '/tmp/'];
   if (withDocNexus) rules.push('node_modules/');
   if (withCodeGraph) rules.push('.codegraph/'); // 本地索引（SQLite），各人各建
   const existing = fs.existsSync(gi) ? fs.readFileSync(gi, 'utf8').split(/\r?\n/).map((l) => l.trim()) : [];
@@ -264,6 +264,15 @@ export function updateGitignore(root, withDocNexus, withCodeGraph = false) {
 // 产物按需求归档（docs/skills/requirements/<需求名>/）：旧版 docs/skills/<skill>/ 下的产物按「对比分支」搬进需求目录（git mv 保留历史），
 // 项目根 .ignore 加上需求目录（不参与代码搜索）。认不出分支的文件留在原处并列出。返回迁移结果
 export function organizeArtifacts(root) {
+  // 独立文档仓库模式：跨仓库搬文件不自动做，只提示用户自己运行 migrate
+  const L = layout(root);
+  if (L.mode === 'repo') {
+    if (!L.ok) { warn(`产物配置为放在独立文档仓库，但还没配好：${L.hint}`); return null; }
+    const p = planMigration(root);
+    const n = p.requirements.reduce((s, q) => s + q.moves.length, 0);
+    if (n) warn(`产物配置为放在文档仓库 ${L.repo_rel}，项目里还有 ${n} 份旧产物没搬：确认后运行 node <skills>/workflow/scripts/requirement.mjs migrate（先加 --dry-run 看看）`);
+    return null;
+  }
   const r = migrateArtifacts(root);
   for (const q of r.requirements) ok(`产物已按需求归档：${q.moves.length} 份 → ${q.dir}/（分支 ${q.branch}${q.existing ? '' : `，需求名「${q.name}」，可在 meta.json 里改`}）`);
   if (r.rewritten.length) ok(`已把 ${r.rewritten.length} 份文档里引用的旧路径（参考产物等）改成新路径`);

@@ -12,28 +12,31 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { collect, KINDS } from './artifacts.mjs';
-import { requirements, parseDocnexus } from './requirement.mjs';
+import { requirements, repoRequirements, layout, parseDocnexus } from './requirement.mjs';
 import { parseReview, parseDelivery, captureState, buildReport } from './report.mjs';
 
 const DEFAULT_OUT = 'tmp/skills/view/index.html';
 
 // 页面数据：需求目录按需求分组；旧布局的产物按分支分组，标为「未归档」
 export function viewData(root) {
-  const metas = new Map(requirements(root).map((r) => [r.slug, r]));
+  // 文档仓库模式：连同其他项目（服务）的产物一起看，一个需求下按项目区分
+  const L = layout(root);
+  const metas = new Map(L.mode === 'repo' ? repoRequirements(root, L).map((r) => [r.slug, { name: r.name, dir: null, branches: [...new Set(r.projects.flatMap((p) => p.meta.branches ?? []))], meta: r.projects.find((p) => p.project === L.project)?.meta ?? r.projects[0]?.meta ?? {} }]) : requirements(root, L).map((r) => [r.slug, r]));
   const groups = new Map();
-  for (const a of collect(root)) {
+  for (const a of collect(root, { allProjects: true })) {
     const id = a.requirement ? `req:${a.requirement}` : `branch:${a.branch ?? '（无分支）'}`;
     if (!groups.has(id)) {
       const m = a.requirement ? metas.get(a.requirement) : null;
       groups.set(id, {
         id, archived: !!a.requirement, name: m?.name ?? (a.requirement ?? a.branch ?? '（无分支）'),
-        dir: m?.dir ?? null, named_by: m?.meta?.named_by ?? null, branches: new Set(m?.branches ?? []), artifacts: [],
+        dir: m?.dir ?? (a.requirement && L.mode === 'repo' ? `${L.repo_name}:${a.requirement}` : null), named_by: m?.meta?.named_by ?? null, branches: new Set(m?.branches ?? []), projects: new Set(), artifacts: [],
       });
     }
     const g = groups.get(id);
     if (a.branch) g.branches.add(a.branch);
+    if (a.project) g.projects.add(a.project);
     const text = fs.readFileSync(path.join(root, a.path), 'utf8');
-    const item = { kind: a.kind, label: a.label, path: a.path, file: path.basename(a.path), date: (a.date || '').slice(0, 10) || null, branch: a.branch, wiki: a.wiki, text };
+    const item = { kind: a.kind, label: a.label, path: a.path, cite: a.cite ?? a.path, project: a.project ?? null, file: a.project && L.mode === 'repo' ? `${a.project}/${path.basename(a.path)}` : path.basename(a.path), date: (a.date || '').slice(0, 10) || null, branch: a.branch, wiki: a.wiki, text };
     if (a.kind === 'review') item.review = parseReview(text);
     if (a.kind === 'delivery') item.delivery = parseDelivery(text);
     if (a.kind === 'review' || a.kind === 'delivery') item.docnexus = captureState(text);
@@ -49,7 +52,7 @@ export function viewData(root) {
       if (!docnexus.has(k)) docnexus.set(k, []);
       docnexus.get(k).push({ path: a.path, file: a.file, label: a.label });
     }
-    return { ...g, branches: [...g.branches], first: dates[0] ?? null, last: dates.at(-1) ?? null, stages: Object.fromEntries(KINDS.map((k) => [k.kind, g.artifacts.filter((a) => a.kind === k.kind).length])), latest_review: latest('review'), docnexus: [...docnexus].map(([path, from]) => ({ path, from })) };
+    return { ...g, branches: [...g.branches], projects: [...g.projects], first: dates[0] ?? null, last: dates.at(-1) ?? null, stages: Object.fromEntries(KINDS.map((k) => [k.kind, g.artifacts.filter((a) => a.kind === k.kind).length])), latest_review: latest('review'), docnexus: [...docnexus].map(([path, from]) => ({ path, from })) };
   });
   list.sort((a, b) => String(b.last).localeCompare(String(a.last)) || a.name.localeCompare(b.name));
   // 反向索引：知识文档 → 来源产物（跨需求）
@@ -61,6 +64,7 @@ export function viewData(root) {
   return {
     knowledge: [...index].sort((a, b) => a[0].localeCompare(b[0])).map(([path, sources]) => ({ path, sources })),
     project: path.basename(path.resolve(root)),
+    mode: L.mode, ...(L.mode === 'repo' ? { repo: L.repo_name, current_project: L.project } : {}),
     generated: new Date().toISOString(),
     kinds: KINDS.map(({ kind, label }) => ({ kind, label })),
     requirements: list,
@@ -148,7 +152,7 @@ const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<
 const theme = (() => { try { return localStorage.getItem('skills-view-theme'); } catch { return null; } })();
 if (theme) document.documentElement.dataset.theme = theme;
 $('#theme').onclick = () => { const t = document.documentElement.dataset.theme === 'dark' || (!document.documentElement.dataset.theme && matchMedia('(prefers-color-scheme: dark)').matches) ? 'light' : 'dark'; document.documentElement.dataset.theme = t; try { localStorage.setItem('skills-view-theme', t); } catch {} };
-$('#meta').textContent = D.project + ' · 生成于 ' + D.generated.slice(0, 16).replace('T', ' ');
+$('#meta').textContent = (D.mode === 'repo' ? '文档仓库 ' + D.repo + ' · ' : '') + D.project + ' · 生成于 ' + D.generated.slice(0, 16).replace('T', ' ');
 
 // 极简 Markdown 渲染：标题、段落、列表、引用、表格、代码块、行内代码 / 粗体 / 链接；先转义再渲染
 function inline(s) {
@@ -252,7 +256,7 @@ function select(id, docPath) {
     return '<div class="stage' + (n ? ' y' : '') + '"><div class="t">' + k.label + '</div><div class="c">' + (n ? (n > 1 ? n + ' 版' : '✓') + (a && a.date ? ' · ' + a.date : '') : '—') + '</div>' + (a && a.wiki ? '<div class="t">wiki ' + (a.wiki.url ? '<a href="' + esc(a.wiki.url) + '" target="_blank" rel="noopener">pageId ' + esc(a.wiki.pageId) + '</a>' : 'pageId ' + esc(a.wiki.pageId)) + '</div>' : '') + '</div>'; }).join('') + '</div>';
   const order = D.kinds.map((k) => k.kind);
   const files = '<div class="files">' + r.artifacts.slice().sort((x, y) => order.indexOf(x.kind) - order.indexOf(y.kind)).map((a) => '<button data-doc="' + esc(a.path) + '">' + esc(a.label) + ' · ' + esc(a.file) + '</button>').join('') + '</div>';
-  $('#main').innerHTML = overview() + '<h2>' + esc(r.name) + '</h2><div class="sub">' + (r.archived ? esc(r.dir) : '旧布局（未归档），运行 requirement.mjs migrate 归档') + ' · 分支 ' + esc(r.branches.join('、') || '无') + (r.named_by === 'migrated' || r.named_by === 'branch' ? ' · <span class="tag">需求名由' + (r.named_by === 'branch' ? '分支名' : '迁移') + '生成，可在 meta.json 改</span>' : '') + '</div>'
+  $('#main').innerHTML = overview() + '<h2>' + esc(r.name) + '</h2><div class="sub">' + (r.archived ? esc(r.dir) : '旧布局（未归档），运行 requirement.mjs migrate 归档') + (r.projects.length ? ' · 项目 ' + esc(r.projects.join('、')) : '') + ' · 分支 ' + esc(r.branches.join('、') || '无') + (r.named_by === 'migrated' || r.named_by === 'branch' ? ' · <span class="tag">需求名由' + (r.named_by === 'branch' ? '分支名' : '迁移') + '生成，可在 meta.json 改</span>' : '') + '</div>'
     + pipeline + reviewBlock(r) + deliveryBlock(r) + knowledgeBlock(r) + files + '<div class="doc" id="doc"></div>';
   document.querySelectorAll('[data-doc]').forEach((el) => (el.onclick = (e) => { e.preventDefault(); showDoc(r, el.dataset.doc); }));
   showDoc(r, docPath || (latest('review') || r.artifacts.at(-1)).path);
@@ -263,7 +267,7 @@ function showDoc(r, p) {
   const a = r.artifacts.find((x) => x.path === p); if (!a) return;
   currentDoc = p;
   document.querySelectorAll('.files button').forEach((b) => b.classList.toggle('on', b.dataset.doc === p));
-  $('#doc').innerHTML = '<div class="path">' + esc(a.path) + (a.wiki ? ' · 已发布 wiki pageId ' + esc(a.wiki.pageId) : '') + '</div>' + md(a.text);
+  $('#doc').innerHTML = '<div class="path">' + esc(a.cite) + (a.wiki ? ' · 已发布 wiki pageId ' + esc(a.wiki.pageId) : '') + '</div>' + md(a.text);
 }
 
 $('#q').oninput = renderList;
