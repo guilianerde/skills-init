@@ -14,6 +14,7 @@
 | `data_review` | 上线前是否需要数据团队评审库表（`true` / `false`） | 技术方案模块 7、上线方案 2.3 |
 | `notes` | 其他项目约定，一条一句（如「启动需要本地 Redis」） | 全部 |
 | `artifacts` | 可选，产物放在哪里：`{ "repo": "../team-docs", "project": "order-service", "commit_prompt": true }`。不配置 = 放在项目的 `docs/skills/requirements/`；配了 `repo` = 放到独立文档仓库的 `<需求名>/<项目名>/`；`commit_prompt: false` 关闭写完后的提交提示。个人设置可写在 `workflow/profile.local.json`（不提交）覆盖 | 见 `references/requirements.md`，用 `requirement.mjs config` 修改 |
+| `docnexus.root` | 可选，DocNexus 工作区所在的目录（相对项目根），默认本项目。和产物共用团队文档仓库时填那个仓库，如 `"docnexus": { "root": "../team-docs" }`；安装时用 `--docnexus-root` 设置 | 见 `references/docnexus.md`「DocNexus 在团队文档仓库里」 |
 | `docnexus_categories` | 可选，覆盖各 skill 写入 DocNexus 时的分类，如 `{"create-tech-md-doc": "技术方案"}`；不填用 skill 默认 | 见 `references/docnexus.md` |
 
 其他 skill 读画像统一用 `node <skills>/workflow/scripts/resolve.mjs profile`：输出 `profile`（文件内容）、`empty`（空字段）、`complete`（`main_branch` / `build` / `test` 都已填写）。

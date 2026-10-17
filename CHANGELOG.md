@@ -4,6 +4,12 @@
 
 ## [Unreleased]
 
+### 新增
+- **DocNexus 可以和产物共用团队文档仓库**：`--docnexus-root <dir>`（PowerShell `-DocnexusRoot`）写入 `workflow/profile.json` 的 `docnexus.root`，DocNexus 装在 `<dir>/docnexus/` 并以 `<dir>` 为项目根运行（`init --agent none`），知识随文档仓库提交；DocNexus 本身不用改，也不需要它的 `--git-remote`。
+  - 本项目里由 skills-init 接上：DocNexus 的 skills 相对链接到 `.claude/skills` / `.agents/skills` / `.qwen/skills`；`CLAUDE.md` / `AGENTS.md` 写入带自己标记的段落（概念索引位置、docnexus 系列 skill 的命令先 `cd <dir>` 再运行）。升级时刷新（DocNexus 新增的 skill 也接上），卸载时撤掉，文档仓库里的 DocNexus 不动。
+  - 脚本按位置处理：`resolve.mjs status` 的 `docnexus` 增加 `root`、`run_in`，`bin` 给出实际路径；模板从文档仓库的知识库取；`knowledge.mjs` 在那里运行，文档多一个从本项目读正文的 `file`；`seed-templates`、`doctor`（报告位置与链接、段落是否齐全）、升级命令同步支持。
+  - 文档仓库里的 `docnexus/` 不当作需求目录；`requirement.mjs pending` 单独列出知识库里未提交的改动（`knowledge_files` / `knowledge_commands`）。说明见 `workflow/references/docnexus.md`「DocNexus 在团队文档仓库里」。
+
 ## [0.14.0] - 2026-10-17
 
 ### 新增

@@ -2,6 +2,16 @@
 
 各 skill 写入与参考 DocNexus 时共用的规则。
 
+## DocNexus 在团队文档仓库里
+
+DocNexus 默认装在本项目的 `docnexus/`。团队把产物和知识库放进同一个文档仓库时（`workflow/profile.json` 的 `docnexus.root`，例如 `../team-docs`，安装时用 `skills-init --with-docnexus --docnexus-root ../team-docs`），工作区在 `<docnexus.root>/docnexus/`，`resolve.mjs status` 的 `docnexus.root` 不是 `.`：
+
+- DocNexus 以 `docnexus.root` 为项目根。docnexus 系列 skill（`docnexus`、`docnexus-recall` 等）里写的「在项目根运行 `./docnexus/node_modules/.bin/docnexus …`」「`node docnexus/skills/…`」，都先切到那个目录再运行：`cd <docnexus.root> && ./docnexus/node_modules/.bin/docnexus …`（`status` 的 `run_in` 就是这个前缀）。草稿、`docnexus/library/<path>` 等路径也相对那个目录，读写文件时加上它，例如 `../team-docs/docnexus/library/<path>`。
+- 本工作流的脚本已处理位置：`knowledge.mjs` 在那里运行，输出的 `file` 是从本项目读正文的路径；`resolve.mjs template` 给出的模板路径、`expected` 都已带上位置。
+- 引用知识文档仍写 `docnexus/library/<path>`（产物里的「DocNexus：」行也一样）。产物和知识库在同一个仓库里，这个路径相对的就是那个仓库。
+- 知识库由共用这个仓库的各服务一起使用：按分类参考和 recall 都会看到其他服务的沉淀，引用前确认和本次任务相关。
+- 写入（capture）完成后，知识库的改动在文档仓库里：运行 `requirement.mjs pending`，`knowledge_files` 是知识库里没提交的文件，`knowledge_commands` 是提交命令（把提交信息换成这次沉淀了什么）。和产物一样，给用户看、用户确认后再提交，推送另外问（见 `references/requirements.md`「文档仓库的提交」）。
+
 ## 写入 DocNexus 的分类
 
 各 skill 产出的内容写入 DocNexus 时，分类由产出它的 skill 显式指定，不交给 DocNexus 的模型分类，同一类产出始终落在同一个分类下，便于按分类浏览和检索。写入前在项目根运行：

@@ -45,6 +45,9 @@ const readJson = (f) => { try { return JSON.parse(fs.readFileSync(f, 'utf8')); }
 const toPosix = (p) => p.split(path.sep).join('/');
 const now = () => new Date().toISOString();
 const isDir = (p) => { try { return fs.statSync(p).isDirectory(); } catch { return false; } };
+// 文档仓库里不是需求的目录：DocNexus 工作区（docnexus.root 指向文档仓库时就在这里）、依赖目录
+const RESERVED = new Set(['docnexus', 'node_modules', 'tmp']);
+const skipDir = (d) => !d.isDirectory() || d.name.startsWith('.') || RESERVED.has(d.name);
 
 // 需求名 / 项目名 → 目录名：保留中文，去掉路径与文件系统不允许的字符，空白换成 -
 export function dirName(name) {
@@ -139,7 +142,7 @@ export function requirements(root, L = layout(root)) {
   const out = [];
   if (!isDir(L.base)) return out;
   for (const d of fs.readdirSync(L.base, { withFileTypes: true })) {
-    if (!d.isDirectory() || d.name.startsWith('.')) continue;
+    if (skipDir(d)) continue;
     const abs = L.reqDir(d.name);
     if (!isDir(abs)) continue;
     const meta = readJson(path.join(abs, 'meta.json')) ?? {};
@@ -153,7 +156,7 @@ export function repoRequirements(root, L = layout(root)) {
   if (L.mode !== 'repo' || !isDir(L.repo)) return [];
   const out = [];
   for (const d of fs.readdirSync(L.repo, { withFileTypes: true })) {
-    if (!d.isDirectory() || d.name.startsWith('.')) continue;
+    if (skipDir(d)) continue;
     const projects = fs.readdirSync(path.join(L.repo, d.name), { withFileTypes: true }).filter((p) => p.isDirectory() && !p.name.startsWith('.')).map((p) => {
       const abs = path.join(L.repo, d.name, p.name);
       return { project: p.name, abs, dir: relOf(root, abs), meta: readJson(path.join(abs, 'meta.json')) ?? {} };
@@ -246,7 +249,7 @@ export function bind(root, { name = null, branch, base = null }) {
   let slug = target?.slug;
   if (!slug) {
     slug = dirName(display);
-    for (let i = 2; pool.some((r) => r.slug === slug) || (L.mode === 'project' && isDir(L.reqDir(slug))); i++) slug = `${dirName(display)}-${i}`;
+    for (let i = 2; pool.some((r) => r.slug === slug) || RESERVED.has(slug) || (L.mode === 'project' && isDir(L.reqDir(slug))); i++) slug = `${dirName(display)}-${i}`;
   }
   const dir = L.reqDir(slug);
   const existedHere = isDir(dir);
@@ -301,10 +304,15 @@ export function pending(root, branch, dirRel = null) {
   const meta = readJson(path.join(abs, 'meta.json')) ?? {};
   const kinds = [...new Set(files.map((f) => parseFile(path.basename(f))?.kind).filter(Boolean))].map((k) => LABELS[k]);
   const message = `docs(${meta.name ?? path.basename(path.dirname(abs))}): ${L.project}${kinds.length ? ` ${kinds.join('、')}` : ' 更新产物'}`;
+  // DocNexus 也在这个文档仓库里时（docnexus.root）：知识库的改动单独列出，单独提交，提交信息写沉淀了什么
+  const kn = isDir(path.join(L.repo, 'docnexus', 'library'))
+    ? git(L.repo, ['-c', 'core.quotePath=false', 'status', '--porcelain', '--untracked-files=all', '--', 'docnexus']).stdout.split('\n').filter(Boolean).map((l) => l.slice(3))
+    : [];
   return {
     ok: true, mode: 'repo', repo: L.repo_rel, is_git: true, project: L.project, dir: relOf(root, abs), files, commit_prompt: L.commit_prompt,
     suggested_message: files.length ? message : null,
     commands: files.length ? [`git -C ${JSON.stringify(L.repo_rel)} add -- ${JSON.stringify(inRepo)}`, `git -C ${JSON.stringify(L.repo_rel)} commit -m ${JSON.stringify(message)}`] : [],
+    ...(kn.length ? { knowledge_files: kn, knowledge_commands: [`git -C ${JSON.stringify(L.repo_rel)} add -- docnexus`, `git -C ${JSON.stringify(L.repo_rel)} commit -m "knowledge: <沉淀了什么>"`] } : {}),
   };
 }
 
@@ -394,7 +402,7 @@ export function planMigration(root) {
     const existing = g.branch ? find(root, g.branch, L) : null;
     const name = g.fixedName ?? existing?.name ?? (g.names.size === 1 ? [...g.names][0] : g.branch.replace(/\//g, '-'));
     let slug = existing?.slug ?? pool.find((r) => r.name === name)?.slug;
-    if (!slug) { slug = dirName(name); for (let i = 2; taken.has(slug); i++) slug = `${dirName(name)}-${i}`; taken.add(slug); }
+    if (!slug) { slug = dirName(name); for (let i = 2; taken.has(slug) || RESERVED.has(slug); i++) slug = `${dirName(name)}-${i}`; taken.add(slug); }
     const dirAbs = L.reqDir(slug);
     const used = new Set(isDir(dirAbs) ? fs.readdirSync(dirAbs) : []);
     const moves = [];

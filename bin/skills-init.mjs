@@ -26,7 +26,7 @@ import { findExistingDbConfig, getDb } from './lib/db.mjs';
 import { report, installSkills, linkSkills, removeRenamed, updateGitignore, preserveRetiredTemplates, organizeArtifacts } from './lib/install.mjs';
 import { setupCodeGraph } from './lib/codegraph.mjs';
 import { uninstall } from './lib/uninstall.mjs';
-import { checkNodeForDocNexus, setupDocNexus, templateRecords, saveTemplateRecords, reportTemplateStatus, installedSkills, docnexusConnected, printTemplateDiffs } from './lib/docnexus.mjs';
+import { checkNodeForDocNexus, setupDocNexus, refreshSharedDocNexus, setDocNexusRoot, templateRecords, saveTemplateRecords, reportTemplateStatus, installedSkills, docnexusConnected, printTemplateDiffs } from './lib/docnexus.mjs';
 import { upgradeOptions, doctor } from './lib/doctor.mjs';
 
 // ---------------------------------------------------------------- 参数
@@ -48,6 +48,7 @@ init 选项：
   --skip-db            跳过数据库连接配置
   --yes                非交互：使用已有数据库配置；都没有且未 --skip-db 时报错退出
   --with-docnexus      同时接入 DocNexus 文档库（需 Node >= 22.13 与 npm），并导入文档模板
+  --docnexus-root <dir>  DocNexus 工作区放在别的目录（如团队文档仓库 ../team-docs，和产物共用一个仓库）；写入 workflow/profile.json 的 docnexus.root，传 . 改回本项目
   --with-codegraph     同时接入 CodeGraph 代码图谱：没有 codegraph 命令时 npm 全局安装，为 claude / codex 写项目级 MCP 配置，并建本项目索引（.codegraph/）
   --copy               不用软链接，各环境独立拷贝
   --skills <列表>      只装这些 skill（逗号分隔），自动带上 skill.json 里 requires 声明的依赖；缺省为全部
@@ -81,6 +82,7 @@ function parseArgs(argv) {
       case '--skip-db': o.skipDb = true; break;
       case '--yes': o.yes = true; break;
       case '--with-docnexus': o.withDocNexus = true; break;
+      case '--docnexus-root': o.docnexusRoot = val(); break;
       case '--with-codegraph': o.withCodeGraph = true; break;
       case '--copy': o.copy = true; break;
       case '--skills': o.skills = val(); break;
@@ -225,7 +227,10 @@ async function main() {
 
   updateGitignore(o.root, o.withDocNexus, o.withCodeGraph);
   organizeArtifacts(o.root);
+  if (o.docnexusRoot !== undefined) setDocNexusRoot(o.root, o.docnexusRoot);
   const docnexus = o.withDocNexus ? setupDocNexus(o.root, sel) : 'skipped';
+  // DocNexus 在别处（团队文档仓库）时，升级 / 重装都刷新本项目里的 DocNexus skills 链接与 CLAUDE.md / AGENTS.md 段落
+  if (!o.withDocNexus) refreshSharedDocNexus(o.root, sel);
   const codegraph = o.withCodeGraph ? setupCodeGraph(o.root, sel) : 'skipped';
   let seedFailed = false;
   // 接入 DocNexus 后文档类 skill 只从知识库取模板，所以 --with-docnexus 时一并导入（已有的不覆盖）；
@@ -256,7 +261,7 @@ async function main() {
   warn('        启用方法：填写 .agents/skills/md-to-wiki/wiki-config.json（enabled: true + base_url + api_token），或接入对应环境的 wiki MCP。重跑不会覆盖已填写的配置。');
   if (docnexus === 'ok') ok('DocNexus 已接入：dev / project-review 会按 docnexus-recall 查项目约定；文档类 skill 只从 docnexus/library/templates/ 取模板；任何写入 DocNexus 的操作都需你授权。');
   // 已接入 DocNexus：缺模板时文档类 skill 会停下来要求导入；默认模板有新版时提示更新或合并
-  if (fs.existsSync(path.join(o.root, 'docnexus', 'project.json'))) reportTemplateStatus(o.root);
+  if (docnexusConnected(o.root)) reportTemplateStatus(o.root);
   if (docnexus === 'failed') warn('注意：DocNexus 接入失败（见上方输出），其他 skills 不受影响；修复后可重跑（加 --with-docnexus）。');
   if (codegraph === 'failed') warn('注意：CodeGraph 接入失败（见上方输出），其他 skills 不受影响；skills 会退回 grep / 读文件；修复后可重跑（加 --with-codegraph）。');
   if (report.overwritten.length || report.removed.length) {

@@ -15,12 +15,13 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { skillMeta, resolveCategory, docnexusConnected, docnexusBin } from './resolve.mjs';
+import { skillMeta, resolveCategory, docnexusConnected, docnexusBin, docnexusRoot } from './resolve.mjs';
 
 const IS_WIN = process.platform === 'win32';
 
-const docnexus = (root, args) => spawnSync(path.join(root, docnexusBin(root) ?? path.join('node_modules', '.bin', 'docnexus')), args,
-  { cwd: root, encoding: 'utf8', shell: IS_WIN, maxBuffer: 256 * 1024 * 1024 });
+// 在 DocNexus 的项目根下运行（docnexus.root 指到团队文档仓库时就在那里），输出里的 path 相对那个目录
+const docnexus = (root, args) => spawnSync(path.resolve(root, docnexusBin(root) ?? path.join('node_modules', '.bin', 'docnexus')), args,
+  { cwd: docnexusRoot(root), encoding: 'utf8', shell: IS_WIN, maxBuffer: 256 * 1024 * 1024 });
 
 function runJson(root, args, what) {
   const r = docnexus(root, args);
@@ -46,6 +47,8 @@ export function knowledge(root, skill, { match = [], limit = 20, query: question
   const terms = match.map((t) => t.toLowerCase()).filter(Boolean);
   const hit = (d) => !terms.length || terms.some((t) => [d.title, d.summary, d.file_path, ...(d.tags ?? [])].some((v) => String(v ?? '').toLowerCase().includes(t)));
   const byCategory = question ? recallSupportsCategory(root) : false;
+  // DocNexus 不在本项目时，读文件要加上它的位置
+  const dnRel = path.relative(path.resolve(root), docnexusRoot(root)).split(path.sep).join('/');
   const seen = new Set();
   const categories = [];
   for (const from of meta.docnexus?.readFrom ?? []) {
@@ -57,7 +60,7 @@ export function knowledge(root, skill, { match = [], limit = 20, query: question
     const docs = q.documents.filter(hit).sort((a, b) => String(b.updated_at).localeCompare(String(a.updated_at)));
     const entry = {
       category: c.category, from, ok: true, total: docs.length,
-      documents: docs.slice(0, limit).map((d) => ({ id: d.id, title: d.title, summary: d.summary, path: d.library_path, updated_at: d.updated_at })),
+      documents: docs.slice(0, limit).map((d) => ({ id: d.id, title: d.title, summary: d.summary, path: d.library_path, ...(dnRel ? { file: `${dnRel}/${d.library_path}` } : {}), updated_at: d.updated_at })),
     };
     if (byCategory) {
       const r = runJson(root, ['recall', question, '--limit', String(recallLimit), '--category', c.category], 'recall');
@@ -65,7 +68,7 @@ export function knowledge(root, skill, { match = [], limit = 20, query: question
     }
     categories.push(entry);
   }
-  const out = { ok: true, skill, categories };
+  const out = { ok: true, skill, ...(dnRel ? { docnexus_root: dnRel, note: `DocNexus 在 ${dnRel}：引用写 path（docnexus/library/...），读正文用 file；recall 结果里的路径也相对 ${dnRel}` } : {}), categories };
   if (question) {
     out.recall_by_category = byCategory;
     if (!byCategory) out.recall_hint = '已装的 DocNexus 不支持 recall --category（0.16.0 起支持）：改用不带分类的 recall，并按上面列出的分类 / 路径挑结果；可升级 @rowansenne/docnexus';

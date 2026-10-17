@@ -2,7 +2,8 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { IS_WIN, CANON_DIR, MANIFEST, step, ok, warn, toPosix, fileHash, readManifest, removeEmptyDirs, lstat, timestamp, removeLink } from './core.mjs';
+import { IS_WIN, CANON_DIR, MANIFEST, step, ok, warn, toPosix, fileHash, readManifest, removeEmptyDirs, lstat, timestamp, removeLink, docnexusRoot, docnexusShared } from './core.mjs';
+import { removeDocNexusContext } from './docnexus.mjs';
 
 // 软链接是否指向 absTarget（按解析后的绝对路径比较，兼容 Windows 上 readlink 返回的 \\?\ 前缀）
 export function linkPointsTo(link, absTarget) {
@@ -34,6 +35,22 @@ export function uninstall(root) {
       removeLink(link); n++;
     }
     if (n) ok(`已移除 ${toPosix(rel)} 下 ${n} 个指向 ${toPosix(CANON_DIR)} 的软链接`);
+  }
+
+  // 1b. DocNexus 在别处（docnexus.root）时本工具接进来的东西：指向那里 docnexus/skills 的链接、CLAUDE.md / AGENTS.md 里的段落。
+  //     DocNexus 工作区本身在团队文档仓库里，不动
+  if (docnexusShared(root)) {
+    const src = path.join(docnexusRoot(root), 'docnexus', 'skills');
+    let n = 0;
+    for (const rel of bases) {
+      const dir = path.join(root, rel);
+      for (const name of fs.existsSync(dir) ? fs.readdirSync(dir) : []) {
+        const link = path.join(dir, name);
+        if (lstat(link)?.isSymbolicLink() && linkPointsTo(link, path.join(src, name))) { removeLink(link); n++; }
+      }
+    }
+    const files = removeDocNexusContext(root);
+    if (n || files.length) ok(`已移除指向 ${toPosix(path.relative(root, src))} 的 ${n} 个 DocNexus skill 链接${files.length ? `，以及 ${files.join('、')} 里的 DocNexus 段落` : ''}（DocNexus 工作区本身不动）`);
   }
 
   // 2. 各安装目录：按清单删除模板文件；用户配置与手改过的模板文件先备份

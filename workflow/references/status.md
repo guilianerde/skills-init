@@ -9,7 +9,7 @@
 |---|---|---|
 | 项目画像 | ✅ / ⚠️ 部分字段为空 | <空字段>；运行 /workflow profile |
 | wiki | ✅ / ❌ | 填写 md-to-wiki/wiki-config.json 或接入 wiki MCP |
-| DocNexus | ✅ / ❌ | 重跑 skills-init 并加 --with-docnexus；已接入但缺模板时列出缺的模板并提示 `skills-init seed-templates` |
+| DocNexus | ✅ / ❌（`docnexus.root` 不是 `.` 时注明位置，如「在 ../team-docs」） | 重跑 skills-init 并加 --with-docnexus；已接入但缺模板时列出缺的模板并提示 `skills-init seed-templates` |
 | 数据库 | ✅ / ❌ | 重跑 init-skills 补配 |
 | 代码图谱 | ✅ / ⚠️ 已装未建索引 / ❌ | 重跑 skills-init 并加 --with-codegraph；已装 codegraph 但没有 .codegraph/ 时提示用户自己运行 codegraph init |
 

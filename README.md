@@ -206,6 +206,7 @@ npx @rowansenne/skills-init doctor
 | `-WithCodeGraph` / `--with-codegraph` | 可选：接入 [CodeGraph](https://github.com/colbymchenry/codegraph) 代码图谱，见下方「CodeGraph 代码图谱（可选）」 |
 | `-Copy` / `--copy`      | 不建软链接，各环境独立拷贝一份完整 skills                                  |
 | `--skills <列表>` | 只装这些 skill（逗号分隔），自动带上 `requires` 依赖；之后可以再用 `--skills` 补装，已装的保留；`upgrade` 只升级装过的。不含 database-query 时不询问数据库 |
+| `-DocnexusRoot <dir>` / `--docnexus-root <dir>` | 可选：DocNexus 工作区放在别的目录，例如和产物共用的团队文档仓库 `../team-docs`（写入 `workflow/profile.json` 的 `docnexus.root`；`.` 改回本项目），见下方「和产物共用团队文档仓库」 |
 | `-SeedTemplates` / `--seed-templates` | 把自带的文档模板导入 DocNexus（已有的不覆盖）；接入 DocNexus 后文档类 skill 只从知识库取模板。`--with-docnexus` 会自动执行 |
 | `-Uninstall` / `--uninstall` | 按安装清单卸载本项目装的 skills 与链接，见下方「卸载」 |
 | `-Offline` / `--offline` | `doctor` 不测试数据库连通性 |
@@ -240,6 +241,20 @@ npx @rowansenne/skills-init doctor
 * 安装后 `dev`、`project-review` 会先按 `docnexus-recall` 查项目约定；`dev`、`project-review` 交付时**每次都问**要不要沉淀（写入后把库内路径记回交付说明 / 审查报告的「DocNexus」元信息行），`create-tech-md-doc`、`create-release-md-doc` 结束时有值得记的内容才**提议**沉淀；**任何写入 DocNexus 的操作都必须经你授权**。
 * 离线或测试时可用环境变量指定安装来源，例如 `DOCNEXUS_PKG=/path/to/rowansenne-docnexus-0.13.0.tgz ./skills-init/init-skills.sh --with-docnexus`（PowerShell：`$env:DOCNEXUS_PKG=...`）。
 * Windows 上 qwen 的链接使用目录 junction（与 docnexus 的做法一致）；Git Bash 下 `ln -s` 是否生成真正的链接取决于 MSYS 设置，建议 Windows 用 PowerShell 版。
+
+### 和产物共用团队文档仓库
+
+产物放到独立文档仓库（`artifacts.repo`，见「产物输出规范」）后，DocNexus 也可以放进同一个仓库，团队只管一个仓库，知识库各服务共用：
+
+```bash
+npx @rowansenne/skills-init --with-docnexus --docnexus-root ../team-docs
+```
+
+* DocNexus 装在 `../team-docs/docnexus/`，以 `../team-docs` 为项目根运行（`docnexus init --agent none`：它自己不往文档仓库里链接 skills、写 `CLAUDE.md`），知识随文档仓库提交，不用 DocNexus 的 `--git-remote`。
+* 本项目里由 skills-init 接上：把 `../team-docs/docnexus/skills/*` 相对链接到 `.claude/skills` / `.agents/skills` / `.qwen/skills`，在 `CLAUDE.md` / `AGENTS.md` 写一段说明（概念索引 `@../team-docs/docnexus/CONCEPTS.md`；docnexus 系列 skill 的命令先 `cd ../team-docs` 再运行），用自己的标记，不碰手写内容。升级时刷新，卸载时撤掉，文档仓库里的 DocNexus 不动。
+* 各 skill 的脚本已按位置处理：`resolve.mjs status` 给出 `docnexus.root` 与 `run_in`，模板从文档仓库的知识库取，`knowledge.mjs` 在那里运行并给出从本项目读正文的路径；沉淀后的知识库改动和产物一样由你确认后在文档仓库提交（`requirement.mjs pending` 单独列出）。
+* 每个人先把团队文档仓库克隆到 `docnexus.root` 指的位置；DocNexus 的依赖和检索库（`node_modules/`、`store/`）不进仓库，各自 `--with-docnexus` 装一次。
+* 本项目里原来的 `docnexus/` 不会自动搬过去，安装时会提示。
 
 ## CodeGraph 代码图谱与 code-graph skill（可选）
 

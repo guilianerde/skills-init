@@ -16,7 +16,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { loadSkills, deriveMeta, TEMPLATE_CATEGORY, TEMPLATE_CATEGORY_REASON } from './skills.mjs';
-import { docnexusBin } from './lib/core.mjs';
+import { docnexusBin, docnexusRoot } from './lib/core.mjs';
 
 // 模板清单来自各 skill 的 skill.json（templates 字段）。没有 src 的（技术方案、上线方案）不随 skills 提供默认版本，
 // 由用户第一次使用时按样例创建，不在导入与版本跟踪之列
@@ -25,22 +25,23 @@ export { TEMPLATE_CATEGORY };
 
 const IS_WIN = process.platform === 'win32';
 const sha256 = (s) => crypto.createHash('sha256').update(s).digest('hex');
-const binPath = (root) => docnexusBin(root) ?? path.join(root, 'docnexus', 'node_modules', '.bin', IS_WIN ? 'docnexus.cmd' : 'docnexus');
+// DocNexus 可能不在本项目（profile.json 的 docnexus.root 指到团队文档仓库）：命令在它的项目根下运行，草稿与知识库路径也相对那里
+const binPath = (root) => docnexusBin(root) ?? path.join(docnexusRoot(root), 'docnexus', 'node_modules', '.bin', IS_WIN ? 'docnexus.cmd' : 'docnexus');
 
 function docnexus(root, args) {
-  const r = spawnSync(binPath(root), args, { cwd: root, encoding: 'utf8', shell: IS_WIN, maxBuffer: 64 * 1024 * 1024 });
+  const r = spawnSync(binPath(root), args, { cwd: docnexusRoot(root), encoding: 'utf8', shell: IS_WIN, maxBuffer: 64 * 1024 * 1024 });
   let json = null;
   try { json = JSON.parse(r.stdout); } catch { /* 非 JSON 输出 */ }
   return { ok: r.status === 0, json, err: (r.stderr || r.stdout || '').trim() };
 }
 
 function requireDocNexus(root) {
-  if (!fs.existsSync(path.join(root, 'docnexus', 'project.json')) || !docnexusBin(root)) {
+  if (!fs.existsSync(path.join(docnexusRoot(root), 'docnexus', 'project.json')) || !docnexusBin(root)) {
     throw new Error('未检测到 DocNexus（需要 docnexus/project.json，以及 docnexus/node_modules/.bin/docnexus 或旧装法的 node_modules/.bin/docnexus）。先加 --with-docnexus 接入。');
   }
 }
 
-const libFile = (root, t) => path.join(root, 'docnexus', 'library', t.file);
+const libFile = (root, t) => path.join(docnexusRoot(root), 'docnexus', 'library', t.file);
 const defaultContent = (tplDir, t) => fs.readFileSync(path.join(tplDir, t.src), 'utf8');
 
 // 写草稿并提交；baseVersion 为 'new'（新建）或已有记录的 record_version（更新，带 --replace）。成功返回 null，失败返回错误信息
@@ -49,9 +50,10 @@ function writeDraft(root, t, content, metadata, baseVersion) {
   const draft = docnexus(root, ['draft', 'new', '--slug', `template-${t.skill}`]);
   if (!draft.ok || !draft.json?.artifacts) return draft.err || 'draft new 失败';
   const a = draft.json.artifacts;
-  fs.writeFileSync(path.join(root, a.source), content);
-  fs.writeFileSync(path.join(root, a.document), content);
-  fs.writeFileSync(path.join(root, a.metadata), JSON.stringify(metadata, null, 2) + '\n');
+  const dn = docnexusRoot(root);
+  fs.writeFileSync(path.join(dn, a.source), content);
+  fs.writeFileSync(path.join(dn, a.document), content);
+  fs.writeFileSync(path.join(dn, a.metadata), JSON.stringify(metadata, null, 2) + '\n');
   const seal = docnexus(root, ['draft', 'seal', '--id', draft.json.draft_id, '--file', t.file, '--base-version', baseVersion,
     '--category', TEMPLATE_CATEGORY, '--category-reason', TEMPLATE_CATEGORY_REASON]);
   const add = seal.ok ? docnexus(root, ['document', 'add', '--draft', draft.json.draft_id, ...(baseVersion === 'new' ? [] : ['--replace'])]) : seal;

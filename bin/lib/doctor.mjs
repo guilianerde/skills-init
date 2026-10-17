@@ -88,6 +88,16 @@ export function doctor(root, offline) {
   if (st) {
     if (st.profile.ok) ok('项目画像已填写'); else meh(`项目画像未完成（空字段：${st.profile.empty.join('、')}）：运行 /workflow profile`);
     if (st.wiki.ok) ok('wiki 已配置'); else console.log('    --  wiki 未配置（可选；也可能通过 wiki MCP 提供）');
+    if (st.docnexus.root && st.docnexus.root !== '.') {
+      // DocNexus 在别处（团队文档仓库）：本项目要有 docnexus skill 的链接和 CLAUDE.md / AGENTS.md 段落，agent 才知道去哪里找
+      if (!st.docnexus.ok) meh(`docnexus.root 指向 ${st.docnexus.root}，但那里还没有 DocNexus 工作区：先克隆团队文档仓库，再重跑 skills-init（加 --with-docnexus）`);
+      else {
+        const linked = [CANON_DIR, path.join('.claude', 'skills'), path.join('.qwen', 'skills')].some((b) => lstat(path.join(root, b, 'docnexus-recall'))?.isSymbolicLink());
+        const ctx = ['CLAUDE.md', 'AGENTS.md'].some((f) => { try { return fs.readFileSync(path.join(root, f), 'utf8').includes('skills-init:docnexus:start'); } catch { return false; } });
+        if (linked && ctx) ok(`DocNexus 在 ${st.docnexus.root}/docnexus/（和产物共用的仓库），本项目已链接它的 skills 并写入段落`);
+        else meh(`DocNexus 在 ${st.docnexus.root}/docnexus/，但本项目${linked ? '' : '缺少 docnexus skill 链接'}${!linked && !ctx ? '、' : ''}${ctx ? '' : '缺少 CLAUDE.md / AGENTS.md 里的 DocNexus 段落'}：运行 skills-init upgrade`);
+      }
+    }
     if (st.docnexus.ok) {
       if (!reportTemplateStatus(root, meh)) ok('DocNexus 已接入，文档模板齐全且与默认模板同步（或为团队定制版）');
       for (const f of st.docnexus.stale_project_templates) meh(`${f} 在接入 DocNexus 后已不再生效，建议删除`);

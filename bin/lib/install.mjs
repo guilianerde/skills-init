@@ -2,7 +2,7 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { TPL_DIR, PKG, CANON_DIR, INSTALL_BASES, SKILLS, SKILL_LIST, USER_FILES, RENAMED, MANIFEST, ok, warn, readJson, walk, toPosix, sameFile, writeFile, render, sha256, fileHash, readManifest, removeEmptyDirs, lstat, timestamp, removeLink } from './core.mjs';
+import { TPL_DIR, PKG, CANON_DIR, INSTALL_BASES, SKILLS, SKILL_LIST, USER_FILES, RENAMED, MANIFEST, ok, warn, readJson, walk, toPosix, sameFile, writeFile, render, sha256, fileHash, readManifest, removeEmptyDirs, lstat, timestamp, removeLink, docnexusRoot } from './core.mjs';
 import { writeDbConfig } from './db.mjs';
 import { migrate as migrateArtifacts, planMigration, layout, ensureIgnore, REQ_DIR } from '../../workflow/scripts/requirement.mjs';
 
@@ -289,7 +289,7 @@ export function preserveRetiredTemplates(root) {
   for (const s of SKILL_LIST) {
     for (const t of s.templates.filter((x) => !x.src)) {
       const project = path.join(root, 'docs', 'skills', 'templates', s.name, t.id);
-      const lib = path.join(root, 'docnexus', 'library', 'templates', s.name, t.id);
+      const lib = path.join(docnexusRoot(root), 'docnexus', 'library', 'templates', s.name, t.id);
       if (fs.existsSync(project) || fs.existsSync(lib)) continue;
       const old = INSTALL_BASES.map((b) => path.join(root, b, s.name, t.id)).find((f) => fs.existsSync(f) && fs.statSync(f).isFile());
       if (!old) continue;
