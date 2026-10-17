@@ -4,6 +4,8 @@
 
 ## [Unreleased]
 
+## [0.17.0] - 2026-10-17
+
 ### 新增
 - **`skills-init docs-repo <仓库地址> [--project <项目名>]`：一条命令改用团队文档仓库**。克隆到 `skills-init/`（里面只有 `tmp/` 时先挪开再放回；已有产物、DocNexus 或项目模板时停下，不自动合并），代码仓库 `.gitignore` 加 `/skills-init/`，文档仓库 `.git/info/exclude` 加 `/tmp/`，项目名写进 `workflow/profile.json`（默认沿用已配置的，其次 git 远端仓库名），文档仓库里有 DocNexus 时接上本项目的链接与段落。不带地址显示当前状态；`--project` 单独使用时只改项目名。安装 / 升级时也会给文档仓库加上 `/tmp/` 排除。
 
@@ -234,7 +236,8 @@
 - 安装器改为单一 Node 实现，`init-skills.sh` / `init-skills.ps1` 只是薄封装。
 - `code-review` 改名为 `project-review`，升级时自动清理旧名。
 
-[Unreleased]: https://github.com/guilianerde/skills-init/compare/v0.16.0...HEAD
+[Unreleased]: https://github.com/guilianerde/skills-init/compare/v0.17.0...HEAD
+[0.17.0]: https://github.com/guilianerde/skills-init/compare/v0.16.0...v0.17.0
 [0.16.0]: https://github.com/guilianerde/skills-init/compare/v0.15.0...v0.16.0
 [0.15.0]: https://github.com/guilianerde/skills-init/compare/v0.14.0...v0.15.0
 [0.14.0]: https://github.com/guilianerde/skills-init/compare/v0.13.0...v0.14.0
