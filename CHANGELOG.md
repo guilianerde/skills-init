@@ -4,6 +4,8 @@
 
 ## [Unreleased]
 
+## [0.18.0] - 2026-10-18
+
 ### 变更（破坏性，不兼容旧版本）
 - **包改名为 `@rowansenne/workflow-run`**，命令改为 `workflow-run`（`npx @rowansenne/workflow-run`）；项目里的目录 `skills-init/` 改为 `workflow-run/`，安装清单 `.skills-init.json` 改为 `.workflow-run.json`，`CLAUDE.md` / `AGENTS.md` 段落标记改为 `workflow-run:docnexus`，环境变量 `SKILLS_INIT_ADMIN` / `SKILLS_INIT_NO_SYMLINK` 改为 `WORKFLOW_RUN_ADMIN` / `WORKFLOW_RUN_NO_SYMLINK`，导入 DocNexus 的模板标签改为 `workflow-run-template`。
 - 不自动迁移：项目里还有 `skills-init/` 或 `.skills-init.json` 时，任何命令都会列出改名命令后停下；旧的 `CLAUDE.md` / `AGENTS.md` 段落和含 `skills-init/` 的忽略规则只提示删除。
@@ -240,7 +242,8 @@
 - 安装器改为单一 Node 实现，`init-skills.sh` / `init-skills.ps1` 只是薄封装。
 - `code-review` 改名为 `project-review`，升级时自动清理旧名。
 
-[Unreleased]: https://github.com/guilianerde/skills-init/compare/v0.17.0...HEAD
+[Unreleased]: https://github.com/guilianerde/skills-init/compare/v0.18.0...HEAD
+[0.18.0]: https://github.com/guilianerde/skills-init/compare/v0.17.0...v0.18.0
 [0.17.0]: https://github.com/guilianerde/skills-init/compare/v0.16.0...v0.17.0
 [0.16.0]: https://github.com/guilianerde/skills-init/compare/v0.15.0...v0.16.0
 [0.15.0]: https://github.com/guilianerde/skills-init/compare/v0.14.0...v0.15.0
