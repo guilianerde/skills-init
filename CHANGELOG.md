@@ -4,6 +4,12 @@
 
 ## [Unreleased]
 
+### 新增
+- **DocNexus 沉淀统一记录来源**：`requirement.mjs provenance <产物路径> [--text]` 按产物生成统一的来源字符串，例如「交付说明 · 需求「订单导出支持按渠道筛选」· 分支 feature/order-export · 2026-10-15 · docs/skills/requirements/…/delivery.md」（需求名取 meta.json，取不到时只写分支；日期取文档头，旧布局可从文件名补）。dev 和 project-review 沉淀时把它原样写进每条 fact 的 provenance，并写进沉淀正文末尾固定的「来源」一节（facts 可选，正文保证有记录）；规则见 `workflow/references/docnexus.md`「沉淀的来源」。DocNexus 本身不改，产物里「DocNexus：docnexus/library/<path>」的反向链接不变。
+
+### 修复
+- 需求目录产物的日期会误取第一行 md-to-wiki 发布记录里的 `at=`（发布时间），影响 `meta.json`、视图与排序；改为跳过 HTML 注释取文档头的日期。
+
 ## [0.13.0] - 2026-10-16
 
 ### 新增

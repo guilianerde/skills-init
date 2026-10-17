@@ -43,7 +43,7 @@ export function parseWiki(text) {
 
 const fileDate = (name) => { const m = name.match(/(\d{4})(\d{2})(\d{2})(?:_v(\d+))?\.md$/); return m ? `${m[1]}-${m[2]}-${m[3]}${m[4] ? `#${m[4].padStart(3, '0')}` : ''}` : ''; };
 
-const headerDate = (text) => /(\d{4}-\d{2}-\d{2})/.exec(text.split(/\r?\n/).slice(0, 8).join('\n'))?.[1] ?? '';
+const headerDate = (text) => /(\d{4}-\d{2}-\d{2})/.exec(text.replace(/<!--[\s\S]*?-->/g, '').split(/\r?\n/).slice(0, 8).join('\n'))?.[1] ?? ''; // 跳过 md-to-wiki 发布记录里的 at=
 
 // docs/skills/requirements/<需求>/<文件> 或旧版 docs/skills/<skill>/<文件> → 产物条目；不是已知产物返回 null
 function entry(rel, text, mtime) {
