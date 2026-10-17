@@ -16,7 +16,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { inferProfile } from './infer-profile.mjs';
-import { layout } from './requirement.mjs';
+import { layout, HOME, TEMPLATES_DIR } from './requirement.mjs';
 
 const SKILLS_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const PROFILE_FIELDS = ['main_branch', 'build', 'test', 'test_single', 'lint', 'config_center', 'deploy.platform', 'deploy.regions', 'job_annotation'];
@@ -36,23 +36,18 @@ function skillMetas() {
 
 export const skillMeta = (name) => skillMetas().find((m) => m.name === name);
 
-// DocNexus 的项目根：docnexus/ 工作区所在的目录。默认是本项目；profile.json 的 docnexus.root 可以指到别处
-// （例如和产物共用的团队文档仓库 ../team-docs），此时 DocNexus 的命令都在那个目录下运行。bin/lib/core.mjs 的 docnexusRoot 与此一致
-export function docnexusRoot(root) {
-  const r = readJson(path.join(SKILLS_DIR, 'workflow', 'profile.json'))?.docnexus?.root;
-  return r ? path.resolve(root, String(r)) : path.resolve(root);
-}
+// DocNexus 的项目根：skills-init/（工作区在 skills-init/docnexus/），DocNexus 的命令都在这个目录下运行。bin/lib/core.mjs 的 docnexusRoot 与此一致
+export const docnexusRoot = (root) => path.resolve(root, HOME);
 
-// DocNexus CLI 的位置（相对项目根）：0.17.0 起装在 docnexus/ 下（docnexus/node_modules/.bin），之前装在项目根。
-// 两处都有时用 docnexus/ 下的；都没有返回 null。bin/lib/core.mjs 的 docnexusBin 与此一致
-export const DOCNEXUS_BIN_DIRS = [['docnexus', 'node_modules', '.bin'], ['node_modules', '.bin']];
+// DocNexus CLI 的位置（相对项目根）：skills-init/docnexus/node_modules/.bin；没有返回 null。bin/lib/core.mjs 的 docnexusBin 与此一致
+export const DOCNEXUS_BIN_DIRS = [['docnexus', 'node_modules', '.bin']];
 export function docnexusBin(root) {
   const name = process.platform === 'win32' ? 'docnexus.cmd' : 'docnexus';
   const dn = docnexusRoot(root);
   for (const dir of DOCNEXUS_BIN_DIRS) if (fs.existsSync(path.join(dn, ...dir, name))) return path.relative(path.resolve(root), path.join(dn, ...dir, name));
   return null;
 }
-// 给 agent 的命令写法：项目内是 ./docnexus/...，在别处是 ../team-docs/docnexus/...
+// 给 agent 的命令写法（相对项目根）：./skills-init/docnexus/...
 const cmdPath = (p) => { const s = p.split(path.sep).join('/'); return s.startsWith('.') ? s : `./${s}`; };
 
 // CodeGraph 代码图谱：本项目建过索引（.codegraph/）且 codegraph 命令可用。索引是否建立由用户决定，skill 不自行 codegraph init
@@ -75,7 +70,7 @@ export function resolveTemplate(root, skill, id) {
   const t = meta?.templates.find((x) => x.id === id);
   if (!t) return { ok: false, error: 'unknown', message: `skill「${skill}」没有登记模板「${id}」（见 ${skill}/skill.json 的 templates）` };
   const lib = path.join(docnexusRoot(root), 'docnexus', 'library', 'templates', skill, id);
-  const project = path.join(root, 'docs', 'skills', 'templates', skill, id);
+  const project = path.join(root, TEMPLATES_DIR, skill, id);
   // 没有 src 的模板（技术方案、上线方案）不随 skills 提供，缺失时按「创建模板」由用户给样例生成
   const builtin = t.src ? path.join(SKILLS_DIR, skill, t.src.replace(/\.tpl$/, '')) : null;
   const CREATE = '按 <skills>/workflow/references/templates.md「创建模板」处理：请用户给一份团队现有的同类文档作样例（本地 md 或 wiki pageId / URL），用 workflow/scripts/make-template.mjs 抽骨架，和用户确认后保存到 expected';
@@ -160,9 +155,9 @@ export function status(root) {
       ok: dn,
       // 调用 DocNexus CLI 时用这个路径（在项目根执行）
       bin: dn ? cmdPath(docnexusBin(root)) : null,
-      // DocNexus 的项目根（相对本项目）：不是「.」时，docnexus 系列 skill 里的命令（./docnexus/...、docnexus/library/<path>）都在这个目录下运行和解析
-      root: rel(root, docnexusRoot(root)) || '.',
-      run_in: rel(root, docnexusRoot(root)) ? `cd ${rel(root, docnexusRoot(root))} && ` : null,
+      // DocNexus 的项目根（相对本项目）：docnexus 系列 skill 里的命令（./docnexus/...、docnexus/library/<path>）都在这个目录下运行和解析
+      root: HOME,
+      run_in: `cd ${HOME} && `,
       missing_templates: dn ? templates.filter((t) => !t.ok && !t.on_demand).map((t) => t.expected) : [],
       stale_project_templates: dn ? templates.map((t) => t.stale_project_file).filter(Boolean) : [],
       // 各 skill 写入时使用的显式分类（没声明的 skill 不列出）
@@ -170,7 +165,7 @@ export function status(root) {
       how: dn ? '缺模板时运行 skills-init seed-templates' : '重跑 skills-init 并加 --with-docnexus',
     },
     // 产物位置：项目里（默认）或独立文档仓库（workflow/references/requirements.md）
-    artifacts: (() => { const L = layout(root); return { mode: L.mode, ok: L.ok, ...(L.mode === 'repo' ? { repo: L.repo_rel, project: L.project, commit_prompt: L.commit_prompt } : { dir: 'docs/skills/requirements' }), how: L.ok ? null : L.hint }; })(),
+    artifacts: (() => { const L = layout(root); return { mode: L.mode, ok: L.ok, ...(L.mode === 'repo' ? { repo: L.repo_rel, project: L.project, commit_prompt: L.commit_prompt } : { dir: 'skills-init/docs/requirements' }), how: L.ok ? null : L.hint }; })(),
     // 代码图谱：可用时读代码、查调用链与影响面优先用它（见 workflow/references/codegraph.md）
     codegraph: codegraphStatus(root),
     database: {

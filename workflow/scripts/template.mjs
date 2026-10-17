@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // 修改 / 创建文档模板（/workflow template）的确定性步骤：起草稿 → 校验并与当前模板、已生成文档比对 → 确认后保存。
-// 来源判定沿用 resolve.mjs template；改动只落在草稿 tmp/skills/template-draft/<skill>/<模板>，save 时才写到生效位置。
+// 来源判定沿用 resolve.mjs template；改动只落在草稿 skills-init/tmp/template-draft/<skill>/<模板>，save 时才写到生效位置。
 // 已接入 DocNexus 时 save 不直接写知识库（写入需按 capture 流程、经用户授权），退出码 2 并给出指引。
 // 流程说明见 workflow/references/templates.md「修改模板」。
 //
@@ -12,7 +12,7 @@
 // <模板>：tech | release | plan | delivery | review | checklist，或 <skill>[/<模板文件名>]（如 create-tech-md-doc/template.md）
 // draft：把当前生效的模板复制成草稿；还没有模板（或 --from）时按样例抽骨架（make-template.mjs）。草稿已存在时不覆盖，--force 重来
 // check：草稿本身的格式问题、与当前模板相比的章节变化、拿最近几份已生成文档按新旧模板各跑一次 lint-doc 看影响
-// save：check 无错误才写入；原模板备份到 tmp/skills/template-backup/<时间>/，写入后重新 resolve 确认生效，删除草稿
+// save：check 无错误才写入；原模板备份到 skills-init/tmp/template-backup/<时间>/，写入后重新 resolve 确认生效，删除草稿
 // 输出 JSON。退出码：0 正常；1 参数错误 / 草稿有错误；2 需要按输出的 hint 处理（缺样例、已接入 DocNexus 需 capture）
 
 import fs from 'node:fs';
@@ -50,7 +50,7 @@ export function target(name) {
   return t ? { skill, id: t.id } : null;
 }
 
-const draftPath = (root, { skill, id }) => path.join(root, 'tmp', 'skills', 'template-draft', skill, id);
+const draftPath = (root, { skill, id }) => path.join(root, 'skills-init', 'tmp', 'template-draft', skill, id);
 
 // 草稿本身的格式检查：错误挡住保存，警告给用户看
 export function checkFormat(text) {
@@ -118,7 +118,7 @@ function current(root, t) {
 export function draft(root, t, { from = null, force = false, stdin = () => fs.readFileSync(0, 'utf8') } = {}) {
   const file = draftPath(root, t);
   const { r, text } = current(root, t);
-  const base = { skill: t.skill, id: t.id, draft: rel(root, file), source: r.ok ? r.source : null, current: r.ok ? r.path : null, docnexus: !!r.docnexus, expected: r.ok ? (r.source === 'default' ? rel(root, path.join(root, 'docs', 'skills', 'templates', t.skill, t.id)) : r.path) : r.expected };
+  const base = { skill: t.skill, id: t.id, draft: rel(root, file), source: r.ok ? r.source : null, current: r.ok ? r.path : null, docnexus: !!r.docnexus, expected: r.ok ? (r.source === 'default' ? rel(root, path.join(root, 'skills-init', 'templates', t.skill, t.id)) : r.path) : r.expected };
   if (r.error === 'unknown') return { code: 1, out: { ok: false, ...base, message: r.message } };
   if (fs.existsSync(file) && !force && !from) return { code: 0, out: { ok: true, ...base, created: false, note: '草稿已存在，沿用上次的草稿；要从当前模板重来加 --force' } };
   let content;
@@ -172,10 +172,10 @@ export function save(root, t, file = null) {
       },
     };
   }
-  const dst = path.join(root, 'docs', 'skills', 'templates', t.skill, t.id);
+  const dst = path.join(root, 'skills-init', 'templates', t.skill, t.id);
   let backup = null;
   if (fs.existsSync(dst)) {
-    backup = path.join(root, 'tmp', 'skills', 'template-backup', stamp(), t.skill, t.id);
+    backup = path.join(root, 'skills-init', 'tmp', 'template-backup', stamp(), t.skill, t.id);
     fs.mkdirSync(path.dirname(backup), { recursive: true });
     fs.copyFileSync(dst, backup);
   }

@@ -33,14 +33,15 @@ function project({ connect = true } = {}) {
   const r = spawnSync(process.execPath, [path.join(REPO, 'bin', 'skills-init.mjs'), '--project-root', root, '--envs', 'codex', '--skip-db', '--yes'], { encoding: 'utf8' });
   assert.equal(r.status, 0, r.stderr);
   if (connect) {
-    fs.mkdirSync(path.join(root, 'docnexus'), { recursive: true });
-    fs.writeFileSync(path.join(root, 'docnexus', 'project.json'), '{}');
+    fs.mkdirSync(path.join(root, 'skills-init/docnexus'), { recursive: true });
+    fs.writeFileSync(path.join(root, 'skills-init/docnexus', 'project.json'), '{}');
     // DocNexus 0.17.0 起的装法：CLI 在 docnexus/node_modules/.bin
-    fs.mkdirSync(path.join(root, 'docnexus', 'node_modules', '.bin'), { recursive: true });
-    fs.writeFileSync(path.join(root, 'docnexus', 'node_modules', '.bin', 'docnexus'), FAKE, { mode: 0o755 });
+    fs.mkdirSync(path.join(root, 'skills-init/docnexus', 'node_modules', '.bin'), { recursive: true });
+    fs.writeFileSync(path.join(root, 'skills-init/docnexus', 'node_modules', '.bin', 'docnexus'), FAKE, { mode: 0o755 });
   }
   const doc = (id, category, title, updated_at, extra = {}) => ({ id, category, title, summary: `${title} 摘要`, file_path: `notes/${id}.md`, updated_at, tags: [], body: `${title} 正文`, ...extra });
-  fs.writeFileSync(path.join(root, 'docs.json'), JSON.stringify([
+  fs.mkdirSync(path.join(root, 'skills-init'), { recursive: true });
+  fs.writeFileSync(path.join(root, 'skills-init', 'docs.json'), JSON.stringify([
     doc('a', 'dev-notes', '订单幂等约定', '2026-10-01'),
     doc('b', 'dev-notes', '缓存击穿处理', '2026-10-03', { body: '缓存失效时订单查询走互斥锁' }),
     doc('c', 'code-review', '金额精度', '2026-10-02', { tags: ['订单'] }),
@@ -104,7 +105,7 @@ test('--query：每个分类内 recall 按正文检索；旧版 DocNexus 不支�
   assert.deepEqual(r.out.categories.map((c) => [c.category, c.recall.context_groups.map((g) => g.id)]), [['dev-notes', ['a', 'b']], ['tech-design', []], ['code-review', []]]);
   assert.equal(run('dev').out.recall_by_category, undefined, '不给 --query 不 recall');
   assert.equal(run('dev', '--query', 'x', '--recall-limit', '0').status, 1);
-  fs.writeFileSync(path.join(root, 'old-docnexus'), '');
+  fs.writeFileSync(path.join(root, 'skills-init', 'old-docnexus'), '');
   r = run('dev', '--query', '订单');
   assert.equal(r.out.recall_by_category, false);
   assert.match(r.out.recall_hint, /0\.16\.0/);

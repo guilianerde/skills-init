@@ -14,21 +14,20 @@ function project() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'view-'));
   spawnSync('git', ['init', '-q', '-b', 'main'], { cwd: root });
   const put = (rel, text) => { fs.mkdirSync(path.dirname(path.join(root, rel)), { recursive: true }); fs.writeFileSync(path.join(root, rel), text); };
-  const dir = 'docs/skills/requirements/订单导出';
+  const dir = 'skills-init/docs/requirements/订单导出';
   put(`${dir}/meta.json`, JSON.stringify({ name: '订单导出（按渠道）', named_by: 'user', branches: ['feature/export'] }));
   put(`${dir}/review.md`, '# 审查\n\n> 审查范围：分支对比 ｜ 日期：2026-10-15\n> 对比分支：`feature/export` ←→ `main`\n> DocNexus：未沉淀\n\n## 严重问题（CRITICAL / HIGH） *\n\n| # | 级别 | 位置 | 问题 | 触发条件 | 建议 | 复核 |\n|---|---|---|---|---|---|---|\n| 1 | HIGH | A.java:1 | 未分页 | 大渠道 | 分页 | ✅ |\n');
   put(`${dir}/delivery.md`, '# 交付\n\n> 类型：功能开发 ｜ 日期：2026-10-15\n> 对比分支：`feature/export` ←→ `main`\n> DocNexus：docnexus/library/dev-notes/export.md、docnexus/library/code-review/paging.md\n');
   put(`${dir}/review_v2.md`, '# 复审\n\n> 日期：2026-10-16\n> 对比分支：`feature/export` ←→ `main`\n> DocNexus：docnexus/library/code-review/paging.md\n\n## 与上次审查对比（如有）\n\n| 上次 # | 问题 | 状态 | 依据 |\n|---|---|---|---|\n| 1 | 未分页 | 已修复 | abc |\n');
   put(`${dir}/tech-doc.md`, '<!-- md-to-wiki: pageId=42 version=2 -->\n# 技术方案 </script><img src=x onerror=alert(1)>\n\n> 对比分支：`feature/export` ←→ `main`\n');
-  put('docs/skills/project-review/review-feature-old-20260901.md', '# 旧审查\n\n> 对比分支：`feature/old` ←→ `main`\n');
   return root;
 }
 
-test('viewData：需求目录按需求分组（用 meta.json 的名字），旧布局按分支标为未归档；审查带解析结果', () => {
+test('viewData：按需求分组（用 meta.json 的名字）；审查带解析结果', () => {
   const root = project();
   const d = viewData(root);
-  assert.equal(d.requirements.length, 2);
-  const r = d.requirements.find((x) => x.archived);
+  assert.equal(d.requirements.length, 1);
+  const r = d.requirements[0];
   assert.equal(r.name, '订单导出（按渠道）');
   assert.deepEqual(r.branches, ['feature/export']);
   assert.deepEqual([r.stages.review, r.stages.tech, r.stages.plan], [2, 1, 0]);
@@ -40,10 +39,7 @@ test('viewData：需求目录按需求分组（用 meta.json 的名字），旧�
   assert.deepEqual(r.docnexus[1].from.map((f) => f.file), ['delivery.md', 'review_v2.md'], '同一篇知识文档来自两份产物，去重后都列出');
   assert.deepEqual(d.knowledge.map((k) => k.path), ['docnexus/library/code-review/paging.md', 'docnexus/library/dev-notes/export.md']);
   assert.deepEqual(d.knowledge[0].sources.map((s) => [s.name, s.label]), [['订单导出（按渠道）', '交付说明'], ['订单导出（按渠道）', '审查报告']]);
-  const legacy = d.requirements.find((x) => !x.archived);
-  assert.equal(legacy.name, 'feature/old');
-  assert.deepEqual(legacy.docnexus, []);
-  assert.equal(d.report.review.reports, 3);
+  assert.equal(d.report.review.reports, 2);
   fs.rmSync(root, { recursive: true, force: true });
 });
 
@@ -56,21 +52,21 @@ test('renderHtml：单文件、数据内嵌且转义（正文里的 </script> �
   assert.match(html, /prefers-color-scheme:dark/);
   assert.match(html, /<title>项目文档视图 · view-/);
   const json = /<script id="data" type="application\/json">([\s\S]*?)<\/script>/.exec(html)[1];
-  assert.equal(JSON.parse(json).requirements.length, 2);
+  assert.equal(JSON.parse(json).requirements.length, 1);
   fs.rmSync(root, { recursive: true, force: true });
 });
 
-test('CLI：skills-init view 默认写到 tmp/skills/view/index.html，--out 指定位置；不改产物', () => {
+test('CLI：skills-init view 默认写到 skills-init/tmp/view/index.html，--out 指定位置；不改产物', () => {
   const root = project();
-  const before = fs.readFileSync(path.join(root, 'docs/skills/requirements/订单导出/meta.json'), 'utf8');
+  const before = fs.readFileSync(path.join(root, 'skills-init/docs/requirements/订单导出/meta.json'), 'utf8');
   let r = spawnSync(process.execPath, [path.join(REPO, 'bin/skills-init.mjs'), 'view', '--project-root', root], { encoding: 'utf8' });
   assert.equal(r.status, 0, r.stderr);
-  assert.match(r.stdout, /已生成 tmp\/skills\/view\/index\.html（2 个需求，5 份产物）/);
-  assert.ok(fs.existsSync(path.join(root, 'tmp/skills/view/index.html')));
+  assert.match(r.stdout, /已生成 skills-init\/tmp\/view\/index\.html（1 个需求，4 份产物）/);
+  assert.ok(fs.existsSync(path.join(root, 'skills-init/tmp/view/index.html')));
   r = spawnSync(process.execPath, [path.join(REPO, 'workflow/scripts/view.mjs'), '--root', root, '--out', 'out/v.html'], { encoding: 'utf8' });
   assert.equal(r.status, 0);
   assert.ok(fs.existsSync(path.join(root, 'out/v.html')));
-  assert.equal(fs.readFileSync(path.join(root, 'docs/skills/requirements/订单导出/meta.json'), 'utf8'), before, '只读');
+  assert.equal(fs.readFileSync(path.join(root, 'skills-init/docs/requirements/订单导出/meta.json'), 'utf8'), before, '只读');
   assert.equal(spawnSync(process.execPath, [path.join(REPO, 'workflow/scripts/view.mjs'), '--bogus'], { encoding: 'utf8' }).status, 1);
   fs.rmSync(root, { recursive: true, force: true });
 });

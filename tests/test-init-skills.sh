@@ -36,21 +36,25 @@ assert_content()  { [[ "$(cat "$P/$1")" == "$2" ]] || fail "$1 内容不符：$(
 assert_contains() { grep -qF -- "$2" "$P/$1" || fail "$1 中缺少: $2"; }
 assert_eq()       { [[ "$1" == "$2" ]] || fail "$3：实际 [$1]，期望 [$2]"; }
 
-# 新建项目：<P>/skills-init 是当前工作区的副本
-new_project() {
-  P="$WORK/$1"; LOG="$WORK/$1.log"
-  mkdir -p "$P/skills-init"
-  # 整个工作区（除 git / CI / 测试本身），实现换成什么都按原样带上
+# 当前工作区的副本放到 $1（实现换成什么都按原样带上；除 git / CI / 测试本身）
+copy_installer() {
+  mkdir -p "$1"
   local e
   for e in "$REPO"/* "$REPO"/.[!.]*; do
-    case "${e##*/}" in .git|.github|.claude|tests|'.[!.]*') continue ;; esac
-    cp -R "$e" "$P/skills-init/"
+    case "${e##*/}" in .git|.github|.claude|tests|tmp|'.[!.]*') continue ;; esac
+    cp -R "$e" "$1/"
   done
 }
+# 新建项目 <P>；安装器副本放在项目外 <INST>
+new_project() {
+  P="$WORK/$1"; LOG="$WORK/$1.log"; INST="$WORK/installer-$1"
+  mkdir -p "$P"
+  copy_installer "$INST"
+}
 
-# 运行安装脚本：stdin 由调用方提供（默认空），输出写入 $LOG，返回退出码到 RC
+# 在项目根运行安装脚本：stdin 由调用方提供（默认空），输出写入 $LOG，返回退出码到 RC
 run_install() {
-  (cd "$P" && "$BASH" skills-init/init-skills.sh "$@") >>"$LOG" 2>&1
+  (cd "$P" && "$BASH" "$INST/init-skills.sh" "$@") >>"$LOG" 2>&1
   RC=$?
 }
 expect_rc() { [[ "$RC" == "$1" ]] || { fail "退出码 ${RC}，期望 $1（日志 ${LOG#$WORK/}）"; sed 's/^/        | /' "$LOG" | tail -n 20; }; }
@@ -68,14 +72,21 @@ PASSWORD='p/a&s|s"w\o\"rd\'
 db_answers() { printf 'mysql\n127.0.0.1\n3307\nappdb\nroot\n%s\n' "$PASSWORD" > "$WORK/answers"; echo "$WORK/answers"; }
 
 # =====================================================================
-test_wrapper_installs_into_parent_dir() {
+test_wrapper_installs_into_current_dir() {
   new_project fresh
   run_install --envs claude,qwen --yes --skip-db </dev/null; expect_rc 0
   local s
   for s in "${SKILLS[@]}"; do assert_file ".agents/skills/$s/SKILL.md"; done
   all_linked .claude/skills
   all_linked .qwen/skills
-  assert_missing skills-init/.agents
+  [[ -e "$INST/.agents" ]] && fail "装到了安装器目录里"
+  # 旧用法：安装器克隆在项目的 skills-init/（现在是放产出的目录）→ 停下并提示挪走，不做改动
+  new_project old-layout
+  copy_installer "$P/skills-init"
+  (cd "$P" && "$BASH" skills-init/init-skills.sh --envs claude --yes --skip-db) </dev/null >>"$LOG" 2>&1; RC=$?
+  expect_rc 1
+  grep -qF '安装器移到项目外' "$LOG" || fail "缺少挪走安装器的提示"
+  assert_missing .agents/skills
 }
 
 test_flags_pass_through() {
@@ -117,7 +128,7 @@ command -v python3 >/dev/null 2>&1 || { echo "需要 python3 来校验 JSON" >&2
 echo "bash: $BASH ($BASH_VERSION)"
 
 TESTS=(
-  test_wrapper_installs_into_parent_dir
+  test_wrapper_installs_into_current_dir
   test_flags_pass_through
   test_interactive_stdin
   test_subcommands_pass_through

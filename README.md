@@ -10,27 +10,23 @@
 
 支持环境：**Codex CLI / Claude Code / 豆包办公（Doubao）/ 千问（Qwen Code）**。
 
-> 本文件夹自包含：初始化命令 + 模板都在
+> 本工具在项目里的产出（需求产物、DocNexus 工作区、项目模板、临时文件）都放在项目根的
 > `skills-init/`
-> 下，脚本会以
-> **上级目录**
-> 作为项目根，
-> 因此从项目任意位置引用均可（调用时保持脚本位于
-> `<项目根>/skills-init/`
-> 即可）。
+> 一个目录里，不往项目的其他地方写；它可以随代码提交，也可以整个是团队的独立文档仓库（见「独立文档仓库」）。
+> 安装器本身用 npx，或克隆到项目外任意位置，在项目根执行；不要克隆进项目的 `skills-init/`。
 
 ## 快速开始
 
 需要 **Node.js >= 22**（接入 DocNexus 时需 >= 22.13，code-graph 的 `impact` / `entry` 需 >= 22.5）。安装逻辑只有一份实现 `bin/skills-init.mjs`，两个脚本只是薄封装：
 
 ```
-# 仓库放在 <项目根>/skills-init/ 时，在项目根执行
-./skills-init/init-skills.sh          # macOS / Linux / Git Bash / WSL
-.\skills-init\init-skills.ps1         # Windows PowerShell（需以管理员身份运行）
-node skills-init/bin/skills-init.mjs --project-root .   # 直接调用，等价
-
-# 或者不拷贝仓库，直接在任意项目根执行（npm 包）
+# 在项目根执行（npm 包，推荐）
 npx @rowansenne/skills-init
+
+# 或者把本仓库克隆到项目外（如 ~/tools/skills-init），在项目根执行；以当前目录为项目根
+~/tools/skills-init/init-skills.sh          # macOS / Linux / Git Bash / WSL
+~\tools\skills-init\init-skills.ps1         # Windows PowerShell（需以管理员身份运行）
+node ~/tools/skills-init/bin/skills-init.mjs --project-root .   # 直接调用，等价
 ```
 
 按提示：选择环境（编号多选，回车 = 全部）→ 确认 / 填写数据库连接 → 自动生成。装完后在 agent 里运行 `/workflow profile` 填写项目画像。
@@ -40,18 +36,18 @@ npx @rowansenne/skills-init
 
 
 ```
-.\skills-init\init-skills.ps1 -Envs codex,claude,doubao,qwen -Yes   # 用现有配置，装全部环境
-.\skills-init\init-skills.ps1 -Envs all -Yes -SkipDb                 # 跳过数据库，只装 project-review 等
+~\tools\skills-init\init-skills.ps1 -Envs codex,claude,doubao,qwen -Yes   # 用现有配置，装全部环境
+~\tools\skills-init\init-skills.ps1 -Envs all -Yes -SkipDb                 # 跳过数据库，只装 project-review 等
 ```
 
 
 
 ```
-./skills-init/init-skills.sh --envs all --yes                        # bash 版等价
-./skills-init/init-skills.sh --envs codex,qwen --skip-db
-./skills-init/init-skills.sh --envs claude,qwen --skip-db --with-docnexus   # 同时接入 DocNexus 文档库
-./skills-init/init-skills.sh --envs all --skip-db --copy             # 不用软链接，各环境独立拷贝
-./skills-init/init-skills.sh --uninstall                             # 按安装清单卸载（PowerShell：-Uninstall）
+~/tools/skills-init/init-skills.sh --envs all --yes                        # bash 版等价
+~/tools/skills-init/init-skills.sh --envs codex,qwen --skip-db
+~/tools/skills-init/init-skills.sh --envs claude,qwen --skip-db --with-docnexus   # 同时接入 DocNexus 文档库
+~/tools/skills-init/init-skills.sh --envs all --skip-db --copy             # 不用软链接，各环境独立拷贝
+~/tools/skills-init/init-skills.sh --uninstall                             # 按安装清单卸载（PowerShell：-Uninstall）
 ```
 
 ### 子命令
@@ -59,18 +55,18 @@ npx @rowansenne/skills-init
 | 命令 | 作用 |
 | --- | --- |
 | `init`（默认，可省略） | 安装或重装 |
-| `upgrade` | 读安装清单里记录的环境与模式，非交互升级到当前版本：保留数据库配置等用户配置，skills 文件一律更新为新版（手改过的先备份到 `tmp/skills/upgrade-backup/`）；已接入 DocNexus 时顺带导入新版本新增的文档模板（只新增，不改动已有模板） |
+| `upgrade` | 读安装清单里记录的环境与模式，非交互升级到当前版本：保留数据库配置等用户配置，skills 文件一律更新为新版（手改过的先备份到 `skills-init/tmp/upgrade-backup/`）；已接入 DocNexus 时顺带导入新版本新增的文档模板（只新增，不改动已有模板） |
 | `doctor` | 自检：已装版本与当前包对比、手改 / 缺失的文件、软链接是否断开、项目画像、DocNexus 模板是否齐全、各数据库连接能否只读 `SELECT 1`（`--offline` 跳过）、`.gitignore` 是否忽略了凭据。有错误时退出码 1 |
 | `uninstall` | 等价于 `--uninstall` |
-| `report` | 本地效果报告：只读统计 `docs/skills/` 下的产物（`--since YYYY-MM-DD`、`--all-branches`、`--json`；PowerShell 为 `-Since` / `-AllBranches` / `-Json`），见「workflow：入口与项目画像」 |
+| `report` | 本地效果报告：只读统计 `skills-init/docs/requirements/` 下的产物（`--since YYYY-MM-DD`、`--all-branches`、`--json`；PowerShell 为 `-Since` / `-AllBranches` / `-Json`），见「workflow：入口与项目画像」 |
 | `view` | 项目文档视图：按需求浏览开发方案、交付说明、审查记录（含复审修复情况）、技术 / 上线方案，生成本地静态页面（`--out <文件>`、`--open`；PowerShell 为 `-Out` / `-Open`） |
 | `seed-templates` | 只把默认文档模板导入 DocNexus，不重装 skills。`--update` 把导入后未改动的模板更新为新版；`--diff` 只读打印团队改过的模板与新默认模板的差异，供手动合并 |
 
 ```
 npx @rowansenne/skills-init upgrade      # 拿最新版升级
 npx @rowansenne/skills-init doctor
-./skills-init/init-skills.sh doctor --offline
-.\skills-init\init-skills.ps1 doctor -Offline
+~/tools/skills-init/init-skills.sh doctor --offline
+~\tools\skills-init\init-skills.ps1 doctor -Offline
 ```
 
 ## 安装路径与启用方式
@@ -87,7 +83,7 @@ npx @rowansenne/skills-init doctor
 **单一来源 + 软链接**：skills 只在 `.agents/skills/` 装一份完整文件，`.claude/skills`、`.qwen/skills` 下按 skill 建相对软链接（`../../.agents/skills/<skill>`），改模板、填配置都只需改一处。因此即使只选了 claude 或 qwen，`.agents/skills/` 也会生成。
 
 * 按 skill 建链接而不是链接整个目录，这样 `.claude/skills/` 里还能放其他 skill（例如 DocNexus 的链接）。
-* 从旧版本（各环境独立拷贝）升级时，脚本会把旧拷贝里的用户配置（`config.json`、`schema.md`、`wiki-config.json`、`profile.json`）并入 `.agents/skills/`，原目录移到 `tmp/skills/backup/<时间>/<环境>/`；两边配置都填过且内容不同时不会自动合并，会保留旧目录并提示手动处理。
+* 之前用 `--copy`（或建不了链接时）装的独立拷贝，再不带 `--copy` 安装时会换成链接：拷贝里填过的用户配置（`config.json`、`schema.md`、`wiki-config.json`、`profile.json`）先并入 `.agents/skills/`，原目录移到 `skills-init/tmp/backup/<时间>/<环境>/`；两份都填过且内容不同时不会自动合并，会保留那个目录并提示手动处理。
 * Windows：安装与升级（`init` / `upgrade`）**必须在管理员终端执行**（建目录软链接需要该权限）；在普通终端运行会直接停下、不做任何改动，并提示改用「以管理员身份运行」的终端。`doctor`、`seed-templates`、`uninstall` 不要求管理员。少数文件系统仍建不了软链接时，该环境自动退回独立拷贝。在 Windows 上 clone 含软链接的仓库需要 `git config core.symlinks true`。
 * 不想用软链接：加 `--copy`（PowerShell：`-Copy`），每个环境各装一份完整文件。
 
@@ -144,7 +140,7 @@ npx @rowansenne/skills-init doctor
 /workflow report     # 本地效果报告（也可以直接运行 npx @rowansenne/skills-init report）
 ```
 
-**效果报告**（`/workflow report` 或 `skills-init report [--since YYYY-MM-DD] [--all-branches] [--json]`）只读统计 `docs/skills/` 下已落盘的产物，不上报、不另存记录，用来回答「用了以后有没有更好」。默认只看工作区；产物随特性分支提交、还没合并时加 `--all-branches`，用 git 只读扫描所有本地分支（同一路径以工作区为准）。统计内容：
+**效果报告**（`/workflow report` 或 `skills-init report [--since YYYY-MM-DD] [--all-branches] [--json]`）只读统计 `skills-init/docs/requirements/` 下已落盘的产物，不上报、不另存记录，用来回答「用了以后有没有更好」。默认只看工作区；产物随特性分支提交、还没合并时加 `--all-branches`，用 git 只读扫描所有本地分支（同一路径以工作区为准）。统计内容：
 
 * 审查：各级别发现条数、严重问题复核通过率、复审时上次问题的修复率；
 * 交付：功能 / 缺陷、S / M / L、开工前经需求澄清确认的决定条数、带「未验证项」的交付；
@@ -179,8 +175,6 @@ npx @rowansenne/skills-init doctor
 | `job_annotation` | 技术方案「定时任务变更」识别任务类 |
 | `data_review` | 是否输出技术方案模块 7 与上线方案 2.3 的库表评审块 |
 
-旧版本的 `dev/profile.json` 会在重跑 init 时自动迁移为 `workflow/profile.json`。
-
 ## dev：开发与修 bug
 
 ```
@@ -188,7 +182,7 @@ npx @rowansenne/skills-init doctor
 /dev --bug <现象 | 报错 | 日志>       # 缺陷修复
 ```
 
-* **功能开发**：理解需求（可读 PRD、查 DocNexus 历史决策）→ 调研现有代码 → 需求澄清（借鉴 grill-me：按决策树分轮提问，每题给推荐答案；事实自己查、决定交给用户；S 规模无未定决定时跳过）→ 按规模出方案（S 直接做；M 对话内方案待确认；L 落盘方案文档待确认）→ 小步实现并编译 → 补测试并运行 → 用 project-review 自审 → 交付说明落盘到 `docs/skills/requirements/<需求名>/delivery.md`（带分支元信息；改动、验证结果、配置清单、未执行的 SQL），已接入 DocNexus 时每次都问要不要沉淀（同意后以 `dev-notes` 分类写入，并把库内路径记回交付说明）。审查和上线方案会按分支自动读取这份交付说明。
+* **功能开发**：理解需求（可读 PRD、查 DocNexus 历史决策）→ 调研现有代码 → 需求澄清（借鉴 grill-me：按决策树分轮提问，每题给推荐答案；事实自己查、决定交给用户；S 规模无未定决定时跳过）→ 按规模出方案（S 直接做；M 对话内方案待确认；L 落盘方案文档待确认）→ 小步实现并编译 → 补测试并运行 → 用 project-review 自审 → 交付说明落盘到 `skills-init/docs/requirements/<需求名>/delivery.md`（带分支元信息；改动、验证结果、配置清单、未执行的 SQL），已接入 DocNexus 时每次都问要不要沉淀（同意后以 `dev-notes` 分类写入，并把库内路径记回交付说明）。审查和上线方案会按分支自动读取这份交付说明。
 * **S 规模快速通道**：S 规模且不涉及配置、SQL / DDL、对外接口、表结构，也没有需要澄清的决定时，编译、测试、自审照常，但只在对话里交付，不落盘交付说明、不问沉淀；实现中碰到上述任何一项或改动超过 3 个文件，就退回完整流程。缺陷修复同样适用（根因仍须在对话里写清楚）。
 * **缺陷修复**：收集现象 → 用失败测试复现 → 用证据定位根因 → 最小修复让测试转绿 → 自审 → 交付（必须写明根因）。
 * 守则：不写库、不改凭据、不擅自 commit / push、不装新依赖；测试没跑就写「未验证」。
@@ -206,12 +200,11 @@ npx @rowansenne/skills-init doctor
 | `-WithCodeGraph` / `--with-codegraph` | 可选：接入 [CodeGraph](https://github.com/colbymchenry/codegraph) 代码图谱，见下方「CodeGraph 代码图谱（可选）」 |
 | `-Copy` / `--copy`      | 不建软链接，各环境独立拷贝一份完整 skills                                  |
 | `--skills <列表>` | 只装这些 skill（逗号分隔），自动带上 `requires` 依赖；之后可以再用 `--skills` 补装，已装的保留；`upgrade` 只升级装过的。不含 database-query 时不询问数据库 |
-| `-DocnexusRoot <dir>` / `--docnexus-root <dir>` | 可选：DocNexus 工作区放在别的目录，例如和产物共用的团队文档仓库 `../team-docs`（写入 `workflow/profile.json` 的 `docnexus.root`；`.` 改回本项目），见下方「和产物共用团队文档仓库」 |
 | `-SeedTemplates` / `--seed-templates` | 把自带的文档模板导入 DocNexus（已有的不覆盖）；接入 DocNexus 后文档类 skill 只从知识库取模板。`--with-docnexus` 会自动执行 |
 | `-Uninstall` / `--uninstall` | 按安装清单卸载本项目装的 skills 与链接，见下方「卸载」 |
 | `-Offline` / `--offline` | `doctor` 不测试数据库连通性 |
 | `-Yes` / `--yes`        | 非交互：自动使用已有数据库配置（依次查找 `.codex/database-query/config.json` 与各环境已安装的 `database-query/config.json`）；都没有且未 `-SkipDb` 时报错退出 |
-| `--project-root`        | 项目根目录；直接调用 `bin/skills-init.mjs` 时默认当前目录，两个封装脚本自动传上级目录 |
+| `--project-root`        | 项目根目录；默认当前目录（两个封装脚本也传当前目录） |
 | `-v` / `--version`      | 显示版本                                                                |
 | `-h` / `--help`         | 帮助                                                                    |
 
@@ -220,18 +213,17 @@ npx @rowansenne/skills-init doctor
 加 `--with-docnexus`（PowerShell：`-WithDocNexus`）时，脚本在装完本仓库的 skills 后额外执行：
 
 1. 检查 Node >= 22.13 与 npm（不满足时**在安装任何文件之前**报错退出）；
-2. 执行 `npm install --prefix ./docnexus --save-exact @rowansenne/docnexus`：按 DocNexus 0.17.0 起的装法装在 `docnexus/` 下，npm 清单、锁文件和依赖不进宿主项目的 `package.json`。之前已经装在项目根（`node_modules/.bin/docnexus`）的项目沿用原位置升级；skills 两种位置都认，都有时用 `docnexus/` 下的；
-3. 执行 `./docnexus/node_modules/.bin/docnexus init --agent <claude|codex|all>`：创建 `docnexus/` 工作区，把 DocNexus 的 skills 同步到 `docnexus/skills/`，并软链接到对应环境目录、写入 `CLAUDE.md` / `AGENTS.md` 的 DocNexus 段落；
+2. 在 `skills-init/` 下执行 `npm install --prefix ./docnexus --save-exact @rowansenne/docnexus`：装在 `skills-init/docnexus/` 下，npm 清单、锁文件和依赖不进宿主项目的 `package.json`；
+3. 在 `skills-init/` 下执行 `./docnexus/node_modules/.bin/docnexus init --agent none`：创建 `skills-init/docnexus/` 工作区，把 DocNexus 的 skills 同步到 `skills-init/docnexus/skills/`；再由本工具把它们软链接到所选环境的 skills 目录、写入 `CLAUDE.md` / `AGENTS.md` 的段落（见下方「DocNexus 的位置」）；
 4. `.gitignore` 追加 `node_modules/`。
 
-环境映射：
+环境映射（本工具链接 DocNexus 的 skills、写段落）：
 
-| 所选环境 | `--agent` | 说明 |
+| 所选环境 | 链接到 | 写段落 |
 | --- | --- | --- |
-| claude | `claude` | 链接到 `.claude/skills/`，写 `CLAUDE.md` |
-| codex / doubao | `codex` | 两者共用 `.agents/skills/`，写 `AGENTS.md` |
-| claude + (codex 或 doubao) | `all` | 以上两者 |
-| qwen | —（仅 qwen 时为 `none`） | docnexus 不支持 qwen：由本脚本把 `docnexus/skills/*` 软链接到 `.qwen/skills/`；不写 `QWEN.md`，需要自动召回时可在 `QWEN.md` 引用 `AGENTS.md` 的 DocNexus 段落，或在 `.qwen/settings.json` 的 `context.fileName` 加入 `AGENTS.md` |
+| claude | `.claude/skills/` | `CLAUDE.md` |
+| codex / doubao | `.agents/skills/`（两者共用） | `AGENTS.md` |
+| qwen | `.qwen/skills/` | 不写 `QWEN.md`；需要自动召回时可在 `QWEN.md` 引用 `AGENTS.md` 的 DocNexus 段落，或在 `.qwen/settings.json` 的 `context.fileName` 加入 `AGENTS.md` |
 
 说明：
 
@@ -239,22 +231,15 @@ npx @rowansenne/skills-init doctor
 * `.qwen/skills/` 下已存在的同名**真实目录**不会被替换，脚本会提示跳过。
 * npm 安装或 `docnexus init` 失败时只跳过 DocNexus，本仓库的 skills 照常安装，脚本最后以退出码 1 结束；修好后重跑即可。
 * 安装后 `dev`、`project-review` 会先按 `docnexus-recall` 查项目约定；`dev`、`project-review` 交付时**每次都问**要不要沉淀（写入后把库内路径记回交付说明 / 审查报告的「DocNexus」元信息行），`create-tech-md-doc`、`create-release-md-doc` 结束时有值得记的内容才**提议**沉淀；**任何写入 DocNexus 的操作都必须经你授权**。
-* 离线或测试时可用环境变量指定安装来源，例如 `DOCNEXUS_PKG=/path/to/rowansenne-docnexus-0.13.0.tgz ./skills-init/init-skills.sh --with-docnexus`（PowerShell：`$env:DOCNEXUS_PKG=...`）。
-* Windows 上 qwen 的链接使用目录 junction（与 docnexus 的做法一致）；Git Bash 下 `ln -s` 是否生成真正的链接取决于 MSYS 设置，建议 Windows 用 PowerShell 版。
+* 离线或测试时可用环境变量指定安装来源，例如 `DOCNEXUS_PKG=/path/to/rowansenne-docnexus-0.13.0.tgz npx @rowansenne/skills-init --with-docnexus`（PowerShell：`$env:DOCNEXUS_PKG=...`）。
+* Windows 上的链接使用目录软链接（需管理员终端）；Git Bash 下 `ln -s` 是否生成真正的链接取决于 MSYS 设置，建议 Windows 用 PowerShell 版。
 
-### 和产物共用团队文档仓库
+### DocNexus 的位置
 
-产物放到独立文档仓库（`artifacts.repo`，见「产物输出规范」）后，DocNexus 也可以放进同一个仓库，团队只管一个仓库，知识库各服务共用：
-
-```bash
-npx @rowansenne/skills-init --with-docnexus --docnexus-root ../team-docs
-```
-
-* DocNexus 装在 `../team-docs/docnexus/`，以 `../team-docs` 为项目根运行（`docnexus init --agent none`：它自己不往文档仓库里链接 skills、写 `CLAUDE.md`），知识随文档仓库提交，不用 DocNexus 的 `--git-remote`。
-* 本项目里由 skills-init 接上：把 `../team-docs/docnexus/skills/*` 相对链接到 `.claude/skills` / `.agents/skills` / `.qwen/skills`，在 `CLAUDE.md` / `AGENTS.md` 写一段说明（概念索引 `@../team-docs/docnexus/CONCEPTS.md`；docnexus 系列 skill 的命令先 `cd ../team-docs` 再运行），用自己的标记，不碰手写内容。升级时刷新，卸载时撤掉，文档仓库里的 DocNexus 不动。
-* 各 skill 的脚本已按位置处理：`resolve.mjs status` 给出 `docnexus.root` 与 `run_in`，模板从文档仓库的知识库取，`knowledge.mjs` 在那里运行并给出从本项目读正文的路径；沉淀后的知识库改动和产物一样由你确认后在文档仓库提交（`requirement.mjs pending` 单独列出）。
-* 每个人先把团队文档仓库克隆到 `docnexus.root` 指的位置；DocNexus 的依赖和检索库（`node_modules/`、`store/`）不进仓库，各自 `--with-docnexus` 装一次。
-* 本项目里原来的 `docnexus/` 不会自动搬过去，安装时会提示。
+* DocNexus 装在 `skills-init/docnexus/`，以 `skills-init/` 为项目根运行（`docnexus init --agent none`：它自己不往 `skills-init/` 里链接 skills、写 `CLAUDE.md`）。
+* 本项目里由 skills-init 接上：把 `skills-init/docnexus/skills/*` 相对链接到 `.claude/skills` / `.agents/skills` / `.qwen/skills`，在 `CLAUDE.md` / `AGENTS.md` 写一段说明（概念索引 `@skills-init/docnexus/CONCEPTS.md`；docnexus 系列 skill 的命令先 `cd skills-init` 再运行），用自己的标记，不碰手写内容。升级时刷新，卸载时撤掉，`skills-init/docnexus/` 本身不动。
+* 各 skill 的脚本已按位置处理：`resolve.mjs status` 给出 `docnexus.root` 与 `run_in`，`knowledge.mjs` 在那里运行并给出从项目根读正文的路径。
+* `skills-init/` 是独立文档仓库时，知识库随文档仓库提交，各服务共用；沉淀后的改动和产物一样由你确认后提交（`requirement.mjs pending` 单独列出）。DocNexus 的依赖和检索库（`node_modules/`、`store/`）不进仓库，各自 `--with-docnexus` 装一次。
 
 ## CodeGraph 代码图谱与 code-graph skill（可选）
 
@@ -315,34 +300,33 @@ dev、project-review、技术方案、上线方案都在对应环节调用它：
 * `.gitignore` 规则无论是否配置数据库都会补齐（只追加缺失的行）；
 * 安装器按 skill 目录自动发现文件（`*.tpl` 去掉后缀），新增 `references/` 文件不需要改安装器。
 * skill 的元数据只写在各目录的 `skill.json` 里（见下方「skill.json」），安装器、`seed-templates` 和 `resolve.mjs` 都从它读取。
-* `code-review` 已改名为 `project-review`（避免与 Claude Code 内置的 `/code-review` 撞名）：重跑时自动移除旧名的目录和链接；只删能确认是本项目装的那份，你自己的同名 skill 不动。
 * 设置环境变量 `SKILLS_INIT_NO_SYMLINK=1` 可强制不建软链接（各环境独立拷贝）；无法建链接时会先探测，旧目录原样保留、只更新模板。
 
 ### 安装清单
 
 每次安装后在 `.agents/skills/.skills-init.json`（`--copy` 时各目标目录各一份）写入清单：安装器版本、安装时间、所选环境、安装模式，以及每个 skill 的模板文件相对路径与 sha256。用户配置（`config.json`、`schema.md`、`wiki-config.json`、`profile.json`）只记录存在与否，不记哈希，重跑和升级都不覆盖。
 
-**skills 目录里的其他文件（SKILL.md、skill.json、references、scripts）一律以安装包为准**，重跑和升级时总是更新为新版，不询问、不生成 `.new`：
+**skills 目录里的其他文件（SKILL.md、skill.json、references、scripts）一律以安装包为准**，重跑和升级时总是更新为新版，不询问：
 
 | 情况 | 处理 |
 | --- | --- |
 | 当前内容与清单记录一致（没改过） | 直接更新 |
-| 与清单记录不同（手改过），或没有清单无从判断 | 原文件先备份到 `tmp/skills/upgrade-backup/<时间>/<相对项目根的路径>`，再更新为新版；结尾列出这些文件和备份目录 |
+| 与清单记录不同（手改过），或没有清单无从判断 | 原文件先备份到 `skills-init/tmp/upgrade-backup/<时间>/<相对项目根的路径>`，再更新为新版；结尾列出这些文件和备份目录 |
 | 清单里有、新版里已没有 | 没改过直接删除；改过的备份后删除 |
 
 * 这样 `SKILL.md`、`skill.json`、脚本始终是同一个版本，不会出现「新 SKILL.md 配旧 skill.json」的混搭。
-* 项目自己的定制不要改 skills 目录里的文件，放到不会被覆盖的地方：项目事实和约定写 `workflow/profile.json`（约定写 `notes`），文档结构用 `docs/skills/templates/<skill>/` 或 DocNexus 里的模板，通用规则写 `CLAUDE.md` / `AGENTS.md`。
-* 旧版本留下的 `<文件名>.new` 在升级时一并删除；需要找回手改内容时到备份目录里取。
+* 项目自己的定制不要改 skills 目录里的文件，放到不会被覆盖的地方：项目事实和约定写 `workflow/profile.json`（约定写 `notes`），文档结构用 `skills-init/templates/<skill>/` 或 DocNexus 里的模板，通用规则写 `CLAUDE.md` / `AGENTS.md`。
+* 需要找回手改内容时到备份目录里取。
 
 ### 卸载
 
 ```
-./skills-init/init-skills.sh --uninstall       # PowerShell：.\skills-init\init-skills.ps1 -Uninstall
+~/tools/skills-init/init-skills.sh --uninstall       # PowerShell：~\tools\skills-init\init-skills.ps1 -Uninstall
 ```
 
 按清单移除本项目安装的 skill 文件、`.claude/skills` 与 `.qwen/skills` 下指向 `.agents/skills` 的软链接，以及清单本身：
 
-* 用户配置（`config.json`、`schema.md`、`wiki-config.json`、`profile.json`）和手改过的模板文件先移到 `tmp/skills/uninstall-backup/<时间戳>/<安装目录>/<skill>/`，结尾列出；
+* 用户配置（`config.json`、`schema.md`、`wiki-config.json`、`profile.json`）和手改过的模板文件先移到 `skills-init/tmp/uninstall-backup/<时间戳>/<安装目录>/<skill>/`，结尾列出；
 * 不在清单里的文件、你自己的 skill 和链接都不动；skill 目录里还有你自己加的文件时保留该目录并提示；目录清空后才删除；
 * `.gitignore` 里追加的规则和 DocNexus 不处理；没有清单时什么也不做。
 * 用户级 `~/.codex/skills` 不在卸载范围内。
@@ -360,8 +344,7 @@ dev、project-review、技术方案、上线方案都在对应环节调用它：
   "optional": ["md-to-wiki", "create-release-md-doc"],
   "shared": ["diff-collection-common.md", "prd-fetch.md"],
   "templates": [{ "id": "template.md", "src": "template.md", "title": "技术方案模板", "summary": "...", "lint": { "requiredMeta": ["模板来源"] } }],
-  "docnexus": { "category": "tech-design", "reason": "create-tech-md-doc skill 从技术方案中沉淀的决策、约定与风险", "readFrom": ["create-tech-md-doc", "dev"] },
-  "renamedFrom": {}
+  "docnexus": { "category": "tech-design", "reason": "create-tech-md-doc skill 从技术方案中沉淀的决策、约定与风险", "readFrom": ["create-tech-md-doc", "dev"] }
 }
 ```
 
@@ -370,7 +353,6 @@ dev、project-review、技术方案、上线方案都在对应环节调用它：
 | `name` / `order` | 与目录名一致；安装和展示顺序 |
 | `userFiles` | 用户配置（安装后的相对路径 → 对应空模板的源路径或 `null`），重跑不覆盖，卸载时备份 |
 | `templates` | 可由 DocNexus 接管的文档模板，知识库路径为 `templates/<skill>/<id>` |
-| `renamedFrom` | 旧名 → SKILL.md 签名正则；升级时只清理能确认是本项目装的旧目录 |
 | `requires` | 运行时必需的 skill（会调用它的脚本或读它的文件）；`--skills` 安装时自动带上 |
 | `optional` | 协作但非必需的 skill：没装时跳过对应增强（如 PRD 读取、自审），不报错 |
 | `shared` | 共享参考文件：源在仓库 `shared/`，安装时拷进本 skill 的 `references/`。仓库里只维护一份，装好后每个 skill 自带完整文件，运行时不依赖别的 skill |
@@ -406,9 +388,9 @@ dev、project-review、技术方案、上线方案都在对应环节调用它：
 | `workflow/scripts/resolve.mjs status` | `/workflow status` 的能力探测（不输出任何凭据） |
 | `workflow/scripts/resolve.mjs infer-profile` | 按固定规则从构建文件、Makefile、依赖与配置文件、git 推断项目画像草稿，每个字段附依据；不写文件 |
 | `workflow/scripts/lint-doc.mjs <文档> --skill <skill> [--facts]` | 对照当前生效的模板检查生成的文档：必填章节、残留 `{{...}}` 占位符、元信息行为错误；缺普通章节、顺序不一致为警告；列出待填写位置。`--facts` 再核对正文里的类名、文件、接口、表名：在对比分支的 diff 和代码里都找不到的记为警告（防编造） |
-| `workflow/scripts/requirement.mjs which / bind / path / sync / pending / list / config / migrate` | 产物按需求归档（项目里，或独立文档仓库的 `<需求>/<项目>/`）：查当前分支绑定的需求（没绑定时给出按分支名生成的建议名）、绑定需求名、给出本次落盘路径（不覆盖，带上一版的 wiki 记录）、重建 `meta.json`、列出所有需求、把旧布局的产物迁进需求目录；`config` 设置产物位置（文档仓库、项目名、提交提示），`pending` 看文档仓库里还没提交的产物 |
-| `workflow/scripts/view.mjs [--out f] [--open]` | 项目文档视图（`/workflow view`、`skills-init view`）：读需求目录（和旧布局）里的产物，生成单个 HTML，按需求列出各阶段、审查记录（各级别数量、复核、与上次对比）、交付记录、沉淀到的知识文档，正文直接渲染；顶部「知识文档」列出每篇知识文档来自哪个需求、哪份产物；数据内嵌，只读、不联网，默认写到 `tmp/skills/view/index.html` |
-| `workflow/scripts/artifacts.mjs [--branch b \| --all]` | 按分支汇总 `docs/skills/requirements/`（及旧版 `docs/skills/<skill>/`）下的开发方案、交付说明、审查报告、技术方案、上线方案及其 wiki 发布记录，给出下一步建议；分支取自文档元信息行，不另存记录。上线方案没传 `--tech` 时据此自动引用同分支的技术方案；project-review 据此对照本分支方案、识别复审 |
+| `workflow/scripts/requirement.mjs which / bind / path / sync / pending / list / config` | 产物按需求归档（`skills-init/docs/requirements/<需求>/`，独立文档仓库模式再分 `<项目>/`）：查当前分支绑定的需求（没绑定时给出按分支名生成的建议名）、绑定需求名、给出本次落盘路径（不覆盖，带上一版的 wiki 记录）、重建 `meta.json`、列出所有需求、把旧布局的产物迁进需求目录；`config` 设置产物位置（文档仓库、项目名、提交提示），`pending` 看文档仓库里还没提交的产物 |
+| `workflow/scripts/view.mjs [--out f] [--open]` | 项目文档视图（`/workflow view`、`skills-init view`）：读需求目录里的产物，生成单个 HTML，按需求列出各阶段、审查记录（各级别数量、复核、与上次对比）、交付记录、沉淀到的知识文档，正文直接渲染；顶部「知识文档」列出每篇知识文档来自哪个需求、哪份产物；数据内嵌，只读、不联网，默认写到 `skills-init/tmp/view/index.html` |
+| `workflow/scripts/artifacts.mjs [--branch b \| --all]` | 按分支汇总 `skills-init/docs/requirements/` 下的开发方案、交付说明、审查报告、技术方案、上线方案及其 wiki 发布记录，给出下一步建议；分支取自文档元信息行，不另存记录。上线方案没传 `--tech` 时据此自动引用同分支的技术方案；project-review 据此对照本分支方案、识别复审 |
 | `workflow/scripts/report.mjs [--since d] [--all-branches] [--json]` | 本地效果报告（`/workflow report`、`skills-init report`）：审查发现与修复率、复核率、需求澄清、沉淀率、知识引用、各分支链路 |
 | `workflow/scripts/tables.mjs [--diff b...h \| --base b \| --files a,b]` | 找出改动涉及哪些表：实体注解（`@TableName` / `@Table`，没写表名时按类名推断）、Mapper XML 与代码里的 SQL、DDL 脚本；标出 DDL、是否在 `schema.md` 里，并给出拉表结构的命令。dev 调研 / 自检与 project-review 审 SQL / DDL 时使用 |
 | `workflow/scripts/template.mjs list / draft / check / save <模板>` | 修改 / 创建模板（`/workflow template`）：把当前模板复制成草稿（或 `--from <样例>` 抽骨架），`check` 校验格式、列出章节变化、拿最近几份已生成文档试跑 lint 看影响，`save` 备份旧模板后写入项目模板并确认生效；已接入 DocNexus 时 `save` 给出 capture 指引，不直接写知识库 |
@@ -427,9 +409,9 @@ node --test "tests/*.mjs"                 # 只跑 node 测试（三个平台都
 
 node 测试覆盖：skill.json 一致性、子命令（upgrade / doctor / seed-templates / uninstall）、`resolve.mjs` 与画像推断、`lint-doc.mjs`（含 `--facts` 核对，用临时 git 仓库）、`artifacts.mjs`、`knowledge.mjs`、`query.mjs` 与表结构导出（用假的 mysql / psql 客户端）、md-to-wiki 转换与上传（用本地假 Confluence 服务）、DocNexus 模板导入与版本跟踪（用假的 docnexus CLI）。
 
-安装器的黑盒场景都在 `tests/test-install.mjs`，三个平台共用：每个用例在临时目录放一份 skills-init 副本，执行安装后检查目录、软链接和配置。覆盖全新安装（单一来源 + 相对软链接）、`SKILLS_INIT_NO_SYMLINK=1` 退回独立拷贝、`--copy`、`--yes` 无数据库配置时退出码 1、含 `/ & | " \` 的密码、重跑保留用户配置、安装清单、手改的 skill 文件备份后更新为新版（含清理旧版本的 `.new`）、删除模板文件后的清理（改过的先备份）、卸载与备份、从旧版各环境独立拷贝升级（用 git 历史中 `71a23c8` 的旧脚本生成旧布局，浅克隆时先 `git fetch --unshallow`）、两边配置冲突、`.gitignore` 只追加缺失规则。
+安装器的黑盒场景都在 `tests/test-install.mjs`，三个平台共用：每个用例在临时目录放一份安装器副本（项目外），执行安装后检查目录、软链接和配置。覆盖全新安装（单一来源 + 相对软链接）、`SKILLS_INIT_NO_SYMLINK=1` 退回独立拷贝、`--copy`、`--yes` 无数据库配置时退出码 1、含 `/ & | " \` 的密码、重跑保留用户配置、安装清单、手改的 skill 文件备份后更新为新版、删除模板文件后的清理（改过的先备份）、卸载与备份、`--copy` 拷贝换成链接（合并用户配置）、两份配置冲突、`.gitignore` 只追加缺失规则。
 
-`tests/test-init-skills.sh` / `.ps1` 只是封装脚本的冒烟测试：确认以上级目录为项目根、参数与子命令原样透传、stdin 交互可用。
+`tests/test-init-skills.sh` / `.ps1` 只是封装脚本的冒烟测试：确认以当前目录为项目根、安装器克隆在项目的 skills-init/ 时停下、参数与子命令原样透传、stdin 交互可用。
 
 ```bash
 bash tests/test-init-skills.sh                     # bash 版（兼容 macOS 自带的 /bin/bash 3.2，需要 python3）
@@ -493,7 +475,7 @@ CI（`.github/workflows/test.yml`）在 push 到 main 和每个 PR 上运行：�
 一个需求的文档产物放在**同一个需求目录**里，开发方案、交付说明、审查报告、技术方案、上线方案一起看：
 
 ```
-docs/skills/requirements/<需求名>/
+skills-init/docs/requirements/<需求名>/
 ├── meta.json        # 需求名、绑定的分支、各产物（版本、日期、wiki 发布记录、DocNexus 沉淀），给以后的可视化用
 ├── plan.md          # 开发方案（dev，L 规模）
 ├── delivery.md      # 交付说明（dev，每次完整交付都写）
@@ -505,43 +487,49 @@ docs/skills/requirements/<需求名>/
 * **需求名由你定**：dev 确定是 M / L 规模（要落盘）时，或从 `/workflow` 完整链路开始时，如果当前分支还没有绑定需求，会问你这个需求叫什么（默认值按分支名生成；也可以选已有的需求，例如修 bug 的新分支挂到原需求下）。你不起名就按分支名生成。绑定后，同一分支上的各 skill 都写到这个目录，不再问。一个需求可以绑定多个分支。
 * 路径由 `workflow/scripts/requirement.mjs path <种类>` 给出，同种产物已存在时加 `_v2`、`_v3`，不覆盖旧文件；上一版发布过 wiki 时，新版沿用同一个页面。
 * 需求目录写在项目根的 `.ignore` 里，ripgrep 和 agent 的代码搜索会跳过它，产物多了不会污染搜索结果（找历史决策用 DocNexus）。git 不受影响，建议随代码提交。
-* 升级时安装器会把旧版 `docs/skills/<skill>/` 下的产物按「对比分支」搬进需求目录（`git mv`，保留历史）。需求名取交付说明或开发方案里的需求短名，没有就用分支名，可以在 `meta.json` 里改。文档里引用的旧路径（「参考产物」等）一并改成新路径；搬迁记录存在 `meta.json` 的 `migrated_from`，之后从其他分支合进来、还引用旧路径的文档，再跑一次迁移（`requirement.mjs migrate` 或下次升级）也会改对。元信息里没有分支的文件留在原处，其中的旧路径同样会改。
 
-**放到独立文档仓库（可选）**：不想让产物进代码仓库、或一个需求横跨多个服务时，在 `workflow/profile.json` 配置 `"artifacts": { "repo": "../team-docs", "project": "order-service" }`（或运行 `requirement.mjs config --repo ../team-docs --project order-service`）。产物改写到 `<文档仓库>/<需求名>/<项目名>/`，各服务在同一个需求目录下各占一个子目录；项目名只配一次，没配时 skill 会问你一次。文档里引用产物写成「文档仓库名:路径」，换机器也不变。
+**独立文档仓库（可选）**：不想让产物进代码仓库、或一个需求横跨多个服务时，把团队文档仓库克隆到项目根的 `skills-init/`（在安装之前，或 `skills-init/` 还不存在时）：
+
+```bash
+git clone <团队文档仓库地址> skills-init
+npx @rowansenne/skills-init --with-docnexus
+```
+
+`skills-init/` 自己是 git 仓库就是这个模式：代码仓库的 `.gitignore` 加上 `/skills-init/`，产物写到 `skills-init/docs/requirements/<需求名>/<项目名>/`，各服务在同一个需求目录下各占一个子目录，DocNexus 知识库也在这个仓库里各服务共用。项目名写在 `workflow/profile.json` 的 `artifacts.project`，只配一次，没配时 skill 会问你一次（`requirement.mjs config --project <名>`）。文档里引用产物写成「文档仓库名:路径」，各服务、各人的克隆里都一样。
 
 * 写完产物后 skill 会列出文档仓库里没提交的文件和建议的提交信息，你确认后才提交，推送另外问。不想被提示：`requirement.mjs config --commit-prompt off --local`（写在个人的 `workflow/profile.local.json`，已加入 `.gitignore`，不影响团队）。
-* 已有产物用 `requirement.mjs migrate --dry-run` 预览、`requirement.mjs migrate` 搬过去（跨仓库不保留 git 历史，旧历史留在项目仓库）；升级时只提示，不会自动跨仓库搬文件。
+* 其他服务的需求要先在 `skills-init/` 里拉下来（`git -C skills-init pull`），绑定时才看得到。
 * `/workflow view` 在这个模式下显示文档仓库里所有项目的需求。
 
-**浏览**：`/workflow view` 或 `skills-init view --open` 生成一个本地页面（`tmp/skills/view/index.html`）。左边是需求列表，可按名称或分支搜索；右边是这个需求的各阶段、审查记录（每轮的级别数量、复核、与上次对比的修复情况）、交付记录，以及各份文档的渲染正文。页面是生成那一刻的快照，产物有更新时重新生成。
+**浏览**：`/workflow view` 或 `skills-init view --open` 生成一个本地页面（`skills-init/tmp/view/index.html`）。左边是需求列表，可按名称或分支搜索；右边是这个需求的各阶段、审查记录（每轮的级别数量、复核、与上次对比的修复情况）、交付记录，以及各份文档的渲染正文。页面是生成那一刻的快照，产物有更新时重新生成。
 
 其他产物：
 
 | 技能 | 产物 | 位置 |
 | --- | --- | --- |
-| database-query | 查询结果 | 默认对话输出；导出时 `tmp/skills/database-query/result-<时间戳>.csv` |
-| md-to-wiki | 转换临时 XHTML | `tmp/skills/md-to-wiki/_wiki_upload_<时间戳>.html`（上传后可删） |
-| 各文档类 skill | 项目模板 | `docs/skills/templates/<skill>/`（见下文「模板」） |
+| database-query | 查询结果 | 默认对话输出；导出时 `skills-init/tmp/database-query/result-<时间戳>.csv` |
+| md-to-wiki | 转换临时 XHTML | `skills-init/tmp/md-to-wiki/_wiki_upload_<时间戳>.html`（上传后可删） |
+| 各文档类 skill | 项目模板 | `skills-init/templates/<skill>/`（见下文「模板」） |
 
 规则：
 
-* `docs/skills/` 是**持久产物**目录，可提交 git，团队共享。
-* `tmp/skills/` 是**临时产物**目录，`init-skills` 自动把 `/tmp/` 加入 `.gitignore`，不入库。
+* 本工具的产出都在 `skills-init/`：`docs/requirements/`（需求产物）、`docnexus/`（DocNexus 工作区）、`templates/`（项目模板）是**持久产物**，随代码提交或在独立文档仓库里提交，团队共享。
+* `skills-init/tmp/` 是**临时产物**目录，安装时自动把 `/skills-init/tmp/` 加入 `.gitignore`，不入库。
 
 ## 自定义模板
 
-初始化命令与模板集中在 `skills-init/` 一个文件夹（`.tpl` 后缀不会被任何平台误加载）：
+本仓库（安装器）的结构如下，`.tpl` 后缀不会被任何平台误加载。它放在项目外，不要和项目里放产出的 `skills-init/` 混在一起：
 
 
 
 ```
-skills-init/
+skills-init（安装器仓库）/
 ├── bin/
 │   ├── skills-init.mjs                # 安装器入口（唯一实现，Node >= 22）：参数解析与 init / upgrade / doctor / uninstall / seed-templates / report 调度
 │   ├── lib/                           # core / prompt / db / install / uninstall / docnexus / doctor
 │   ├── skills.mjs                     # 读取各 skill 的 skill.json
 │   └── seed-templates.mjs             # 把文档模板导入 DocNexus
-├── init-skills.sh / init-skills.ps1   # 薄封装：以上级目录为项目根调用安装器
+├── init-skills.sh / init-skills.ps1   # 薄封装：以当前目录为项目根调用安装器
 ├── package.json                       # npm 包信息（bin: skills-init）
 ├── shared/                            # 多个 skill 共用的参考文件（diff-collection-common.md、prd-fetch.md），安装时按 skill.json 的 shared 拷入
 ├── tests/                             # node 测试 + 封装脚本冒烟测试（bash / pwsh）
@@ -559,7 +547,7 @@ skills-init/
 │   ├── scripts/pr-desc.mjs            # 按本分支产物生成 PR / MR 描述
 │   ├── scripts/template.mjs           # 修改 / 创建模板：草稿 → 校验与影响 → 保存
 │   ├── scripts/tables.mjs             # 找出改动涉及的数据库表
-│   ├── scripts/requirement.mjs        # 产物按需求归档：绑定需求名、落盘路径、meta.json、旧布局迁移
+│   ├── scripts/requirement.mjs        # 产物按需求归档：绑定需求名、落盘路径、meta.json
 │   ├── scripts/view.mjs               # 项目文档视图（本地静态页面）
 │   ├── scripts/make-template.mjs      # 从样例文档抽模板骨架
 │   ├── scripts/doc-sections.mjs       # 读产物的章节、表格、元信息（report / pr-desc 共用，标题解析复用 lint-doc）
@@ -607,8 +595,8 @@ skills-init/
 
 文档类 skill 的模板来源取决于项目是否接入了 DocNexus，生成的文档开头会注明「模板来源」：
 
-* **已接入 DocNexus：只用知识库里的模板** `docnexus/library/templates/<skill>/<文件名>`（分类 `doc-template`）。不再使用 skill 自带的默认模板，也不使用 `docs/skills/templates/` 下的文件。库里缺模板时 skill 会停下来，提示你导入后再继续，不会悄悄回退到默认模板。
-* **未接入 DocNexus**：依次取项目文件 `docs/skills/templates/<skill>/<文件名>`、skill 自带默认模板。
+* **已接入 DocNexus：只用知识库里的模板** `skills-init/docnexus/library/templates/<skill>/<文件名>`（分类 `doc-template`）。不再使用 skill 自带的默认模板，也不使用 `skills-init/templates/` 下的文件。库里缺模板时 skill 会停下来，提示你导入后再继续，不会悄悄回退到默认模板。
+* **未接入 DocNexus**：依次取项目文件 `skills-init/templates/<skill>/<文件名>`、skill 自带默认模板。
 
 | skill | 文件名 | 用途 | 默认模板 |
 | --- | --- | --- | --- |
@@ -619,32 +607,32 @@ skills-init/
 | project-review | `checklist.md` | 审查清单 | 有 |
 | project-review | `report.md` | 审查报告模板 | 有 |
 
-**技术方案、上线方案的模板按团队自己的格式创建**：各团队发到 wiki 的文档格式不同，skills 不再自带固定格式。第一次生成时 skill 会停下来，请你给一份团队现有的同类文档（本地 Markdown，或 wiki 的 pageId / URL）作样例，用 `workflow/scripts/make-template.mjs` 抽出章节和表格结构，把正文换成填写说明，你确认后保存：未接入 DocNexus 时存到 `docs/skills/templates/<skill>/template.md`（建议提交，团队共用），已接入时经你授权写入 DocNexus。之后想换格式，直接说「重新生成技术方案模板」。
+**技术方案、上线方案的模板按团队自己的格式创建**：各团队发到 wiki 的文档格式不同，skills 不再自带固定格式。第一次生成时 skill 会停下来，请你给一份团队现有的同类文档（本地 Markdown，或 wiki 的 pageId / URL）作样例，用 `workflow/scripts/make-template.mjs` 抽出章节和表格结构，把正文换成填写说明，你确认后保存：未接入 DocNexus 时存到 `skills-init/templates/<skill>/template.md`（建议提交，团队共用），已接入时经你授权写入 DocNexus。之后想换格式，直接说「重新生成技术方案模板」。
 
 **修改模板**：说「改技术方案模板，加一节回滚方案」或 `/workflow template release 去掉灰度那节`，agent 会一路走完：
 
-1. 把当前生效的模板复制成草稿 `tmp/skills/template-draft/<skill>/<文件名>`，只改草稿；
+1. 把当前生效的模板复制成草稿 `skills-init/tmp/template-draft/<skill>/<文件名>`，只改草稿；
 2. `template.mjs check` 校验格式（必填 ` *`、可选「（如有）」、占位符），列出新增 / 删除的章节、必填变化，并拿最近几份已生成的文档试跑，告诉你新模板下它们会多出哪些错误；
-3. 你确认后 `template.mjs save`：旧模板备份到 `tmp/skills/template-backup/<时间>/`，写入 `docs/skills/templates/<skill>/`，再确认生效；已接入 DocNexus 时经你授权按 capture 流程写入知识库。
+3. 你确认后 `template.mjs save`：旧模板备份到 `skills-init/tmp/template-backup/<时间>/`，写入 `skills-init/templates/<skill>/`，再确认生效；已接入 DocNexus 时经你授权按 capture 流程写入知识库。
 
 模板别名：`tech`、`release`、`plan`、`delivery`、`review`、`checklist`。改带默认版本的模板（开发方案、交付说明、审查报告、审查清单）也走这条路，保存后项目文件优先，升级不会覆盖。
 
-* 老项目升级时，如果还在用原来自带的默认模板（项目和 DocNexus 里都没有自己的版本），安装器会先把它保存到 `docs/skills/templates/<skill>/template.md`，生成效果不变。
+* 老项目升级时，如果还在用原来自带的默认模板（项目和 DocNexus 里都没有自己的版本），安装器会先把它保存到 `skills-init/templates/<skill>/template.md`，生成效果不变。
 * `doctor` 和 `/workflow status` 会列出还没创建的模板。
 
 **模板导入 DocNexus**：
 
 ```
-./skills-init/init-skills.sh --envs claude --skip-db --with-docnexus   # 接入时自动导入默认模板
-./skills-init/init-skills.sh seed-templates                      # 已接入的项目补导入缺的模板（upgrade 时也会自动导入新增的）
-./skills-init/init-skills.sh seed-templates --update             # 导入后没改过的模板更新为新版
-./skills-init/init-skills.sh seed-templates --diff               # 团队改过的模板：打印与新默认模板的差异，手动合并
+~/tools/skills-init/init-skills.sh --envs claude --skip-db --with-docnexus   # 接入时自动导入默认模板
+~/tools/skills-init/init-skills.sh seed-templates                      # 已接入的项目补导入缺的模板（upgrade 时也会自动导入新增的）
+~/tools/skills-init/init-skills.sh seed-templates --update             # 导入后没改过的模板更新为新版
+~/tools/skills-init/init-skills.sh seed-templates --diff               # 团队改过的模板：打印与新默认模板的差异，手动合并
 ```
 
 * 只导入 DocNexus 里还没有的、有默认版本的模板（技术方案、上线方案不在内），已有的不覆盖；项目已接入但缺模板时，安装结束会列出缺哪几份。
-* 之后模板随知识库更新：直接编辑 `docnexus/library/templates/...` 后执行 `./docnexus/node_modules/.bin/docnexus document sync --id <id>`（旧装法为 `./node_modules/.bin/docnexus`）采纳；或者在生成文档后，skill 发现你做了结构性调整时会提议同步回模板（你确认后才写入）。每次变更都记录在 DocNexus 的 timeline 里，可追溯。
+* 之后模板随知识库更新：直接编辑 `skills-init/docnexus/library/templates/...` 后在 `skills-init/` 下执行 `./docnexus/node_modules/.bin/docnexus document sync --id <id>` 采纳；或者在生成文档后，skill 发现你做了结构性调整时会提议同步回模板（你确认后才写入）。每次变更都记录在 DocNexus 的 timeline 里，可追溯。
 * 模板里的 `{{...}}` 是给 agent 的填写提示，DocNexus 原样保存；不要写成单独一行的 `{{fact:...}}`（那是 DocNexus 的事实引用语法）。
-* 没接入 DocNexus 时，可用 `docs/skills/templates/` 下的同名文件覆盖默认模板；之后接入 DocNexus，skill 会提示你把这些文件导入知识库（导入后它们不再生效）。
+* 没接入 DocNexus 时，可用 `skills-init/templates/` 下的同名文件覆盖默认模板；之后接入 DocNexus，skill 会提示你把这些文件导入知识库（导入后它们不再生效）。
 
 ## 触发准确度评估
 

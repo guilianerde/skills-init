@@ -7,7 +7,6 @@
 //   order        安装与展示顺序
 //   userFiles    用户配置：{ "<安装后相对路径>": "<对应空模板的源路径>" | null }，重跑不覆盖；空模板用于判断是否还没填写
 //   templates    可由 DocNexus 接管的文档模板：[{ id, src, title, summary }]，知识库路径为 templates/<skill>/<id>
-//   renamedFrom  旧名 -> SKILL.md 签名正则（多行模式），升级时只清理能确认是本项目装的旧目录
 //   requires     运行时必需的其他 skill（会读它的脚本或文件），--skills 安装时自动带上
 //   optional     协作但非必需的 skill：没装时本 skill 跳过对应增强（如 PRD 读取、自审），不报错
 //   shared       共享参考文件名列表：源在仓库 shared/ 下，安装时拷进本 skill 的 references/（仓库里只维护一份，装好后各 skill 自带）
@@ -32,7 +31,7 @@ export function loadSkills(tplDir) {
     if (!d.isDirectory() || !fs.existsSync(f)) continue;
     const m = JSON.parse(fs.readFileSync(f, 'utf8'));
     if (m.name !== d.name) throw new Error(`${d.name}/${SKILL_META} 的 name（${m.name}）与目录名不一致`);
-    skills.push({ order: 999, requires: [], optional: [], shared: [], userFiles: {}, templates: [], renamedFrom: {}, docnexus: null, ...m });
+    skills.push({ order: 999, requires: [], optional: [], shared: [], userFiles: {}, templates: [], docnexus: null, ...m });
   }
   return skills.sort((a, b) => a.order - b.order || a.name.localeCompare(b.name));
 }
@@ -40,16 +39,14 @@ export function loadSkills(tplDir) {
 // 派生出安装器与 seed 使用的结构
 export function deriveMeta(skills) {
   const userFiles = {};
-  const renamed = {};
   const templates = [];
   for (const s of skills) {
     for (const [rel, blank] of Object.entries(s.userFiles)) userFiles[`${s.name}/${rel}`] = blank ? `${s.name}/${blank}` : null;
-    for (const [old, sig] of Object.entries(s.renamedFrom)) renamed[old] = { to: s.name, signature: new RegExp(sig, 'm') };
     for (const t of s.templates) {
       templates.push({ skill: s.name, id: t.id, src: t.src ? `${s.name}/${t.src}` : null, file: `templates/${s.name}/${t.id}`, title: t.title, summary: t.summary });
     }
   }
-  return { skills: skills.map((s) => s.name), userFiles, renamed, templates };
+  return { skills: skills.map((s) => s.name), userFiles, templates };
 }
 
 // 选中的 skill 加上 requires 的传递闭包，按 order 排序；未知名称抛错

@@ -8,7 +8,7 @@ import { spawnSync } from 'node:child_process';
 
 const read = (f) => { try { return fs.readFileSync(f, 'utf8'); } catch { return ''; } };
 const readJson = (f) => { try { return JSON.parse(fs.readFileSync(f, 'utf8')); } catch { return null; } };
-const SKIP_DIRS = new Set(['node_modules', '.git', 'target', 'build', 'dist', 'out', '.gradle', '.idea', 'vendor', 'tmp', '.agents', '.claude', '.qwen', 'docnexus']);
+const SKIP_DIRS = new Set(['node_modules', '.git', 'target', 'build', 'dist', 'out', '.gradle', '.idea', 'vendor', 'tmp', '.agents', '.claude', '.qwen', 'docnexus', 'skills-init']);
 
 function git(root, args) {
   const r = spawnSync('git', args, { cwd: root, encoding: 'utf8' });

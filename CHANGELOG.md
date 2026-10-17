@@ -4,6 +4,18 @@
 
 ## [Unreleased]
 
+### 变更（破坏性，不兼容旧版本）
+- **本工具的产出都放进项目根的 `skills-init/`**，不再往项目的其他地方写：
+  - 需求产物：`skills-init/docs/requirements/<需求名>/`（原 `docs/skills/requirements/`）；
+  - DocNexus 工作区：`skills-init/docnexus/`，DocNexus 以 `skills-init/` 为项目根运行（`init --agent none`），由本工具把它的 skills 相对链接到各环境、在 `CLAUDE.md` / `AGENTS.md` 写段落（原 `docnexus/`）；
+  - 项目模板：`skills-init/templates/<skill>/`（原 `docs/skills/templates/`）；
+  - 临时文件：`skills-init/tmp/`（原 `tmp/skills/`），`.gitignore` 加 `/skills-init/tmp/`。
+- **独立文档仓库改为克隆到 `skills-init/`**：`skills-init/` 自己是 git 仓库即为文档仓库模式，代码仓库 `.gitignore` 加 `/skills-init/`；产物在 `skills-init/docs/requirements/<需求名>/<项目名>/`，引用写「文档仓库名:路径」（仓库名取 git 远端）。去掉 `artifacts.repo`、`requirement.mjs config --repo`。
+- **去掉 `--docnexus-root` / `-DocnexusRoot`**（`docnexus.root` 配置）。
+- **安装器放在项目外**：`init-skills.sh` / `init-skills.ps1` 改为以当前目录为项目根；推荐用 `npx`。安装器克隆在项目的 `skills-init/` 里时停下并提示挪走。
+- **不再迁移旧版本的产物**：去掉 `requirement.mjs migrate`、升级时的自动归档，以及对旧布局 `docs/skills/<skill>/` 的识别。旧位置的文件需要的话自己搬。
+- **安装器去掉旧版本兼容**：不再把 `dev/profile.json` 迁成 `workflow/profile.json`、不再清理旧版本留下的 `<文件>.new`、不再移除改名前的 `code-review`（`skill.json` 去掉 `renamedFrom`）。`--copy` 拷贝换成链接时合并用户配置仍保留。
+
 ## [0.15.0] - 2026-10-17
 
 ### 新增

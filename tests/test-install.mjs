@@ -1,6 +1,5 @@
 // 安装器黑盒测试（三个平台都跑）：每个用例在临时目录放一份 skills-init 副本，执行安装后检查目录、软链接与配置。
 // 原来 bash / PowerShell 各维护一份的场景都在这里；tests/test-init-skills.* 只保留封装脚本的冒烟用例。
-// 旧布局升级用例从 git 历史取 71a23c8 的旧脚本（CI 用 fetch-depth: 0），取不到时跳过。
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
@@ -13,7 +12,6 @@ import { fileURLToPath } from 'node:url';
 const REPO = fileURLToPath(new URL('..', import.meta.url));
 const IS_WIN = process.platform === 'win32';
 const SKILLS = ['workflow', 'dev', 'project-review', 'database-query', 'md-to-wiki', 'create-tech-md-doc', 'create-release-md-doc', 'code-graph'];
-const OLD_REV = '71a23c8'; // 单一来源之前的版本：各环境独立拷贝，画像在 dev/profile.json
 const PASSWORD = 'p/a&s|s"w\\o\\"rd\\';
 const DB_ANSWERS = `mysql\n127.0.0.1\n3307\nappdb\nroot\n${PASSWORD}\n`;
 const WORK = fs.mkdtempSync(path.join(os.tmpdir(), 'skills-init-install-'));
@@ -24,9 +22,6 @@ const SYMLINK_OK = (() => {
   const d = fs.mkdtempSync(path.join(WORK, 'probe-'));
   try { fs.symlinkSync('.', path.join(d, 'l'), 'dir'); return true; } catch { return false; }
 })();
-const OLD_AVAILABLE = spawnSync('git', ['-C', REPO, 'cat-file', '-e', `${OLD_REV}^{commit}`]).status === 0;
-const oldSkip = !OLD_AVAILABLE ? `git 历史中没有 ${OLD_REV}（浅克隆时先 git fetch --unshallow）`
-  : IS_WIN && spawnSync('pwsh', ['-v']).status !== 0 ? 'Windows 上需要 pwsh 运行旧版脚本' : false;
 
 // ---------------------------------------------------------------- 工具
 function copyRepo(dst) {
@@ -39,16 +34,19 @@ function copyRepo(dst) {
 
 function project(name) {
   const P = path.join(WORK, name);
-  copyRepo(path.join(P, 'skills-init'));
+  // 安装器副本放在项目外（项目里的 skills-init/ 是放产出的目录）
+  const INST = path.join(WORK, `${name}.installer`);
+  fs.mkdirSync(P, { recursive: true });
+  copyRepo(INST);
   const at = (rel) => path.join(P, ...rel.split('/'));
   const install = (args, { input = '', env = {} } = {}) => {
-    const r = spawnSync(process.execPath, [path.join(P, 'skills-init', 'bin', 'skills-init.mjs'), '--project-root', P, ...args], {
+    const r = spawnSync(process.execPath, [path.join(INST, 'bin', 'skills-init.mjs'), '--project-root', P, ...args], {
       encoding: 'utf8', input, env: { ...process.env, SKILLS_INIT_NO_SYMLINK: '', ...env },
     });
     return { status: r.status, log: `${r.stdout}\n${r.stderr}` };
   };
   return {
-    P, at, install,
+    P, at, install, inst: (rel) => path.join(INST, ...rel.split('/')),
     read: (rel) => fs.readFileSync(at(rel), 'utf8'),
     json: (rel) => JSON.parse(fs.readFileSync(at(rel), 'utf8')),
     write: (rel, text) => { fs.mkdirSync(path.dirname(at(rel)), { recursive: true }); fs.writeFileSync(at(rel), text); },
@@ -56,21 +54,6 @@ function project(name) {
     isLink: (rel) => { try { return fs.lstatSync(at(rel)).isSymbolicLink(); } catch { return false; } },
     isDir: (rel) => { try { const s = fs.lstatSync(at(rel)); return s.isDirectory() && !s.isSymbolicLink(); } catch { return false; } },
     isFile: (rel) => { try { const s = fs.lstatSync(at(rel)); return s.isFile(); } catch { return false; } },
-    // 用 git 历史中的旧版脚本生成旧布局（各环境独立拷贝），再换回当前版本的 skills-init
-    oldLayout() {
-      const dst = path.join(P, 'skills-init');
-      fs.rmSync(dst, { recursive: true, force: true });
-      fs.mkdirSync(dst);
-      const tar = spawnSync('git', ['-C', REPO, 'archive', '--format=tar', OLD_REV], { maxBuffer: 64 * 1024 * 1024 });
-      assert.equal(tar.status, 0, '无法从 git 历史取出旧版本');
-      assert.equal(spawnSync('tar', ['-x', '-C', dst], { input: tar.stdout }).status, 0);
-      const r = IS_WIN
-        ? spawnSync('pwsh', ['-NoProfile', '-File', path.join(dst, 'init-skills.ps1'), '-Envs', 'all', '-Yes', '-SkipDb'], { cwd: P, encoding: 'utf8', input: '' })
-        : spawnSync('bash', [path.join(dst, 'init-skills.sh'), '--envs', 'all', '--yes', '--skip-db'], { cwd: P, encoding: 'utf8', input: '' });
-      assert.equal(r.status, 0, `旧版脚本执行失败：${r.stdout}${r.stderr}`);
-      fs.rmSync(dst, { recursive: true, force: true });
-      copyRepo(dst);
-    },
   };
 }
 
@@ -94,16 +77,16 @@ function assertLinked(p, envDir, skills = SKILLS) {
   }
 }
 const backups = (p, glob) => {
-  const root = p.at('tmp/skills/backup');
+  const root = p.at('skills-init/tmp/backup');
   if (!fs.existsSync(root)) return [];
   return fs.readdirSync(root).map((ts) => path.join(root, ts, ...glob.split('/'))).filter((d) => fs.existsSync(d));
 };
 
 // ---------------------------------------------------------------- 用例
 
-// 升级备份：tmp/skills/upgrade-backup/<时间>/<相对项目根的路径>；返回所有备份里这个文件的内容
+// 升级备份：skills-init/tmp/upgrade-backup/<时间>/<相对项目根的路径>；返回所有备份里这个文件的内容
 function upgradeBackups(p, rel) {
-  const dir = p.at('tmp/skills/upgrade-backup');
+  const dir = p.at('skills-init/tmp/upgrade-backup');
   if (!fs.existsSync(dir)) return [];
   return fs.readdirSync(dir).map((d) => path.join(dir, d, rel)).filter((f) => fs.existsSync(f)).map((f) => fs.readFileSync(f, 'utf8'));
 }
@@ -122,7 +105,7 @@ test('全新安装：单一来源完整文件 + 相对软链接；重跑不变',
   assert.ok(!p.exists('.agents/skills/database-query/config.json'));
   ok(p.install(['--envs', 'claude,qwen', '--yes', '--skip-db']));
   assertLinked(p, '.claude/skills');
-  assert.ok(!p.exists('tmp/skills/backup'));
+  assert.ok(!p.exists('skills-init/tmp/backup'));
 });
 
 test('非管理员终端（SKILLS_INIT_ADMIN=0 模拟）：安装与升级直接停下并提示用管理员终端，不做任何改动；doctor 不受影响', () => {
@@ -192,7 +175,6 @@ test('重跑保留用户配置；手改的 skill 文件备份后更新为新版�
   for (const [f, v] of Object.entries(keep)) assert.equal(p.read(`${c}/${f}`), v, f);
   assert.equal(p.read(`${c}/database-query/references/schema.md`), '# my schema\n');
   assert.equal(p.read(`${c}/dev/SKILL.md`), repoFile('dev/SKILL.md.tpl'));
-  assert.ok(!p.exists(`${c}/dev/SKILL.md.new`));
   assert.deepEqual(upgradeBackups(p, `${c}/dev/SKILL.md`), ['stale\n']);
   ok(p.install(['--envs', 'claude,qwen', '--yes', '--skip-db']));
   assert.equal(p.read(`${c}/database-query/config.json`), keep['database-query/config.json']);
@@ -216,20 +198,18 @@ test('安装清单：版本 / 环境 / sha256，用户配置只记存在与否�
   assert.equal(p.json('.qwen/skills/.skills-init.json').mode, 'copy');
 });
 
-test('手改的 skill 文件：一律更新为新版，原文件备份到 tmp/skills/upgrade-backup/；不再询问、不再生成 .new，旧版本留下的 .new 被清理', () => {
+test('手改的 skill 文件：一律更新为新版，原文件备份到 skills-init/tmp/upgrade-backup/；不询问', () => {
   const p = project('modified');
   const c = '.agents/skills';
   const args = ['--envs', 'claude,qwen', '--skip-db'];
   ok(p.install([...args, '--yes']));
   p.write(`${c}/dev/SKILL.md`, 'my edits\n');
   p.write(`${c}/create-tech-md-doc/skill.json`, '{"name":"create-tech-md-doc","order":6,"templates":[{"id":"template.md","src":"template.md"}]}\n');
-  p.write(`${c}/workflow/SKILL.md.new`, 'left over by an old version\n');
   let r = p.install(args); ok(r); // 交互模式也不询问（没有输入也不会卡住）
   assert.equal(p.read(`${c}/dev/SKILL.md`), repoFile('dev/SKILL.md.tpl'));
   assert.equal(p.read(`${c}/create-tech-md-doc/skill.json`), repoFile('create-tech-md-doc/skill.json'), 'skill.json 与 SKILL.md 不会新旧混搭');
   assert.deepEqual(upgradeBackups(p, `${c}/dev/SKILL.md`), ['my edits\n']);
-  assert.ok(!p.exists(`${c}/dev/SKILL.md.new`) && !p.exists(`${c}/workflow/SKILL.md.new`));
-  assert.match(r.log, /以下文件被手动修改过，已按新版覆盖，原文件备份在 tmp\/skills\/upgrade-backup\/\d{8}-\d{6}\//);
+  assert.match(r.log, /以下文件被手动修改过，已按新版覆盖，原文件备份在 skills-init\/tmp\/upgrade-backup\/\d{8}-\d{6}\//);
   assert.ok(r.log.includes(`  ${c}/dev/SKILL.md`));
   r = p.install([...args, '--yes']); ok(r);
   assert.ok(!r.log.includes('被手动修改过'), '没有再改过就不再提示');
@@ -241,13 +221,13 @@ test('新版本删掉的模板文件：未改过的直接清理，改过的备�
   ok(p.install(['--envs', 'claude,qwen', '--yes', '--skip-db']));
   fs.appendFileSync(p.at(`${c}/dev/references/delivery-template.md`), 'my notes\n');
   const edited = p.read(`${c}/dev/references/delivery-template.md`);
-  fs.rmSync(p.at('skills-init/dev/references/plan-template.md'));
-  fs.rmSync(p.at('skills-init/dev/references/delivery-template.md'));
-  fs.rmSync(p.at('skills-init/create-tech-md-doc/references'), { recursive: true });
+  fs.rmSync(p.inst('dev/references/plan-template.md'));
+  fs.rmSync(p.inst('dev/references/delivery-template.md'));
+  fs.rmSync(p.inst('create-tech-md-doc/references'), { recursive: true });
   // dev/skill.json 登记了 plan-template.md：同步去掉，模拟新版本整体删除
-  const meta = JSON.parse(fs.readFileSync(p.at('skills-init/dev/skill.json'), 'utf8'));
+  const meta = JSON.parse(fs.readFileSync(p.inst('dev/skill.json'), 'utf8'));
   meta.templates = [];
-  fs.writeFileSync(p.at('skills-init/dev/skill.json'), JSON.stringify(meta));
+  fs.writeFileSync(p.inst('dev/skill.json'), JSON.stringify(meta));
   const r = p.install(['--envs', 'claude,qwen', '--yes', '--skip-db']); ok(r);
   assert.ok(!p.exists(`${c}/dev/references/plan-template.md`));
   assert.ok(!p.exists(`${c}/dev/references/delivery-template.md`));
@@ -287,8 +267,8 @@ test('卸载：移除本项目的文件与链接，备份用户配置与手改�
   assert.equal(p.read(`${c}/my-skill/SKILL.md`), 'mine\n');
   assert.equal(p.read('.claude/skills/my-claude-skill/SKILL.md'), 'mine\n');
   if (SYMLINK_OK) assert.ok(p.isLink('.qwen/skills/my-skill'));
-  const [b] = fs.readdirSync(p.at('tmp/skills/uninstall-backup'));
-  const bk = (rel) => fs.readFileSync(path.join(p.at('tmp/skills/uninstall-backup'), b, ...c.split('/'), ...rel.split('/')), 'utf8');
+  const [b] = fs.readdirSync(p.at('skills-init/tmp/uninstall-backup'));
+  const bk = (rel) => fs.readFileSync(path.join(p.at('skills-init/tmp/uninstall-backup'), b, ...c.split('/'), ...rel.split('/')), 'utf8');
   assert.equal(bk('md-to-wiki/wiki-config.json'), wiki);
   assert.equal(bk('workflow/profile.json'), profile);
   assert.equal(bk('project-review/SKILL.md'), 'my edits\n');
@@ -304,58 +284,39 @@ test('卸载 --copy 安装：环境目录清空后一并移除', () => {
   for (const d of ['.claude', '.qwen', '.agents']) assert.ok(!p.exists(d), d);
 });
 
-test('从旧版各环境独立拷贝升级：用户配置并入单一来源，旧目录备份，code-review 清理', { skip: oldSkip }, () => {
-  const p = project('upgrade');
-  p.oldLayout();
-  assert.ok(p.isDir('.claude/skills/dev') && p.isFile('.claude/skills/dev/profile.json') && !p.exists('.claude/skills/workflow'));
+test('--copy 装的独立拷贝换成链接：填过的用户配置并入单一来源，原目录备份', { skip: !SYMLINK_OK && '需要软链接' }, () => {
+  const p = project('copy-to-link');
+  ok(p.install(['--envs', 'claude,qwen', '--copy', '--yes', '--skip-db']));
   fillWiki(p, '.claude/skills/md-to-wiki/wiki-config.json', 'https://wiki.example.com');
-  fillProfile(p, '.claude/skills/dev/profile.json', 'main');
+  fillProfile(p, '.claude/skills/workflow/profile.json', 'main');
   p.write('.qwen/skills/database-query/config.json', '{"connections":{"default":{"host":"db.local","database":"x"}}}\n');
-  p.write('.qwen/skills/database-query/references/schema.md', '# qwen schema\n');
   const wiki = p.read('.claude/skills/md-to-wiki/wiki-config.json');
-  const profile = p.read('.claude/skills/dev/profile.json');
+  const profile = p.read('.claude/skills/workflow/profile.json');
   const cfg = p.read('.qwen/skills/database-query/config.json');
-
   ok(p.install(['--envs', 'claude,qwen', '--yes', '--skip-db']));
   assertLinked(p, '.claude/skills');
   assertLinked(p, '.qwen/skills');
   const c = '.agents/skills';
-  if (SYMLINK_OK) {
-    assert.equal(p.read(`${c}/md-to-wiki/wiki-config.json`), wiki);
-    assert.equal(p.read(`${c}/workflow/profile.json`), profile);
-    assert.ok(!p.exists(`${c}/dev/profile.json`));
-    assert.equal(p.read(`${c}/database-query/config.json`), cfg);
-    assert.equal(p.read(`${c}/database-query/references/schema.md`), '# qwen schema\n');
-    const [b] = backups(p, 'claude/md-to-wiki');
-    assert.ok(b, '缺少 claude 的 md-to-wiki 备份');
-    assert.equal(fs.readFileSync(path.join(b, 'wiki-config.json'), 'utf8'), wiki);
-    for (const e of ['claude', 'qwen']) for (const s of ['dev', 'database-query', 'md-to-wiki', 'create-tech-md-doc', 'create-release-md-doc']) {
-      assert.equal(backups(p, `${e}/${s}`).length, 1, `${e}/${s} 的备份数量`);
-    }
-  } else {
-    // 建不了链接时不动旧目录：用户配置原地保留、不做备份，模板照常更新
-    assert.equal(p.read('.claude/skills/md-to-wiki/wiki-config.json'), wiki);
-    assert.equal(p.read('.claude/skills/dev/SKILL.md'), repoFile('dev/SKILL.md.tpl'));
-    assert.ok(p.isFile('.claude/skills/workflow/SKILL.md'));
-    assert.ok(!p.exists('tmp/skills/backup'));
-  }
-  for (const e of ['.agents', '.claude', '.qwen']) assert.ok(!p.exists(`${e}/skills/code-review`), `${e}/skills/code-review`);
+  assert.equal(p.read(`${c}/md-to-wiki/wiki-config.json`), wiki);
+  assert.equal(p.read(`${c}/workflow/profile.json`), profile);
+  assert.equal(p.read(`${c}/database-query/config.json`), cfg);
+  const [b] = backups(p, 'claude/md-to-wiki');
+  assert.ok(b, '缺少 claude 的 md-to-wiki 备份');
+  assert.equal(fs.readFileSync(path.join(b, 'wiki-config.json'), 'utf8'), wiki);
 });
 
-test('旧布局两边配置都填过且不同：保留旧目录不建链接，其余照常', { skip: oldSkip || (!SYMLINK_OK && '需要软链接') }, () => {
+test('两份独立拷贝的同一配置都填过且不同：保留那个目录不建链接，其余照常', { skip: !SYMLINK_OK && '需要软链接' }, () => {
   const p = project('conflict');
-  p.oldLayout();
-  fillWiki(p, '.agents/skills/md-to-wiki/wiki-config.json', 'https://a.example.com');
-  fillWiki(p, '.claude/skills/md-to-wiki/wiki-config.json', 'https://b.example.com');
-  const a = p.read('.agents/skills/md-to-wiki/wiki-config.json');
-  const b = p.read('.claude/skills/md-to-wiki/wiki-config.json');
+  ok(p.install(['--envs', 'claude,qwen', '--copy', '--yes', '--skip-db']));
+  fillWiki(p, '.claude/skills/md-to-wiki/wiki-config.json', 'https://a.example.com');
+  fillWiki(p, '.qwen/skills/md-to-wiki/wiki-config.json', 'https://b.example.com');
+  const b = p.read('.qwen/skills/md-to-wiki/wiki-config.json');
   ok(p.install(['--envs', 'claude,qwen', '--yes', '--skip-db']));
-  assert.ok(p.isDir('.claude/skills/md-to-wiki'));
-  assert.equal(p.read('.claude/skills/md-to-wiki/wiki-config.json'), b);
-  assert.equal(p.read('.agents/skills/md-to-wiki/wiki-config.json'), a);
-  assert.equal(backups(p, 'claude/md-to-wiki').length, 0);
-  assertLinked(p, '.claude/skills', SKILLS.filter((s) => s !== 'md-to-wiki'));
-  assertLinked(p, '.qwen/skills');
+  assert.equal(p.read('.agents/skills/md-to-wiki/wiki-config.json'), p.read('.claude/skills/md-to-wiki/wiki-config.json'), 'claude 的先并入');
+  assert.ok(p.isDir('.qwen/skills/md-to-wiki'));
+  assert.equal(p.read('.qwen/skills/md-to-wiki/wiki-config.json'), b);
+  assertLinked(p, '.claude/skills');
+  assertLinked(p, '.qwen/skills', SKILLS.filter((s) => s !== 'md-to-wiki'));
 });
 
 test('.gitignore 只追加缺失的规则，重跑不重复', () => {
@@ -363,7 +324,7 @@ test('.gitignore 只追加缺失的规则，重跑不重复', () => {
   p.write('.gitignore', 'node_modules/\n**/wiki-config.json\n.env');
   ok(p.install(['--envs', 'claude', '--yes', '--skip-db']));
   const lines = p.read('.gitignore').split(/\r?\n/);
-  for (const r of ['**/database-query/config.json', '**/wiki-config.json', '/tmp/', 'node_modules/', '.env']) {
+  for (const r of ['**/database-query/config.json', '**/wiki-config.json', '/skills-init/tmp/', 'node_modules/', '.env']) {
     assert.equal(lines.filter((l) => l === r).length, 1, r);
   }
   const after = p.read('.gitignore');
@@ -397,7 +358,7 @@ test('共享参考文件：仓库只有一份，装进每个声明它的 skill�
   const users = ['dev', 'create-tech-md-doc', 'create-release-md-doc'];
   for (const s of users) assert.equal(p.read(`.agents/skills/${s}/references/prd-fetch.md`), repoFile('shared/prd-fetch.md'), s);
   assert.ok(!p.exists('.agents/skills/project-review/references/prd-fetch.md'));
-  fs.appendFileSync(p.at('skills-init/shared/prd-fetch.md'), '\n<!-- 新版 -->\n');
+  fs.appendFileSync(p.inst('shared/prd-fetch.md'), '\n<!-- 新版 -->\n');
   ok(p.install(['--envs', 'codex', '--yes', '--skip-db']));
   for (const s of users) assert.match(p.read(`.agents/skills/${s}/references/prd-fetch.md`), /新版/, s);
   ok(p.install(['--envs', 'codex', '--yes', '--skip-db', '--skills', 'database-query']));

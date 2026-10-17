@@ -31,7 +31,7 @@ description: "Entry point for this project's dev workflow skills: routes a reque
 | 根据分支 diff 出上线方案 | `create-release-md-doc` | 可带 `--tech` 复用技术方案 |
 | 把 md 发布到 wiki | `md-to-wiki` | 需 wiki 已配置 |
 | 写 PR / MR 描述、提 PR | `workflow/scripts/pr-desc.mjs` | 汇总本分支交付说明、审查报告、技术 / 上线方案；创建 PR 需用户同意 |
-| 这套工作流效果怎么样、用得怎么样 | `/workflow report` | 只读统计 `docs/skills/` 下的产物 |
+| 这套工作流效果怎么样、用得怎么样 | `/workflow report` | 只读统计 `skills-init/docs/requirements/` 下的产物 |
 | 看看项目文档、某个需求留下了哪些文档、审查记录 | `/workflow view` | 生成本地静态页面，按需求浏览 |
 | 改技术方案 / 上线方案 / 交付说明 / 审查报告的模板，按样例建模板 | `/workflow template` | 草稿 → 校验与影响 → 用户确认后保存 |
 | 记住 / 查找项目决策与约定 | DocNexus（入口 skill `docnexus`） | 需已接入；写入必须用户授权 |
@@ -49,7 +49,7 @@ dev（需求 → 方案 → 实现 → 测试 → 自审）
   → DocNexus 沉淀（可选，需授权）
 ```
 
-开始完整链路时先确定需求名：`node <skills>/workflow/scripts/requirement.mjs which`，当前分支没绑定就问用户这个需求叫什么并 `bind`（见 `references/requirements.md`），之后各段产物都落在 `docs/skills/requirements/<需求名>/`。
+开始完整链路时先确定需求名：`node <skills>/workflow/scripts/requirement.mjs which`，当前分支没绑定就问用户这个需求叫什么并 `bind`（见 `references/requirements.md`），之后各段产物都落在 `skills-init/docs/requirements/<需求名>/`。
 
 提交、推送、发布 wiki、写入 DocNexus 都是对外动作，每一步都要用户明确同意。
 
@@ -63,7 +63,7 @@ dev（需求 → 方案 → 实现 → 测试 → 自审）
 | `references/templates.md` | 模板来源判定（`resolve.mjs template`）、创建与修改模板（`/workflow template`）、模板随知识库更新 |
 | `references/docnexus.md` | 写入 DocNexus 的分类（`resolve.mjs category`）、按分类参考知识库（`knowledge.mjs`） |
 | `references/status.md` | `/workflow status` 的输出格式 |
-| `references/requirements.md` | 产物按需求归档（`docs/skills/requirements/<需求名>/`）：什么时候问需求名、`requirement.mjs` 绑定分支与给出落盘路径、`meta.json` |
+| `references/requirements.md` | 产物按需求归档（`skills-init/docs/requirements/<需求名>/`）：什么时候问需求名、`requirement.mjs` 绑定分支与给出落盘路径、`meta.json` |
 | `references/tables.md` | 确定改动涉及哪些表（`tables.mjs`）、只读拉取实际表结构 / 索引 / 行数核对（`query.mjs --schema --indexes`），没有库连接时怎么退回 |
 | `references/codegraph.md` | 用 CodeGraph 代码图谱读代码、查调用链与影响面（MCP 工具与 CLI 对照、图谱看不到的部分） |
 
@@ -76,7 +76,7 @@ dev（需求 → 方案 → 实现 → 测试 → 自审）
 | 能力 | 判定为可用 | 用途 |
 |---|---|---|
 | wiki | `md-to-wiki/wiki-config.json` 中 `enabled=true` 且 `wiki.base_url` 非空；或环境存在 wiki MCP 工具 | 读 PRD（各 skill 按 `references/prd-fetch.md`，REST 通道统一调 `md-to-wiki/scripts/upload.mjs get`）、发布文档 |
-| DocNexus | DocNexus 的项目根（默认本项目；`profile.json` 的 `docnexus.root` 可指到团队文档仓库）下有 `docnexus/project.json`，且 CLI 可执行：`./docnexus/node_modules/.bin/docnexus`（0.17.0 起的装法）或 `./node_modules/.bin/docnexus`（旧装法）；`resolve.mjs status` 的 `docnexus.bin` 给出实际路径，`docnexus.root` 不是 `.` 时按 `references/docnexus.md`「DocNexus 在团队文档仓库里」运行 | 查约定与历史决策、沉淀知识、提供文档模板 |
+| DocNexus | 有 `skills-init/docnexus/project.json`，且 CLI 可执行：`skills-init/docnexus/node_modules/.bin/docnexus`（`resolve.mjs status` 的 `docnexus.bin`）；DocNexus 以 `skills-init/` 为项目根，按 `references/docnexus.md`「DocNexus 在 skills-init/ 里」运行 | 查约定与历史决策、沉淀知识、提供文档模板 |
 | 数据库 | `database-query/config.json` 存在且 `connections` 非空 | 查表结构、核对数据 |
 | 代码图谱（CodeGraph） | 项目根有 `.codegraph/` 索引，且 `codegraph` 命令可用（`resolve.mjs status` 的 `codegraph.ok`） | 读代码、查调用链与影响面、找受影响的测试；用法见 `references/codegraph.md` |
 | 项目画像 | `workflow/profile.json` 中 `main_branch` 与 `build` / `test` 非空 | dev 构建与测试 |

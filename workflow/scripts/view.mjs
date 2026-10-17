@@ -1,7 +1,7 @@
 #!/usr/bin/env node
-// 项目文档视图：把 docs/skills/requirements/<需求>/（以及旧版 docs/skills/<skill>/）下的产物生成一个本地静态页面，
+// 项目文档视图：把 skills-init/docs/requirements/<需求>/ 下的产物生成一个本地静态页面，
 // 按需求浏览开发方案、交付说明、审查报告（含复审修复情况）、技术方案、上线方案，正文直接渲染。
-// 只读产物；页面是单个 HTML 文件，数据内嵌，不联网、不上报。默认写到 tmp/skills/view/index.html（tmp 不入库）。
+// 只读产物；页面是单个 HTML 文件，数据内嵌，不联网、不上报。默认写到 skills-init/tmp/view/index.html（tmp 不入库）。
 //
 // 用法（在项目根执行；--root 可指定项目根）：
 //   node .agents/skills/workflow/scripts/view.mjs [--out <文件>] [--open]
@@ -15,9 +15,9 @@ import { collect, KINDS } from './artifacts.mjs';
 import { requirements, repoRequirements, layout, parseDocnexus } from './requirement.mjs';
 import { parseReview, parseDelivery, captureState, buildReport } from './report.mjs';
 
-const DEFAULT_OUT = 'tmp/skills/view/index.html';
+const DEFAULT_OUT = 'skills-init/tmp/view/index.html';
 
-// 页面数据：需求目录按需求分组；旧布局的产物按分支分组，标为「未归档」
+// 页面数据：按需求分组
 export function viewData(root) {
   // 文档仓库模式：连同其他项目（服务）的产物一起看，一个需求下按项目区分
   const L = layout(root);
@@ -28,8 +28,8 @@ export function viewData(root) {
     if (!groups.has(id)) {
       const m = a.requirement ? metas.get(a.requirement) : null;
       groups.set(id, {
-        id, archived: !!a.requirement, name: m?.name ?? (a.requirement ?? a.branch ?? '（无分支）'),
-        dir: m?.dir ?? (a.requirement && L.mode === 'repo' ? `${L.repo_name}:${a.requirement}` : null), named_by: m?.meta?.named_by ?? null, branches: new Set(m?.branches ?? []), projects: new Set(), artifacts: [],
+        id, name: m?.name ?? (a.requirement ?? a.branch ?? '（无分支）'),
+        dir: m?.dir ?? (a.requirement && L.mode === 'repo' ? `${L.repo_name}:docs/requirements/${a.requirement}` : null), named_by: m?.meta?.named_by ?? null, branches: new Set(m?.branches ?? []), projects: new Set(), artifacts: [],
       });
     }
     const g = groups.get(id);
@@ -193,7 +193,7 @@ const pct = (v) => (v == null ? '—' : v + '%');
 function overview() {
   const r = D.report; const v = r.review;
   const cards = [
-    ['需求', D.requirements.filter((x) => x.archived).length + (D.requirements.some((x) => !x.archived) ? ' + ' + D.requirements.filter((x) => !x.archived).length + ' 未归档' : '')],
+    ['需求', D.requirements.length],
     ['审查报告', v.reports + '（复审 ' + v.rereviews + '）'],
     ['严重问题', v.levels.CRITICAL + v.levels.HIGH],
     ['复核通过率', pct(v.verified_rate)],
@@ -207,7 +207,7 @@ let current = null; let currentDoc = null;
 function renderList() {
   const q = $('#q').value.trim().toLowerCase();
   const items = D.requirements.filter((r) => !q || (r.name + ' ' + r.branches.join(' ')).toLowerCase().includes(q));
-  $('#list').innerHTML = items.length ? items.map((r) => '<button class="req' + (current === r.id ? ' on' : '') + '" data-id="' + esc(r.id) + '"><div class="n">' + esc(r.name) + (r.archived ? '' : ' <span class="tag warn">未归档</span>') + '</div><div class="s">' + esc(r.branches.join('、') || '无分支') + (r.last ? ' · ' + r.last : '') + '</div><div class="dots">' + D.kinds.map((k) => '<span class="dot' + (r.stages[k.kind] ? ' y' : '') + '" title="' + k.label + '"></span>').join('') + '</div></button>').join('') : '<div class="empty">没有匹配的需求</div>';
+  $('#list').innerHTML = items.length ? items.map((r) => '<button class="req' + (current === r.id ? ' on' : '') + '" data-id="' + esc(r.id) + '"><div class="n">' + esc(r.name) + '' + '</div><div class="s">' + esc(r.branches.join('、') || '无分支') + (r.last ? ' · ' + r.last : '') + '</div><div class="dots">' + D.kinds.map((k) => '<span class="dot' + (r.stages[k.kind] ? ' y' : '') + '" title="' + k.label + '"></span>').join('') + '</div></button>').join('') : '<div class="empty">没有匹配的需求</div>';
   document.querySelectorAll('.req').forEach((b) => (b.onclick = () => select(b.dataset.id)));
 }
 
@@ -256,7 +256,7 @@ function select(id, docPath) {
     return '<div class="stage' + (n ? ' y' : '') + '"><div class="t">' + k.label + '</div><div class="c">' + (n ? (n > 1 ? n + ' 版' : '✓') + (a && a.date ? ' · ' + a.date : '') : '—') + '</div>' + (a && a.wiki ? '<div class="t">wiki ' + (a.wiki.url ? '<a href="' + esc(a.wiki.url) + '" target="_blank" rel="noopener">pageId ' + esc(a.wiki.pageId) + '</a>' : 'pageId ' + esc(a.wiki.pageId)) + '</div>' : '') + '</div>'; }).join('') + '</div>';
   const order = D.kinds.map((k) => k.kind);
   const files = '<div class="files">' + r.artifacts.slice().sort((x, y) => order.indexOf(x.kind) - order.indexOf(y.kind)).map((a) => '<button data-doc="' + esc(a.path) + '">' + esc(a.label) + ' · ' + esc(a.file) + '</button>').join('') + '</div>';
-  $('#main').innerHTML = overview() + '<h2>' + esc(r.name) + '</h2><div class="sub">' + (r.archived ? esc(r.dir) : '旧布局（未归档），运行 requirement.mjs migrate 归档') + (r.projects.length ? ' · 项目 ' + esc(r.projects.join('、')) : '') + ' · 分支 ' + esc(r.branches.join('、') || '无') + (r.named_by === 'migrated' || r.named_by === 'branch' ? ' · <span class="tag">需求名由' + (r.named_by === 'branch' ? '分支名' : '迁移') + '生成，可在 meta.json 改</span>' : '') + '</div>'
+  $('#main').innerHTML = overview() + '<h2>' + esc(r.name) + '</h2><div class="sub">' + esc(r.dir ?? '') + (r.projects.length ? ' · 项目 ' + esc(r.projects.join('、')) : '') + ' · 分支 ' + esc(r.branches.join('、') || '无') + (r.named_by === 'migrated' || r.named_by === 'branch' ? ' · <span class="tag">需求名由' + (r.named_by === 'branch' ? '分支名' : '迁移') + '生成，可在 meta.json 改</span>' : '') + '</div>'
     + pipeline + reviewBlock(r) + deliveryBlock(r) + knowledgeBlock(r) + files + '<div class="doc" id="doc"></div>';
   document.querySelectorAll('[data-doc]').forEach((el) => (el.onclick = (e) => { e.preventDefault(); showDoc(r, el.dataset.doc); }));
   showDoc(r, docPath || (latest('review') || r.artifacts.at(-1)).path);
@@ -275,7 +275,7 @@ $('#kb').onclick = knowledgeView;
 const fromHash = decodeURIComponent(location.hash.slice(1));
 if (fromHash === 'knowledge') knowledgeView();
 else if (D.requirements.length) select(D.requirements.some((r) => r.id === fromHash) ? fromHash : D.requirements[0].id);
-else { $('#main').innerHTML = overview() + '<div class="empty">还没有产物。dev 交付、审查报告、技术方案、上线方案落盘到 docs/skills/requirements/&lt;需求名&gt;/ 后，重新生成这个页面。</div>'; renderList(); }
+else { $('#main').innerHTML = overview() + '<div class="empty">还没有产物。dev 交付、审查报告、技术方案、上线方案落盘到 skills-init/docs/requirements/&lt;需求名&gt;/ 后，重新生成这个页面。</div>'; renderList(); }
 </script>
 </body>
 </html>

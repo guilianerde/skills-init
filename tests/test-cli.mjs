@@ -57,9 +57,8 @@ test('upgrade：沿用清单里的环境、保留数据库配置、手改文件�
   assert.match(r.stdout, new RegExp(`升级：0\\.0\\.1 -> ${PKG.version.replace(/\./g, '\\.')}`));
   assert.match(r.stdout, /目标环境：(claude codex|codex claude)/);
   assert.equal(fs.readFileSync(cfg, 'utf8'), '{"connections":{"default":{"driver":"mysql","password":"keep"}}}');
-  assert.ok(!fs.existsSync(path.join(root, '.agents/skills/workflow/SKILL.md.new')));
   assert.doesNotMatch(fs.readFileSync(path.join(root, '.agents/skills/workflow/SKILL.md'), 'utf8'), /# 手改/);
-  const bk = path.join(root, 'tmp/skills/upgrade-backup');
+  const bk = path.join(root, 'skills-init/tmp/upgrade-backup');
   assert.ok(fs.readdirSync(bk).some((d) => /# 手改/.test(fs.readFileSync(path.join(bk, d, '.agents/skills/workflow/SKILL.md'), 'utf8'))));
   assert.equal(JSON.parse(fs.readFileSync(manifestPath(root), 'utf8')).version, PKG.version);
   assert.equal(cli(root, 'uninstall').status, 0);

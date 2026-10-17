@@ -45,7 +45,7 @@ test('symlinkSupported：探测链接用完即删，并清掉之前异常退出�
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
-test('DocNexus CLI 位置：0.17.0 起的 docnexus/node_modules/.bin 优先，旧装法的项目根 node_modules/.bin 兼容；安装器与 skill 脚本判断一致', async () => {
+test('DocNexus CLI 位置：skills-init/docnexus/node_modules/.bin；项目根的旧位置不再使用；安装器与 skill 脚本判断一致', async () => {
   const { docnexusBin, docnexusUpgradeCmd } = await import('../bin/lib/core.mjs');
   const { docnexusBin: skillBin, docnexusConnected } = await import('../workflow/scripts/resolve.mjs');
   const name = process.platform === 'win32' ? 'docnexus.cmd' : 'docnexus';
@@ -54,15 +54,16 @@ test('DocNexus CLI 位置：0.17.0 起的 docnexus/node_modules/.bin 优先，�
   assert.equal(docnexusBin(root), null);
   assert.equal(skillBin(root), null);
   put('docnexus', 'project.json');
-  assert.equal(docnexusConnected(root), false, '只有工作区没有 CLI');
   put('node_modules', '.bin', name);
-  assert.equal(path.relative(root, docnexusBin(root)), path.join('node_modules', '.bin', name));
-  assert.equal(skillBin(root), path.join('node_modules', '.bin', name));
-  assert.equal(docnexusConnected(root), true);
-  assert.match(docnexusUpgradeCmd(root), /^npm i -D /, '旧装法沿用项目根');
   put('docnexus', 'node_modules', '.bin', name);
-  assert.equal(path.relative(root, docnexusBin(root)), path.join('docnexus', 'node_modules', '.bin', name), '两处都有时用 docnexus/ 下的');
-  assert.equal(skillBin(root), path.join('docnexus', 'node_modules', '.bin', name));
-  assert.match(docnexusUpgradeCmd(root), /^npm install --prefix \.\/docnexus --save-exact /);
+  assert.equal(docnexusBin(root), null, '项目根的 docnexus/ 是旧位置，升级时搬进 skills-init/');
+  assert.equal(docnexusConnected(root), false);
+  put('skills-init', 'docnexus', 'project.json');
+  assert.equal(docnexusConnected(root), false, '只有工作区没有 CLI');
+  put('skills-init', 'docnexus', 'node_modules', '.bin', name);
+  assert.equal(path.relative(root, docnexusBin(root)), path.join('skills-init', 'docnexus', 'node_modules', '.bin', name));
+  assert.equal(skillBin(root), path.join('skills-init', 'docnexus', 'node_modules', '.bin', name));
+  assert.equal(docnexusConnected(root), true);
+  assert.match(docnexusUpgradeCmd(), /^cd skills-init && npm install --prefix \.\/docnexus --save-exact /);
   fs.rmSync(root, { recursive: true, force: true });
 });

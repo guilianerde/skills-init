@@ -8,9 +8,6 @@
     "code-graph",
     "database-query"
   ],
-  "renamedFrom": {
-    "code-review": "^name:\\s*code-review\\s*$[\\s\\S]*?description:\\s*\"Review source code \\("
-  },
   "templates": [
     {
       "id": "checklist.md",

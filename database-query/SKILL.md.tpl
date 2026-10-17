@@ -92,4 +92,4 @@ node <skills>/database-query/scripts/query.mjs --schema --tables a,b --indexes  
 ## Artifact Location
 
 - 查询结果默认只在对话内输出，不落盘。
-- 用户明确要求导出时写入 `tmp/skills/database-query/result-<YYYYMMDD-HHmmss>.csv`（已被 gitignore），并告知路径。
+- 用户明确要求导出时写入 `skills-init/tmp/database-query/result-<YYYYMMDD-HHmmss>.csv`（已被 gitignore），并告知路径。

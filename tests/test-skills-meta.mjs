@@ -43,14 +43,6 @@ test('模板与用户文件的源路径都存在，模板 id 在 skill 内唯一
   for (const s of skills) assert.equal(new Set(s.templates.map((t) => t.id)).size, s.templates.length, s.name);
 });
 
-test('改名签名不会误伤当前 skill', () => {
-  for (const [old, { to, signature }] of Object.entries(meta.renamed)) {
-    assert.ok(meta.skills.includes(to));
-    assert.ok(!meta.skills.includes(old));
-    assert.doesNotMatch(read(`${to}/SKILL.md.tpl`), signature);
-  }
-});
-
 test('package.json files 与 README 覆盖全部 skill', () => {
   const pkg = JSON.parse(read('package.json'));
   const readme = read('README.md');

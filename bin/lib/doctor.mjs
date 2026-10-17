@@ -3,7 +3,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { PKG, CANON_DIR, DOCNEXUS_PKG, docnexusUpgradeCmd, SKILLS, step, ok, warn, fail, toPosix, fileHash, readManifest, lstat, findManifests, cmpVersion } from './core.mjs';
+import { PKG, CANON_DIR, HOME, DOCNEXUS_PKG, docnexusUpgradeCmd, SKILLS, step, ok, warn, fail, toPosix, fileHash, readManifest, lstat, findManifests, cmpVersion } from './core.mjs';
 import { reportTemplateStatus, docnexusSupportsCategory, docnexusSupportsRecallCategory } from './docnexus.mjs';
 import { codegraphVersion } from './codegraph.mjs';
 
@@ -33,7 +33,7 @@ export function doctor(root, offline) {
   if (maj < 22) bad(`Node v${process.versions.node} 低于 22（skills-init 只在 Node 22 / 24 上测试；18、20 已停止维护）`); else ok(`Node v${process.versions.node}`);
 
   const found = findManifests(root);
-  if (!found.length) { bad('未找到安装清单：本项目还没用 skills-init 安装过（或是清单功能之前的旧版本安装，重跑 init 即可生成）'); return 1; }
+  if (!found.length) { bad('未找到安装清单：本项目还没用 skills-init 安装过'); return 1; }
   const m = found[0].m;
   const c = cmpVersion(m.version ?? '0', PKG.version);
   if (c < 0) meh(`已安装 ${m.version}，当前包是 ${PKG.version}：运行 skills-init upgrade 升级`);
@@ -50,9 +50,8 @@ export function doctor(root, offline) {
         const file = path.join(dir, f);
         const label = toPosix(path.join(rel, skill, f));
         if (!fs.existsSync(file)) { missing++; meh(`缺少 ${label}：运行 skills-init upgrade 恢复`); }
-        else if (fileHash(file) !== h) { modified++; meh(`${label} 被手动修改过（升级时会被新版覆盖，原文件备份到 tmp/skills/upgrade-backup/；项目定制请放到 profile.json、docs/skills/templates/ 或 DocNexus）`); }
+        else if (fileHash(file) !== h) { modified++; meh(`${label} 被手动修改过（升级时会被新版覆盖，原文件备份到 skills-init/tmp/upgrade-backup/；项目定制请放到 profile.json、skills-init/templates/ 或 DocNexus）`); }
       }
-      for (const f of entry.pending ?? []) if (fs.existsSync(path.join(dir, f))) meh(`${toPosix(path.join(rel, skill, f))} 是旧版本留下的 .new：运行 skills-init upgrade 会更新为新版并清理`);
     }
     if (!modified && !missing) ok(`${toPosix(rel)}：${Object.keys(man.skills).length} 个 skill 的模板文件与安装时一致`);
   }
@@ -88,22 +87,23 @@ export function doctor(root, offline) {
   if (st) {
     if (st.profile.ok) ok('项目画像已填写'); else meh(`项目画像未完成（空字段：${st.profile.empty.join('、')}）：运行 /workflow profile`);
     if (st.wiki.ok) ok('wiki 已配置'); else console.log('    --  wiki 未配置（可选；也可能通过 wiki MCP 提供）');
-    if (st.docnexus.root && st.docnexus.root !== '.') {
-      // DocNexus 在别处（团队文档仓库）：本项目要有 docnexus skill 的链接和 CLAUDE.md / AGENTS.md 段落，agent 才知道去哪里找
-      if (!st.docnexus.ok) meh(`docnexus.root 指向 ${st.docnexus.root}，但那里还没有 DocNexus 工作区：先克隆团队文档仓库，再重跑 skills-init（加 --with-docnexus）`);
-      else {
-        const linked = [CANON_DIR, path.join('.claude', 'skills'), path.join('.qwen', 'skills')].some((b) => lstat(path.join(root, b, 'docnexus-recall'))?.isSymbolicLink());
-        const ctx = ['CLAUDE.md', 'AGENTS.md'].some((f) => { try { return fs.readFileSync(path.join(root, f), 'utf8').includes('skills-init:docnexus:start'); } catch { return false; } });
-        if (linked && ctx) ok(`DocNexus 在 ${st.docnexus.root}/docnexus/（和产物共用的仓库），本项目已链接它的 skills 并写入段落`);
-        else meh(`DocNexus 在 ${st.docnexus.root}/docnexus/，但本项目${linked ? '' : '缺少 docnexus skill 链接'}${!linked && !ctx ? '、' : ''}${ctx ? '' : '缺少 CLAUDE.md / AGENTS.md 里的 DocNexus 段落'}：运行 skills-init upgrade`);
-      }
+    if (st.docnexus.ok) {
+      // DocNexus 以 skills-init/ 为项目根：本项目要有 docnexus skill 的链接和 CLAUDE.md / AGENTS.md 段落，agent 才知道去哪里找
+      const linked = [CANON_DIR, path.join('.claude', 'skills'), path.join('.qwen', 'skills')].some((b) => lstat(path.join(root, b, 'docnexus-recall'))?.isSymbolicLink());
+      const ctx = ['CLAUDE.md', 'AGENTS.md'].some((f) => { try { return fs.readFileSync(path.join(root, f), 'utf8').includes('skills-init:docnexus:start'); } catch { return false; } });
+      if (linked && ctx) ok(`DocNexus 在 ${HOME}/docnexus/，本项目已链接它的 skills 并写入段落`);
+      else meh(`DocNexus 在 ${HOME}/docnexus/，但本项目${linked ? '' : '缺少 docnexus skill 链接'}${!linked && !ctx ? '、' : ''}${ctx ? '' : '缺少 CLAUDE.md / AGENTS.md 里的 DocNexus 段落'}：运行 skills-init upgrade`);
     }
+    // 产出目录：都在 skills-init/
+    const mode = st.artifacts?.mode === 'repo' ? `独立文档仓库（${HOME}/ 自己是 git 仓库）` : '随项目提交';
+    if (st.artifacts && !st.artifacts.ok) meh(`产出目录 ${HOME}/：${mode}，${st.artifacts.how}`);
+    else ok(`产出目录 ${HOME}/：${mode}`);
     if (st.docnexus.ok) {
       if (!reportTemplateStatus(root, meh)) ok('DocNexus 已接入，文档模板齐全且与默认模板同步（或为团队定制版）');
       for (const f of st.docnexus.stale_project_templates) meh(`${f} 在接入 DocNexus 后已不再生效，建议删除`);
-      if (docnexusSupportsCategory(root) === false) meh(`已装的 DocNexus 不支持 draft seal --category：各 skill 的分类只能经 metadata.category 写入，不记为调用方指定。升级：${docnexusUpgradeCmd(root)}`);
+      if (docnexusSupportsCategory(root) === false) meh(`已装的 DocNexus 不支持 draft seal --category：各 skill 的分类只能经 metadata.category 写入，不记为调用方指定。升级：${docnexusUpgradeCmd()}`);
       else ok('DocNexus 支持调用方显式分类（draft seal --category）');
-      if (docnexusSupportsRecallCategory(root) === false) meh(`已装的 DocNexus 不支持 recall --category：knowledge.mjs --query 只列文档，skill 改用不带分类的 recall。升级：${docnexusUpgradeCmd(root)}`);
+      if (docnexusSupportsRecallCategory(root) === false) meh(`已装的 DocNexus 不支持 recall --category：knowledge.mjs --query 只列文档，skill 改用不带分类的 recall。升级：${docnexusUpgradeCmd()}`);
       else ok('DocNexus 支持按分类检索（recall --category）');
     } else console.log('    --  DocNexus 未接入（可选）');
     for (const t of st.templates_to_create ?? []) console.log(`    --  ${t.skill} 的模板 ${t.id} 还没有创建（不随 skills 提供）：第一次生成文档时会请你给一份样例文档来创建，保存到 ${t.expected}`);

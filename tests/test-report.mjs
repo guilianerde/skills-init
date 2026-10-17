@@ -1,4 +1,4 @@
-// workflow/scripts/report.mjs（本地效果报告）与 pr-desc.mjs（PR / MR 描述）：都只读 docs/skills/ 下的产物
+// workflow/scripts/report.mjs（本地效果报告）与 pr-desc.mjs（PR / MR 描述）：都只读 skills-init/docs/requirements/ 下的产物
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -58,7 +58,7 @@ const REVIEW = (rereview) => `# 代码审查报告 — feature-pay
 > 审查范围：分支对比：合并前 ｜ 日期：2026-10-16
 > 对比分支：\`feature/pay\` ←→ \`main\`
 > 审查方式：全量精读 ｜ 清单来源：skill 默认
-> 参考产物：docs/skills/dev/delivery-pay-20261015.md
+> 参考产物：skills-init/docs/requirements/pay/delivery.md
 > DocNexus：未沉淀
 
 ## 结论摘要 *
@@ -105,7 +105,7 @@ function project() {
   const g = (...a) => spawnSync('git', a, { cwd: root, encoding: 'utf8' });
   g('init', '-q', '-b', 'main');
   g('-c', 'user.name=t', '-c', 'user.email=t@example.com', 'commit', '-q', '--allow-empty', '-m', 'init');
-  const put = (rel, text) => { const f = path.join(root, 'docs', 'skills', rel); fs.mkdirSync(path.dirname(f), { recursive: true }); fs.writeFileSync(f, text); };
+  const put = (rel, text) => { const f = path.join(root, 'skills-init', 'docs', 'requirements', rel); fs.mkdirSync(path.dirname(f), { recursive: true }); fs.writeFileSync(f, text); };
   return { root, put, g };
 }
 
@@ -129,11 +129,11 @@ test('parseReview / parseDelivery / captureState：按模板结构计数，跳�
 
 test('report：汇总修复率、复核率、澄清、沉淀率、知识引用与各分支链路；--since 过滤；CLI 子命令', () => {
   const { root, put } = project();
-  put('dev/delivery-pay-20261015.md', DELIVERY);
-  put('project-review/review-feature-pay-20261015.md', REVIEW(false));
-  put('project-review/review-feature-pay-20261016.md', REVIEW(true).replace('无\n', '参考 docnexus/library/code-review/tx-mq.md\n'));
-  put('create-tech-md-doc/tech-doc_feature-pay_20261016.md', '# 技术方案\n> 对比分支：`feature/pay` ←→ `main`\n');
-  put('dev/delivery-old-20250101.md', '# 开发交付 — 旧\n\n> 类型：缺陷修复 ｜ 规模：S\n> 对比分支：`fix/old` ←→ `main`\n');
+  put('pay/delivery.md', DELIVERY);
+  put('pay/review.md', REVIEW(false).replace('日期：2026-10-16', '日期：2026-10-15'));
+  put('pay/review_v2.md', REVIEW(true).replace('无\n', '参考 docnexus/library/code-review/tx-mq.md\n'));
+  put('pay/tech-doc.md', '# 技术方案\n> 对比分支：`feature/pay` ←→ `main`\n');
+  put('old/delivery.md', '# 开发交付 — 旧\n\n> 类型：缺陷修复 ｜ 规模：S ｜ 日期：2025-01-01\n> 对比分支：`fix/old` ←→ `main`\n');
   const r = buildReport(root);
   assert.equal(r.artifacts, 5);
   assert.equal(r.review.reports, 2);
@@ -151,7 +151,7 @@ test('report：汇总修复率、复核率、澄清、沉淀率、知识引用�
   const cli = node([path.join(REPO, 'bin/skills-init.mjs'), 'report', '--project-root', root], root);
   assert.equal(cli.status, 0, cli.stderr);
   assert.match(cli.stdout, /复审时上次问题的修复率：50%/);
-  assert.match(cli.stdout, /\| `feature\/pay` \| {2}\| ✓ \| ✓×2 \| ✓ \|/);
+  assert.match(cli.stdout, /\| `feature\/pay`（pay） \| {2}\| ✓ \| ✓×2 \| ✓ \|/);
   const json = node([path.join(REPO, 'workflow/scripts/report.mjs'), '--json', '--since', '2026-10-16'], root);
   assert.equal(JSON.parse(json.stdout).review.reports, 1);
   assert.equal(node([path.join(REPO, 'workflow/scripts/report.mjs'), '--since', '10/16'], root).status, 1);
@@ -168,8 +168,8 @@ test('report：没有产物时给出说明', () => {
 
 test('pr-desc：有交付说明与审查报告时汇总；没有时退回用 git 记录', () => {
   const { root, put, g } = project();
-  put('dev/delivery-pay-20261015.md', DELIVERY);
-  put('project-review/review-feature-pay-20261016.md', REVIEW(true));
+  put('pay/delivery.md', DELIVERY);
+  put('pay/review.md', REVIEW(true));
   const d = buildDescription(root, 'feature/pay', 'main').markdown;
   assert.match(d, /## 做了什么\n\n回调按 orderNo 去重/);
   assert.match(d, /## 已确认的决定\n\n- 重复回调返回成功/);
@@ -178,7 +178,7 @@ test('pr-desc：有交付说明与审查报告时汇总；没有时退回用 git
   assert.doesNotMatch(d, /模板说明/, 'HTML 注释不输出');
   assert.match(d, /CRITICAL \/ HIGH（2 条）/);
   assert.match(d, /## 影响面\n\n影响 POST \/pay\/callback/);
-  assert.match(d, /- 交付说明：`docs\/skills\/dev\/delivery-pay-20261015\.md`/);
+  assert.match(d, /- 交付说明：`skills-init\/docs\/requirements\/pay\/delivery\.md`/);
 
   g('checkout', '-q', '-b', 'fix/small');
   fs.writeFileSync(path.join(root, 'a.txt'), 'x\n');
@@ -198,20 +198,20 @@ test('pr-desc：有交付说明与审查报告时汇总；没有时退回用 git
 test('report --all-branches：只读扫描本地分支里提交过、还没合并的产物；同一路径以工作区为准', () => {
   const { root, put, g } = project();
   const commit = (m) => g('-c', 'user.name=t', '-c', 'user.email=t@example.com', 'commit', '-q', '-m', m);
-  put('dev/delivery-pay-20261015.md', DELIVERY);
+  put('pay/delivery.md', DELIVERY);
   g('add', '-A'); commit('main 上已合并的交付');
   g('checkout', '-q', '-b', 'feature/coupon');
-  put('project-review/review-feature-coupon-20261016.md', REVIEW(false).replaceAll('feature/pay', 'feature/coupon'));
+  put('coupon/review.md', REVIEW(false).replaceAll('feature/pay', 'feature/coupon'));
   g('add', '-A'); commit('特性分支上的审查报告');
   g('checkout', '-q', 'main');
-  put('dev/delivery-pay-20261015.md', DELIVERY.replace('规模：M', '规模：L')); // 工作区里改过，未提交
+  put('pay/delivery.md', DELIVERY.replace('规模：M', '规模：L')); // 工作区里改过，未提交
   const only = buildReport(root);
   assert.deepEqual([only.artifacts, only.review.reports, only.scanned_branches.length], [1, 0, 0]);
   const all = buildReport(root, { allBranches: true });
   assert.deepEqual([all.artifacts, all.review.reports, all.from_branches], [2, 1, 1]);
   assert.equal(all.delivery.scale.L, 1, '同一路径取工作区版本');
   assert.ok(all.branches.some((b) => b.branch === 'feature/coupon' && b.has.review));
-  assert.equal(fs.readFileSync(path.join(root, 'docs/skills/dev/delivery-pay-20261015.md'), 'utf8').includes('规模：L'), true, '不改工作区');
+  assert.equal(fs.readFileSync(path.join(root, 'skills-init/docs/requirements/pay/delivery.md'), 'utf8').includes('规模：L'), true, '不改工作区');
   const cli = node([path.join(REPO, 'bin/skills-init.mjs'), 'report', '--all-branches', '--project-root', root], root);
   assert.equal(cli.status, 0, cli.stderr);
   assert.match(cli.stdout, /范围：工作区 \+ 2 个本地分支（其中 1 份只在分支里）/);

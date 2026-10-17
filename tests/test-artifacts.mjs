@@ -1,4 +1,4 @@
-// workflow/scripts/artifacts.mjs：从 docs/skills/ 下的产物按分支归组，给出最新一份、wiki 记录与下一步
+// workflow/scripts/artifacts.mjs：从 skills-init/docs/requirements/ 下的产物按分支归组，给出最新一份、wiki 记录与下一步
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -14,7 +14,7 @@ function project() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'artifacts-'));
   spawnSync('git', ['init', '-q', '-b', 'feature/pay'], { cwd: root });
   const put = (rel, text, mtime) => {
-    const f = path.join(root, 'docs', 'skills', rel);
+    const f = path.join(root, 'skills-init', 'docs', 'requirements', rel);
     fs.mkdirSync(path.dirname(f), { recursive: true });
     fs.writeFileSync(f, text);
     if (mtime) fs.utimesSync(f, mtime / 1000, mtime / 1000);
@@ -33,24 +33,24 @@ test('parseBranch：对比分支取开发分支，模板占位符不算', () => 
 test('按当前分支归组：最新一份、wiki 记录、下一步建议；其他分支不混入', () => {
   const { root, put, run } = project();
   const t0 = Date.parse('2026-10-15T00:00:00Z');
-  put('dev/plan-pay-20261014.md', '# 方案\n> 规模：L ｜ 分支：feature/pay ｜ 日期：2026-10-14\n');
-  put('create-tech-md-doc/tech-doc_feature-pay_20261015.md', '# 技术方案\n> 对比分支：`feature/pay` ←→ `main`\n', t0);
-  put('create-tech-md-doc/tech-doc_feature-pay_20261015_v2.md', '<!-- md-to-wiki: pageId=99 version=3 at=2026-10-15T01:00:00Z -->\n# 技术方案\n> 对比分支：`feature/pay` ←→ `main`\n', t0);
-  put('create-tech-md-doc/tech-doc_feature-other_20261015.md', '# 技术方案\n> 对比分支：`feature/other` ←→ `main`\n');
+  put('pay/plan.md', '# 方案\n> 规模：L ｜ 分支：feature/pay ｜ 日期：2026-10-14\n');
+  put('pay/tech-doc.md', '# 技术方案\n> 对比分支：`feature/pay` ←→ `main`\n', t0);
+  put('pay/tech-doc_v2.md', '<!-- md-to-wiki: pageId=99 version=3 at=2026-10-15T01:00:00Z -->\n# 技术方案\n> 对比分支：`feature/pay` ←→ `main`\n', t0);
+  put('other/tech-doc.md', '# 技术方案\n> 对比分支：`feature/other` ←→ `main`\n');
   let r = run();
   assert.equal(r.status, 0, r.err);
   assert.equal(r.out.branch, 'feature/pay');
   assert.equal(r.out.artifacts.length, 3);
-  assert.equal(r.out.latest.tech.path, 'docs/skills/create-tech-md-doc/tech-doc_feature-pay_20261015_v2.md');
+  assert.equal(r.out.latest.tech.path, 'skills-init/docs/requirements/pay/tech-doc_v2.md');
   assert.deepEqual([r.out.latest.tech.wiki.pageId, r.out.latest.tech.wiki.version], ['99', 3]);
   assert.equal(r.out.latest.review, null);
   assert.ok(r.out.next.some((s) => s.startsWith('project-review')));
-  assert.ok(r.out.next.some((s) => s.includes('自动引用 docs/skills/create-tech-md-doc/tech-doc_feature-pay_20261015_v2.md')));
+  assert.ok(r.out.next.some((s) => s.includes('自动引用 skills-init/docs/requirements/pay/tech-doc_v2.md')));
   assert.ok(!r.out.next.some((s) => s.startsWith('create-tech-md-doc')));
   assert.ok(!r.out.next.some((s) => s.includes('tech-doc') && s.startsWith('md-to-wiki')));
   assert.ok(!r.out.next.some((s) => s.includes('pr-desc')), '没有交付说明和审查报告时不建议提 PR');
   // 发布后又改过 → 建议重新发布到同一页面
-  put('create-tech-md-doc/tech-doc_feature-pay_20261015_v2.md', fs.readFileSync(path.join(root, 'docs/skills/create-tech-md-doc/tech-doc_feature-pay_20261015_v2.md'), 'utf8'), Date.parse('2026-10-15T02:00:00Z'));
+  put('pay/tech-doc_v2.md', fs.readFileSync(path.join(root, 'skills-init/docs/requirements/pay/tech-doc_v2.md'), 'utf8'), Date.parse('2026-10-15T02:00:00Z'));
   assert.ok(run().out.next.some((s) => s.includes('重新发布到 pageId 99')));
   r = run('--all');
   assert.deepEqual(r.out.branches.map((b) => b.branch), ['feature/other', 'feature/pay']);
@@ -66,16 +66,16 @@ test('审查报告模板的元信息：取对比分支里的开发分支，不�
   assert.equal(parseBranch(tpl), null, '未填写的模板不算任何分支');
 });
 
-test('交付说明（dev 的 delivery-*）按对比分支归到 latest.delivery，与开发方案分开', () => {
+test('交付说明按对比分支归到 latest.delivery，与开发方案分开', () => {
   const { root, put, run } = project();
-  put('dev/plan-pay-20261014.md', '# 方案\n> 规模：L ｜ 分支：feature/pay ｜ 日期：2026-10-14\n');
-  put('dev/delivery-pay-20261015.md', '# 开发交付 — 支付回调幂等\n\n> 类型：功能开发 ｜ 规模：L ｜ 日期：2026-10-15\n> 对比分支：`feature/pay` ←→ `main`\n> 参考产物：docs/skills/dev/plan-pay-20261014.md\n> DocNexus：未沉淀\n');
-  put('dev/delivery-other-20261015.md', '# 开发交付 — 别的需求\n\n> 类型：缺陷修复 ｜ 规模：S ｜ 日期：2026-10-15\n> 对比分支：`fix/other` ←→ `main`\n');
+  put('pay/plan.md', '# 方案\n> 规模：L ｜ 分支：feature/pay ｜ 日期：2026-10-14\n');
+  put('pay/delivery.md', '# 开发交付 — 支付回调幂等\n\n> 类型：功能开发 ｜ 规模：L ｜ 日期：2026-10-15\n> 对比分支：`feature/pay` ←→ `main`\n> 参考产物：skills-init/docs/requirements/pay/plan.md\n> DocNexus：未沉淀\n');
+  put('other/delivery.md', '# 开发交付 — 别的需求\n\n> 类型：缺陷修复 ｜ 规模：S ｜ 日期：2026-10-15\n> 对比分支：`fix/other` ←→ `main`\n');
   const r = run();
   assert.equal(r.status, 0, r.err);
-  assert.equal(r.out.latest.delivery.path, 'docs/skills/dev/delivery-pay-20261015.md');
+  assert.equal(r.out.latest.delivery.path, 'skills-init/docs/requirements/pay/delivery.md');
   assert.equal(r.out.latest.delivery.label, '交付说明');
-  assert.equal(r.out.latest.plan.path, 'docs/skills/dev/plan-pay-20261014.md');
+  assert.equal(r.out.latest.plan.path, 'skills-init/docs/requirements/pay/plan.md');
   assert.ok(r.out.next.some((s) => s.startsWith('提 PR / MR') && s.includes('pr-desc.mjs')));
   const tpl = fs.readFileSync(fileURLToPath(new URL('../dev/references/delivery-template.md', import.meta.url)), 'utf8');
   assert.equal(parseBranch(tpl), null, '未填写的交付模板不算任何分支');

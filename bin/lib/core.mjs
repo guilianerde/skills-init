@@ -13,7 +13,7 @@ export const IS_WIN = process.platform === 'win32';
 
 export const ENV_NAMES = ['codex', 'claude', 'doubao', 'qwen'];
 export const CANON_DIR = path.join('.agents', 'skills'); // 单一来源目录
-// skill 列表、用户配置、改名清理、文档模板都来自各 skill 目录的 skill.json（见 bin/skills.mjs）
+// skill 列表、用户配置、文档模板都来自各 skill 目录的 skill.json（见 bin/skills.mjs）
 export const SKILL_LIST = loadSkills(TPL_DIR);
 export const META = deriveMeta(SKILL_LIST);
 // --skills 子集：加上 requires 依赖后的安装列表
@@ -21,38 +21,22 @@ export const resolveSkillSelection = (names) => withDependencies(SKILL_LIST, nam
 export const SKILLS = META.skills;
 // 用户配置：重跑不覆盖；值为对应空模板（用于判断单一来源中的文件是否还没被填写过）
 export const USER_FILES = META.userFiles;
-// 改过名的 skill：旧名 -> 新名。升级时只清理能确认是本项目安装的旧目录 / 链接（按 SKILL.md 签名判断）
-export const RENAMED = META.renamed;
 export const DOCNEXUS_PKG = process.env.DOCNEXUS_PKG || '@rowansenne/docnexus';
 export const CODEGRAPH_PKG = process.env.CODEGRAPH_PKG || '@colbymchenry/codegraph@1'; // code-graph skill 按 1.x 的库接口编写
-// DocNexus CLI：0.17.0 起装在 docnexus/node_modules/.bin（与宿主项目的 npm 文件隔离），之前装在项目根 node_modules/.bin。
-// 两处都有时用 docnexus/ 下的。返回绝对路径或 null；workflow/scripts/resolve.mjs 的 docnexusBin 与此一致
-export const DOCNEXUS_BIN_DIRS = [['docnexus', 'node_modules', '.bin'], ['node_modules', '.bin']];
-// DocNexus 的项目根（docnexus/ 工作区所在目录）：默认本项目；已安装的 workflow/profile.json 里 docnexus.root 指到别处时
-// （例如和产物共用的团队文档仓库）用那里。workflow/scripts/resolve.mjs 的 docnexusRoot 与此一致
-export function docnexusRoot(root) {
-  for (const b of [CANON_DIR, path.join('.claude', 'skills'), path.join('.qwen', 'skills')]) {
-    const r = readJson(path.join(root, b, 'workflow', 'profile.json'))?.docnexus?.root;
-    if (r) return path.resolve(root, String(r));
-  }
-  return path.resolve(root);
-}
-export const docnexusShared = (root) => docnexusRoot(root) !== path.resolve(root);
+// 本工具在项目里的唯一目录：需求产物、DocNexus 工作区、项目模板、临时文件都在这里（与 workflow/scripts/requirement.mjs 的 HOME 一致）
+export const HOME = 'skills-init';
+// DocNexus 的项目根是 skills-init/（工作区 skills-init/docnexus/），CLI 在 skills-init/docnexus/node_modules/.bin。
+// workflow/scripts/resolve.mjs 的 docnexusRoot / docnexusBin 与此一致
+export const DOCNEXUS_BIN_DIRS = [['docnexus', 'node_modules', '.bin']];
+export const docnexusRoot = (root) => path.resolve(root, HOME);
 export function docnexusBin(root) {
   const name = IS_WIN ? 'docnexus.cmd' : 'docnexus';
   const dn = docnexusRoot(root);
   for (const dir of DOCNEXUS_BIN_DIRS) { const p = path.join(dn, ...dir, name); if (fs.existsSync(p)) return p; }
   return null;
 }
-// 升级 DocNexus 的命令：按现有装法给出（项目根旧装法沿用 npm i -D）；DocNexus 不在本项目时先 cd 过去
-export function docnexusUpgradeCmd(root) {
-  const dn = docnexusRoot(root);
-  const b = docnexusBin(root);
-  const cd = docnexusShared(root) ? `cd ${toPosix(path.relative(root, dn))} && ` : '';
-  return b && path.relative(dn, b).startsWith('node_modules')
-    ? `${cd}npm i -D ${DOCNEXUS_PKG}@latest`
-    : `${cd}npm install --prefix ./docnexus --save-exact ${DOCNEXUS_PKG}@latest`;
-}
+// 升级 DocNexus 的命令（在项目根执行）
+export const docnexusUpgradeCmd = () => `cd ${HOME} && npm install --prefix ./docnexus --save-exact ${DOCNEXUS_PKG}@latest`;
 export const MANIFEST = '.skills-init.json'; // 安装清单，位于每个安装目录（单一来源时只有 .agents/skills 一份）
 
 // ---------------------------------------------------------------- 输出

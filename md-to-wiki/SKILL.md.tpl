@@ -46,7 +46,7 @@ description: "Publish a local Markdown document to an existing Confluence wiki p
 ### Step 1 — 转换并校验
 
 ```bash
-node <skillDir>/scripts/md-to-wiki.mjs <mdPath> tmp/skills/md-to-wiki/_wiki_upload_<timestamp>.html [--banner <path>] [--no-banner]
+node <skillDir>/scripts/md-to-wiki.mjs <mdPath> skills-init/tmp/md-to-wiki/_wiki_upload_<timestamp>.html [--banner <path>] [--no-banner]
 ```
 
 脚本转换后会自动做 XML 良构校验，退出码非 0 表示不良构（单独校验：`node <skillDir>/scripts/md-to-wiki.mjs --check <html>`）。不良构 → 停，把报错的行号和原因告诉用户；不要把不良构的内容传给 Confluence。`--validate-only` 到此结束并报告结果。
@@ -70,4 +70,4 @@ node <skillDir>/scripts/md-to-wiki.mjs <mdPath> tmp/skills/md-to-wiki/_wiki_uplo
 - `references/upload.md`：通道 A / B 的调用细节与验证
 - `references/troubleshooting.md`：转换脚本说明、XHTML 规则、校验命令、常见错误
 
-典型串联：`create-tech-md-doc` / `create-release-md-doc` 生成 `docs/skills/requirements/<需求名>/` 下的 md → 本 skill 发布。
+典型串联：`create-tech-md-doc` / `create-release-md-doc` 生成 `skills-init/docs/requirements/<需求名>/` 下的 md → 本 skill 发布。

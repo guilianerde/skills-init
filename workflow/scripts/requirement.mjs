@@ -1,9 +1,11 @@
 #!/usr/bin/env node
 // 产物按需求归档：开发方案、交付说明、审查报告、技术方案、上线方案按需求放在一起，meta.json 汇总需求名、绑定的分支、各产物、
-// wiki 发布记录与 DocNexus 沉淀，供 /workflow view 等直接读取。两种放法（workflow/profile.json 的 artifacts 配置）：
-//   - 默认：项目仓库里的 docs/skills/requirements/<需求名>/，随代码提交；这个目录写进项目根 .ignore，不参与代码搜索
-//   - 独立文档仓库（artifacts.repo 配了路径）：<文档仓库>/<需求名>/<项目名>/，一个需求横跨多个服务时各项目各占一个子目录；
-//     代码仓库不再有产物，文档仓库单独提交（写完由用户确认，可用 artifacts.commit_prompt 关闭提交提示）
+// wiki 发布记录与 DocNexus 沉淀，供 /workflow view 等直接读取。
+// 本工具的产出都在项目根的 skills-init/ 里（需求产物 docs/requirements/、DocNexus 工作区 docnexus/、项目模板 templates/、临时文件 tmp/），
+// 不往项目的其他地方写。两种用法：
+//   - 默认：skills-init/ 随代码提交，需求产物在 skills-init/docs/requirements/<需求名>/；这个目录写进项目根 .ignore，不参与代码搜索
+//   - 独立文档仓库：团队文档仓库克隆到 skills-init/（它自己是 git 仓库，代码仓库忽略它），产物在 skills-init/docs/requirements/<需求名>/<项目名>/，
+//     一个需求横跨多个服务时各项目各占一个子目录；文档仓库单独提交（写完由用户确认，可用 artifacts.commit_prompt 关闭提交提示）
 // 需求名由用户在流程开始或第一次落盘时给出；用户不给时按分支名生成。分支 → 需求的绑定记在 meta.json 的 branches。
 // 说明见 workflow/references/requirements.md。
 //
@@ -14,9 +16,8 @@
 //   requirement.mjs sync [<需求目录或其中的文件> | --all]  # 按目录里的文件重建 meta.json；文档仓库模式下带上提交提示
 //   requirement.mjs pending [--branch b]               # 文档仓库模式：当前需求在文档仓库里未提交的改动与建议的提交命令
 //   requirement.mjs list                               # 所有需求（名称、分支、产物数、更新时间）
-//   requirement.mjs config [--repo <路径|"">] [--project <项目名>] [--commit-prompt on|off] [--local]   # 查看 / 修改产物位置配置
-//   requirement.mjs migrate [--dry-run]                # 旧版 docs/skills/<skill>/（文档仓库模式下还有项目里的需求目录）搬到当前位置
-// 输出 JSON。退出码：0 正常；1 参数错误 / git 失败；2 需要先问用户（还没绑定需求、还没配置项目名、文档仓库不存在）
+//   requirement.mjs config [--project <项目名>] [--commit-prompt on|off] [--local]   # 查看 / 修改产物配置
+// 输出 JSON。退出码：0 正常；1 参数错误 / git 失败；2 需要先问用户（还没绑定需求、还没配置项目名）
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -24,19 +25,18 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 const SKILLS_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
-export const REQ_DIR = 'docs/skills/requirements';
-export const IGNORE_LINE = `${REQ_DIR}/`;
+// 本工具在项目里的唯一目录
+export const HOME = 'skills-init';
+export const REQ_DIR = `${HOME}/docs/requirements`;
+export const TEMPLATES_DIR = `${HOME}/templates`;
+export const TMP_DIR = `${HOME}/tmp`;
+export const IGNORE_LINE = `${HOME}/docs/`;
+export const homeDir = (root) => path.join(root, HOME);
+// skills-init/ 自己是 git 仓库（团队文档仓库克隆到这里）= 独立文档仓库模式
+export const homeIsRepo = (root) => fs.existsSync(path.join(root, HOME, '.git'));
 // 产物种类 → 需求目录里的文件名（版本：<base>.md、<base>_v2.md …）
 export const FILES = { plan: 'plan', delivery: 'delivery', review: 'review', tech: 'tech-doc', release: 'release-doc' };
 const LABELS = { plan: '开发方案', delivery: '交付说明', review: '审查报告', tech: '技术方案', release: '上线方案' };
-// 旧版目录（docs/skills/<skill>/<前缀>…）→ 种类
-const LEGACY = [
-  { kind: 'plan', skill: 'dev', prefix: 'plan-' },
-  { kind: 'delivery', skill: 'dev', prefix: 'delivery-' },
-  { kind: 'review', skill: 'project-review', prefix: 'review-' },
-  { kind: 'tech', skill: 'create-tech-md-doc', prefix: 'tech-doc' },
-  { kind: 'release', skill: 'create-release-md-doc', prefix: 'release-doc' },
-];
 // 安装后的 skills 目录（安装器从安装包调用本脚本时，到项目里找画像）
 const INSTALL_BASES = ['.agents/skills', '.claude/skills', '.qwen/skills'];
 
@@ -44,10 +44,9 @@ const git = (cwd, args) => spawnSync('git', args, { cwd, encoding: 'utf8' });
 const readJson = (f) => { try { return JSON.parse(fs.readFileSync(f, 'utf8')); } catch { return null; } };
 const toPosix = (p) => p.split(path.sep).join('/');
 const now = () => new Date().toISOString();
+const relOf = (root, abs) => toPosix(path.relative(root, abs));
 const isDir = (p) => { try { return fs.statSync(p).isDirectory(); } catch { return false; } };
-// 文档仓库里不是需求的目录：DocNexus 工作区（docnexus.root 指向文档仓库时就在这里）、依赖目录
-const RESERVED = new Set(['docnexus', 'node_modules', 'tmp']);
-const skipDir = (d) => !d.isDirectory() || d.name.startsWith('.') || RESERVED.has(d.name);
+const skipDir = (d) => !d.isDirectory() || d.name.startsWith('.');
 
 // 需求名 / 项目名 → 目录名：保留中文，去掉路径与文件系统不允许的字符，空白换成 -
 export function dirName(name) {
@@ -106,24 +105,31 @@ export function artifactsConfig(root) {
   const team = readJson(path.join(dir, 'profile.json'))?.artifacts ?? {};
   const mine = readJson(path.join(dir, 'profile.local.json'))?.artifacts ?? {};
   const c = { ...team, ...mine };
-  return { repo: c.repo ? String(c.repo) : '', project: c.project ? String(c.project) : '', commit_prompt: c.commit_prompt !== false, profile_dir: dir };
+  return { project: c.project ? String(c.project) : '', commit_prompt: c.commit_prompt !== false, profile_dir: dir };
 }
 
-// 产物位置：project = 项目仓库 docs/skills/requirements/<需求>/；repo = <文档仓库>/<需求>/<项目>/
+// 产物位置：project = skills-init/docs/requirements/<需求>/（随代码提交）；repo = 同一位置下再分 <项目>/（skills-init/ 是独立的文档仓库）
 export function layout(root, cfg = artifactsConfig(root)) {
-  if (!cfg.repo) {
-    const base = path.join(root, REQ_DIR);
-    return { mode: 'project', ok: true, base, repo: null, project: null, commit_prompt: cfg.commit_prompt, reqDir: (slug) => path.join(base, slug), ref: (abs) => toPosix(path.relative(root, abs)) };
-  }
-  const repo = path.resolve(root, cfg.repo);
-  const repoName = path.basename(repo);
-  const L = { mode: 'repo', base: repo, repo, repo_rel: toPosix(path.relative(root, repo)) || '.', repo_name: repoName, project: cfg.project ? dirName(cfg.project) : null, commit_prompt: cfg.commit_prompt };
-  L.reqDir = (slug) => path.join(repo, slug, L.project ?? '_');
-  // 文档里引用产物用「文档仓库名:仓库内路径」，换机器、换克隆位置都不变
-  L.ref = (abs) => `${repoName}:${toPosix(path.relative(repo, abs))}`;
-  if (!isDir(repo)) return { ...L, ok: false, need_repo: true, hint: `artifacts.repo 指向的文档仓库 ${L.repo_rel} 不存在：请先把团队文档仓库克隆到这里，或用 config --repo 改成实际位置（config --repo "" 改回放在项目里）` };
-  if (!L.project) return { ...L, ok: false, need_project: true, suggested_project: suggestProject(root), hint: '文档仓库模式需要项目名（产物放在 <文档仓库>/<需求名>/<项目名>/），只需配置一次：问用户这个项目在文档仓库里叫什么（默认 suggested_project），然后运行 config --project <项目名>' };
+  const home = homeDir(root);
+  const base = path.join(root, REQ_DIR);
+  if (!homeIsRepo(root)) return { mode: 'project', ok: true, base, home, repo: null, project: null, commit_prompt: cfg.commit_prompt, reqDir: (slug) => path.join(base, slug), ref: (abs) => relOf(root, abs) };
+  const repoName = remoteName(home);
+  const L = { mode: 'repo', base, home, repo: home, repo_rel: HOME, repo_name: repoName, project: cfg.project ? dirName(cfg.project) : null, commit_prompt: cfg.commit_prompt };
+  L.reqDir = (slug) => path.join(base, slug, L.project ?? '_');
+  // 文档里引用产物用「文档仓库名:仓库内路径」，各服务、各人的克隆里都一样
+  L.ref = (abs) => `${repoName}:${toPosix(path.relative(home, abs))}`;
+  if (!L.project) return { ...L, ok: false, need_project: true, suggested_project: suggestProject(root), hint: '文档仓库模式需要项目名（产物放在 skills-init/docs/requirements/<需求名>/<项目名>/），只需配置一次：问用户这个项目在文档仓库里叫什么（默认 suggested_project），然后运行 config --project <项目名>' };
   return { ...L, ok: true };
+}
+
+// 文档仓库名：它的 git 远端仓库名，没有远端时用 skills-init
+const remoteNames = new Map();
+function remoteName(home) {
+  if (!remoteNames.has(home)) {
+    const url = git(home, ['remote', 'get-url', 'origin']).stdout?.trim();
+    remoteNames.set(home, url ? url.replace(/\.git$/, '').split(/[/:]/).pop() || HOME : HOME);
+  }
+  return remoteNames.get(home);
 }
 
 // 项目名建议：git 远端仓库名，取不到用项目目录名
@@ -132,8 +138,6 @@ function suggestProject(root) {
   const name = url ? url.replace(/\.git$/, '').split(/[/:]/).pop() : path.basename(path.resolve(root));
   return dirName(name);
 }
-
-const relOf = (root, abs) => toPosix(path.relative(root, abs));
 
 // ------------------------------------------------------------------ 读需求
 // 当前项目的需求目录：{ dir（相对项目根）, abs, slug, name, branches, updated, meta }
@@ -153,12 +157,12 @@ export function requirements(root, L = layout(root)) {
 
 // 文档仓库里所有项目的需求（跨服务视图、bind 时找同名需求）：{ slug, name, projects:[{ project, abs, dir, meta }] }
 export function repoRequirements(root, L = layout(root)) {
-  if (L.mode !== 'repo' || !isDir(L.repo)) return [];
+  if (L.mode !== 'repo' || !isDir(L.base)) return [];
   const out = [];
-  for (const d of fs.readdirSync(L.repo, { withFileTypes: true })) {
+  for (const d of fs.readdirSync(L.base, { withFileTypes: true })) {
     if (skipDir(d)) continue;
-    const projects = fs.readdirSync(path.join(L.repo, d.name), { withFileTypes: true }).filter((p) => p.isDirectory() && !p.name.startsWith('.')).map((p) => {
-      const abs = path.join(L.repo, d.name, p.name);
+    const projects = fs.readdirSync(path.join(L.base, d.name), { withFileTypes: true }).filter((p) => p.isDirectory() && !p.name.startsWith('.')).map((p) => {
+      const abs = path.join(L.base, d.name, p.name);
       return { project: p.name, abs, dir: relOf(root, abs), meta: readJson(path.join(abs, 'meta.json')) ?? {} };
     });
     if (!projects.length) continue;
@@ -212,14 +216,13 @@ export function sync(root, dirRel) {
   const meta = {
     name: old.name ?? path.basename(dir), named_by: old.named_by ?? 'user', ...(old.project ? { project: old.project } : {}), branches, base: old.base ?? null,
     created: old.created ?? now(), updated: changed || !old.updated ? now() : old.updated, latest, artifacts,
-    ...(old.migrated_from ? { migrated_from: old.migrated_from } : {}),
   };
   const out = `${JSON.stringify(meta, null, 2)}\n`;
   if (!fs.existsSync(f) || fs.readFileSync(f, 'utf8') !== out) fs.writeFileSync(f, out);
   return meta;
 }
 
-const notReady = (L) => ({ ok: false, mode: L.mode, ...(L.need_repo ? { need_repo: true, repo: L.repo_rel } : {}), ...(L.need_project ? { need_project: true, suggested_project: L.suggested_project } : {}), hint: L.hint });
+const notReady = (L) => ({ ok: false, mode: L.mode, ...(L.need_project ? { need_project: true, suggested_project: L.suggested_project } : {}), hint: L.hint });
 
 export function which(root, branch) {
   const L = layout(root);
@@ -249,7 +252,7 @@ export function bind(root, { name = null, branch, base = null }) {
   let slug = target?.slug;
   if (!slug) {
     slug = dirName(display);
-    for (let i = 2; pool.some((r) => r.slug === slug) || RESERVED.has(slug) || (L.mode === 'project' && isDir(L.reqDir(slug))); i++) slug = `${dirName(display)}-${i}`;
+    for (let i = 2; pool.some((r) => r.slug === slug) || (L.mode === 'project' && isDir(L.reqDir(slug))); i++) slug = `${dirName(display)}-${i}`;
   }
   const dir = L.reqDir(slug);
   const existedHere = isDir(dir);
@@ -292,7 +295,7 @@ export function list(root) {
 // 当前需求（或给定目录）在文档仓库里未提交的改动；项目模式下产物随代码提交，不单独提示
 export function pending(root, branch, dirRel = null) {
   const L = layout(root);
-  if (L.mode === 'project') return { mode: 'project', commit_prompt: false, note: '产物在项目仓库里，随代码一起提交' };
+  if (L.mode === 'project') return { mode: 'project', commit_prompt: false, note: `产物在项目仓库的 ${HOME}/ 里，随代码一起提交` };
   if (!L.ok) return notReady(L);
   const abs = dirRel ? path.resolve(root, dirRel) : find(root, branch, L)?.abs;
   if (!abs) return { ok: false, mode: 'repo', error: '当前分支没有绑定需求' };
@@ -304,7 +307,7 @@ export function pending(root, branch, dirRel = null) {
   const meta = readJson(path.join(abs, 'meta.json')) ?? {};
   const kinds = [...new Set(files.map((f) => parseFile(path.basename(f))?.kind).filter(Boolean))].map((k) => LABELS[k]);
   const message = `docs(${meta.name ?? path.basename(path.dirname(abs))}): ${L.project}${kinds.length ? ` ${kinds.join('、')}` : ' 更新产物'}`;
-  // DocNexus 也在这个文档仓库里时（docnexus.root）：知识库的改动单独列出，单独提交，提交信息写沉淀了什么
+  // DocNexus 也在这个文档仓库里（skills-init/docnexus/）：知识库的改动单独列出，单独提交，提交信息写沉淀了什么
   const kn = isDir(path.join(L.repo, 'docnexus', 'library'))
     ? git(L.repo, ['-c', 'core.quotePath=false', 'status', '--porcelain', '--untracked-files=all', '--', 'docnexus']).stdout.split('\n').filter(Boolean).map((l) => l.slice(3))
     : [];
@@ -323,7 +326,6 @@ export function setConfig(root, patch, { local = false } = {}) {
   const f = path.join(dir, local ? 'profile.local.json' : 'profile.json');
   const cur = readJson(f) ?? {};
   const a = { ...(cur.artifacts ?? {}) };
-  if (patch.repo !== undefined) { if (patch.repo) a.repo = patch.repo; else delete a.repo; }
   if (patch.project !== undefined) a.project = dirName(patch.project);
   if (patch.commit_prompt !== undefined) a.commit_prompt = patch.commit_prompt;
   fs.mkdirSync(dir, { recursive: true });
@@ -336,160 +338,15 @@ export function setConfig(root, patch, { local = false } = {}) {
 export function ensureIgnore(root) {
   const f = path.join(root, '.ignore');
   const text = fs.existsSync(f) ? fs.readFileSync(f, 'utf8') : '';
-  if (text.split(/\r?\n/).some((l) => l.trim().replace(/^\//, '') === IGNORE_LINE || l.trim().replace(/^\//, '') === REQ_DIR)) return false;
+  const norm = (l) => l.trim().replace(/^\//, '').replace(/\/$/, '');
+  if (text.split(/\r?\n/).some((l) => norm(l) === norm(IGNORE_LINE))) return false;
   const add = `# skills-init：需求产物（开发方案、交付说明、审查报告、技术 / 上线方案）不参与代码搜索，检索交给 DocNexus\n${IGNORE_LINE}\n`;
   fs.writeFileSync(f, text ? `${text.replace(/\s*$/, '')}\n\n${add}` : add);
   return true;
 }
 
-// ------------------------------------------------------------------ 迁移
-const SHORT = /^(?:plan|delivery)-(.+?)-\d{8}(?:_v\d+)?\.md$/;
-
-// 跨目录移动：项目仓库内用 git mv 保留历史；移到文档仓库（另一个 git 仓库）时复制后删除，原仓库里记为删除
-function move(root, from, to, sameRepo) {
-  fs.mkdirSync(path.dirname(to), { recursive: true });
-  if (sameRepo) git(root, ['mv', '-k', relOf(root, from), relOf(root, to)]);
-  if (fs.existsSync(to)) return;
-  try { fs.renameSync(from, to); } catch { fs.copyFileSync(from, to); fs.rmSync(from); }
-}
-
-export function planMigration(root) {
-  const L = layout(root);
-  if (!L.ok) return { blocked: notReady(L), requirements: [], left_in_place: [] };
-  const groups = new Map(); // key → { branch, names:Set, existingSlug, files:[] }
-  const left = [];
-  const group = (key, init) => { if (!groups.has(key)) groups.set(key, { names: new Set(), files: [], ...init }); return groups.get(key); };
-  for (const k of LEGACY) {
-    const d = path.join(root, 'docs', 'skills', k.skill);
-    if (!isDir(d)) continue;
-    for (const name of fs.readdirSync(d)) {
-      if (!name.startsWith(k.prefix) || !name.endsWith('.md')) continue;
-      const abs = path.join(d, name);
-      const branch = parseBranch(fs.readFileSync(abs, 'utf8'));
-      if (!branch) { left.push(relOf(root, abs)); continue; }
-      const g = group(`branch:${branch}`, { branch });
-      const short = SHORT.exec(name)?.[1];
-      if (short) g.names.add(short);
-      const date = /(\d{8})(?:_v(\d+))?\.md$/.exec(name);
-      g.files.push({ from: abs, kind: k.kind, order: `${date?.[1] ?? ''}#${(date?.[2] ?? '1').padStart(3, '0')}`, mtime: fs.statSync(abs).mtimeMs });
-    }
-  }
-  // 文档仓库模式：项目里已有的需求目录整体搬到文档仓库（需求名沿用 meta.json）
-  const fromProject = [];
-  if (L.mode === 'repo' && isDir(path.join(root, REQ_DIR))) {
-    for (const d of fs.readdirSync(path.join(root, REQ_DIR), { withFileTypes: true })) {
-      if (!d.isDirectory()) continue;
-      const src = path.join(root, REQ_DIR, d.name);
-      const meta = readJson(path.join(src, 'meta.json')) ?? {};
-      const g = group(`dir:${d.name}`, { branch: meta.branches?.[0] ?? null, branches: meta.branches ?? [], fixedName: meta.name ?? d.name, srcMeta: meta, srcDir: src });
-      for (const name of fs.readdirSync(src)) {
-        const p = parseFile(name);
-        if (p) g.files.push({ from: path.join(src, name), kind: p.kind, order: `#${String(p.version).padStart(3, '0')}`, mtime: 0 });
-      }
-      fromProject.push(relOf(root, src));
-    }
-  }
-  // 旧布局的产物所在分支，已经绑定在项目里的某个需求目录上：并进那个需求一起搬
-  for (const [key, g] of [...groups]) {
-    if (!key.startsWith('branch:')) continue;
-    const owner = [...groups.values()].find((x) => x.srcDir && x.branches.includes(g.branch));
-    if (owner) { owner.files.push(...g.files); groups.delete(key); }
-  }
-  const pool = L.mode === 'repo' ? repoRequirements(root, L).map((r) => ({ slug: r.slug, name: r.name })) : requirements(root, L).map((r) => ({ slug: r.slug, name: r.name }));
-  const taken = new Set(pool.map((r) => r.slug));
-  const plan = [];
-  for (const g of groups.values()) {
-    const existing = g.branch ? find(root, g.branch, L) : null;
-    const name = g.fixedName ?? existing?.name ?? (g.names.size === 1 ? [...g.names][0] : g.branch.replace(/\//g, '-'));
-    let slug = existing?.slug ?? pool.find((r) => r.name === name)?.slug;
-    if (!slug) { slug = dirName(name); for (let i = 2; taken.has(slug) || RESERVED.has(slug); i++) slug = `${dirName(name)}-${i}`; taken.add(slug); }
-    const dirAbs = L.reqDir(slug);
-    const used = new Set(isDir(dirAbs) ? fs.readdirSync(dirAbs) : []);
-    const moves = [];
-    for (const kind of Object.keys(FILES)) {
-      const list_ = g.files.filter((x) => x.kind === kind).sort((a, b) => a.order.localeCompare(b.order) || a.mtime - b.mtime);
-      let v = 1;
-      for (const x of list_) {
-        let to;
-        do { to = `${FILES[kind]}${v > 1 ? `_v${v}` : ''}.md`; v++; } while (used.has(to));
-        used.add(to);
-        moves.push({ from: relOf(root, x.from), to: relOf(root, path.join(dirAbs, to)), cite: L.ref(path.join(dirAbs, to)) });
-      }
-    }
-    plan.push({ branch: g.branch, branches: g.branches ?? (g.branch ? [g.branch] : []), name, dir: relOf(root, dirAbs), existing: isDir(dirAbs), moves, srcMeta: g.srcMeta ?? null, srcDir: g.srcDir ? relOf(root, g.srcDir) : null });
-  }
-  return { mode: L.mode, ...(L.mode === 'repo' ? { repo: L.repo_rel, project: L.project } : {}), requirements: plan, left_in_place: left, from_project: fromProject };
-}
-
-// 旧路径 → 新的引用：本次要搬的，加上以前迁移时记在各需求 meta.json 的 migrated_from（其他分支后来合进来的文档也能改对）。
-// 项目模式引用写项目内路径；文档仓库模式写「文档仓库名:仓库内路径」
-function pathMap(root, plan, L) {
-  const map = new Map();
-  for (const r of requirements(root, L)) for (const [file, from] of Object.entries(r.meta.migrated_from ?? {})) map.set(from, L.ref(path.join(r.abs, file)));
-  for (const r of plan.requirements) for (const m of r.moves) map.set(m.from, m.cite);
-  return map;
-}
-
-// 产物正文里引用的旧路径（「参考产物」、正文提到的方案 / 报告路径）换成新的引用；返回改了哪些文件
-function rewriteRefs(root, map, dryRun, L, extraDirs = []) {
-  if (!map.size) return [];
-  const pairs = [...map].sort((a, b) => b[0].length - a[0].length);
-  const dirs = [...requirements(root, L).map((r) => r.abs), ...LEGACY.map((k) => path.join(root, 'docs', 'skills', k.skill)), ...extraDirs];
-  if (L.mode === 'repo' && isDir(path.join(root, REQ_DIR))) for (const d of fs.readdirSync(path.join(root, REQ_DIR))) dirs.push(path.join(root, REQ_DIR, d));
-  const files = [...new Set(dirs)].filter(isDir).flatMap((d) => fs.readdirSync(d).filter((n) => n.endsWith('.md')).map((n) => path.join(d, n)));
-  const changed = [];
-  for (const f of files) {
-    const text = fs.readFileSync(f, 'utf8');
-    let out = text;
-    for (const [from, to] of pairs) if (out.includes(from)) out = out.split(from).join(to);
-    if (out === text) continue;
-    if (!dryRun) fs.writeFileSync(f, out);
-    changed.push(relOf(root, f));
-  }
-  return changed;
-}
-
-export function migrate(root, { dryRun = false } = {}) {
-  const L = layout(root);
-  const p = planMigration(root);
-  if (p.blocked) return { ...p, moved: 0, rewritten: [], dry_run: dryRun };
-  const map = pathMap(root, p, L);
-  // dry-run 时文件还在原处：按原位置检查哪些会被改
-  if (dryRun) return { ...p, moved: 0, rewritten: rewriteRefs(root, map, true, L), dry_run: true };
-  let moved = 0;
-  for (const r of p.requirements) {
-    const dirAbs = path.resolve(root, r.dir);
-    fs.mkdirSync(dirAbs, { recursive: true });
-    const f = path.join(dirAbs, 'meta.json');
-    const base = r.srcMeta ? { ...r.srcMeta, artifacts: undefined, latest: undefined } : { name: r.name, named_by: 'migrated', branches: r.branches, base: null, created: now() };
-    const meta = readJson(f) ?? base;
-    if (L.mode === 'repo') meta.project = L.project;
-    meta.branches = [...new Set([...(meta.branches ?? []), ...r.branches])];
-    meta.migrated_from = { ...(r.srcMeta?.migrated_from ?? {}), ...(meta.migrated_from ?? {}) };
-    for (const m of r.moves) {
-      move(root, path.resolve(root, m.from), path.resolve(root, m.to), L.mode === 'project');
-      meta.migrated_from[path.basename(m.to)] = m.from;
-      moved++;
-    }
-    fs.writeFileSync(f, `${JSON.stringify(meta, null, 2)}\n`);
-  }
-  const rewritten = rewriteRefs(root, map, false, L);
-  for (const r of p.requirements) sync(root, r.dir);
-  // 搬空的旧目录删掉（项目里的需求目录只剩 meta.json 时一并删掉）
-  for (const r of p.requirements) {
-    if (!r.srcDir) continue;
-    const src = path.resolve(root, r.srcDir);
-    if (isDir(src) && fs.readdirSync(src).every((n) => n === 'meta.json')) { git(root, ['rm', '-q', '--cached', '--ignore-unmatch', '--', relOf(root, path.join(src, 'meta.json'))]); fs.rmSync(src, { recursive: true, force: true }); }
-  }
-  for (const d of [...new Set(LEGACY.map((x) => path.join(root, 'docs', 'skills', x.skill)))].concat(L.mode === 'repo' ? [path.join(root, REQ_DIR)] : [])) {
-    if (isDir(d) && !fs.readdirSync(d).length) fs.rmdirSync(d);
-  }
-  const strip = ({ srcMeta, srcDir, ...x }) => x;
-  return { ...p, requirements: p.requirements.map(strip), moved, rewritten, dry_run: false };
-}
-
 // ------------------------------------------------------------------ CLI
-const USAGE = '用法: requirement.mjs which | bind [--name <需求名>] | path <plan|delivery|review|tech|release> | sync [<目录|文件> | --all] | pending | list | config [--repo <路径>] [--project <名>] [--commit-prompt on|off] [--local] | migrate [--dry-run]  （通用：--root <项目根> --branch <分支>）';
+const USAGE = '用法: requirement.mjs which | bind [--name <需求名>] | path <plan|delivery|review|tech|release> | sync [<目录|文件> | --all] | pending | list | config [--project <名>] [--commit-prompt on|off] [--local]  （通用：--root <项目根> --branch <分支>）';
 
 function main(argv) {
   let root = process.cwd();
@@ -499,24 +356,23 @@ function main(argv) {
     const a = argv[i];
     if (a === '--root') root = path.resolve(argv[++i] ?? '.');
     else if (['--name', '--branch', '--base', '--repo', '--project', '--commit-prompt'].includes(a)) { if (i + 1 >= argv.length) { console.error(USAGE); return 1; } o[a.slice(2)] = argv[++i]; }
-    else if (a === '--all' || a === '--dry-run' || a === '--local') o[a.slice(2)] = true;
+    else if (a === '--all' || a === '--local') o[a.slice(2)] = true;
     else if (a.startsWith('--')) { console.error(USAGE); return 1; }
     else pos.push(a);
   }
   const [cmd, arg] = pos;
   const branch = o.branch ?? currentBranch(root);
   const print = (x, code = 0) => { console.log(JSON.stringify(x, null, 2)); return code; };
-  const ready = (x) => (x.ok === false && (x.need_repo || x.need_project) ? 2 : 0);
+  const ready = (x) => (x.ok === false && x.need_project ? 2 : 0);
   switch (cmd) {
     case 'which': { const r = which(root, branch); return print(r, ready(r)); }
     case 'bind': { const r = bind(root, { name: o.name, branch, base: o.base }); return print(r, r.ok ? 0 : ready(r) || 1); }
     case 'path': { const r = nextPath(root, arg, branch); return print(r.out, r.code); }
     case 'list': return print(list(root));
     case 'pending': { const r = pending(root, branch); return print(r, ready(r)); }
-    case 'migrate': { const r = migrate(root, { dryRun: !!o['dry-run'] }); return print(r, r.blocked ? 2 : 0); }
     case 'config': {
       const patch = {};
-      if (o.repo !== undefined) patch.repo = o.repo;
+      if (o.repo !== undefined) { console.error(`--repo 已不再支持：独立文档仓库改为把团队文档仓库克隆到项目根的 ${HOME}/（见 workflow/references/requirements.md）`); return 1; }
       if (o.project !== undefined) patch.project = o.project;
       if (o['commit-prompt'] !== undefined) {
         if (!['on', 'off'].includes(o['commit-prompt'])) { console.error('--commit-prompt 取 on / off'); return 1; }
