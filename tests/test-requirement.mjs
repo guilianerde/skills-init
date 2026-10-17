@@ -1,4 +1,4 @@
-// workflow/scripts/requirement.mjs：产物按需求归档（绑定分支、落盘路径与版本、meta.json、旧布局迁移、.ignore）
+// workflow/scripts/requirement.mjs：产物按需求归档（绑定分支、落盘路径与版本、meta.json、.ignore）
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
