@@ -1,7 +1,7 @@
 #!/usr/bin/env node
-// 项目文档视图：把 skills-init/docs/requirements/<需求>/ 下的产物生成一个本地静态页面，
+// 项目文档视图：把 workflow-run/docs/requirements/<需求>/ 下的产物生成一个本地静态页面，
 // 按需求浏览开发方案、交付说明、审查报告（含复审修复情况）、技术方案、上线方案，正文直接渲染。
-// 只读产物；页面是单个 HTML 文件，数据内嵌，不联网、不上报。默认写到 skills-init/tmp/view/index.html（tmp 不入库）。
+// 只读产物；页面是单个 HTML 文件，数据内嵌，不联网、不上报。默认写到 workflow-run/tmp/view/index.html（tmp 不入库）。
 //
 // 用法（在项目根执行；--root 可指定项目根）：
 //   node .agents/skills/workflow/scripts/view.mjs [--out <文件>] [--open]
@@ -15,7 +15,7 @@ import { collect, KINDS } from './artifacts.mjs';
 import { requirements, repoRequirements, layout, parseDocnexus } from './requirement.mjs';
 import { parseReview, parseDelivery, captureState, buildReport } from './report.mjs';
 
-const DEFAULT_OUT = 'skills-init/tmp/view/index.html';
+const DEFAULT_OUT = 'workflow-run/tmp/view/index.html';
 
 // 页面数据：按需求分组
 export function viewData(root) {
@@ -275,7 +275,7 @@ $('#kb').onclick = knowledgeView;
 const fromHash = decodeURIComponent(location.hash.slice(1));
 if (fromHash === 'knowledge') knowledgeView();
 else if (D.requirements.length) select(D.requirements.some((r) => r.id === fromHash) ? fromHash : D.requirements[0].id);
-else { $('#main').innerHTML = overview() + '<div class="empty">还没有产物。dev 交付、审查报告、技术方案、上线方案落盘到 skills-init/docs/requirements/&lt;需求名&gt;/ 后，重新生成这个页面。</div>'; renderList(); }
+else { $('#main').innerHTML = overview() + '<div class="empty">还没有产物。dev 交付、审查报告、技术方案、上线方案落盘到 workflow-run/docs/requirements/&lt;需求名&gt;/ 后，重新生成这个页面。</div>'; renderList(); }
 </script>
 </body>
 </html>

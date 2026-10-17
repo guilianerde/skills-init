@@ -13,9 +13,9 @@ const node = (args, opts = {}) => spawnSync(process.execPath, args, { encoding: 
 
 function project() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'tpl-'));
-  assert.equal(node([path.join(REPO, 'bin/skills-init.mjs'), '--project-root', root, '--envs', 'codex', '--skip-db', '--yes'], { cwd: root, env: { ...process.env, SKILLS_INIT_ADMIN: '1' } }).status, 0);
+  assert.equal(node([path.join(REPO, 'bin/workflow-run.mjs'), '--project-root', root, '--envs', 'codex', '--skip-db', '--yes'], { cwd: root, env: { ...process.env, WORKFLOW_RUN_ADMIN: '1' } }).status, 0);
   const run = (...a) => { const r = node([path.join(root, '.agents/skills/workflow/scripts/template.mjs'), ...a], { cwd: root }); return { code: r.status, out: r.stdout ? JSON.parse(r.stdout) : null, err: r.stderr }; };
-  return { root, run, draftFile: (skill, id = 'template.md') => path.join(root, 'skills-init/tmp/template-draft', skill, id) };
+  return { root, run, draftFile: (skill, id = 'template.md') => path.join(root, 'workflow-run/tmp/template-draft', skill, id) };
 }
 
 test('checkFormat：没有标题、{{ }} 不成对、{{fact:}} 是错误；元信息块、重名、没有必填是警告', () => {
@@ -53,18 +53,18 @@ test('没有模板时 draft 要样例；--from 抽骨架 → check → save 写�
   assert.equal(r.out.changes, null, '还没有当前模板');
   r = run('save', 'tech');
   assert.equal(r.code, 0, JSON.stringify(r.out));
-  assert.deepEqual([r.out.saved, r.out.backup, r.out.effective, r.out.source], ['skills-init/templates/create-tech-md-doc/template.md', null, true, 'project']);
+  assert.deepEqual([r.out.saved, r.out.backup, r.out.effective, r.out.source], ['workflow-run/templates/create-tech-md-doc/template.md', null, true, 'project']);
   assert.ok(!fs.existsSync(draftFile('create-tech-md-doc')), '保存后删除草稿');
   fs.rmSync(root, { recursive: true, force: true });
 });
 
 test('修改已有模板：草稿沿用 / --force 重来；check 列出变化与对已生成文档的影响；save 备份旧模板', () => {
   const { root, run, draftFile } = project();
-  const tplFile = path.join(root, 'skills-init/templates/create-release-md-doc/template.md');
+  const tplFile = path.join(root, 'workflow-run/templates/create-release-md-doc/template.md');
   fs.mkdirSync(path.dirname(tplFile), { recursive: true });
   fs.writeFileSync(tplFile, '# 【上线方案】{{文档标题}}\n\n## 一、上线服务 *\n\n{{服务}}\n\n## 二、灰度\n\n{{灰度}}\n');
-  fs.mkdirSync(path.join(root, 'skills-init/docs/requirements/x'), { recursive: true });
-  fs.writeFileSync(path.join(root, 'skills-init/docs/requirements/x/release-doc.md'), '# 【上线方案】x\n\n> 自动生成\n> 对比分支：`a` ←→ `main`\n> diff 概览\n> 模板来源：项目文件\n\n## 一、上线服务\n\norder\n\n## 二、灰度\n\n无\n');
+  fs.mkdirSync(path.join(root, 'workflow-run/docs/requirements/x'), { recursive: true });
+  fs.writeFileSync(path.join(root, 'workflow-run/docs/requirements/x/release-doc.md'), '# 【上线方案】x\n\n> 自动生成\n> 对比分支：`a` ←→ `main`\n> diff 概览\n> 模板来源：项目文件\n\n## 一、上线服务\n\norder\n\n## 二、灰度\n\n无\n');
 
   let r = run('draft', 'release');
   assert.equal(r.out.from, 'project');
@@ -83,7 +83,7 @@ test('修改已有模板：草稿沿用 / --force 重来；check 列出变化与
 
   r = run('save', 'release');
   assert.equal(r.code, 0);
-  assert.match(r.out.backup, /^skills-init\/tmp\/template-backup\/[\d-]+\/create-release-md-doc\/template\.md$/);
+  assert.match(r.out.backup, /^workflow-run\/tmp\/template-backup\/[\d-]+\/create-release-md-doc\/template\.md$/);
   assert.match(fs.readFileSync(path.join(root, r.out.backup), 'utf8'), /灰度/);
   assert.match(fs.readFileSync(tplFile, 'utf8'), /回滚/);
 
@@ -103,7 +103,7 @@ test('带默认版本的模板：草稿取默认模板，保存到项目后优�
   const { root, run, draftFile } = project();
   let r = run('draft', 'delivery');
   assert.equal(r.out.source, 'default');
-  assert.equal(r.out.expected, 'skills-init/templates/dev/delivery-template.md');
+  assert.equal(r.out.expected, 'workflow-run/templates/dev/delivery-template.md');
   fs.appendFileSync(draftFile('dev', 'delivery-template.md'), '\n## 上线关注点（如有）\n\n{{要盯的指标}}\n');
   r = run('save', 'delivery');
   assert.equal(r.code, 0, JSON.stringify(r.out));
@@ -114,10 +114,10 @@ test('带默认版本的模板：草稿取默认模板，保存到项目后优�
 
 test('已接入 DocNexus：save 不写知识库，退出码 2 给出 capture 指引', () => {
   const { root, run } = project();
-  fs.mkdirSync(path.join(root, 'skills-init/docnexus/node_modules/.bin'), { recursive: true });
-  fs.writeFileSync(path.join(root, 'skills-init/docnexus/project.json'), '{}');
-  fs.writeFileSync(path.join(root, 'skills-init/docnexus/node_modules/.bin', process.platform === 'win32' ? 'docnexus.cmd' : 'docnexus'), '');
-  const lib = path.join(root, 'skills-init/docnexus/library/templates/create-tech-md-doc/template.md');
+  fs.mkdirSync(path.join(root, 'workflow-run/docnexus/node_modules/.bin'), { recursive: true });
+  fs.writeFileSync(path.join(root, 'workflow-run/docnexus/project.json'), '{}');
+  fs.writeFileSync(path.join(root, 'workflow-run/docnexus/node_modules/.bin', process.platform === 'win32' ? 'docnexus.cmd' : 'docnexus'), '');
+  const lib = path.join(root, 'workflow-run/docnexus/library/templates/create-tech-md-doc/template.md');
   fs.mkdirSync(path.dirname(lib), { recursive: true });
   fs.writeFileSync(lib, '# 【技术方案】{{文档标题}}\n\n## 背景 *\n');
   let r = run('draft', 'tech');

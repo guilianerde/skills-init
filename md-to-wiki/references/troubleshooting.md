@@ -48,4 +48,4 @@ node <skillDir>/scripts/md-to-wiki.mjs --check <tmpHtmlPath>
 | 不传 `version` | 并发编辑时覆盖他人改动 | 先读当前 version 再更新 |
 | URL 解析不出 pageId 却硬猜 | 写到错误页面 | 用 `[?&]pageId=(\d+)` 提取，失败就停 |
 | body 过大（>256KB） | REST 拒绝 | 拆分或精简文档；~50KB 实测无问题 |
-| 临时 HTML 写到源码目录 | 污染 git 工作区 | 写到 `skills-init/tmp/md-to-wiki/` |
+| 临时 HTML 写到源码目录 | 污染 git 工作区 | 写到 `workflow-run/tmp/md-to-wiki/` |

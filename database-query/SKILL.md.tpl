@@ -9,7 +9,7 @@ description: "Query the project database via SQL and report results. Use when th
 
 ## 连接配置（config.json）
 
-本 skill 目录下的 `config.json` 由 skills-init 生成，可以手动增加连接。格式见 `references/config.example.json`：
+本 skill 目录下的 `config.json` 由 workflow-run 生成，可以手动增加连接。格式见 `references/config.example.json`：
 
 ```json
 {
@@ -92,7 +92,7 @@ node <skills>/database-query/scripts/query.mjs --schema --tables a,b --indexes  
 ## Artifact Location
 
 - 查询结果默认只在对话内输出，不落盘。
-- 用户明确要求导出时写入 `skills-init/tmp/database-query/result-<YYYYMMDD-HHmmss>.csv`（已被 gitignore），并告知路径。
+- 用户明确要求导出时写入 `workflow-run/tmp/database-query/result-<YYYYMMDD-HHmmss>.csv`（已被 gitignore），并告知路径。
 
 ## 终端命令
 

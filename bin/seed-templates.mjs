@@ -1,5 +1,5 @@
-// 把 skills-init 自带的文档模板导入 DocNexus（seed-templates），并跟踪导入时的版本。
-// 模板存为 skills-init/docnexus/library/templates/<skill>/<文件名>，分类 doc-template；接入 DocNexus 后文档类 skill 只从这里读取模板，
+// 把 workflow-run 自带的文档模板导入 DocNexus（seed-templates），并跟踪导入时的版本。
+// 模板存为 workflow-run/docnexus/library/templates/<skill>/<文件名>，分类 doc-template；接入 DocNexus 后文档类 skill 只从这里读取模板，
 // 之后模板随 DocNexus 知识库更新（每次变更都有 timeline）。
 //
 // 导入记录（records）：{ "<库内路径>": { version, sha256 } }，保存在安装清单的 templates 字段，用来区分：
@@ -25,7 +25,7 @@ export { TEMPLATE_CATEGORY };
 
 const IS_WIN = process.platform === 'win32';
 const sha256 = (s) => crypto.createHash('sha256').update(s).digest('hex');
-// DocNexus 以 skills-init/ 为项目根：命令在那里运行，草稿与知识库路径也相对那里
+// DocNexus 以 workflow-run/ 为项目根：命令在那里运行，草稿与知识库路径也相对那里
 const binPath = (root) => docnexusBin(root) ?? path.join(docnexusRoot(root), 'docnexus', 'node_modules', '.bin', IS_WIN ? 'docnexus.cmd' : 'docnexus');
 
 function docnexus(root, args) {
@@ -37,7 +37,7 @@ function docnexus(root, args) {
 
 function requireDocNexus(root) {
   if (!fs.existsSync(path.join(docnexusRoot(root), 'docnexus', 'project.json')) || !docnexusBin(root)) {
-    throw new Error('未检测到 DocNexus（需要 skills-init/docnexus/project.json 与 skills-init/docnexus/node_modules/.bin/docnexus）。先加 --with-docnexus 接入。');
+    throw new Error('未检测到 DocNexus（需要 workflow-run/docnexus/project.json 与 workflow-run/docnexus/node_modules/.bin/docnexus）。先加 --with-docnexus 接入。');
   }
 }
 
@@ -67,7 +67,7 @@ const newMetadata = (t) => ({
   summary: t.summary,
   category: TEMPLATE_CATEGORY,
   category_reason: TEMPLATE_CATEGORY_REASON,
-  tags: ['skills-init-template', t.skill],
+  tags: ['workflow-run-template', t.skill],
   entities: [],
   relationships: [],
 });
@@ -90,7 +90,7 @@ export function seedTemplates(root, tplDir, { ok = console.log, warn = console.e
     if (err) { result.failed.push({ file: t.file, error: err }); warn(`导入 ${t.file} 失败：${err}`); continue; }
     result.seeded.push(t.file);
     result.records[t.file] = { version, sha256: sha256(content) };
-    ok(`已导入 DocNexus：skills-init/docnexus/library/${t.file}`);
+    ok(`已导入 DocNexus：workflow-run/docnexus/library/${t.file}`);
   }
   return result;
 }
@@ -133,16 +133,16 @@ export function updateTemplates(root, tplDir, records = {}, { ok = console.log, 
     if (err) { result.failed.push({ file: t.file, error: err }); warn(`更新 ${t.file} 失败：${err}`); continue; }
     result.updated.push(t.file);
     result.records[t.file] = { version, sha256: sha256(content) };
-    ok(`已更新 DocNexus 模板：skills-init/docnexus/library/${t.file}（原导入自 ${s.seededFrom || '未知版本'}）`);
+    ok(`已更新 DocNexus 模板：workflow-run/docnexus/library/${t.file}（原导入自 ${s.seededFrom || '未知版本'}）`);
   }
   return result;
 }
 
 export const STATUS_TEXT = {
   current: '与默认模板一致',
-  outdated: '默认模板有新版，库中模板未改动：运行 skills-init seed-templates --update 更新',
-  customized: '团队改过，默认模板也有新版：运行 skills-init seed-templates --diff 查看差异后手动合并',
+  outdated: '默认模板有新版，库中模板未改动：运行 workflow-run seed-templates --update 更新',
+  customized: '团队改过，默认模板也有新版：运行 workflow-run seed-templates --diff 查看差异后手动合并',
   edited: '团队改过（默认模板无变化）',
-  untracked: '没有导入记录，内容与默认模板不同：如需采用新默认模板，运行 skills-init seed-templates --diff 对比',
-  missing: '知识库中缺失：运行 skills-init seed-templates 导入（upgrade 时会自动导入）',
+  untracked: '没有导入记录，内容与默认模板不同：如需采用新默认模板，运行 workflow-run seed-templates --diff 对比',
+  missing: '知识库中缺失：运行 workflow-run seed-templates 导入（upgrade 时会自动导入）',
 };

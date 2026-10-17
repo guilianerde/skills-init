@@ -10,8 +10,8 @@ import { detectEnv } from '../../workflow/scripts/resolve.mjs';
 // 结尾汇总：被手改过、已用新版覆盖（原文件已备份）的 / 模板已删除、手改过而备份后删除的文件
 export const report = { overwritten: [], removed: [], backupDir: null };
 
-// skills 目录里的文件一律以安装包为准：手改过的先备份到 <项目根>/skills-init/tmp/upgrade-backup/<时间>/（同一次运行共用一个目录），
-// 再覆盖或删除。项目自己的定制应放在不会被升级覆盖的地方：workflow/profile.json、skills-init/templates/、DocNexus、CLAUDE.md / AGENTS.md
+// skills 目录里的文件一律以安装包为准：手改过的先备份到 <项目根>/workflow-run/tmp/upgrade-backup/<时间>/（同一次运行共用一个目录），
+// 再覆盖或删除。项目自己的定制应放在不会被升级覆盖的地方：workflow/profile.json、workflow-run/templates/、DocNexus、CLAUDE.md / AGENTS.md
 let stamp = null;
 function backup(root, file) {
   stamp ??= timestamp();
@@ -153,12 +153,12 @@ export function migrateCopy(root, old, skill) {
 
 
 // 能否在 dir 里创建目录软链接。先探测再动旧目录：建不了链接时旧拷贝原样保留、只更新模板。
-// 环境变量 SKILLS_INIT_NO_SYMLINK=1 可强制走独立拷贝（测试与无法建链接的环境用）。
+// 环境变量 WORKFLOW_RUN_NO_SYMLINK=1 可强制走独立拷贝（测试与无法建链接的环境用）。
 export function symlinkSupported(dir) {
-  if (process.env.SKILLS_INIT_NO_SYMLINK === '1') return false;
+  if (process.env.WORKFLOW_RUN_NO_SYMLINK === '1') return false;
   // 清掉之前异常退出留下的探测链接
-  for (const f of fs.readdirSync(dir)) if (f.startsWith('.skills-init-probe-') && lstat(path.join(dir, f))?.isSymbolicLink()) removeLink(path.join(dir, f));
-  const probe = path.join(dir, `.skills-init-probe-${process.pid}`);
+  for (const f of fs.readdirSync(dir)) if (f.startsWith('.workflow-run-probe-') && lstat(path.join(dir, f))?.isSymbolicLink()) removeLink(path.join(dir, f));
+  const probe = path.join(dir, `.workflow-run-probe-${process.pid}`);
   try {
     fs.symlinkSync('.', probe, 'dir');
   } catch (e) {
@@ -174,7 +174,7 @@ export function linkSkills(root, envName, rel, skills = SKILLS) {
   const dir = path.join(root, rel);
   fs.mkdirSync(dir, { recursive: true });
   if (!symlinkSupported(dir)) {
-    warn(`${envName}：无法创建软链接（Windows 需开启开发者模式或以管理员运行，或设置了 SKILLS_INIT_NO_SYMLINK=1），改为独立拷贝到 ${dir}`);
+    warn(`${envName}：无法创建软链接（Windows 需开启开发者模式或以管理员运行，或设置了 WORKFLOW_RUN_NO_SYMLINK=1），改为独立拷贝到 ${dir}`);
     return false;
   }
   let skipped = 0;
@@ -204,7 +204,7 @@ export function linkSkills(root, envName, rel, skills = SKILLS) {
 }
 
 // ---------------------------------------------------------------- 4. .gitignore 保护
-// skills-init/ 是独立文档仓库时整个忽略（它自己提交）；否则只忽略其中的临时文件
+// workflow-run/ 是独立文档仓库时整个忽略（它自己提交）；否则只忽略其中的临时文件
 export function updateGitignore(root, withDocNexus, withCodeGraph = false) {
   const gi = path.join(root, '.gitignore');
   const rules = ['**/database-query/config.json', '**/wiki-config.json', '**/workflow/profile.local.json', homeIsRepo(root) ? `/${HOME}/` : `/${TMP_DIR}/`];
@@ -217,7 +217,7 @@ export function updateGitignore(root, withDocNexus, withCodeGraph = false) {
   ok(`.gitignore 已追加：${missing.join(' ')}`);
 }
 
-// skills-init/：.ignore 加上需求目录（不参与代码搜索）；是独立文档仓库时还没配项目名就提示
+// workflow-run/：.ignore 加上需求目录（不参与代码搜索）；是独立文档仓库时还没配项目名就提示
 // 本机系统与终端写进各安装目录的 workflow/profile.local.json（个人设置，已在 .gitignore 里），skill 从 resolve.mjs 的 env 读，
 // 不用每次对话再探测。每次安装 / 升级都重新检测（换了终端、拷到别的机器后重跑即可）
 export function recordEnv(root) {
@@ -235,14 +235,14 @@ export function recordEnv(root) {
   return env;
 }
 
-// skills-init/ 是独立文档仓库时，tmp/（本机临时文件）不能进文档仓库：写进它的 .git/info/exclude（只在本机生效，不改仓库内容）
+// workflow-run/ 是独立文档仓库时，tmp/（本机临时文件）不能进文档仓库：写进它的 .git/info/exclude（只在本机生效，不改仓库内容）
 export function excludeHomeTmp(root) {
   if (!homeIsRepo(root)) return false;
   const f = path.join(root, HOME, '.git', 'info', 'exclude');
   const cur = fs.existsSync(f) ? fs.readFileSync(f, 'utf8') : '';
   if (cur.split(/\r?\n/).some((l) => l.trim() === '/tmp/')) return false;
   fs.mkdirSync(path.dirname(f), { recursive: true });
-  fs.writeFileSync(f, `${cur}${cur && !cur.endsWith('\n') ? '\n' : ''}# skills-init：本机临时文件\n/tmp/\n`);
+  fs.writeFileSync(f, `${cur}${cur && !cur.endsWith('\n') ? '\n' : ''}# workflow-run：本机临时文件\n/tmp/\n`);
   ok(`${HOME}/tmp/ 已加入文档仓库的 .git/info/exclude（不会提交到文档仓库）`);
   return true;
 }

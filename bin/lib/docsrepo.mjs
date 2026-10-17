@@ -1,6 +1,6 @@
-// docs-repo：把团队文档仓库克隆到项目根的 skills-init/，一步切到独立文档仓库模式
-//   - 克隆（skills-init/ 里只有 tmp/ 时先挪开再放回；有产物、DocNexus 或项目模板时停下，不合并）
-//   - 代码仓库 .gitignore 加 /skills-init/；文档仓库的 .git/info/exclude 加 /tmp/（本机临时文件不进文档仓库）
+// docs-repo：把团队文档仓库克隆到项目根的 workflow-run/，一步切到独立文档仓库模式
+//   - 克隆（workflow-run/ 里只有 tmp/ 时先挪开再放回；有产物、DocNexus 或项目模板时停下，不合并）
+//   - 代码仓库 .gitignore 加 /workflow-run/；文档仓库的 .git/info/exclude 加 /tmp/（本机临时文件不进文档仓库）
 //   - 项目名写进 workflow/profile.json 的 artifacts.project（--project，或沿用已有的，默认 git 远端仓库名）
 //   - 文档仓库里有 DocNexus 时接上本项目的链接与段落；还没装依赖时提示
 // 不带地址运行：只显示当前状态
@@ -18,7 +18,7 @@ const git = (cwd, args, opts = {}) => spawnSync('git', args, { cwd, encoding: 'u
 function show(root) {
   const L = layout(root);
   if (L.mode !== 'repo') {
-    console.log(`${HOME}/ 随项目提交（不是独立文档仓库）。要改用团队文档仓库：npx @rowansenne/skills-init docs-repo <仓库地址> [--project <项目名>]`);
+    console.log(`${HOME}/ 随项目提交（不是独立文档仓库）。要改用团队文档仓库：npx @rowansenne/workflow-run docs-repo <仓库地址> [--project <项目名>]`);
     return 0;
   }
   const remote = git(L.repo, ['remote', 'get-url', 'origin']).stdout.trim() || '（没有 origin）';
@@ -63,7 +63,7 @@ export function docsRepo(root, { url, project }) {
   if (tracked) warn(`代码仓库里还跟踪着 ${HOME}/ 下的文件，运行 git rm -r --cached ${HOME} 后提交，代码仓库就不再管它`);
 
   if (!installed) {
-    warn(`本项目还没安装 skills：先运行 npx @rowansenne/skills-init，项目名之后用 docs-repo --project <项目名> 配置（或第一次落盘时 skill 会问）`);
+    warn(`本项目还没安装 skills：先运行 npx @rowansenne/workflow-run，项目名之后用 docs-repo --project <项目名> 配置（或第一次落盘时 skill 会问）`);
     return 0;
   }
   const name = project || artifactsConfig(root).project || suggestProject(root);
@@ -73,7 +73,7 @@ export function docsRepo(root, { url, project }) {
   if (fs.existsSync(path.join(docnexusRoot(root), 'docnexus', 'project.json'))) {
     const envs = findManifests(root)[0]?.m.envs ?? [];
     if (docnexusBin(root)) refreshDocNexusLinks(root, envs);
-    else warn(`文档仓库里有 DocNexus，本机还没装它的依赖：运行 npx @rowansenne/skills-init upgrade --with-docnexus`);
+    else warn(`文档仓库里有 DocNexus，本机还没装它的依赖：运行 npx @rowansenne/workflow-run upgrade --with-docnexus`);
   }
   const L = layout(root);
   step('完成');

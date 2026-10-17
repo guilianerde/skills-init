@@ -1,6 +1,6 @@
 # Schema Notes
 
-> 本文件由 skills-init 安装时生成，用于记录库表结构速查。初始化时为空，
+> 本文件由 workflow-run 安装时生成，用于记录库表结构速查。初始化时为空，
 > 可运行 `query.mjs --schema --write` 自动导出（经确认后），补充说明后提交，帮助各平台 agent 快速定位表。
 
 ## 连接

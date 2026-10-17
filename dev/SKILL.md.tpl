@@ -152,7 +152,7 @@ description: "Implement a feature or fix a bug in this project end to end: under
 
 ## Artifact Location
 
-产物按需求归档在 `skills-init/docs/requirements/<需求名>/`，规则见 `<skills>/workflow/references/requirements.md`：
+产物按需求归档在 `workflow-run/docs/requirements/<需求名>/`，规则见 `<skills>/workflow/references/requirements.md`：
 
 - **需求名**：确定规模为 M / L（要落盘）时，先运行 `node <skills>/workflow/scripts/requirement.mjs which`；当前分支还没绑定需求就问用户这个需求叫什么（默认值用输出的 `suggested_name`），再 `requirement.mjs bind --name "<需求名>"`；用户不给名字时 `bind` 按分支名生成。S 规模快速通道不落盘，不问。缺陷修复同样处理（可以选择挂到原需求下）。
 - **路径**：交付说明用 `requirement.mjs path delivery`，L 规模方案（或用户要求落盘的 M 规模方案）用 `requirement.mjs path plan`，写到输出的 `path`；已有旧版时自动给出 `_v2`、`_v3`，不覆盖。

@@ -1,14 +1,14 @@
 #!/usr/bin/env node
-// skills-init — 项目级 Agent Skills 一键初始化（Node 版，跨平台单一实现）
+// workflow-run — 项目级 Agent Skills 一键初始化（Node 版，跨平台单一实现）
 //
 // 用法：
-//   npx @rowansenne/skills-init [命令] [选项]          # 在项目根执行（唯一的安装方式）
+//   npx @rowansenne/workflow-run [命令] [选项]          # 在项目根执行（唯一的安装方式）
 //
 // 单一来源：skills 只完整安装到 .agents/skills（codex / doubao 直接使用）；
 //           .claude/skills、.qwen/skills 下按 skill 建相对软链接指向它；--copy 退回各环境独立拷贝。
 // 重跑安全：SKILL.md / references / 模板会更新；用户已填写的 wiki-config.json、schema.md、
 //           workflow/profile.json 保留不覆盖；database-query/config.json 仅在本次提供了数据库配置时写入。
-// 安装清单：每个安装目录写 .skills-init.json，记录模板文件的 sha256。重跑时据此判断模板文件是否被手改过
+// 安装清单：每个安装目录写 .workflow-run.json，记录模板文件的 sha256。重跑时据此判断模板文件是否被手改过
 //           （改过的不静默覆盖）、清理模板里已删除的文件；--uninstall 按清单卸载。
 //
 // 本文件只做参数解析与命令调度，实现在 bin/lib/：core（常量与工具）、prompt（交互输入）、db（数据库配置）、
@@ -27,28 +27,29 @@ import { uninstall } from './lib/uninstall.mjs';
 import { checkNodeForDocNexus, setupDocNexus, refreshDocNexusLinks, templateRecords, saveTemplateRecords, reportTemplateStatus, installedSkills, docnexusConnected, printTemplateDiffs } from './lib/docnexus.mjs';
 import { upgradeOptions, doctor } from './lib/doctor.mjs';
 import { docsRepo } from './lib/docsrepo.mjs';
+import { findLegacy, legacyMessage } from './lib/legacy.mjs';
 
 // ---------------------------------------------------------------- 参数
 const COMMANDS = ['init', 'upgrade', 'doctor', 'uninstall', 'seed-templates', 'report', 'view', 'docs-repo'];
-const HELP = `用法: skills-init [命令] [选项]
+const HELP = `用法: workflow-run [命令] [选项]
 
 命令：
   init（默认）         安装或重装 skills
-  upgrade              按安装清单里的环境与模式非交互升级到当前版本（保留数据库配置等用户配置；skills 文件一律更新为新版，手改过的先备份到 skills-init/tmp/upgrade-backup/）；
+  upgrade              按安装清单里的环境与模式非交互升级到当前版本（保留数据库配置等用户配置；skills 文件一律更新为新版，手改过的先备份到 workflow-run/tmp/upgrade-backup/）；
                        已接入 DocNexus 时顺带导入新增的文档模板（只新增，不覆盖已有模板）
   doctor               自检：版本、手改 / 缺失文件、软链接、项目画像、DocNexus 模板、数据库连通性、.gitignore
-  uninstall            按安装清单卸载本项目装的 skills 与链接（用户配置备份到 skills-init/tmp/uninstall-backup/）
-  seed-templates       只把自带的文档模板导入 DocNexus（skills-init/docnexus/library/templates/，已有的不覆盖）
-  report               本地效果报告：只读统计 skills-init/docs/requirements/ 下的产物（审查发现与修复率、需求澄清、DocNexus 沉淀与复用、各分支链路）
+  uninstall            按安装清单卸载本项目装的 skills 与链接（用户配置备份到 workflow-run/tmp/uninstall-backup/）
+  seed-templates       只把自带的文档模板导入 DocNexus（workflow-run/docnexus/library/templates/，已有的不覆盖）
+  report               本地效果报告：只读统计 workflow-run/docs/requirements/ 下的产物（审查发现与修复率、需求澄清、DocNexus 沉淀与复用、各分支链路）
   view                 项目文档视图：按需求浏览方案、交付、审查（含复审修复情况）、技术 / 上线方案，生成本地静态页面
-  docs-repo <仓库地址> 改用团队文档仓库：克隆到 skills-init/、代码仓库忽略它、配置本项目的项目名、接上仓库里的 DocNexus；
+  docs-repo <仓库地址> 改用团队文档仓库：克隆到 workflow-run/、代码仓库忽略它、配置本项目的项目名、接上仓库里的 DocNexus；
                        不带地址时显示当前状态
 
 init 选项：
   --envs <列表>        环境，逗号分隔：codex,claude,doubao,qwen；all = 全部（不传则交互选择）
   --skip-db            跳过数据库连接配置
   --yes                非交互：使用已有数据库配置；都没有且未 --skip-db 时报错退出
-  --with-docnexus      同时接入 DocNexus 文档库（装在 skills-init/docnexus/，需 Node >= 22.13 与 npm），并导入文档模板
+  --with-docnexus      同时接入 DocNexus 文档库（装在 workflow-run/docnexus/，需 Node >= 22.13 与 npm），并导入文档模板
   --with-codegraph     同时接入 CodeGraph 代码图谱：没有 codegraph 命令时 npm 全局安装，为 claude / codex 写项目级 MCP 配置，并建本项目索引（.codegraph/）
   --copy               不用软链接，各环境独立拷贝
   --skills <列表>      只装这些 skill（逗号分隔），自动带上 skill.json 里 requires 声明的依赖；缺省为全部
@@ -66,7 +67,7 @@ report 选项：
 docs-repo 选项：
   --project <名称>     本项目在文档仓库里的名字（默认沿用已配置的，其次 git 远端仓库名）；只改项目名时可不带地址
 view 选项：
-  --out <文件>         页面写到哪里（默认 skills-init/tmp/view/index.html）
+  --out <文件>         页面写到哪里（默认 workflow-run/tmp/view/index.html）
   --open               生成后用默认浏览器打开
 通用：
   --project-root <dir> 项目根目录（默认当前目录）
@@ -136,7 +137,11 @@ async function resolveEnvs(o) {
 // ================================================================= main
 async function main() {
   let o = parseArgs(process.argv.slice(2));
-  if (Number(process.versions.node.split('.')[0]) < 22) warn(`当前 Node v${process.versions.node} 低于 22：skills-init 只在 Node 22 / 24 上测试（18、20 已停止维护），建议升级`);
+  // 旧包 skills-init 留下的数据目录 / 安装清单：给出改名命令后停下，不自动迁移
+  const legacy = findLegacy(o.root);
+  if (legacy.block.length) fail(legacyMessage(legacy));
+  for (const s of legacy.notes) warn(`旧版残留：${s}`);
+  if (Number(process.versions.node.split('.')[0]) < 22) warn(`当前 Node v${process.versions.node} 低于 22：workflow-run 只在 Node 22 / 24 上测试（18、20 已停止维护），建议升级`);
   if (o.cmd === 'uninstall') { step(`按安装清单卸载 ${o.root} 中的 skills`); return uninstall(o.root); }
   if (o.cmd === 'doctor') return doctor(o.root, o.offline);
   if (o.cmd === 'docs-repo') return docsRepo(o.root, { url: o.url, project: o.project });
@@ -172,7 +177,7 @@ async function main() {
   // Windows：安装 / 升级只在管理员终端进行（建目录软链接需要该权限），否则直接停下，不做任何改动
   if (!isAdminTerminal()) {
     const args = process.argv.slice(2);
-    const again = `npx @rowansenne/skills-init ${args.join(' ')}`.trim();
+    const again = `npx @rowansenne/workflow-run ${args.join(' ')}`.trim();
     fail(`当前终端没有管理员权限，已停止${o.cmd === 'upgrade' ? '升级' : '安装'}（没有做任何改动）。
 请以管理员身份打开终端：开始菜单搜索「PowerShell」或「终端」→ 右键「以管理员身份运行」，进入项目目录后重新执行：
   cd "${o.root}"
@@ -245,7 +250,7 @@ async function main() {
       // upgrade 顺带的导入是尽力而为：失败只提示，不让升级本身算失败
       const explicit = o.seedTemplates || o.withDocNexus;
       seedFailed = explicit && r.failed.length > 0;
-      if (!explicit && r.failed.length) warn('新增模板导入失败（skills 已升级）：修复后运行 skills-init seed-templates 重试');
+      if (!explicit && r.failed.length) warn('新增模板导入失败（skills 已升级）：修复后运行 workflow-run seed-templates 重试');
       if (upgradeSeed && !r.seeded.length && !r.failed.length) ok('知识库里的文档模板齐全，无需导入');
     } catch (e) { warn(e.message); seedFailed = o.seedTemplates || o.withDocNexus; }
   }
@@ -260,17 +265,17 @@ async function main() {
   else warn('注意：本次未写入数据库连接。可重跑补配，或手动放置 database-query/config.json（已有的保留不动）。');
   warn('注意：md-to-wiki 的 wiki 连接（wiki-config.json）默认留空（enabled=false），未配置前 md-to-wiki 与 create-*-md-doc 的 --prd 增强不启动。');
   warn('        启用方法：填写 .agents/skills/md-to-wiki/wiki-config.json（enabled: true + base_url + api_token），或接入对应环境的 wiki MCP。重跑不会覆盖已填写的配置。');
-  if (docnexus === 'ok') ok('DocNexus 已接入：dev / project-review 会按 docnexus-recall 查项目约定；文档类 skill 只从 skills-init/docnexus/library/templates/ 取模板；任何写入 DocNexus 的操作都需你授权。');
+  if (docnexus === 'ok') ok('DocNexus 已接入：dev / project-review 会按 docnexus-recall 查项目约定；文档类 skill 只从 workflow-run/docnexus/library/templates/ 取模板；任何写入 DocNexus 的操作都需你授权。');
   // 已接入 DocNexus：缺模板时文档类 skill 会停下来要求导入；默认模板有新版时提示更新或合并
   if (docnexusConnected(o.root)) reportTemplateStatus(o.root);
   if (docnexus === 'failed') warn('注意：DocNexus 接入失败（见上方输出），其他 skills 不受影响；修复后可重跑（加 --with-docnexus）。');
   if (codegraph === 'failed') warn('注意：CodeGraph 接入失败（见上方输出），其他 skills 不受影响；skills 会退回 grep / 读文件；修复后可重跑（加 --with-codegraph）。');
   if (report.overwritten.length || report.removed.length) {
-    warn(`以下文件被手动修改过，已按新版${report.removed.length ? '覆盖或删除' : '覆盖'}，原文件备份在 ${report.backupDir}/（skills 目录里的文件以安装包为准；项目定制请放到 workflow/profile.json、skills-init/templates/、DocNexus 或 CLAUDE.md / AGENTS.md）：`);
+    warn(`以下文件被手动修改过，已按新版${report.removed.length ? '覆盖或删除' : '覆盖'}，原文件备份在 ${report.backupDir}/（skills 目录里的文件以安装包为准；项目定制请放到 workflow/profile.json、workflow-run/templates/、DocNexus 或 CLAUDE.md / AGENTS.md）：`);
     for (const f of report.overwritten) warn(`  ${f}`);
     for (const f of report.removed) warn(`  ${f}（新版已不提供，已删除）`);
   }
-  console.log('先运行 /workflow profile 填写项目画像；说明见 skills-init README。');
+  console.log('先运行 /workflow profile 填写项目画像；说明见 workflow-run README。');
   // skills 已装好，但显式要求的 DocNexus 未接入：返回非 0 便于自动化感知
   return docnexus === 'failed' || codegraph === 'failed' || seedFailed ? 1 : 0;
 }

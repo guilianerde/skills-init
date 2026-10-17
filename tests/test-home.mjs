@@ -1,6 +1,6 @@
-// 本工具的产出都在项目根的 skills-init/：DocNexus 工作区 skills-init/docnexus/（以 skills-init/ 为项目根运行）、
+// 本工具的产出都在项目根的 workflow-run/：DocNexus 工作区 workflow-run/docnexus/（以 workflow-run/ 为项目根运行）、
 // 需求产物、项目模板、临时文件。用假的 DocNexus 工作区与 CLI：本项目链接它的 skills 并写 CLAUDE.md / AGENTS.md 段落，
-// 脚本在 skills-init/ 下运行；卸载撤掉链接和段落，产出不删
+// 脚本在 workflow-run/ 下运行；卸载撤掉链接和段落，产出不删
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -47,7 +47,7 @@ function project() {
   const git = (...a) => spawnSync('git', [...G, ...a], { cwd: root, encoding: 'utf8' });
   git('init', '-q', '-b', 'main'); git('commit', '-q', '--allow-empty', '-m', 'init'); git('checkout', '-q', '-b', 'feature/x');
   fs.writeFileSync(path.join(root, 'CLAUDE.md'), '# 项目说明\n\n手写的内容\n');
-  const cli = (...a) => spawnSync(process.execPath, [path.join(REPO, 'bin/skills-init.mjs'), '--project-root', root, ...a], { cwd: root, encoding: 'utf8', env: { ...process.env, SKILLS_INIT_ADMIN: '1' } });
+  const cli = (...a) => spawnSync(process.execPath, [path.join(REPO, 'bin/workflow-run.mjs'), '--project-root', root, ...a], { cwd: root, encoding: 'utf8', env: { ...process.env, WORKFLOW_RUN_ADMIN: '1' } });
   const install = (envs = 'codex,claude') => { const r = cli('--envs', envs, '--skip-db', '--yes'); assert.equal(r.status, 0, r.stdout + r.stderr); return r; };
   const script = (s, ...a) => { const x = spawnSync(process.execPath, [path.join(root, '.agents/skills/workflow/scripts', s), ...a], { cwd: root, encoding: 'utf8', env: { ...process.env, FAKE_LOG: path.join(ws, 'calls.log') } }); return { code: x.status, out: x.stdout.trim().startsWith('{') ? JSON.parse(x.stdout) : x.stdout, err: x.stderr }; };
   const put = (rel, text) => { const f = path.join(root, rel); fs.mkdirSync(path.dirname(f), { recursive: true }); fs.writeFileSync(f, text); };
@@ -56,68 +56,68 @@ function project() {
   return { ws, root, git, cli, install, script, put, read, exists, calls: () => fs.readFileSync(path.join(ws, 'calls.log'), 'utf8') };
 }
 
-test('DocNexus 在 skills-init/docnexus/：本项目链接它的 skills（相对链接）、写 CLAUDE.md / AGENTS.md 段落，不动手写内容', { skip }, () => {
+test('DocNexus 在 workflow-run/docnexus/：本项目链接它的 skills（相对链接）、写 CLAUDE.md / AGENTS.md 段落，不动手写内容', { skip }, () => {
   const p = project();
-  fakeDocNexus(p.root, 'skills-init');
+  fakeDocNexus(p.root, 'workflow-run');
   p.install();
   for (const dir of ['.agents/skills', '.claude/skills']) {
     const link = path.join(p.root, dir, 'docnexus-recall');
     assert.ok(fs.lstatSync(link).isSymbolicLink(), dir);
     assert.ok(!path.isAbsolute(fs.readlinkSync(link)), '相对链接，换机器克隆也能用');
-    assert.equal(fs.realpathSync(link), fs.realpathSync(path.join(p.root, 'skills-init/docnexus/skills/docnexus-recall')));
+    assert.equal(fs.realpathSync(link), fs.realpathSync(path.join(p.root, 'workflow-run/docnexus/skills/docnexus-recall')));
   }
   const claude = p.read('CLAUDE.md');
-  assert.match(claude, /^# 项目说明\n\n手写的内容\n\n<!-- skills-init:docnexus:start -->/);
-  assert.match(claude, /@skills-init\/docnexus\/CONCEPTS\.md/);
+  assert.match(claude, /^# 项目说明\n\n手写的内容\n\n<!-- workflow-run:docnexus:start -->/);
+  assert.match(claude, /@workflow-run\/docnexus\/CONCEPTS\.md/);
   assert.match(claude, /`node \.claude\/skills\/workflow\/scripts\/docnexus\.mjs <参数>`/);
-  assert.doesNotMatch(claude, /cd skills-init/);
+  assert.doesNotMatch(claude, /cd workflow-run/);
   assert.match(p.read('AGENTS.md'), /`node \.agents\/skills\/workflow\/scripts\/docnexus\.mjs --node docnexus\/skills\/<…>\.mjs <参数>`/);
-  assert.match(p.read('AGENTS.md'), /`skills-init\/docnexus\/CONCEPTS\.md`（每个任务开始时读）/);
-  assert.ok(!p.exists('skills-init/CLAUDE.md'), '不往 skills-init/ 里写 agent 段落');
+  assert.match(p.read('AGENTS.md'), /`workflow-run\/docnexus\/CONCEPTS\.md`（每个任务开始时读）/);
+  assert.ok(!p.exists('workflow-run/CLAUDE.md'), '不往 workflow-run/ 里写 agent 段落');
   assert.equal(p.install().stdout.match(/CLAUDE\.md 已写入/g), null, '重跑段落不变');
-  assert.equal(p.read('CLAUDE.md').match(/skills-init:docnexus:start/g).length, 1);
+  assert.equal(p.read('CLAUDE.md').match(/workflow-run:docnexus:start/g).length, 1);
   fs.rmSync(p.ws, { recursive: true, force: true });
 });
 
-test('脚本：status 给出位置与运行前缀；模板从 skills-init/docnexus/library 取；knowledge 在 skills-init/ 下运行并给出可读路径', { skip }, () => {
+test('脚本：status 给出位置与运行前缀；模板从 workflow-run/docnexus/library 取；knowledge 在 workflow-run/ 下运行并给出可读路径', { skip }, () => {
   const p = project();
-  fakeDocNexus(p.root, 'skills-init');
+  fakeDocNexus(p.root, 'workflow-run');
   p.install();
   const st = p.script('resolve.mjs', 'status').out.docnexus;
-  assert.deepEqual([st.ok, st.root, st.bin, st.run], [true, 'skills-init', './skills-init/docnexus/node_modules/.bin/docnexus', 'node .agents/skills/workflow/scripts/docnexus.mjs']);
-  // 包装脚本：在 skills-init/ 下运行 CLI 与 node 脚本，输出、退出码透传
+  assert.deepEqual([st.ok, st.root, st.bin, st.run], [true, 'workflow-run', './workflow-run/docnexus/node_modules/.bin/docnexus', 'node .agents/skills/workflow/scripts/docnexus.mjs']);
+  // 包装脚本：在 workflow-run/ 下运行 CLI 与 node 脚本，输出、退出码透传
   let w = p.script('docnexus.mjs', 'recall', '订单');
   assert.equal(w.code, 0, w.err);
   assert.equal(w.out.query, '订单');
-  p.put('skills-init/docnexus/skills/docnexus-library/scripts/q.mjs', "console.log(JSON.stringify({ cwd: process.cwd(), args: process.argv.slice(2) })); process.exit(3);\n");
+  p.put('workflow-run/docnexus/skills/docnexus-library/scripts/q.mjs', "console.log(JSON.stringify({ cwd: process.cwd(), args: process.argv.slice(2) })); process.exit(3);\n");
   w = p.script('docnexus.mjs', '--node', 'docnexus/skills/docnexus-library/scripts/q.mjs', '--category', 'dev-notes');
-  assert.deepEqual([w.code, fs.realpathSync(w.out.cwd), w.out.args], [3, fs.realpathSync(path.join(p.root, 'skills-init')), ['--category', 'dev-notes']]);
+  assert.deepEqual([w.code, fs.realpathSync(w.out.cwd), w.out.args], [3, fs.realpathSync(path.join(p.root, 'workflow-run')), ['--category', 'dev-notes']]);
   assert.equal(p.script('docnexus.mjs', 'bogus').code, 1);
   const t = p.script('resolve.mjs', 'template', 'create-tech-md-doc', 'template.md').out;
-  assert.deepEqual([t.source, t.path], ['docnexus', 'skills-init/docnexus/library/templates/create-tech-md-doc/template.md']);
+  assert.deepEqual([t.source, t.path], ['docnexus', 'workflow-run/docnexus/library/templates/create-tech-md-doc/template.md']);
   const k = p.script('knowledge.mjs', 'dev');
   assert.equal(k.code, 0, k.err);
   const d = k.out.categories.find((c) => c.category === 'dev-notes').documents[0];
-  assert.deepEqual([d.path, d.file], ['docnexus/library/dev/a.md', 'skills-init/docnexus/library/dev/a.md']);
-  const home = fs.realpathSync(path.join(p.root, 'skills-init'));
-  assert.ok(p.calls().split('\n').filter(Boolean).every((l) => l.startsWith(home + ' ')), '在 skills-init/ 下运行');
+  assert.deepEqual([d.path, d.file], ['docnexus/library/dev/a.md', 'workflow-run/docnexus/library/dev/a.md']);
+  const home = fs.realpathSync(path.join(p.root, 'workflow-run'));
+  assert.ok(p.calls().split('\n').filter(Boolean).every((l) => l.startsWith(home + ' ')), '在 workflow-run/ 下运行');
   fs.rmSync(p.ws, { recursive: true, force: true });
 });
 
-test('doctor 报告产出目录与 DocNexus；卸载撤掉链接和段落，skills-init/ 不动；没有 --docnexus-root', { skip }, () => {
+test('doctor 报告产出目录与 DocNexus；卸载撤掉链接和段落，workflow-run/ 不动；没有 --docnexus-root', { skip }, () => {
   const p = project();
-  fakeDocNexus(p.root, 'skills-init');
+  fakeDocNexus(p.root, 'workflow-run');
   p.install();
   let r = p.cli('doctor', '--offline');
-  assert.match(r.stdout + r.stderr, /DocNexus 在 skills-init\/docnexus\/，本项目已链接它的 skills 并写入段落/);
-  assert.match(r.stdout + r.stderr, /产出目录 skills-init\/：随项目提交/);
+  assert.match(r.stdout + r.stderr, /DocNexus 在 workflow-run\/docnexus\/，本项目已链接它的 skills 并写入段落/);
+  assert.match(r.stdout + r.stderr, /产出目录 workflow-run\/：随项目提交/);
 
   r = p.cli('uninstall');
   assert.equal(r.status, 0, r.stdout + r.stderr);
-  assert.match(r.stdout, /已移除指向 skills-init\/docnexus\/skills 的 \d+ 个 DocNexus skill 链接，以及 CLAUDE\.md、AGENTS\.md 里的 DocNexus 段落/);
+  assert.match(r.stdout, /已移除指向 workflow-run\/docnexus\/skills 的 \d+ 个 DocNexus skill 链接，以及 CLAUDE\.md、AGENTS\.md 里的 DocNexus 段落/);
   assert.equal(p.read('CLAUDE.md'), '# 项目说明\n\n手写的内容\n');
   assert.ok(!p.exists('AGENTS.md'), '只有段落的文件删掉');
-  assert.ok(p.exists('skills-init/docnexus/skills/docnexus-recall/SKILL.md'), 'skills-init/ 里的 DocNexus 不动');
+  assert.ok(p.exists('workflow-run/docnexus/skills/docnexus-recall/SKILL.md'), 'workflow-run/ 里的 DocNexus 不动');
 
   r = p.cli('--envs', 'codex', '--skip-db', '--yes', '--docnexus-root', '../team-docs');
   assert.equal(r.status, 1);
@@ -125,18 +125,18 @@ test('doctor 报告产出目录与 DocNexus；卸载撤掉链接和段落，skil
   fs.rmSync(p.ws, { recursive: true, force: true });
 });
 
-test('skills-init/ 是独立文档仓库：DocNexus 在里面，知识库改动在 pending 里单独列出', { skip }, () => {
+test('workflow-run/ 是独立文档仓库：DocNexus 在里面，知识库改动在 pending 里单独列出', { skip }, () => {
   const p = project();
-  fs.mkdirSync(path.join(p.root, 'skills-init'));
-  spawnSync('git', ['init', '-q', '-b', 'main'], { cwd: path.join(p.root, 'skills-init') });
-  fakeDocNexus(p.root, 'skills-init');
+  fs.mkdirSync(path.join(p.root, 'workflow-run'));
+  spawnSync('git', ['init', '-q', '-b', 'main'], { cwd: path.join(p.root, 'workflow-run') });
+  fakeDocNexus(p.root, 'workflow-run');
   p.install();
   p.script('requirement.mjs', 'config', '--project', 'order-service');
   p.script('requirement.mjs', 'bind', '--name', '订单导出');
-  p.put('skills-init/docnexus/library/dev/new.md', '# 新沉淀\n');
+  p.put('workflow-run/docnexus/library/dev/new.md', '# 新沉淀\n');
   const pd = p.script('requirement.mjs', 'pending').out;
   assert.ok(pd.knowledge_files.includes('docnexus/library/dev/new.md'));
-  assert.match(pd.knowledge_commands[1], /^git -C "skills-init" commit -m "knowledge: <沉淀了什么>"$/);
-  assert.match(p.read('.gitignore'), /^\/skills-init\/$/m, '代码仓库忽略整个 skills-init/');
+  assert.match(pd.knowledge_commands[1], /^git -C "workflow-run" commit -m "knowledge: <沉淀了什么>"$/);
+  assert.match(p.read('.gitignore'), /^\/workflow-run\/$/m, '代码仓库忽略整个 workflow-run/');
   fs.rmSync(p.ws, { recursive: true, force: true });
 });

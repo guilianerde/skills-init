@@ -12,7 +12,7 @@ description: "Publish a local Markdown document to an existing Confluence wiki p
 执行任何步骤前，先读本 skill 目录下的 `wiki-config.json`：
 
 - 文件缺失、`enabled` 不是 `true`、或 `wiki.base_url` 为空 → **立即停止**，回复：
-  `wiki 连接未配置：重跑 skills-init 补配，或填写 <skill目录>/wiki-config.json（enabled: true，并填 base_url / api_token）。`
+  `wiki 连接未配置：重跑 workflow-run 补配，或填写 <skill目录>/wiki-config.json（enabled: true，并填 base_url / api_token）。`
   不做转换、不上传、不调用任何 wiki API。
 
 ## Command Format
@@ -46,7 +46,7 @@ description: "Publish a local Markdown document to an existing Confluence wiki p
 ### Step 1 — 转换并校验
 
 ```bash
-node <skillDir>/scripts/md-to-wiki.mjs <mdPath> skills-init/tmp/md-to-wiki/_wiki_upload_<timestamp>.html [--banner <path>] [--no-banner]
+node <skillDir>/scripts/md-to-wiki.mjs <mdPath> workflow-run/tmp/md-to-wiki/_wiki_upload_<timestamp>.html [--banner <path>] [--no-banner]
 ```
 
 脚本转换后会自动做 XML 良构校验，退出码非 0 表示不良构（单独校验：`node <skillDir>/scripts/md-to-wiki.mjs --check <html>`）。不良构 → 停，把报错的行号和原因告诉用户；不要把不良构的内容传给 Confluence。`--validate-only` 到此结束并报告结果。
@@ -70,7 +70,7 @@ node <skillDir>/scripts/md-to-wiki.mjs <mdPath> skills-init/tmp/md-to-wiki/_wiki
 - `references/upload.md`：通道 A / B 的调用细节与验证
 - `references/troubleshooting.md`：转换脚本说明、XHTML 规则、校验命令、常见错误
 
-典型串联：`create-tech-md-doc` / `create-release-md-doc` 生成 `skills-init/docs/requirements/<需求名>/` 下的 md → 本 skill 发布。
+典型串联：`create-tech-md-doc` / `create-release-md-doc` 生成 `workflow-run/docs/requirements/<需求名>/` 下的 md → 本 skill 发布。
 
 ## 终端命令
 

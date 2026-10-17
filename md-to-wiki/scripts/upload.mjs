@@ -60,7 +60,7 @@ export function loadWikiConfig(dir = SKILL_DIR) {
   let cfg = null;
   try { cfg = JSON.parse(fs.readFileSync(f, 'utf8')); } catch { /* 缺失或不是合法 JSON */ }
   if (!cfg || cfg.enabled !== true || !cfg.wiki?.base_url) {
-    throw new UsageError('wiki 连接未配置：重跑 skills-init 补配，或填写 wiki-config.json（enabled: true，并填 base_url / api_token）。');
+    throw new UsageError('wiki 连接未配置：重跑 workflow-run 补配，或填写 wiki-config.json（enabled: true，并填 base_url / api_token）。');
   }
   if (!cfg.wiki.api_token) throw new UsageError('wiki-config.json 中 api_token 为空，无法使用 REST 通道');
   return cfg.wiki;

@@ -42,7 +42,7 @@ test('没绑定时 path 退出码 2 并给出建议名；bind 后给出路径，
   assert.equal(nextPath(root, 'tech', b).code, 2);
 
   const r = bind(root, { name: '订单导出支持按渠道筛选', branch: b, base: 'main' });
-  assert.deepEqual([r.ok, r.created, r.dir, r.named_by], [true, true, 'skills-init/docs/requirements/订单导出支持按渠道筛选', 'user']);
+  assert.deepEqual([r.ok, r.created, r.dir, r.named_by], [true, true, 'workflow-run/docs/requirements/订单导出支持按渠道筛选', 'user']);
   let p = nextPath(root, 'tech', b).out;
   assert.equal(p.path, `${r.dir}/tech-doc.md`);
   put(p.path, doc('技术方案', b, '<!-- md-to-wiki: pageId=42 version=3 -->\n'));
@@ -59,7 +59,7 @@ test('没绑定时 path 退出码 2 并给出建议名；bind 后给出路径，
   assert.equal(which(root, 'fix/export-npe').dir, r.dir);
   // 不给名字按分支名生成
   const r3 = bind(root, { branch: 'feature/coupon' });
-  assert.deepEqual([r3.name, r3.named_by, r3.dir], ['feature-coupon', 'branch', 'skills-init/docs/requirements/feature-coupon']);
+  assert.deepEqual([r3.name, r3.named_by, r3.dir], ['feature-coupon', 'branch', 'workflow-run/docs/requirements/feature-coupon']);
   fs.rmSync(root, { recursive: true, force: true });
 });
 
@@ -108,10 +108,10 @@ test('ensureIgnore：创建或追加一次，不重复', () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ign-'));
   assert.equal(ensureIgnore(root), true);
   assert.equal(ensureIgnore(root), false);
-  assert.equal(fs.readFileSync(path.join(root, '.ignore'), 'utf8').match(/^skills-init\/docs\/$/gm).length, 1);
+  assert.equal(fs.readFileSync(path.join(root, '.ignore'), 'utf8').match(/^workflow-run\/docs\/$/gm).length, 1);
   fs.writeFileSync(path.join(root, '.ignore'), 'node_modules/\n');
   assert.equal(ensureIgnore(root), true);
-  assert.match(fs.readFileSync(path.join(root, '.ignore'), 'utf8'), /^node_modules\/\n\n# skills-init/);
+  assert.match(fs.readFileSync(path.join(root, '.ignore'), 'utf8'), /^node_modules\/\n\n# workflow-run/);
   fs.rmSync(root, { recursive: true, force: true });
 });
 
@@ -126,9 +126,9 @@ test('CLI：which / bind / path / sync；安装时写 .ignore', () => {
   assert.equal(cli('sync', 'README.md').code, 1);
   assert.equal(cli('bogus').code, 1);
 
-  const r = spawnSync(process.execPath, [path.join(REPO, 'bin/skills-init.mjs'), '--project-root', root, '--envs', 'codex', '--skip-db', '--yes'], { cwd: root, encoding: 'utf8', env: { ...process.env, SKILLS_INIT_ADMIN: '1' } });
+  const r = spawnSync(process.execPath, [path.join(REPO, 'bin/workflow-run.mjs'), '--project-root', root, '--envs', 'codex', '--skip-db', '--yes'], { cwd: root, encoding: 'utf8', env: { ...process.env, WORKFLOW_RUN_ADMIN: '1' } });
   assert.equal(r.status, 0, r.stdout + r.stderr);
-  assert.match(r.stdout, /\.ignore 已加上 skills-init\/docs\//);
+  assert.match(r.stdout, /\.ignore 已加上 workflow-run\/docs\//);
   assert.ok(fs.existsSync(path.join(root, '.agents/skills/workflow/scripts/requirement.mjs')));
   fs.rmSync(root, { recursive: true, force: true });
 });

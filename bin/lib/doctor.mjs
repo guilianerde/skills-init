@@ -10,7 +10,7 @@ import { codegraphVersion } from './codegraph.mjs';
 // upgrade = 用清单里记录的环境与模式非交互重装；数据库配置原样保留
 export function upgradeOptions(o) {
   const found = findManifests(o.root);
-  if (!found.length) fail('未找到安装清单（.agents/skills/.skills-init.json 等），无法判断装过哪些环境。请先运行 init。');
+  if (!found.length) fail('未找到安装清单（.agents/skills/.workflow-run.json 等），无法判断装过哪些环境。请先运行 init。');
   const m = found[0].m;
   const from = m.version ?? '未知';
   if (cmpVersion(from, PKG.version) > 0) warn(`已安装的是 ${from}，比当前包 ${PKG.version} 新；继续会降级。`);
@@ -27,16 +27,16 @@ export function doctor(root, offline) {
   const warns = [];
   const bad = (m) => { errors.push(m); console.log(`    XX  ${m}`); };
   const meh = (m) => { warns.push(m); warn(m); };
-  step(`skills-init doctor（${PKG.version}）  ${root}`);
+  step(`workflow-run doctor（${PKG.version}）  ${root}`);
 
   const [maj] = process.versions.node.split('.').map(Number);
-  if (maj < 22) bad(`Node v${process.versions.node} 低于 22（skills-init 只在 Node 22 / 24 上测试；18、20 已停止维护）`); else ok(`Node v${process.versions.node}`);
+  if (maj < 22) bad(`Node v${process.versions.node} 低于 22（workflow-run 只在 Node 22 / 24 上测试；18、20 已停止维护）`); else ok(`Node v${process.versions.node}`);
 
   const found = findManifests(root);
-  if (!found.length) { bad('未找到安装清单：本项目还没用 skills-init 安装过'); return 1; }
+  if (!found.length) { bad('未找到安装清单：本项目还没用 workflow-run 安装过'); return 1; }
   const m = found[0].m;
   const c = cmpVersion(m.version ?? '0', PKG.version);
-  if (c < 0) meh(`已安装 ${m.version}，当前包是 ${PKG.version}：运行 skills-init upgrade 升级`);
+  if (c < 0) meh(`已安装 ${m.version}，当前包是 ${PKG.version}：运行 workflow-run upgrade 升级`);
   else if (c > 0) meh(`已安装 ${m.version}，比当前包 ${PKG.version} 新（当前包版本过旧）`);
   else ok(`已安装版本 ${m.version}（环境 ${(m.envs ?? []).join(',')}，模式 ${m.mode}）`);
 
@@ -45,12 +45,12 @@ export function doctor(root, offline) {
     let modified = 0, missing = 0;
     for (const [skill, entry] of Object.entries(man.skills)) {
       const dir = path.join(base, skill);
-      if (!fs.existsSync(dir)) { bad(`${toPosix(path.join(rel, skill))} 不存在：运行 skills-init upgrade 恢复`); continue; }
+      if (!fs.existsSync(dir)) { bad(`${toPosix(path.join(rel, skill))} 不存在：运行 workflow-run upgrade 恢复`); continue; }
       for (const [f, h] of Object.entries(entry.files ?? {})) {
         const file = path.join(dir, f);
         const label = toPosix(path.join(rel, skill, f));
-        if (!fs.existsSync(file)) { missing++; meh(`缺少 ${label}：运行 skills-init upgrade 恢复`); }
-        else if (fileHash(file) !== h) { modified++; meh(`${label} 被手动修改过（升级时会被新版覆盖，原文件备份到 skills-init/tmp/upgrade-backup/；项目定制请放到 profile.json、skills-init/templates/ 或 DocNexus）`); }
+        if (!fs.existsSync(file)) { missing++; meh(`缺少 ${label}：运行 workflow-run upgrade 恢复`); }
+        else if (fileHash(file) !== h) { modified++; meh(`${label} 被手动修改过（升级时会被新版覆盖，原文件备份到 workflow-run/tmp/upgrade-backup/；项目定制请放到 profile.json、workflow-run/templates/ 或 DocNexus）`); }
       }
     }
     if (!modified && !missing) ok(`${toPosix(rel)}：${Object.keys(man.skills).length} 个 skill 的模板文件与安装时一致`);
@@ -66,7 +66,7 @@ export function doctor(root, offline) {
       for (const skill of Object.keys(canon.m.skills)) {
         const link = path.join(dir, skill);
         const st = lstat(link);
-        if (!st) bad(`.${env}/skills/${skill} 不存在：运行 skills-init upgrade 重建`);
+        if (!st) bad(`.${env}/skills/${skill} 不存在：运行 workflow-run upgrade 重建`);
         else if (!st.isSymbolicLink()) { if (!readManifest(dir)) meh(`.${env}/skills/${skill} 是普通目录而非软链接（可能是建链接失败后的独立拷贝）`); else good++; }
         else if (!fs.existsSync(link)) bad(`.${env}/skills/${skill} 是断开的软链接`);
         else good++;
@@ -83,18 +83,18 @@ export function doctor(root, offline) {
   if (fs.existsSync(resolveJs)) {
     const r = spawnSync(process.execPath, [resolveJs, '--root', root, 'status'], { encoding: 'utf8' });
     try { st = JSON.parse(r.stdout); } catch { bad(`resolve.mjs status 执行失败：${(r.stderr || '').trim().split('\n')[0]}`); }
-  } else bad('缺少 workflow/scripts/resolve.mjs：运行 skills-init upgrade');
+  } else bad('缺少 workflow/scripts/resolve.mjs：运行 workflow-run upgrade');
   if (st) {
     if (st.profile.ok) ok('项目画像已填写'); else meh(`项目画像未完成（空字段：${st.profile.empty.join('、')}）：运行 /workflow profile`);
     if (st.wiki.ok) ok('wiki 已配置'); else console.log('    --  wiki 未配置（可选；也可能通过 wiki MCP 提供）');
     if (st.docnexus.ok) {
-      // DocNexus 以 skills-init/ 为项目根：本项目要有 docnexus skill 的链接和 CLAUDE.md / AGENTS.md 段落，agent 才知道去哪里找
+      // DocNexus 以 workflow-run/ 为项目根：本项目要有 docnexus skill 的链接和 CLAUDE.md / AGENTS.md 段落，agent 才知道去哪里找
       const linked = [CANON_DIR, path.join('.claude', 'skills'), path.join('.qwen', 'skills')].some((b) => lstat(path.join(root, b, 'docnexus-recall'))?.isSymbolicLink());
-      const ctx = ['CLAUDE.md', 'AGENTS.md'].some((f) => { try { return fs.readFileSync(path.join(root, f), 'utf8').includes('skills-init:docnexus:start'); } catch { return false; } });
+      const ctx = ['CLAUDE.md', 'AGENTS.md'].some((f) => { try { return fs.readFileSync(path.join(root, f), 'utf8').includes('workflow-run:docnexus:start'); } catch { return false; } });
       if (linked && ctx) ok(`DocNexus 在 ${HOME}/docnexus/，本项目已链接它的 skills 并写入段落`);
-      else meh(`DocNexus 在 ${HOME}/docnexus/，但本项目${linked ? '' : '缺少 docnexus skill 链接'}${!linked && !ctx ? '、' : ''}${ctx ? '' : '缺少 CLAUDE.md / AGENTS.md 里的 DocNexus 段落'}：运行 skills-init upgrade`);
+      else meh(`DocNexus 在 ${HOME}/docnexus/，但本项目${linked ? '' : '缺少 docnexus skill 链接'}${!linked && !ctx ? '、' : ''}${ctx ? '' : '缺少 CLAUDE.md / AGENTS.md 里的 DocNexus 段落'}：运行 workflow-run upgrade`);
     }
-    // 产出目录：都在 skills-init/
+    // 产出目录：都在 workflow-run/
     const mode = st.artifacts?.mode === 'repo' ? `独立文档仓库（${HOME}/ 自己是 git 仓库）` : '随项目提交';
     if (st.artifacts && !st.artifacts.ok) meh(`产出目录 ${HOME}/：${mode}，${st.artifacts.how}`);
     else ok(`产出目录 ${HOME}/：${mode}`);
@@ -108,7 +108,7 @@ export function doctor(root, offline) {
     } else console.log('    --  DocNexus 未接入（可选）');
     for (const t of st.templates_to_create ?? []) console.log(`    --  ${t.skill} 的模板 ${t.id} 还没有创建（不随 skills 提供）：第一次生成文档时会请你给一份样例文档来创建，保存到 ${t.expected}`);
     if (st.codegraph?.ok) ok(`CodeGraph 已接入（codegraph ${codegraphVersion(root)}，索引在 .codegraph/）`);
-    else if (st.codegraph?.indexed) meh('有 .codegraph/ 索引但找不到 codegraph 命令：npm i -g @colbymchenry/codegraph，或重跑 skills-init 并加 --with-codegraph');
+    else if (st.codegraph?.indexed) meh('有 .codegraph/ 索引但找不到 codegraph 命令：npm i -g @colbymchenry/codegraph，或重跑 workflow-run 并加 --with-codegraph');
     else if (st.codegraph?.cli) console.log('    --  已装 codegraph，但本项目没有建索引（可选：在项目根运行 codegraph init）');
     else console.log('    --  CodeGraph 未接入（可选）');
     if (!st.database.ok) console.log('    --  数据库未配置（可选）');
@@ -132,7 +132,7 @@ export function doctor(root, offline) {
   const lines = fs.existsSync(gi) ? fs.readFileSync(gi, 'utf8').split(/\r?\n/).map((l) => l.trim()) : [];
   const need = ['**/database-query/config.json', '**/wiki-config.json'];
   const lack = need.filter((r) => !lines.includes(r));
-  if (lack.length) bad(`.gitignore 缺少 ${lack.join(' ')}：凭据可能被提交，重跑 skills-init upgrade 补齐`); else ok('凭据文件已被忽略');
+  if (lack.length) bad(`.gitignore 缺少 ${lack.join(' ')}：凭据可能被提交，重跑 workflow-run upgrade 补齐`); else ok('凭据文件已被忽略');
 
   console.log(`\n${errors.length} 个错误，${warns.length} 个警告`);
   return errors.length ? 1 : 0;

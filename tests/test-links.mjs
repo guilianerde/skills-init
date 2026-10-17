@@ -34,18 +34,18 @@ test('removeLink：Windows 式的 EPERM / EISDIR 改用 rmdir；不存在时不�
 
 test('symlinkSupported：探测链接用完即删，并清掉之前异常退出留下的探测链接', () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'probe-'));
-  const stale = path.join(dir, '.skills-init-probe-12345');
+  const stale = path.join(dir, '.workflow-run-probe-12345');
   let canLink = true;
   try { fs.symlinkSync('.', stale, 'dir'); } catch { canLink = false; }
-  const prev = process.env.SKILLS_INIT_NO_SYMLINK; delete process.env.SKILLS_INIT_NO_SYMLINK;
+  const prev = process.env.WORKFLOW_RUN_NO_SYMLINK; delete process.env.WORKFLOW_RUN_NO_SYMLINK;
   try {
     assert.equal(symlinkSupported(dir), canLink);
-  } finally { if (prev !== undefined) process.env.SKILLS_INIT_NO_SYMLINK = prev; }
+  } finally { if (prev !== undefined) process.env.WORKFLOW_RUN_NO_SYMLINK = prev; }
   assert.deepEqual(fs.readdirSync(dir), []);
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
-test('DocNexus CLI 位置：skills-init/docnexus/node_modules/.bin；项目根的旧位置不再使用；安装器与 skill 脚本判断一致', async () => {
+test('DocNexus CLI 位置：workflow-run/docnexus/node_modules/.bin；项目根的旧位置不再使用；安装器与 skill 脚本判断一致', async () => {
   const { docnexusBin, docnexusUpgradeCmd } = await import('../bin/lib/core.mjs');
   const { docnexusBin: skillBin, docnexusConnected } = await import('../workflow/scripts/resolve.mjs');
   const name = process.platform === 'win32' ? 'docnexus.cmd' : 'docnexus';
@@ -56,14 +56,14 @@ test('DocNexus CLI 位置：skills-init/docnexus/node_modules/.bin；项目根�
   put('docnexus', 'project.json');
   put('node_modules', '.bin', name);
   put('docnexus', 'node_modules', '.bin', name);
-  assert.equal(docnexusBin(root), null, '项目根的 docnexus/ 是旧位置，升级时搬进 skills-init/');
+  assert.equal(docnexusBin(root), null, '项目根的 docnexus/ 是旧位置，升级时搬进 workflow-run/');
   assert.equal(docnexusConnected(root), false);
-  put('skills-init', 'docnexus', 'project.json');
+  put('workflow-run', 'docnexus', 'project.json');
   assert.equal(docnexusConnected(root), false, '只有工作区没有 CLI');
-  put('skills-init', 'docnexus', 'node_modules', '.bin', name);
-  assert.equal(path.relative(root, docnexusBin(root)), path.join('skills-init', 'docnexus', 'node_modules', '.bin', name));
-  assert.equal(skillBin(root), path.join('skills-init', 'docnexus', 'node_modules', '.bin', name));
+  put('workflow-run', 'docnexus', 'node_modules', '.bin', name);
+  assert.equal(path.relative(root, docnexusBin(root)), path.join('workflow-run', 'docnexus', 'node_modules', '.bin', name));
+  assert.equal(skillBin(root), path.join('workflow-run', 'docnexus', 'node_modules', '.bin', name));
   assert.equal(docnexusConnected(root), true);
-  assert.match(docnexusUpgradeCmd(), /^npm install --prefix \.\/skills-init\/docnexus --save-exact /);
+  assert.match(docnexusUpgradeCmd(), /^npm install --prefix \.\/workflow-run\/docnexus --save-exact /);
   fs.rmSync(root, { recursive: true, force: true });
 });

@@ -69,7 +69,7 @@ description: "Generate a Markdown release/deployment plan (上线方案) from th
 
 ### Step 4 — 写文件
 
-- 路径：运行 `node <skills>/workflow/scripts/requirement.mjs path release --branch <dev分支>`，写到输出的 `path`（`skills-init/docs/requirements/<需求名>/release-doc.md`，已有旧版时给出 `_v2`、`_v3`，不覆盖）。规则见 `<skills>/workflow/references/requirements.md`。
+- 路径：运行 `node <skills>/workflow/scripts/requirement.mjs path release --branch <dev分支>`，写到输出的 `path`（`workflow-run/docs/requirements/<需求名>/release-doc.md`，已有旧版时给出 `_v2`、`_v3`，不覆盖）。规则见 `<skills>/workflow/references/requirements.md`。
   - 退出码 2（这个分支还没绑定需求）：问用户这个需求叫什么，默认值用输出的 `suggested_name`，再 `requirement.mjs bind --name "<需求名>" --branch <dev分支>`；用户不给名字时 `bind` 按分支名生成。
   - `wiki_record` 非空：上一版已发布到 wiki，新版第一行原样写这条记录，重新发布时更新同一页面。
 - 写完运行 `requirement.mjs sync <path>` 更新 `meta.json`；输出里 `commit` 非空（独立文档仓库模式）时按 `<skills>/workflow/references/requirements.md`「文档仓库的提交」处理。文档里引用其他产物（「参考产物」等）写 `requirement.mjs path` 输出的 `cite`。

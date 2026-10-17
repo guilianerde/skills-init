@@ -11,7 +11,7 @@ description: "Answer structural questions about this project's source code from 
 
 运行 `node <skills>/code-graph/scripts/cg.mjs status`：
 
-- `indexed: false` → 本项目没有 `.codegraph/` 索引。**不要替用户建索引**；告诉用户可以运行 `codegraph init`（或重跑 skills-init 加 `--with-codegraph`），这次改用 grep / 读文件回答，并说明「未使用代码图谱」。
+- `indexed: false` → 本项目没有 `.codegraph/` 索引。**不要替用户建索引**；告诉用户可以运行 `codegraph init`（或重跑 workflow-run 加 `--with-codegraph`），这次改用 grep / 读文件回答，并说明「未使用代码图谱」。
 - `library` 里有 `error` → 找不到库或 Node 低于 22.5：`impact` / `entry` 不可用，改用 CodeGraph 的 CLI（`codegraph impact` / `callers` / `explore`，见 `<skills>/workflow/references/codegraph.md`）；`mq` / `jobs` / `tables` 只扫源码，照常可用。
 
 ## 命令

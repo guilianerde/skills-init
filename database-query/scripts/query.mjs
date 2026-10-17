@@ -86,7 +86,7 @@ export function parseTsv(text) {
 
 function loadConfig() {
   const f = path.join(SKILL_DIR, 'config.json');
-  if (!fs.existsSync(f)) throw new UsageError(`未找到 ${f}：重跑 skills-init 配置数据库，或按 references/config.example.json 手动创建`);
+  if (!fs.existsSync(f)) throw new UsageError(`未找到 ${f}：重跑 workflow-run 配置数据库，或按 references/config.example.json 手动创建`);
   const cfg = JSON.parse(fs.readFileSync(f, 'utf8'));
   if (!cfg.connections || !Object.keys(cfg.connections).length) throw new UsageError('config.json 中没有 connections');
   return cfg;

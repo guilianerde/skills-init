@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 // 产物按需求归档：开发方案、交付说明、审查报告、技术方案、上线方案按需求放在一起，meta.json 汇总需求名、绑定的分支、各产物、
 // wiki 发布记录与 DocNexus 沉淀，供 /workflow view 等直接读取。
-// 本工具的产出都在项目根的 skills-init/ 里（需求产物 docs/requirements/、DocNexus 工作区 docnexus/、项目模板 templates/、临时文件 tmp/），
+// 本工具的产出都在项目根的 workflow-run/ 里（需求产物 docs/requirements/、DocNexus 工作区 docnexus/、项目模板 templates/、临时文件 tmp/），
 // 不往项目的其他地方写。两种用法：
-//   - 默认：skills-init/ 随代码提交，需求产物在 skills-init/docs/requirements/<需求名>/；这个目录写进项目根 .ignore，不参与代码搜索
-//   - 独立文档仓库：团队文档仓库克隆到 skills-init/（它自己是 git 仓库，代码仓库忽略它），产物在 skills-init/docs/requirements/<需求名>/<项目名>/，
+//   - 默认：workflow-run/ 随代码提交，需求产物在 workflow-run/docs/requirements/<需求名>/；这个目录写进项目根 .ignore，不参与代码搜索
+//   - 独立文档仓库：团队文档仓库克隆到 workflow-run/（它自己是 git 仓库，代码仓库忽略它），产物在 workflow-run/docs/requirements/<需求名>/<项目名>/，
 //     一个需求横跨多个服务时各项目各占一个子目录；文档仓库单独提交（写完由用户确认，可用 artifacts.commit_prompt 关闭提交提示）
 // 需求名由用户在流程开始或第一次落盘时给出；用户不给时按分支名生成。分支 → 需求的绑定记在 meta.json 的 branches。
 // 说明见 workflow/references/requirements.md。
@@ -26,13 +26,13 @@ import { fileURLToPath } from 'node:url';
 
 const SKILLS_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 // 本工具在项目里的唯一目录
-export const HOME = 'skills-init';
+export const HOME = 'workflow-run';
 export const REQ_DIR = `${HOME}/docs/requirements`;
 export const TEMPLATES_DIR = `${HOME}/templates`;
 export const TMP_DIR = `${HOME}/tmp`;
 export const IGNORE_LINE = `${HOME}/docs/`;
 export const homeDir = (root) => path.join(root, HOME);
-// skills-init/ 自己是 git 仓库（团队文档仓库克隆到这里）= 独立文档仓库模式
+// workflow-run/ 自己是 git 仓库（团队文档仓库克隆到这里）= 独立文档仓库模式
 export const homeIsRepo = (root) => fs.existsSync(path.join(root, HOME, '.git'));
 // 产物种类 → 需求目录里的文件名（版本：<base>.md、<base>_v2.md …）
 export const FILES = { plan: 'plan', delivery: 'delivery', review: 'review', tech: 'tech-doc', release: 'release-doc' };
@@ -108,7 +108,7 @@ export function artifactsConfig(root) {
   return { project: c.project ? String(c.project) : '', commit_prompt: c.commit_prompt !== false, profile_dir: dir };
 }
 
-// 产物位置：project = skills-init/docs/requirements/<需求>/（随代码提交）；repo = 同一位置下再分 <项目>/（skills-init/ 是独立的文档仓库）
+// 产物位置：project = workflow-run/docs/requirements/<需求>/（随代码提交）；repo = 同一位置下再分 <项目>/（workflow-run/ 是独立的文档仓库）
 export function layout(root, cfg = artifactsConfig(root)) {
   const home = homeDir(root);
   const base = path.join(root, REQ_DIR);
@@ -118,11 +118,11 @@ export function layout(root, cfg = artifactsConfig(root)) {
   L.reqDir = (slug) => path.join(base, slug, L.project ?? '_');
   // 文档里引用产物用「文档仓库名:仓库内路径」，各服务、各人的克隆里都一样
   L.ref = (abs) => `${repoName}:${toPosix(path.relative(home, abs))}`;
-  if (!L.project) return { ...L, ok: false, need_project: true, suggested_project: suggestProject(root), hint: '文档仓库模式需要项目名（产物放在 skills-init/docs/requirements/<需求名>/<项目名>/），只需配置一次：问用户这个项目在文档仓库里叫什么（默认 suggested_project），然后运行 config --project <项目名>' };
+  if (!L.project) return { ...L, ok: false, need_project: true, suggested_project: suggestProject(root), hint: '文档仓库模式需要项目名（产物放在 workflow-run/docs/requirements/<需求名>/<项目名>/），只需配置一次：问用户这个项目在文档仓库里叫什么（默认 suggested_project），然后运行 config --project <项目名>' };
   return { ...L, ok: true };
 }
 
-// 文档仓库名：它的 git 远端仓库名，没有远端时用 skills-init
+// 文档仓库名：它的 git 远端仓库名，没有远端时用 workflow-run
 const remoteNames = new Map();
 function remoteName(home) {
   if (!remoteNames.has(home)) {
@@ -307,7 +307,7 @@ export function pending(root, branch, dirRel = null) {
   const meta = readJson(path.join(abs, 'meta.json')) ?? {};
   const kinds = [...new Set(files.map((f) => parseFile(path.basename(f))?.kind).filter(Boolean))].map((k) => LABELS[k]);
   const message = `docs(${meta.name ?? path.basename(path.dirname(abs))}): ${L.project}${kinds.length ? ` ${kinds.join('、')}` : ' 更新产物'}`;
-  // DocNexus 也在这个文档仓库里（skills-init/docnexus/）：知识库的改动单独列出，单独提交，提交信息写沉淀了什么
+  // DocNexus 也在这个文档仓库里（workflow-run/docnexus/）：知识库的改动单独列出，单独提交，提交信息写沉淀了什么
   const kn = isDir(path.join(L.repo, 'docnexus', 'library'))
     ? git(L.repo, ['-c', 'core.quotePath=false', 'status', '--porcelain', '--untracked-files=all', '--', 'docnexus']).stdout.split('\n').filter(Boolean).map((l) => l.slice(3))
     : [];
@@ -340,7 +340,7 @@ export function ensureIgnore(root) {
   const text = fs.existsSync(f) ? fs.readFileSync(f, 'utf8') : '';
   const norm = (l) => l.trim().replace(/^\//, '').replace(/\/$/, '');
   if (text.split(/\r?\n/).some((l) => norm(l) === norm(IGNORE_LINE))) return false;
-  const add = `# skills-init：需求产物（开发方案、交付说明、审查报告、技术 / 上线方案）不参与代码搜索，检索交给 DocNexus\n${IGNORE_LINE}\n`;
+  const add = `# workflow-run：需求产物（开发方案、交付说明、审查报告、技术 / 上线方案）不参与代码搜索，检索交给 DocNexus\n${IGNORE_LINE}\n`;
   fs.writeFileSync(f, text ? `${text.replace(/\s*$/, '')}\n\n${add}` : add);
   return true;
 }

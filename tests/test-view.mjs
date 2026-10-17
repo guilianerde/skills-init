@@ -14,7 +14,7 @@ function project() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'view-'));
   spawnSync('git', ['init', '-q', '-b', 'main'], { cwd: root });
   const put = (rel, text) => { fs.mkdirSync(path.dirname(path.join(root, rel)), { recursive: true }); fs.writeFileSync(path.join(root, rel), text); };
-  const dir = 'skills-init/docs/requirements/订单导出';
+  const dir = 'workflow-run/docs/requirements/订单导出';
   put(`${dir}/meta.json`, JSON.stringify({ name: '订单导出（按渠道）', named_by: 'user', branches: ['feature/export'] }));
   put(`${dir}/review.md`, '# 审查\n\n> 审查范围：分支对比 ｜ 日期：2026-10-15\n> 对比分支：`feature/export` ←→ `main`\n> DocNexus：未沉淀\n\n## 严重问题（CRITICAL / HIGH） *\n\n| # | 级别 | 位置 | 问题 | 触发条件 | 建议 | 复核 |\n|---|---|---|---|---|---|---|\n| 1 | HIGH | A.java:1 | 未分页 | 大渠道 | 分页 | ✅ |\n');
   put(`${dir}/delivery.md`, '# 交付\n\n> 类型：功能开发 ｜ 日期：2026-10-15\n> 对比分支：`feature/export` ←→ `main`\n> DocNexus：docnexus/library/dev-notes/export.md、docnexus/library/code-review/paging.md\n');
@@ -56,17 +56,17 @@ test('renderHtml：单文件、数据内嵌且转义（正文里的 </script> �
   fs.rmSync(root, { recursive: true, force: true });
 });
 
-test('CLI：skills-init view 默认写到 skills-init/tmp/view/index.html，--out 指定位置；不改产物', () => {
+test('CLI：workflow-run view 默认写到 workflow-run/tmp/view/index.html，--out 指定位置；不改产物', () => {
   const root = project();
-  const before = fs.readFileSync(path.join(root, 'skills-init/docs/requirements/订单导出/meta.json'), 'utf8');
-  let r = spawnSync(process.execPath, [path.join(REPO, 'bin/skills-init.mjs'), 'view', '--project-root', root], { encoding: 'utf8' });
+  const before = fs.readFileSync(path.join(root, 'workflow-run/docs/requirements/订单导出/meta.json'), 'utf8');
+  let r = spawnSync(process.execPath, [path.join(REPO, 'bin/workflow-run.mjs'), 'view', '--project-root', root], { encoding: 'utf8' });
   assert.equal(r.status, 0, r.stderr);
-  assert.match(r.stdout, /已生成 skills-init\/tmp\/view\/index\.html（1 个需求，4 份产物）/);
-  assert.ok(fs.existsSync(path.join(root, 'skills-init/tmp/view/index.html')));
+  assert.match(r.stdout, /已生成 workflow-run\/tmp\/view\/index\.html（1 个需求，4 份产物）/);
+  assert.ok(fs.existsSync(path.join(root, 'workflow-run/tmp/view/index.html')));
   r = spawnSync(process.execPath, [path.join(REPO, 'workflow/scripts/view.mjs'), '--root', root, '--out', 'out/v.html'], { encoding: 'utf8' });
   assert.equal(r.status, 0);
   assert.ok(fs.existsSync(path.join(root, 'out/v.html')));
-  assert.equal(fs.readFileSync(path.join(root, 'skills-init/docs/requirements/订单导出/meta.json'), 'utf8'), before, '只读');
+  assert.equal(fs.readFileSync(path.join(root, 'workflow-run/docs/requirements/订单导出/meta.json'), 'utf8'), before, '只读');
   assert.equal(spawnSync(process.execPath, [path.join(REPO, 'workflow/scripts/view.mjs'), '--bogus'], { encoding: 'utf8' }).status, 1);
   fs.rmSync(root, { recursive: true, force: true });
 });

@@ -11,7 +11,7 @@ const REPO = fileURLToPath(new URL('..', import.meta.url));
 
 function project() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'resolve-'));
-  const r = spawnSync(process.execPath, [path.join(REPO, 'bin', 'skills-init.mjs'), '--project-root', root, '--envs', 'codex,claude', '--skip-db', '--yes'], { encoding: 'utf8' });
+  const r = spawnSync(process.execPath, [path.join(REPO, 'bin', 'workflow-run.mjs'), '--project-root', root, '--envs', 'codex,claude', '--skip-db', '--yes'], { encoding: 'utf8' });
   assert.equal(r.status, 0, r.stderr);
   const resolve = (...args) => {
     // 经 .claude 下的软链接调用，和 Claude Code 中的实际路径一致（Windows 建不了链接时退回 .agents）
@@ -22,22 +22,22 @@ function project() {
   const put = (rel, text) => { fs.mkdirSync(path.dirname(path.join(root, rel)), { recursive: true }); fs.writeFileSync(path.join(root, rel), text); };
   return { root, resolve, put };
 }
-const connect = (put) => { put('skills-init/docnexus/project.json', '{}'); put('skills-init/docnexus/node_modules/.bin/docnexus', ''); put('skills-init/docnexus/node_modules/.bin/docnexus.cmd', ''); };
+const connect = (put) => { put('workflow-run/docnexus/project.json', '{}'); put('workflow-run/docnexus/node_modules/.bin/docnexus', ''); put('workflow-run/docnexus/node_modules/.bin/docnexus.cmd', ''); };
 
 test('未接入 DocNexus：项目文件优先，其次默认模板；技术方案没有默认模板，缺失时退出 2 引导按样例创建', () => {
   const { root, resolve, put } = project();
   let r = resolve('template', 'create-tech-md-doc', 'template.md');
   assert.equal(r.status, 2);
-  assert.deepEqual([r.out.error, r.out.on_demand, r.out.docnexus, r.out.expected], ['missing', true, false, 'skills-init/templates/create-tech-md-doc/template.md']);
+  assert.deepEqual([r.out.error, r.out.on_demand, r.out.docnexus, r.out.expected], ['missing', true, false, 'workflow-run/templates/create-tech-md-doc/template.md']);
   assert.match(r.out.hint, /创建模板/);
   assert.match(r.out.hint, /make-template\.mjs/);
   assert.equal(resolve('template', 'project-review', 'checklist.md').out.path, '.agents/skills/project-review/references/checklist.md');
   assert.equal(resolve('template', 'dev', 'plan-template.md').out.source, 'default');
   const s0 = resolve('status').out;
   assert.deepEqual(s0.templates_to_create.map((t) => t.skill).sort(), ['create-release-md-doc', 'create-tech-md-doc']);
-  put('skills-init/templates/create-tech-md-doc/template.md', '# 团队模板');
+  put('workflow-run/templates/create-tech-md-doc/template.md', '# 团队模板');
   r = resolve('template', 'create-tech-md-doc', 'template.md');
-  assert.deepEqual([r.out.source, r.out.path], ['project', 'skills-init/templates/create-tech-md-doc/template.md']);
+  assert.deepEqual([r.out.source, r.out.path], ['project', 'workflow-run/templates/create-tech-md-doc/template.md']);
   assert.equal(resolve('template', 'dev', 'nope.md').status, 1);
   fs.rmSync(root, { recursive: true, force: true });
 });
@@ -45,28 +45,28 @@ test('未接入 DocNexus：项目文件优先，其次默认模板；技术方�
 test('已接入 DocNexus：只用知识库，缺失退出 2 并给出导入来源', () => {
   const { root, resolve, put } = project();
   connect(put);
-  put('skills-init/templates/dev/plan-template.md', '# 旧项目模板');
+  put('workflow-run/templates/dev/plan-template.md', '# 旧项目模板');
   let r = resolve('template', 'dev', 'plan-template.md');
   assert.equal(r.status, 2);
   assert.equal(r.out.error, 'missing');
-  assert.equal(r.out.expected, 'skills-init/docnexus/library/templates/dev/plan-template.md');
-  assert.equal(r.out.import_from, 'skills-init/templates/dev/plan-template.md');
+  assert.equal(r.out.expected, 'workflow-run/docnexus/library/templates/dev/plan-template.md');
+  assert.equal(r.out.import_from, 'workflow-run/templates/dev/plan-template.md');
   assert.match(r.out.hint, /--seed-templates/);
-  put('skills-init/docnexus/library/templates/dev/plan-template.md', '# 库里的模板');
+  put('workflow-run/docnexus/library/templates/dev/plan-template.md', '# 库里的模板');
   r = resolve('template', 'dev', 'plan-template.md');
   assert.equal(r.status, 0);
   assert.equal(r.out.source, 'docnexus');
-  assert.equal(r.out.stale_project_file, 'skills-init/templates/dev/plan-template.md');
+  assert.equal(r.out.stale_project_file, 'workflow-run/templates/dev/plan-template.md');
   const s = resolve('status').out;
   assert.equal(s.docnexus.ok, true);
-  assert.ok(s.docnexus.missing_templates.includes('skills-init/docnexus/library/templates/dev/delivery-template.md'));
-  assert.ok(!s.docnexus.missing_templates.includes('skills-init/docnexus/library/templates/dev/plan-template.md'));
+  assert.ok(s.docnexus.missing_templates.includes('workflow-run/docnexus/library/templates/dev/delivery-template.md'));
+  assert.ok(!s.docnexus.missing_templates.includes('workflow-run/docnexus/library/templates/dev/plan-template.md'));
   // 没有默认版本的模板不算「缺失待导入」，而是待创建；创建位置是知识库
-  assert.ok(!s.docnexus.missing_templates.includes('skills-init/docnexus/library/templates/create-tech-md-doc/template.md'));
-  assert.ok(s.templates_to_create.some((t) => t.expected === 'skills-init/docnexus/library/templates/create-tech-md-doc/template.md'));
-  put('skills-init/templates/create-release-md-doc/template.md', '# 项目里的上线方案模板');
+  assert.ok(!s.docnexus.missing_templates.includes('workflow-run/docnexus/library/templates/create-tech-md-doc/template.md'));
+  assert.ok(s.templates_to_create.some((t) => t.expected === 'workflow-run/docnexus/library/templates/create-tech-md-doc/template.md'));
+  put('workflow-run/templates/create-release-md-doc/template.md', '# 项目里的上线方案模板');
   r = resolve('template', 'create-release-md-doc', 'template.md');
-  assert.deepEqual([r.status, r.out.on_demand, r.out.import_from], [2, true, 'skills-init/templates/create-release-md-doc/template.md']);
+  assert.deepEqual([r.status, r.out.on_demand, r.out.import_from], [2, true, 'workflow-run/templates/create-release-md-doc/template.md']);
   assert.doesNotMatch(r.out.hint, /seed-templates/);
   fs.rmSync(root, { recursive: true, force: true });
 });

@@ -7,11 +7,11 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
-const CLI = fileURLToPath(new URL('../bin/skills-init.mjs', import.meta.url));
+const CLI = fileURLToPath(new URL('../bin/workflow-run.mjs', import.meta.url));
 const PKG = JSON.parse(fs.readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
 const cli = (root, ...args) => spawnSync(process.execPath, [CLI, '--project-root', root, ...args], { encoding: 'utf8', input: '' });
 const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'cli-'));
-const manifestPath = (root) => path.join(root, '.agents', 'skills', '.skills-init.json');
+const manifestPath = (root) => path.join(root, '.agents', 'skills', '.workflow-run.json');
 
 test('未安装时 doctor / upgrade 报错退出', () => {
   const root = tmp();
@@ -58,7 +58,7 @@ test('upgrade：沿用清单里的环境、保留数据库配置、手改文件�
   assert.match(r.stdout, /目标环境：(claude codex|codex claude)/);
   assert.equal(fs.readFileSync(cfg, 'utf8'), '{"connections":{"default":{"driver":"mysql","password":"keep"}}}');
   assert.doesNotMatch(fs.readFileSync(path.join(root, '.agents/skills/workflow/SKILL.md'), 'utf8'), /# 手改/);
-  const bk = path.join(root, 'skills-init/tmp/upgrade-backup');
+  const bk = path.join(root, 'workflow-run/tmp/upgrade-backup');
   assert.ok(fs.readdirSync(bk).some((d) => /# 手改/.test(fs.readFileSync(path.join(bk, d, '.agents/skills/workflow/SKILL.md'), 'utf8'))));
   assert.equal(JSON.parse(fs.readFileSync(manifestPath(root), 'utf8')).version, PKG.version);
   assert.equal(cli(root, 'uninstall').status, 0);

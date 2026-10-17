@@ -1,5 +1,5 @@
-// 独立文档仓库：团队文档仓库克隆到项目根的 skills-init/（它自己是 git 仓库，代码仓库忽略它），产物在
-// skills-init/docs/requirements/<需求名>/<项目名>/，项目名配置一次，写完提示提交（可关闭），跨服务需求共用一个需求目录
+// 独立文档仓库：团队文档仓库克隆到项目根的 workflow-run/（它自己是 git 仓库，代码仓库忽略它），产物在
+// workflow-run/docs/requirements/<需求名>/<项目名>/，项目名配置一次，写完提示提交（可关闭），跨服务需求共用一个需求目录
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -11,9 +11,9 @@ import { fileURLToPath } from 'node:url';
 const REPO = fileURLToPath(new URL('..', import.meta.url));
 const G = ['-c', 'user.email=t@t', '-c', 'user.name=t'];
 const doc = (title, branch, extra = '') => `${extra}# ${title}\n\n> 日期：2026-10-15\n> 对比分支：\`${branch}\` ←→ \`main\`\n\n## 结果\n\nok\n`;
-const ENV = { ...process.env, SKILLS_INIT_ADMIN: '1' };
+const ENV = { ...process.env, WORKFLOW_RUN_ADMIN: '1' };
 
-// 一个工作区：团队文档仓库（远端 team-docs.git）+ 若干项目（各自装好 skills；clone 时把文档仓库克隆到 skills-init/）
+// 一个工作区：团队文档仓库（远端 team-docs.git）+ 若干项目（各自装好 skills；clone 时把文档仓库克隆到 workflow-run/）
 function workspace() {
   const ws = fs.mkdtempSync(path.join(os.tmpdir(), 'docsrepo-'));
   const remote = path.join(ws, 'team-docs.git');
@@ -27,25 +27,25 @@ function workspace() {
     fs.mkdirSync(root);
     const git = (...a) => spawnSync('git', [...G, ...a], { cwd: root, encoding: 'utf8' });
     git('init', '-q', '-b', 'main'); git('commit', '-q', '--allow-empty', '-m', 'init'); git('checkout', '-q', '-b', branch);
-    const cloneDocs = () => assert.equal(spawnSync('git', ['clone', '-q', remote, 'skills-init'], { cwd: root }).status, 0);
+    const cloneDocs = () => assert.equal(spawnSync('git', ['clone', '-q', remote, 'workflow-run'], { cwd: root }).status, 0);
     if (clone) cloneDocs();
-    const cli = (...a) => spawnSync(process.execPath, [path.join(REPO, 'bin/skills-init.mjs'), '--project-root', root, ...a], { cwd: root, encoding: 'utf8', env: ENV });
+    const cli = (...a) => spawnSync(process.execPath, [path.join(REPO, 'bin/workflow-run.mjs'), '--project-root', root, ...a], { cwd: root, encoding: 'utf8', env: ENV });
     const r = cli('--envs', 'codex', '--skip-db', '--yes');
     assert.equal(r.status, 0, r.stdout + r.stderr);
     const script = (s) => path.join(root, '.agents/skills/workflow/scripts', s);
     const run = (s, ...a) => { const x = spawnSync(process.execPath, [script(s), ...a], { cwd: root, encoding: 'utf8' }); return { code: x.status, out: x.stdout.trim().startsWith('{') || x.stdout.trim().startsWith('[') ? JSON.parse(x.stdout) : x.stdout, err: x.stderr }; };
     const req = (...a) => run('requirement.mjs', ...a);
     const put = (rel, text) => { fs.mkdirSync(path.dirname(path.resolve(root, rel)), { recursive: true }); fs.writeFileSync(path.resolve(root, rel), text); };
-    const docsGit = (...a) => spawnSync('git', [...G, ...a], { cwd: path.join(root, 'skills-init'), encoding: 'utf8' });
-    return { root, git, run, req, put, cli, cloneDocs, docsGit, docs: path.join(root, 'skills-init') };
+    const docsGit = (...a) => spawnSync('git', [...G, ...a], { cwd: path.join(root, 'workflow-run'), encoding: 'utf8' });
+    return { root, git, run, req, put, cli, cloneDocs, docsGit, docs: path.join(root, 'workflow-run') };
   };
   return { ws, remote, project };
 }
 
-test('文档仓库克隆到 skills-init/：先要项目名（只配一次），之后产物写到 skills-init/docs/requirements/<需求>/<项目>/，引用用「仓库名:路径」', () => {
+test('文档仓库克隆到 workflow-run/：先要项目名（只配一次），之后产物写到 workflow-run/docs/requirements/<需求>/<项目>/，引用用「仓库名:路径」', () => {
   const { ws, project } = workspace();
   const p = project('order-service', 'feature/order-export');
-  assert.equal(p.req('which').out.mode, 'project', '默认 skills-init/ 随项目提交');
+  assert.equal(p.req('which').out.mode, 'project', '默认 workflow-run/ 随项目提交');
   assert.equal(p.req('config', '--repo', '../team-docs').code, 1, '--repo 已不支持');
 
   p.cloneDocs();
@@ -61,19 +61,19 @@ test('文档仓库克隆到 skills-init/：先要项目名（只配一次），�
   assert.deepEqual([r.code, r.out.bound, r.out.mode, r.out.project], [0, false, 'repo', 'order-service']);
 
   r = p.req('bind', '--name', '订单导出支持按渠道筛选');
-  assert.equal(r.out.dir, 'skills-init/docs/requirements/订单导出支持按渠道筛选/order-service');
+  assert.equal(r.out.dir, 'workflow-run/docs/requirements/订单导出支持按渠道筛选/order-service');
   r = p.req('path', 'delivery').out;
-  assert.equal(r.path, 'skills-init/docs/requirements/订单导出支持按渠道筛选/order-service/delivery.md');
+  assert.equal(r.path, 'workflow-run/docs/requirements/订单导出支持按渠道筛选/order-service/delivery.md');
   assert.equal(r.cite, 'team-docs:docs/requirements/订单导出支持按渠道筛选/order-service/delivery.md');
   p.put(r.path, doc('交付', 'feature/order-export'));
   const meta = JSON.parse(fs.readFileSync(path.join(p.docs, 'docs/requirements/订单导出支持按渠道筛选/order-service/meta.json'), 'utf8'));
   assert.equal(meta.project, 'order-service');
   assert.equal(p.run('resolve.mjs', 'status').out.artifacts.mode, 'repo');
 
-  // 升级后代码仓库忽略整个 skills-init/
+  // 升级后代码仓库忽略整个 workflow-run/
   assert.equal(p.cli('upgrade').status, 0);
-  assert.match(fs.readFileSync(path.join(p.root, '.gitignore'), 'utf8'), /^\/skills-init\/$/m);
-  assert.equal(p.git('status', '--porcelain', '--', 'skills-init').stdout, '', '代码仓库里看不到产物');
+  assert.match(fs.readFileSync(path.join(p.root, '.gitignore'), 'utf8'), /^\/workflow-run\/$/m);
+  assert.equal(p.git('status', '--porcelain', '--', 'workflow-run').stdout, '', '代码仓库里看不到产物');
   fs.rmSync(ws, { recursive: true, force: true });
 });
 
@@ -117,13 +117,13 @@ test('跨服务需求：其他项目在 which 里看到已有需求（推送后�
   const w = b.req('which').out;
   assert.deepEqual(w.other_projects.map((x) => [x.name, x.projects]), [['订单导出', ['order-service']]]);
   const r = b.req('bind', '--name', '订单导出').out;
-  assert.deepEqual([r.dir, r.joined, r.created], ['skills-init/docs/requirements/订单导出/pay-service', true, true]);
+  assert.deepEqual([r.dir, r.joined, r.created], ['workflow-run/docs/requirements/订单导出/pay-service', true, true]);
   b.put(b.req('path', 'delivery').out.path, doc('支付服务交付', 'feature/export-pay'));
   assert.deepEqual(fs.readdirSync(path.join(b.docs, 'docs/requirements/订单导出')).sort(), ['order-service', 'pay-service']);
 
-  const v = b.run('view.mjs', '--out', 'skills-init/tmp/v.html');
+  const v = b.run('view.mjs', '--out', 'workflow-run/tmp/v.html');
   assert.equal(v.code, 0, v.err);
-  const html = fs.readFileSync(path.join(b.root, 'skills-init/tmp/v.html'), 'utf8');
+  const html = fs.readFileSync(path.join(b.root, 'workflow-run/tmp/v.html'), 'utf8');
   const data = JSON.parse(/<script id="data" type="application\/json">([\s\S]*?)<\/script>/.exec(html)[1]);
   const req = data.requirements.find((x) => x.name === '订单导出');
   assert.deepEqual(req.projects.sort(), ['order-service', 'pay-service']);
@@ -138,8 +138,8 @@ test('跨服务需求：其他项目在 which 里看到已有需求（推送后�
 test('docs-repo 一条命令切到文档仓库：克隆、忽略、项目名、tmp/ 保留且不进文档仓库；已有产物时停下', () => {
   const { ws, remote, project } = workspace();
   const p = project('order-service', 'feature/order-export');
-  fs.mkdirSync(path.join(p.root, 'skills-init/tmp/view'), { recursive: true });
-  fs.writeFileSync(path.join(p.root, 'skills-init/tmp/view/index.html'), 'x');
+  fs.mkdirSync(path.join(p.root, 'workflow-run/tmp/view'), { recursive: true });
+  fs.writeFileSync(path.join(p.root, 'workflow-run/tmp/view/index.html'), 'x');
   let r = p.cli('docs-repo');
   assert.equal(r.status, 0);
   assert.match(r.stdout, /随项目提交（不是独立文档仓库）/);
@@ -149,7 +149,7 @@ test('docs-repo 一条命令切到文档仓库：克隆、忽略、项目名、t
   assert.ok(fs.existsSync(path.join(p.docs, '.git')));
   assert.equal(fs.readFileSync(path.join(p.docs, 'tmp/view/index.html'), 'utf8'), 'x', 'tmp/ 放回');
   assert.equal(p.docsGit('status', '--porcelain').stdout, '', 'tmp/ 不进文档仓库');
-  assert.match(fs.readFileSync(path.join(p.root, '.gitignore'), 'utf8'), /^\/skills-init\/$/m);
+  assert.match(fs.readFileSync(path.join(p.root, '.gitignore'), 'utf8'), /^\/workflow-run\/$/m);
   assert.match(r.stdout, /项目名：order-service/);
   const w = p.req('which').out;
   assert.deepEqual([w.mode, w.project], ['repo', 'order-service']);
@@ -163,7 +163,7 @@ test('docs-repo 一条命令切到文档仓库：克隆、忽略、项目名、t
   assert.match(r.stdout + r.stderr, /已经是文档仓库/);
   assert.match(p.cli('docs-repo').stdout, /仓库名（引用前缀）：team-docs[\s\S]*项目名：orders/);
 
-  // 随项目提交的产物还在 skills-init/ 里：不克隆、不改动
+  // 随项目提交的产物还在 workflow-run/ 里：不克隆、不改动
   const q = project('pay-service', 'feature/pay');
   q.req('bind', '--name', '支付');
   r = q.cli('docs-repo', remote);

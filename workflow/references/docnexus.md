@@ -2,18 +2,18 @@
 
 各 skill 写入与参考 DocNexus 时共用的规则。
 
-## DocNexus 在 skills-init/ 里
+## DocNexus 在 workflow-run/ 里
 
-DocNexus 工作区在 `skills-init/docnexus/`，以 `skills-init/` 为项目根运行：
+DocNexus 工作区在 `workflow-run/docnexus/`，以 `workflow-run/` 为项目根运行：
 
 - docnexus 系列 skill（`docnexus`、`docnexus-recall` 等）里写的命令，在项目根换成下面的写法运行，不用先 `cd`，任何终端都一样（`resolve.mjs status` 的 `docnexus.run` 就是这个前缀）：
   - `./docnexus/node_modules/.bin/docnexus <参数>` → `node <skills>/workflow/scripts/docnexus.mjs <参数>`；
   - `node docnexus/skills/<…>.mjs <参数>` → `node <skills>/workflow/scripts/docnexus.mjs --node docnexus/skills/<…>.mjs <参数>`。
 
-  参数里的路径（草稿、`docnexus/library/<path>`）照旧相对 `skills-init/`；自己读写这些文件时加上 `skills-init/`，例如 `skills-init/docnexus/library/<path>`。
+  参数里的路径（草稿、`docnexus/library/<path>`）照旧相对 `workflow-run/`；自己读写这些文件时加上 `workflow-run/`，例如 `workflow-run/docnexus/library/<path>`。
 - 本工作流的脚本已处理位置：`knowledge.mjs` 在那里运行，输出的 `file` 是从项目根读正文的路径；`resolve.mjs template` 给出的模板路径、`expected` 都已带上位置。
 - 引用知识文档仍写 `docnexus/library/<path>`（产物里的「DocNexus：」行也一样）。
-- `skills-init/` 是独立文档仓库时（见 `references/requirements.md`），知识库由共用这个仓库的各服务一起使用：按分类参考和 recall 都会看到其他服务的沉淀，引用前确认和本次任务相关。写入（capture）完成后运行 `requirement.mjs pending`，`knowledge_files` 是知识库里没提交的文件，`knowledge_commands` 是提交命令（把提交信息换成这次沉淀了什么）。和产物一样，给用户看、用户确认后再提交，推送另外问。
+- `workflow-run/` 是独立文档仓库时（见 `references/requirements.md`），知识库由共用这个仓库的各服务一起使用：按分类参考和 recall 都会看到其他服务的沉淀，引用前确认和本次任务相关。写入（capture）完成后运行 `requirement.mjs pending`，`knowledge_files` 是知识库里没提交的文件，`knowledge_commands` 是提交命令（把提交信息换成这次沉淀了什么）。和产物一样，给用户看、用户确认后再提交，推送另外问。
 
 ## 写入 DocNexus 的分类
 
@@ -32,7 +32,7 @@ node <skills>/workflow/scripts/resolve.mjs category <skill>
 
 DocNexus 按它自己的设计使用：沉淀文档的正文只写知识（约定、决定、坑、根因），不写分支名、产物路径这类工作流信息，免得进入 recall 的检索索引造成干扰，也免得知识文档和工作流的目录结构绑在一起。
 
-- 有 facts 时，每条 fact 的 `provenance` 写一条简单的来源，由你按这个格式写：`<产物种类> <产物路径>（<产物日期>）`，例如 `交付说明 skills-init/docs/requirements/订单导出支持按渠道筛选/delivery.md（2026-10-15）`。没有 facts 就不写。
+- 有 facts 时，每条 fact 的 `provenance` 写一条简单的来源，由你按这个格式写：`<产物种类> <产物路径>（<产物日期>）`，例如 `交付说明 workflow-run/docs/requirements/订单导出支持按渠道筛选/delivery.md（2026-10-15）`。没有 facts 就不写。
 - 从知识库追溯回产物，靠的是产物里的「DocNexus：docnexus/library/<path>」元信息行（沉淀成功后写入）反查，`/workflow view` 会按需求列出沉淀到的知识文档，以及每篇来自哪份产物。不往 DocNexus 里多写内容。
 
 ## 按分类参考知识库

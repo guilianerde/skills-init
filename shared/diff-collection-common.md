@@ -1,6 +1,6 @@
 # diff 分层采集：通用规则
 
-> 共享文件：源文件在 skills-init 仓库的 `shared/`，安装时拷进每个声明了它的 skill 的 `references/`。各 skill 自己的「层 → 文档模块」映射和特有抽取规则写在各自的 `references/diff-collection.md`。
+> 共享文件：源文件在 workflow-run 仓库的 `shared/`，安装时拷进每个声明了它的 skill 的 `references/`。各 skill 自己的「层 → 文档模块」映射和特有抽取规则写在各自的 `references/diff-collection.md`。
 
 ## 基线
 

@@ -20,7 +20,7 @@ export function uninstall(root) {
   const bases = [CANON_DIR, path.join('.claude', 'skills'), path.join('.qwen', 'skills')];
   const found = bases.map((rel) => [rel, readManifest(path.join(root, rel))]).filter(([, m]) => m);
   if (!found.length) { warn(`未找到安装清单（${bases.map((b) => toPosix(path.join(b, MANIFEST))).join(' / ')}），没有可卸载的内容`); return 0; }
-  const backupRoot = path.join(root, 'skills-init', 'tmp', 'uninstall-backup', timestamp());
+  const backupRoot = path.join(root, 'workflow-run', 'tmp', 'uninstall-backup', timestamp());
   const backedUp = [];
   const leftovers = [];
 
@@ -37,8 +37,8 @@ export function uninstall(root) {
     if (n) ok(`已移除 ${toPosix(rel)} 下 ${n} 个指向 ${toPosix(CANON_DIR)} 的软链接`);
   }
 
-  // 1b. 本工具接进来的 DocNexus：指向 skills-init/docnexus/skills 的链接、CLAUDE.md / AGENTS.md 里的段落。
-  //     skills-init/ 里的东西（产物、DocNexus 工作区、项目模板）是项目数据，不删
+  // 1b. 本工具接进来的 DocNexus：指向 workflow-run/docnexus/skills 的链接、CLAUDE.md / AGENTS.md 里的段落。
+  //     workflow-run/ 里的东西（产物、DocNexus 工作区、项目模板）是项目数据，不删
   {
     const src = path.join(docnexusRoot(root), 'docnexus', 'skills');
     let n = 0;
@@ -50,7 +50,7 @@ export function uninstall(root) {
       }
     }
     const files = removeDocNexusContext(root);
-    if (n || files.length) ok(`已移除指向 ${toPosix(path.relative(root, src))} 的 ${n} 个 DocNexus skill 链接${files.length ? `，以及 ${files.join('、')} 里的 DocNexus 段落` : ''}（skills-init/docnexus/ 本身不动）`);
+    if (n || files.length) ok(`已移除指向 ${toPosix(path.relative(root, src))} 的 ${n} 个 DocNexus skill 链接${files.length ? `，以及 ${files.join('、')} 里的 DocNexus 段落` : ''}（workflow-run/docnexus/ 本身不动）`);
   }
 
   // 2. 各安装目录：按清单删除模板文件；用户配置与手改过的模板文件先备份
@@ -90,6 +90,6 @@ export function uninstall(root) {
     for (const f of backedUp) console.log(`      ${f}`);
   }
   for (const d of leftovers) warn(`${d} 中有不在清单里的文件，已保留该目录`);
-  console.log('.gitignore 中追加的规则未移除，如不再需要可手动删除。skills-init/（需求产物、DocNexus 工作区、项目模板）是项目数据，没有删除。');
+  console.log('.gitignore 中追加的规则未移除，如不再需要可手动删除。workflow-run/（需求产物、DocNexus 工作区、项目模板）是项目数据，没有删除。');
   return 0;
 }

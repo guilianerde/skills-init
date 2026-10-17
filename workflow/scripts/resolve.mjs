@@ -37,10 +37,10 @@ function skillMetas() {
 
 export const skillMeta = (name) => skillMetas().find((m) => m.name === name);
 
-// DocNexus 的项目根：skills-init/（工作区在 skills-init/docnexus/），DocNexus 的命令都在这个目录下运行。bin/lib/core.mjs 的 docnexusRoot 与此一致
+// DocNexus 的项目根：workflow-run/（工作区在 workflow-run/docnexus/），DocNexus 的命令都在这个目录下运行。bin/lib/core.mjs 的 docnexusRoot 与此一致
 export const docnexusRoot = (root) => path.resolve(root, HOME);
 
-// DocNexus CLI 的位置（相对项目根）：skills-init/docnexus/node_modules/.bin；没有返回 null。bin/lib/core.mjs 的 docnexusBin 与此一致
+// DocNexus CLI 的位置（相对项目根）：workflow-run/docnexus/node_modules/.bin；没有返回 null。bin/lib/core.mjs 的 docnexusBin 与此一致
 export const DOCNEXUS_BIN_DIRS = [['docnexus', 'node_modules', '.bin']];
 export function docnexusBin(root) {
   const name = process.platform === 'win32' ? 'docnexus.cmd' : 'docnexus';
@@ -48,7 +48,7 @@ export function docnexusBin(root) {
   for (const dir of DOCNEXUS_BIN_DIRS) if (fs.existsSync(path.join(dn, ...dir, name))) return path.relative(path.resolve(root), path.join(dn, ...dir, name));
   return null;
 }
-// 给 agent 的命令写法（相对项目根）：./skills-init/docnexus/...
+// 给 agent 的命令写法（相对项目根）：./workflow-run/docnexus/...
 const cmdPath = (p) => { const s = p.split(path.sep).join('/'); return s.startsWith('.') ? s : `./${s}`; };
 
 // CodeGraph 代码图谱：本项目建过索引（.codegraph/）且 codegraph 命令可用。索引是否建立由用户决定，skill 不自行 codegraph init
@@ -58,7 +58,7 @@ export function codegraphStatus(root) {
   const cli = r.status === 0;
   return {
     ok: indexed && cli, cli, indexed,
-    how: cli && indexed ? null : !cli ? '重跑 skills-init 并加 --with-codegraph（或 npm i -g @colbymchenry/codegraph）' : '在项目根运行 codegraph init 建索引（由用户决定）',
+    how: cli && indexed ? null : !cli ? '重跑 workflow-run 并加 --with-codegraph（或 npm i -g @colbymchenry/codegraph）' : '在项目根运行 codegraph init 建索引（由用户决定）',
   };
 }
 
@@ -88,7 +88,7 @@ export function resolveTemplate(root, skill, id) {
     return {
       ok: false, ...res, error: 'missing', expected: rel(root, lib),
       import_from: fs.existsSync(project) ? rel(root, project) : rel(root, builtin),
-      hint: '已接入 DocNexus，只使用知识库中的模板。停下这一步告诉用户缺这份模板：可在项目根运行 skills-init seed-templates（或重跑安装加 --seed-templates），或经用户确认后把 import_from 按 capture 流程写入 expected（以显式分类 --category doc-template 封存）。',
+      hint: '已接入 DocNexus，只使用知识库中的模板。停下这一步告诉用户缺这份模板：可在项目根运行 workflow-run seed-templates（或重跑安装加 --seed-templates），或经用户确认后把 import_from 按 capture 流程写入 expected（以显式分类 --category doc-template 封存）。',
     };
   }
   if (fs.existsSync(project)) return { ok: true, skill, id, docnexus: false, source: 'project', path: rel(root, project) };
@@ -189,17 +189,17 @@ export function status(root) {
       stale_project_templates: dn ? templates.map((t) => t.stale_project_file).filter(Boolean) : [],
       // 各 skill 写入时使用的显式分类（没声明的 skill 不列出）
       categories: Object.fromEntries(skillMetas().map((m) => [m.name, resolveCategory(root, m.name)]).filter(([, c]) => c.ok).map(([n, c]) => [n, c.category])),
-      how: dn ? '缺模板时运行 skills-init seed-templates' : '重跑 skills-init 并加 --with-docnexus',
+      how: dn ? '缺模板时运行 workflow-run seed-templates' : '重跑 workflow-run 并加 --with-docnexus',
     },
     // 产物位置：项目里（默认）或独立文档仓库（workflow/references/requirements.md）
-    artifacts: (() => { const L = layout(root); return { mode: L.mode, ok: L.ok, ...(L.mode === 'repo' ? { repo: L.repo_rel, project: L.project, commit_prompt: L.commit_prompt } : { dir: 'skills-init/docs/requirements' }), how: L.ok ? null : L.hint }; })(),
+    artifacts: (() => { const L = layout(root); return { mode: L.mode, ok: L.ok, ...(L.mode === 'repo' ? { repo: L.repo_rel, project: L.project, commit_prompt: L.commit_prompt } : { dir: 'workflow-run/docs/requirements' }), how: L.ok ? null : L.hint }; })(),
     // 代码图谱：可用时读代码、查调用链与影响面优先用它（见 workflow/references/codegraph.md）
     codegraph: codegraphStatus(root),
     database: {
       ok: !!db?.connections && Object.keys(db.connections).length > 0,
       default: db?.default_connection ?? (db?.connections?.default ? 'default' : null),
       connections: Object.fromEntries(Object.entries(db?.connections ?? {}).map(([k, c]) => [k, { driver: c.driver ?? 'mysql', readonly: c.readonly !== false }])),
-      how: '重跑 skills-init 补配数据库',
+      how: '重跑 workflow-run 补配数据库',
     },
     templates: templates.map(({ skill, id, source, path: p2, ok, on_demand, expected }) => ({ skill, id, ok, source: source ?? 'missing', path: p2 ?? null, ...(on_demand ? { on_demand: true, expected } : {}) })),
     // 不随 skills 提供、还没创建的模板（技术方案、上线方案）：第一次生成文档时按「创建模板」引导用户创建

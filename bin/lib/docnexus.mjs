@@ -16,8 +16,8 @@ export function checkNodeForDocNexus() {
   if (spawnSync(IS_WIN ? 'npm.cmd' : 'npm', ['-v'], { stdio: 'ignore', shell: IS_WIN }).status !== 0) fail('--with-docnexus 需要 npm，但未找到。请安装后重试，或去掉 --with-docnexus。');
   ok(`Node v${process.versions.node}`);
 }
-// DocNexus 的 skills（skills-init/docnexus/skills/*）软链接到本项目的 agent skills 目录。DocNexus 以 skills-init/ 为项目根、
-// init --agent none 运行，它自己不链接 skills、不写 CLAUDE.md / AGENTS.md（那些会落在 skills-init/ 里），都由这里接到本项目。
+// DocNexus 的 skills（workflow-run/docnexus/skills/*）软链接到本项目的 agent skills 目录。DocNexus 以 workflow-run/ 为项目根、
+// init --agent none 运行，它自己不链接 skills、不写 CLAUDE.md / AGENTS.md（那些会落在 workflow-run/ 里），都由这里接到本项目。
 // 已有的同名软链接换成新的；同名目录内容和 DocNexus 的一样（建不了链接时的拷贝）也换掉，否则跳过
 export function linkDocNexusSkills(root, dirs) {
   const srcRoot = path.join(docnexusRoot(root), 'docnexus', 'skills');
@@ -42,10 +42,10 @@ export function linkDocNexusSkills(root, dirs) {
   }
 }
 
-// 本项目 agent 的说明段落：概念索引在哪、docnexus 系列 skill 里的「项目根」指 skills-init/。
+// 本项目 agent 的说明段落：概念索引在哪、docnexus 系列 skill 里的「项目根」指 workflow-run/。
 // 用自己的标记，不碰 DocNexus 自己的段落
-const CTX_START = '<!-- skills-init:docnexus:start -->';
-const CTX_END = '<!-- skills-init:docnexus:end -->';
+const CTX_START = '<!-- workflow-run:docnexus:start -->';
+const CTX_END = '<!-- workflow-run:docnexus:end -->';
 function contextBlock(file) {
   const run = `${file === 'CLAUDE.md' ? '.claude/skills' : '.agents/skills'}/workflow/scripts/docnexus.mjs`;
   const index = file === 'CLAUDE.md' ? `@${HOME}/docnexus/CONCEPTS.md` : `\`${HOME}/docnexus/CONCEPTS.md\`（每个任务开始时读）`;
@@ -174,7 +174,7 @@ export function printTemplateDiffs(root) {
     const lib = path.join(HOME, 'docnexus', 'library', t.file);
     const def = path.join(TPL_DIR, t.src);
     step(`${lib}（${s.status === 'customized' ? '团队改过，默认模板有新版' : '无导入记录，内容与默认模板不同'}）`);
-    console.log(`  --- 知识库：${lib}\n  +++ 新默认：${t.src}（skills-init ${PKG.version}）`);
+    console.log(`  --- 知识库：${lib}\n  +++ 新默认：${t.src}（workflow-run ${PKG.version}）`);
     const r = spawnSync('git', ['diff', '--no-index', '--no-color', '--', path.join(root, lib), def], { encoding: 'utf8' });
     if (r.error) { warn(`未找到 git，无法生成差异；请手动对比上面两个文件`); continue; }
     console.log(r.stdout.split('\n').filter((l) => !/^(diff --git|index |--- |\+\+\+ )/.test(l)).join('\n'));

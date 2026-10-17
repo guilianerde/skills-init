@@ -1,5 +1,5 @@
 {
-  "name": "@rowansenne/skills-init",
+  "name": "@rowansenne/workflow-run",
   "version": "0.17.0",
   "description": "项目级 Agent Skills 一键初始化：workflow / dev / project-review / code-graph / database-query / md-to-wiki / 技术与上线方案生成",
   "keywords": [
@@ -17,7 +17,7 @@
     "node": ">=22"
   },
   "bin": {
-    "skills-init": "bin/skills-init.mjs"
+    "workflow-run": "bin/workflow-run.mjs"
   },
   "files": [
     "bin",

@@ -24,8 +24,8 @@ export const USER_FILES = META.userFiles;
 export const DOCNEXUS_PKG = process.env.DOCNEXUS_PKG || '@rowansenne/docnexus';
 export const CODEGRAPH_PKG = process.env.CODEGRAPH_PKG || '@colbymchenry/codegraph@1'; // code-graph skill 按 1.x 的库接口编写
 // 本工具在项目里的唯一目录：需求产物、DocNexus 工作区、项目模板、临时文件都在这里（与 workflow/scripts/requirement.mjs 的 HOME 一致）
-export const HOME = 'skills-init';
-// DocNexus 的项目根是 skills-init/（工作区 skills-init/docnexus/），CLI 在 skills-init/docnexus/node_modules/.bin。
+export const HOME = 'workflow-run';
+// DocNexus 的项目根是 workflow-run/（工作区 workflow-run/docnexus/），CLI 在 workflow-run/docnexus/node_modules/.bin。
 // workflow/scripts/resolve.mjs 的 docnexusRoot / docnexusBin 与此一致
 export const DOCNEXUS_BIN_DIRS = [['docnexus', 'node_modules', '.bin']];
 export const docnexusRoot = (root) => path.resolve(root, HOME);
@@ -37,7 +37,7 @@ export function docnexusBin(root) {
 }
 // 升级 DocNexus 的命令（在项目根执行；不用 cd / &&，PowerShell 5.1 也能直接运行）
 export const docnexusUpgradeCmd = () => `npm install --prefix ./${HOME}/docnexus --save-exact ${DOCNEXUS_PKG}@latest`;
-export const MANIFEST = '.skills-init.json'; // 安装清单，位于每个安装目录（单一来源时只有 .agents/skills 一份）
+export const MANIFEST = '.workflow-run.json'; // 安装清单，位于每个安装目录（单一来源时只有 .agents/skills 一份）
 
 // ---------------------------------------------------------------- 输出
 export const step = (m) => console.log(`==> ${m}`);
@@ -47,9 +47,9 @@ export class CliError extends Error {}
 export const fail = (m) => { throw new CliError(m); };
 
 // Windows 上安装 / 升级要求管理员终端（建目录软链接需要该权限）。非 Windows 一律放行。
-// SKILLS_INIT_ADMIN=1 / 0 强制视为管理员 / 非管理员（测试用，任何平台都生效）
+// WORKFLOW_RUN_ADMIN=1 / 0 强制视为管理员 / 非管理员（测试用，任何平台都生效）
 export function isAdminTerminal() {
-  const forced = process.env.SKILLS_INIT_ADMIN;
+  const forced = process.env.WORKFLOW_RUN_ADMIN;
   if (forced === '1') return true;
   if (forced === '0') return false;
   if (!IS_WIN) return true;

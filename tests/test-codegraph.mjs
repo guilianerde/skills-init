@@ -38,7 +38,7 @@ function setup({ installed = true } = {}) {
   if (installed) fs.copyFileSync(cgSrc, path.join(bin, 'codegraph'));
   // PATH 只留假命令目录、node 与系统目录，避免用到本机真装的 codegraph
   const env = { ...process.env, PATH: [bin, path.dirname(process.execPath), '/usr/bin', '/bin'].join(path.delimiter), DO_NOT_TRACK: '' };
-  const cli = (...a) => { const r = spawnSync(process.execPath, [path.join(REPO, 'bin/skills-init.mjs'), '--project-root', root, ...a], { cwd: root, encoding: 'utf8', env }); return { status: r.status, log: `${r.stdout}\n${r.stderr}` }; };
+  const cli = (...a) => { const r = spawnSync(process.execPath, [path.join(REPO, 'bin/workflow-run.mjs'), '--project-root', root, ...a], { cwd: root, encoding: 'utf8', env }); return { status: r.status, log: `${r.stdout}\n${r.stderr}` }; };
   const calls = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split('\n') : []);
   const status = () => JSON.parse(spawnSync(process.execPath, [path.join(root, '.agents/skills/workflow/scripts/resolve.mjs'), 'status'], { cwd: root, encoding: 'utf8', env }).stdout).codegraph;
   return { base, root, cli, status, cg: () => calls(cgLog), npm: () => calls(npmLog) };

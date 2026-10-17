@@ -1,6 +1,6 @@
 # PRD 拉取（通用）
 
-> 共享文件：源文件在 skills-init 仓库的 `shared/`，安装时拷进每个声明了它的 skill 的 `references/`。各 skill 需要从 PRD 抽取的额外字段写在各自的文档里。
+> 共享文件：源文件在 workflow-run 仓库的 `shared/`，安装时拷进每个声明了它的 skill 的 `references/`。各 skill 需要从 PRD 抽取的额外字段写在各自的文档里。
 
 任一步失败都**只回退**（不用 PRD 继续），在产出中写明「PRD 增强已跳过」，绝不因此中止主流程。
 

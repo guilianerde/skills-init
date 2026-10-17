@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// 本地效果报告：只读扫描 skills-init/docs/requirements/下的产物，回答「用了这套工作流以后有没有更好」。
+// 本地效果报告：只读扫描 workflow-run/docs/requirements/下的产物，回答「用了这套工作流以后有没有更好」。
 // 数据全部来自已经落盘的产物，不上报、不另存记录：
 //   - 审查：每份报告的 CRITICAL / HIGH / MEDIUM / LOW 条数、复核通过率；复审报告里上次问题的「已修复 / 仍存在 / 不再适用」→ 修复率
 //   - 交付：功能 / 缺陷、S / M / L、需求澄清中确认的决定条数、带「未验证项」的交付
@@ -139,7 +139,7 @@ export function toMarkdown(r) {
     ? `范围：工作区 + ${r.scanned_branches.length} 个本地分支（其中 ${r.from_branches} 份只在分支里）。`
     : '范围：只看工作区。随特性分支提交、还没合并的产物不在内，加 `--all-branches` 一起统计。', '');
   if (!r.artifacts) {
-    L.push('`skills-init/docs/requirements/` 下还没有产物。dev 交付（M / L 规模）、审查报告、技术方案、上线方案落盘后，这里才有数据。');
+    L.push('`workflow-run/docs/requirements/` 下还没有产物。dev 交付（M / L 规模）、审查报告、技术方案、上线方案落盘后，这里才有数据。');
     return L.join('\n');
   }
   L.push(`产物 ${r.artifacts} 份：${KINDS.map((k) => `${k.label} ${r.counts[k.kind]}`).join('、')}。S 规模走快速通道的交付不落盘，不在统计内。`, '');

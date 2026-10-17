@@ -27,9 +27,9 @@ let cases = JSON.parse(fs.readFileSync(path.join(REPO, 'evals', 'trigger-cases.j
 if (ONLY) cases = cases.filter((c) => c.expect.includes(ONLY));
 
 // 临时项目：用安装器把 skills 装进 .claude/skills（软链接到 .agents/skills）
-const proj = fs.mkdtempSync(path.join(os.tmpdir(), 'skills-init-eval-'));
+const proj = fs.mkdtempSync(path.join(os.tmpdir(), 'workflow-run-eval-'));
 spawnSync('git', ['init', '-q'], { cwd: proj });
-const inst = spawnSync(process.execPath, [path.join(REPO, 'bin', 'skills-init.mjs'), '--project-root', proj, '--envs', 'claude', '--yes', '--skip-db'], { encoding: 'utf8' });
+const inst = spawnSync(process.execPath, [path.join(REPO, 'bin', 'workflow-run.mjs'), '--project-root', proj, '--envs', 'claude', '--yes', '--skip-db'], { encoding: 'utf8' });
 if (inst.status !== 0) { console.error(inst.stdout, inst.stderr); process.exit(1); }
 
 function classify(toolName, input) {

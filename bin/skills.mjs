@@ -19,7 +19,7 @@ import path from 'node:path';
 
 export const SKILL_META = 'skill.json';
 export const TEMPLATE_CATEGORY = 'doc-template';
-export const TEMPLATE_CATEGORY_REASON = 'skills-init 文档类 skill 读取的写作模板，与普通知识文档区分；模板随知识库更新。';
+export const TEMPLATE_CATEGORY_REASON = 'workflow-run 文档类 skill 读取的写作模板，与普通知识文档区分；模板随知识库更新。';
 
 // DocNexus 对显式分类名的约束：1–80 字符，无首尾空白与控制字符
 export const validCategory = (c) => typeof c === 'string' && c.length >= 1 && c.length <= 80 && c === c.trim() && !/[\u0000-\u001f\u007f]/.test(c);

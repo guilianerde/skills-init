@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // 按分支汇总各 skill 的产物：开发方案、交付说明、审查报告、技术方案、上线方案，以及它们的 wiki 发布记录。
-// 产物按需求归档在 skills-init/docs/requirements/<需求>/（独立文档仓库模式再分 <项目>/，见 requirement.mjs）。
+// 产物按需求归档在 workflow-run/docs/requirements/<需求>/（独立文档仓库模式再分 <项目>/，见 requirement.mjs）。
 // 直接扫描 Markdown，从元信息行读分支（「分支：」「对比分支：」），
 // 从第一行的 <!-- md-to-wiki: ... --> 读发布记录（md-to-wiki 上传后写入）。只读。
 //
@@ -44,7 +44,7 @@ export function parseWiki(text) {
 
 const headerDate = (text) => /(\d{4}-\d{2}-\d{2})/.exec(text.replace(/<!--[\s\S]*?-->/g, '').split(/\r?\n/).slice(0, 8).join('\n'))?.[1] ?? ''; // 跳过 md-to-wiki 发布记录里的 at=
 
-// skills-init/docs/requirements/<需求>/<文件> → 产物条目；不是已知产物返回 null
+// workflow-run/docs/requirements/<需求>/<文件> → 产物条目；不是已知产物返回 null
 function entry(rel, text, mtime) {
   const parts = rel.split('/');
   if (parts.length !== 5 || parts.slice(0, 3).join('/') !== REQ_DIR) return null;

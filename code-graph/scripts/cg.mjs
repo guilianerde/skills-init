@@ -53,7 +53,7 @@ export function loadLibrary(root) {
       return { ok: false, error: 'load_failed', hint: `加载 ${dir} 失败：${String(e.message).split('\n')[0]}` };
     }
   }
-  return { ok: false, error: 'no_library', hint: `找不到 ${PKG}：重跑 skills-init 并加 --with-codegraph（全局安装），或改用 grep / 读文件` };
+  return { ok: false, error: 'no_library', hint: `找不到 ${PKG}：重跑 workflow-run 并加 --with-codegraph（全局安装），或改用 grep / 读文件` };
 }
 
 // 打开索引（只读）。索引落后于工作区时先用 codegraph CLI 增量同步（同步不是建索引；没有索引时不替用户建）

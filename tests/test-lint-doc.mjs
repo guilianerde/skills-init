@@ -53,14 +53,14 @@ test('缺必填章节、残留占位符、缺元信息为错误；缺普通章�
 
 test('CLI：按项目模板检查，原样的骨架报错；技术方案没有模板时退出 2；已接入 DocNexus 时改用知识库模板', () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'lintdoc-'));
-  assert.equal(spawnSync(process.execPath, [path.join(REPO, 'bin/skills-init.mjs'), '--project-root', root, '--envs', 'codex', '--skip-db', '--yes'], { encoding: 'utf8' }).status, 0);
+  assert.equal(spawnSync(process.execPath, [path.join(REPO, 'bin/workflow-run.mjs'), '--project-root', root, '--envs', 'codex', '--skip-db', '--yes'], { encoding: 'utf8' }).status, 0);
   const cli = (...a) => spawnSync(process.execPath, [path.join(root, '.agents/skills/workflow/scripts/lint-doc.mjs'), ...a], { cwd: root, encoding: 'utf8' });
   const TEAM = '# 【技术方案】{{文档标题}}\n\n## 1. 需求背景 *\n\n{{需求背景}}\n\n## 2. 影响范围 *\n\n{{影响范围}}\n';
   fs.writeFileSync(path.join(root, 'raw.md'), TEAM);
   let r = cli('raw.md', '--skill', 'create-tech-md-doc', '--json');
   assert.equal(r.status, 2, '技术方案模板不随 skills 提供，没创建时停下');
-  fs.mkdirSync(path.join(root, 'skills-init/templates/create-tech-md-doc'), { recursive: true });
-  fs.writeFileSync(path.join(root, 'skills-init/templates/create-tech-md-doc/template.md'), TEAM);
+  fs.mkdirSync(path.join(root, 'workflow-run/templates/create-tech-md-doc'), { recursive: true });
+  fs.writeFileSync(path.join(root, 'workflow-run/templates/create-tech-md-doc/template.md'), TEAM);
   r = cli('raw.md', '--skill', 'create-tech-md-doc', '--json');
   assert.equal(r.status, 1);
   const out = JSON.parse(r.stdout);
@@ -83,12 +83,12 @@ test('CLI：按项目模板检查，原样的骨架报错；技术方案没有�
   assert.equal(r.status, 1);
   const errs = JSON.parse(r.stdout).errors;
   assert.ok(errs.some((e) => e.includes('审查方式')) && errs.some((e) => e.includes('未覆盖与待确认')), errs.join('\n'));
-  fs.mkdirSync(path.join(root, 'skills-init/docnexus/library/templates/create-tech-md-doc'), { recursive: true });
-  fs.mkdirSync(path.join(root, 'skills-init/docnexus/node_modules/.bin'), { recursive: true });
-  for (const f of ['project.json', 'node_modules/.bin/docnexus', 'node_modules/.bin/docnexus.cmd']) fs.writeFileSync(path.join(root, 'skills-init/docnexus', f), '{}');
+  fs.mkdirSync(path.join(root, 'workflow-run/docnexus/library/templates/create-tech-md-doc'), { recursive: true });
+  fs.mkdirSync(path.join(root, 'workflow-run/docnexus/node_modules/.bin'), { recursive: true });
+  for (const f of ['project.json', 'node_modules/.bin/docnexus', 'node_modules/.bin/docnexus.cmd']) fs.writeFileSync(path.join(root, 'workflow-run/docnexus', f), '{}');
   r = cli('raw.md', '--skill', 'create-tech-md-doc');
   assert.equal(r.status, 2, '缺知识库模板时不回退默认模板');
-  fs.writeFileSync(path.join(root, 'skills-init/docnexus/library/templates/create-tech-md-doc/template.md'), '# 团队模板\n## 背景 *\n## 方案 *\n');
+  fs.writeFileSync(path.join(root, 'workflow-run/docnexus/library/templates/create-tech-md-doc/template.md'), '# 团队模板\n## 背景 *\n## 方案 *\n');
   fs.writeFileSync(path.join(root, 'doc.md'), '# 订单导出\n> **自动生成** by x\n> 对比分支：a\n> diff 概览：1 file\n> 模板来源：DocNexus\n## 背景\n## 方案\n');
   r = cli('doc.md', '--skill', 'create-tech-md-doc');
   assert.equal(r.status, 0, r.stdout);

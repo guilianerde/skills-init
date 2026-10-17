@@ -1,4 +1,4 @@
-// 安装器黑盒测试（三个平台都跑）：每个用例在临时目录放一份 skills-init 副本，执行安装后检查目录、软链接与配置。
+// 安装器黑盒测试（三个平台都跑）：每个用例在临时目录放一份 workflow-run 副本，执行安装后检查目录、软链接与配置。
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
@@ -13,11 +13,11 @@ const IS_WIN = process.platform === 'win32';
 const SKILLS = ['workflow', 'dev', 'project-review', 'database-query', 'md-to-wiki', 'create-tech-md-doc', 'create-release-md-doc', 'code-graph'];
 const PASSWORD = 'p/a&s|s"w\\o\\"rd\\';
 const DB_ANSWERS = `mysql\n127.0.0.1\n3307\nappdb\nroot\n${PASSWORD}\n`;
-const WORK = fs.mkdtempSync(path.join(os.tmpdir(), 'skills-init-install-'));
+const WORK = fs.mkdtempSync(path.join(os.tmpdir(), 'workflow-run-install-'));
 test.after(() => fs.rmSync(WORK, { recursive: true, force: true }));
 
 const SYMLINK_OK = (() => {
-  if (process.env.SKILLS_INIT_NO_SYMLINK === '1') return false;
+  if (process.env.WORKFLOW_RUN_NO_SYMLINK === '1') return false;
   const d = fs.mkdtempSync(path.join(WORK, 'probe-'));
   try { fs.symlinkSync('.', path.join(d, 'l'), 'dir'); return true; } catch { return false; }
 })();
@@ -33,14 +33,14 @@ function copyRepo(dst) {
 
 function project(name) {
   const P = path.join(WORK, name);
-  // 安装器副本放在项目外（项目里的 skills-init/ 是放产出的目录）
+  // 安装器副本放在项目外（项目里的 workflow-run/ 是放产出的目录）
   const INST = path.join(WORK, `${name}.installer`);
   fs.mkdirSync(P, { recursive: true });
   copyRepo(INST);
   const at = (rel) => path.join(P, ...rel.split('/'));
   const install = (args, { input = '', env = {} } = {}) => {
-    const r = spawnSync(process.execPath, [path.join(INST, 'bin', 'skills-init.mjs'), '--project-root', P, ...args], {
-      encoding: 'utf8', input, env: { ...process.env, SKILLS_INIT_NO_SYMLINK: '', ...env },
+    const r = spawnSync(process.execPath, [path.join(INST, 'bin', 'workflow-run.mjs'), '--project-root', P, ...args], {
+      encoding: 'utf8', input, env: { ...process.env, WORKFLOW_RUN_NO_SYMLINK: '', ...env },
     });
     return { status: r.status, log: `${r.stdout}\n${r.stderr}` };
   };
@@ -76,16 +76,16 @@ function assertLinked(p, envDir, skills = SKILLS) {
   }
 }
 const backups = (p, glob) => {
-  const root = p.at('skills-init/tmp/backup');
+  const root = p.at('workflow-run/tmp/backup');
   if (!fs.existsSync(root)) return [];
   return fs.readdirSync(root).map((ts) => path.join(root, ts, ...glob.split('/'))).filter((d) => fs.existsSync(d));
 };
 
 // ---------------------------------------------------------------- 用例
 
-// 升级备份：skills-init/tmp/upgrade-backup/<时间>/<相对项目根的路径>；返回所有备份里这个文件的内容
+// 升级备份：workflow-run/tmp/upgrade-backup/<时间>/<相对项目根的路径>；返回所有备份里这个文件的内容
 function upgradeBackups(p, rel) {
-  const dir = p.at('skills-init/tmp/upgrade-backup');
+  const dir = p.at('workflow-run/tmp/upgrade-backup');
   if (!fs.existsSync(dir)) return [];
   return fs.readdirSync(dir).map((d) => path.join(dir, d, rel)).filter((f) => fs.existsSync(f)).map((f) => fs.readFileSync(f, 'utf8'));
 }
@@ -104,29 +104,29 @@ test('全新安装：单一来源完整文件 + 相对软链接；重跑不变',
   assert.ok(!p.exists('.agents/skills/database-query/config.json'));
   ok(p.install(['--envs', 'claude,qwen', '--yes', '--skip-db']));
   assertLinked(p, '.claude/skills');
-  assert.ok(!p.exists('skills-init/tmp/backup'));
+  assert.ok(!p.exists('workflow-run/tmp/backup'));
 });
 
-test('非管理员终端（SKILLS_INIT_ADMIN=0 模拟）：安装与升级直接停下并提示用管理员终端，不做任何改动；doctor 不受影响', () => {
+test('非管理员终端（WORKFLOW_RUN_ADMIN=0 模拟）：安装与升级直接停下并提示用管理员终端，不做任何改动；doctor 不受影响', () => {
   const p = project('non-admin');
-  const env = { SKILLS_INIT_ADMIN: '0' };
+  const env = { WORKFLOW_RUN_ADMIN: '0' };
   let r = p.install(['--envs', 'claude', '--yes', '--skip-db'], { env });
   assert.equal(r.status, 1);
   assert.match(r.log, /没有管理员权限，已停止安装/);
   assert.match(r.log, /以管理员身份运行/);
-  assert.deepEqual(fs.readdirSync(p.P).filter((f) => f !== 'skills-init'), [], '没有创建任何文件');
+  assert.deepEqual(fs.readdirSync(p.P).filter((f) => f !== 'workflow-run'), [], '没有创建任何文件');
   ok(p.install(['--envs', 'claude', '--yes', '--skip-db']));
-  const before = p.read('.agents/skills/.skills-init.json');
+  const before = p.read('.agents/skills/.workflow-run.json');
   r = p.install(['upgrade'], { env });
   assert.equal(r.status, 1);
   assert.match(r.log, /已停止升级/);
-  assert.equal(p.read('.agents/skills/.skills-init.json'), before);
+  assert.equal(p.read('.agents/skills/.workflow-run.json'), before);
   assert.doesNotMatch(p.install(['doctor', '--offline'], { env }).log, /管理员/, 'doctor 只读，不要求管理员');
 });
 
-test('SKILLS_INIT_NO_SYMLINK=1：退回各环境独立拷贝', () => {
+test('WORKFLOW_RUN_NO_SYMLINK=1：退回各环境独立拷贝', () => {
   const p = project('no-symlink');
-  ok(p.install(['--envs', 'claude,qwen', '--yes', '--skip-db'], { env: { SKILLS_INIT_NO_SYMLINK: '1' } }));
+  ok(p.install(['--envs', 'claude,qwen', '--yes', '--skip-db'], { env: { WORKFLOW_RUN_NO_SYMLINK: '1' } }));
   for (const d of ['.claude/skills', '.qwen/skills']) {
     for (const s of SKILLS) { assert.ok(p.isDir(`${d}/${s}`), `${d}/${s}`); assert.ok(p.isFile(`${d}/${s}/SKILL.md`)); }
     assert.equal(p.read(`${d}/workflow/profile.json`), repoFile('workflow/profile.json.tpl'));
@@ -182,7 +182,7 @@ test('重跑保留用户配置；手改的 skill 文件备份后更新为新版�
 test('安装清单：版本 / 环境 / sha256，用户配置只记存在与否；--copy 各目录一份', () => {
   let p = project('manifest');
   ok(p.install(['--envs', 'claude,qwen', '--yes', '--skip-db']));
-  const m = p.json('.agents/skills/.skills-init.json');
+  const m = p.json('.agents/skills/.workflow-run.json');
   assert.equal(m.version, JSON.parse(repoFile('package.json')).version);
   assert.deepEqual(m.envs, ['claude', 'qwen']);
   assert.equal(m.skills.dev.files['SKILL.md'], sha256('dev/SKILL.md.tpl'));
@@ -190,14 +190,14 @@ test('安装清单：版本 / 环境 / sha256，用户配置只记存在与否�
   assert.equal(m.skills.workflow.userFiles['profile.json'], true);
   assert.equal(m.skills['database-query'].userFiles['config.json'], false);
   assert.ok(!('profile.json' in m.skills.workflow.files));
-  assert.ok(!p.exists('.claude/skills/.skills-init.json'));
+  assert.ok(!p.exists('.claude/skills/.workflow-run.json'));
   p = project('manifest-copy');
   ok(p.install(['--envs', 'claude,qwen', '--copy', '--yes', '--skip-db']));
-  assert.ok(p.isFile('.claude/skills/.skills-init.json'));
-  assert.equal(p.json('.qwen/skills/.skills-init.json').mode, 'copy');
+  assert.ok(p.isFile('.claude/skills/.workflow-run.json'));
+  assert.equal(p.json('.qwen/skills/.workflow-run.json').mode, 'copy');
 });
 
-test('手改的 skill 文件：一律更新为新版，原文件备份到 skills-init/tmp/upgrade-backup/；不询问', () => {
+test('手改的 skill 文件：一律更新为新版，原文件备份到 workflow-run/tmp/upgrade-backup/；不询问', () => {
   const p = project('modified');
   const c = '.agents/skills';
   const args = ['--envs', 'claude,qwen', '--skip-db'];
@@ -208,7 +208,7 @@ test('手改的 skill 文件：一律更新为新版，原文件备份到 skills
   assert.equal(p.read(`${c}/dev/SKILL.md`), repoFile('dev/SKILL.md.tpl'));
   assert.equal(p.read(`${c}/create-tech-md-doc/skill.json`), repoFile('create-tech-md-doc/skill.json'), 'skill.json 与 SKILL.md 不会新旧混搭');
   assert.deepEqual(upgradeBackups(p, `${c}/dev/SKILL.md`), ['my edits\n']);
-  assert.match(r.log, /以下文件被手动修改过，已按新版覆盖，原文件备份在 skills-init\/tmp\/upgrade-backup\/\d{8}-\d{6}\//);
+  assert.match(r.log, /以下文件被手动修改过，已按新版覆盖，原文件备份在 workflow-run\/tmp\/upgrade-backup\/\d{8}-\d{6}\//);
   assert.ok(r.log.includes(`  ${c}/dev/SKILL.md`));
   r = p.install([...args, '--yes']); ok(r);
   assert.ok(!r.log.includes('被手动修改过'), '没有再改过就不再提示');
@@ -237,7 +237,7 @@ test('新版本删掉的模板文件：未改过的直接清理，改过的备�
   assert.ok(p.isFile(`${c}/create-tech-md-doc/references/prd-fetch.md`));
   assert.ok(p.isFile(`${c}/create-tech-md-doc/SKILL.md`));
   assert.ok(r.log.includes(`${c}/dev/references/delivery-template.md（新版已不提供，已删除）`));
-  assert.ok(!('references/plan-template.md' in p.json(`${c}/.skills-init.json`).skills.dev.files));
+  assert.ok(!('references/plan-template.md' in p.json(`${c}/.workflow-run.json`).skills.dev.files));
 });
 
 test('卸载：移除本项目的文件与链接，备份用户配置与手改文件，不动用户自己的 skill', () => {
@@ -260,14 +260,14 @@ test('卸载：移除本项目的文件与链接，备份用户配置与手改�
     assert.ok(!p.exists(`.qwen/skills/${s}`), `.qwen/skills/${s}`);
     if (s !== 'dev') assert.ok(!p.exists(`${c}/${s}`), `${c}/${s}`);
   }
-  assert.ok(!p.exists(`${c}/.skills-init.json`));
+  assert.ok(!p.exists(`${c}/.workflow-run.json`));
   assert.ok(!p.exists(`${c}/dev/SKILL.md`));
   assert.equal(p.read(`${c}/dev/notes.md`), 'notes\n');
   assert.equal(p.read(`${c}/my-skill/SKILL.md`), 'mine\n');
   assert.equal(p.read('.claude/skills/my-claude-skill/SKILL.md'), 'mine\n');
   if (SYMLINK_OK) assert.ok(p.isLink('.qwen/skills/my-skill'));
-  const [b] = fs.readdirSync(p.at('skills-init/tmp/uninstall-backup'));
-  const bk = (rel) => fs.readFileSync(path.join(p.at('skills-init/tmp/uninstall-backup'), b, ...c.split('/'), ...rel.split('/')), 'utf8');
+  const [b] = fs.readdirSync(p.at('workflow-run/tmp/uninstall-backup'));
+  const bk = (rel) => fs.readFileSync(path.join(p.at('workflow-run/tmp/uninstall-backup'), b, ...c.split('/'), ...rel.split('/')), 'utf8');
   assert.equal(bk('md-to-wiki/wiki-config.json'), wiki);
   assert.equal(bk('workflow/profile.json'), profile);
   assert.equal(bk('project-review/SKILL.md'), 'my edits\n');
@@ -347,7 +347,7 @@ test('.gitignore 只追加缺失的规则，重跑不重复', () => {
   p.write('.gitignore', 'node_modules/\n**/wiki-config.json\n.env');
   ok(p.install(['--envs', 'claude', '--yes', '--skip-db']));
   const lines = p.read('.gitignore').split(/\r?\n/);
-  for (const r of ['**/database-query/config.json', '**/wiki-config.json', '/skills-init/tmp/', 'node_modules/', '.env']) {
+  for (const r of ['**/database-query/config.json', '**/wiki-config.json', '/workflow-run/tmp/', 'node_modules/', '.env']) {
     assert.equal(lines.filter((l) => l === r).length, 1, r);
   }
   const after = p.read('.gitignore');
@@ -363,7 +363,7 @@ test('--skills 子集：自动带上 requires 依赖；不装 database-query 时
   assertLinked(p, '.claude/skills', ['workflow', 'project-review']);
   assert.ok(!p.exists('.claude/skills/dev'));
   r = p.install(['--envs', 'claude', '--yes', '--skip-db', '--skills', 'md-to-wiki']); ok(r);
-  assert.deepEqual(Object.keys(p.json('.agents/skills/.skills-init.json').skills).sort(), ['md-to-wiki', 'project-review', 'workflow']);
+  assert.deepEqual(Object.keys(p.json('.agents/skills/.workflow-run.json').skills).sort(), ['md-to-wiki', 'project-review', 'workflow']);
   assertLinked(p, '.claude/skills', ['workflow', 'project-review', 'md-to-wiki']);
   r = p.install(['upgrade']); ok(r);
   assert.match(r.log, /安装的 skill：workflow project-review md-to-wiki/);
@@ -387,4 +387,30 @@ test('共享参考文件：仓库只有一份，装进每个声明它的 skill�
   ok(p.install(['--envs', 'codex', '--yes', '--skip-db', '--skills', 'database-query']));
   ok(p.install(['uninstall']));
   for (const s of users) assert.ok(!p.exists(`.agents/skills/${s}`), s);
+});
+
+test('旧包 skills-init 装过的项目：列出改名命令后停下，不做改动；按提示改名后 upgrade 正常，旧段落与旧忽略规则只提示', () => {
+  const p = project('legacy');
+  ok(p.install(['--envs', 'codex', '--yes', '--skip-db']));
+  p.write('skills-init/docs/requirements/x/plan.md', '# 方案\n');
+  fs.renameSync(p.at('.agents/skills/.workflow-run.json'), p.at('.agents/skills/.skills-init.json'));
+  p.write('CLAUDE.md', '# 项目\n\n<!-- skills-init:docnexus:start -->\n旧段落\n<!-- skills-init:docnexus:end -->\n');
+  fs.appendFileSync(p.at('.gitignore'), '/skills-init/tmp/\n');
+  for (const cmd of [[], ['upgrade'], ['doctor']]) {
+    const r = p.install([...cmd, '--envs', 'codex', '--yes', '--skip-db']);
+    assert.equal(r.status, 1, cmd.join(' '));
+    assert.match(r.log, /mv skills-init workflow-run/);
+    assert.match(r.log, /mv \.agents\/skills\/\.skills-init\.json \.agents\/skills\/\.workflow-run\.json/);
+    assert.match(r.log, /CLAUDE\.md：删掉/);
+  }
+  assert.ok(!p.exists('workflow-run'), '停下时不建新目录');
+
+  fs.renameSync(p.at('skills-init'), p.at('workflow-run'));
+  fs.renameSync(p.at('.agents/skills/.skills-init.json'), p.at('.agents/skills/.workflow-run.json'));
+  const r = p.install(['upgrade']);
+  ok(r);
+  assert.ok(p.exists('workflow-run/docs/requirements/x/plan.md'));
+  assert.match(r.log, /旧版残留：CLAUDE\.md/);
+  assert.match(r.log, /旧版残留：\.gitignore/);
+  assert.ok(p.read('.gitignore').includes('/workflow-run/tmp/'));
 });
