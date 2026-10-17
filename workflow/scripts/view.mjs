@@ -297,7 +297,7 @@ export function main(argv) {
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(file, renderHtml(data));
   const n = data.requirements.length;
-  const shown = path.relative(root, file);
+  const shown = path.relative(root, file).split(path.sep).join('/');
   console.log(`已生成 ${shown && !shown.startsWith('..') ? shown : file}（${n} 个需求，${data.requirements.reduce((s, r) => s + r.artifacts.length, 0)} 份产物）。用浏览器打开即可，只读、不联网。`);
   if (open) {
     const [cmd, args] = process.platform === 'darwin' ? ['open', [file]] : process.platform === 'win32' ? ['cmd', ['/c', 'start', '', file]] : ['xdg-open', [file]];
