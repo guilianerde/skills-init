@@ -127,7 +127,7 @@ const remoteNames = new Map();
 function remoteName(home) {
   if (!remoteNames.has(home)) {
     const url = git(home, ['remote', 'get-url', 'origin']).stdout?.trim();
-    remoteNames.set(home, url ? url.replace(/\.git$/, '').split(/[/:]/).pop() || HOME : HOME);
+    remoteNames.set(home, url ? url.replace(/[/\\]+$/, '').replace(/\.git$/, '').split(/[/\\:]/).pop() || HOME : HOME);
   }
   return remoteNames.get(home);
 }
@@ -135,7 +135,7 @@ function remoteName(home) {
 // 项目名建议：git 远端仓库名，取不到用项目目录名
 function suggestProject(root) {
   const url = git(root, ['remote', 'get-url', 'origin']).stdout?.trim();
-  const name = url ? url.replace(/\.git$/, '').split(/[/:]/).pop() : path.basename(path.resolve(root));
+  const name = url ? url.replace(/[/\\]+$/, '').replace(/\.git$/, '').split(/[/\\:]/).pop() : path.basename(path.resolve(root));
   return dirName(name);
 }
 

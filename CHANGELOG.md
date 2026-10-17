@@ -16,6 +16,9 @@
 - **不再迁移旧版本的产物**：去掉 `requirement.mjs migrate`、升级时的自动归档，以及对旧布局 `docs/skills/<skill>/` 的识别。旧位置的文件需要的话自己搬。
 - **安装器去掉旧版本兼容**：不再把 `dev/profile.json` 迁成 `workflow/profile.json`、不再清理旧版本留下的 `<文件>.new`、不再移除改名前的 `code-review`（`skill.json` 去掉 `renamedFrom`）。`--copy` 拷贝换成链接时合并用户配置仍保留。
 
+### 修复
+- 文档仓库的远端是 Windows 本地路径（反斜杠）时，引用里的仓库名会带上整段路径；改为和项目名建议一样按 `/`、`\\`、`:` 切分。
+
 ## [0.15.0] - 2026-10-17
 
 ### 新增
