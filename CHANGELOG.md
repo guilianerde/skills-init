@@ -4,6 +4,8 @@
 
 ## [Unreleased]
 
+## [0.16.0] - 2026-10-17
+
 ### 变更（破坏性，不兼容旧版本）
 - **本工具的产出都放进项目根的 `skills-init/`**，不再往项目的其他地方写：
   - 需求产物：`skills-init/docs/requirements/<需求名>/`（原 `docs/skills/requirements/`）；
@@ -226,7 +228,8 @@
 - 安装器改为单一 Node 实现，`init-skills.sh` / `init-skills.ps1` 只是薄封装。
 - `code-review` 改名为 `project-review`，升级时自动清理旧名。
 
-[Unreleased]: https://github.com/guilianerde/skills-init/compare/v0.15.0...HEAD
+[Unreleased]: https://github.com/guilianerde/skills-init/compare/v0.16.0...HEAD
+[0.16.0]: https://github.com/guilianerde/skills-init/compare/v0.15.0...v0.16.0
 [0.15.0]: https://github.com/guilianerde/skills-init/compare/v0.14.0...v0.15.0
 [0.14.0]: https://github.com/guilianerde/skills-init/compare/v0.13.0...v0.14.0
 [0.13.0]: https://github.com/guilianerde/skills-init/compare/v0.12.0...v0.13.0
