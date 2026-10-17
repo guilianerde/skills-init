@@ -12,6 +12,7 @@
     "code-graph"
   ],
   "userFiles": {
-    "profile.json": "profile.json.tpl"
+    "profile.json": "profile.json.tpl",
+    "profile.local.json": null
   }
 }

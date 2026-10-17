@@ -16,6 +16,12 @@
 - **不再迁移旧版本的产物**：去掉 `requirement.mjs migrate`、升级时的自动归档，以及对旧布局 `docs/skills/<skill>/` 的识别。旧位置的文件需要的话自己搬。
 - **安装器去掉旧版本兼容**：不再把 `dev/profile.json` 迁成 `workflow/profile.json`、不再清理旧版本留下的 `<文件>.new`、不再移除改名前的 `code-review`（`skill.json` 去掉 `renamedFrom`）。`--copy` 拷贝换成链接时合并用户配置仍保留。
 
+- **DocNexus 命令不再要求先 `cd skills-init`**：新增 `workflow/scripts/docnexus.mjs`，在项目根运行即在 `skills-init/` 下执行 DocNexus（`--node <脚本>` 运行它的 node 脚本），bash / PowerShell 5.1 写法一样，Windows 上直接用 node 跑 CLI 入口。`resolve.mjs status` 的 `docnexus.run_in` 改为 `docnexus.run`；`CLAUDE.md` / `AGENTS.md` 段落与 DocNexus 升级命令同步改写，不再含 `cd … &&`。
+
+### 新增
+- **安装时记录本机系统与终端**：写进 `workflow/profile.local.json` 的 `env`（`os`、`shell`，Windows 区分 `pwsh` 与 `powershell`；个人设置，不提交）。新命令 `resolve.mjs env`，`profile` / `status` 输出也带上 `env`；各 skill 增加「终端命令」一节：按 `env` 写命令，不再每次对话自己探测系统。
+- 技术方案里找候选分支改用 `git branch -a -i --list "*<关键词>*"`，不再依赖 `grep`。
+
 ### 修复
 - 文档仓库的远端是 Windows 本地路径（反斜杠）时，引用里的仓库名会带上整段路径；改为和项目名建议一样按 `/`、`\`、`:` 切分。
 

@@ -5,6 +5,7 @@ import path from 'node:path';
 import { TPL_DIR, PKG, CANON_DIR, INSTALL_BASES, SKILLS, SKILL_LIST, USER_FILES, MANIFEST, ok, warn, readJson, walk, toPosix, sameFile, writeFile, render, sha256, fileHash, readManifest, removeEmptyDirs, lstat, timestamp, removeLink, docnexusRoot, HOME } from './core.mjs';
 import { writeDbConfig } from './db.mjs';
 import { layout, ensureIgnore, homeIsRepo, IGNORE_LINE, TEMPLATES_DIR, TMP_DIR } from '../../workflow/scripts/requirement.mjs';
+import { detectEnv } from '../../workflow/scripts/resolve.mjs';
 
 // 结尾汇总：被手改过、已用新版覆盖（原文件已备份）的 / 模板已删除、手改过而备份后删除的文件
 export const report = { overwritten: [], removed: [], backupDir: null };
@@ -217,6 +218,23 @@ export function updateGitignore(root, withDocNexus, withCodeGraph = false) {
 }
 
 // skills-init/：.ignore 加上需求目录（不参与代码搜索）；是独立文档仓库时还没配项目名就提示
+// 本机系统与终端写进各安装目录的 workflow/profile.local.json（个人设置，已在 .gitignore 里），skill 从 resolve.mjs 的 env 读，
+// 不用每次对话再探测。每次安装 / 升级都重新检测（换了终端、拷到别的机器后重跑即可）
+export function recordEnv(root) {
+  const env = detectEnv();
+  const files = [];
+  for (const base of INSTALL_BASES) {
+    const dir = path.join(root, base, 'workflow');
+    if (lstat(path.join(root, base, 'workflow'))?.isSymbolicLink() || !fs.existsSync(path.join(dir, 'SKILL.md'))) continue;
+    const f = path.join(dir, 'profile.local.json');
+    const cur = readJson(f) ?? {};
+    if (cur.env?.os !== env.os || cur.env?.shell !== env.shell) writeFile(f, JSON.stringify({ ...cur, env }, null, 2) + '\n');
+    files.push(toPosix(path.relative(root, f)));
+  }
+  if (files.length) ok(`本机环境：${env.os} / ${env.shell}（写入 ${files.join('、')}，不提交；skill 写命令按它来）`);
+  return env;
+}
+
 export function setupHome(root) {
   if (ensureIgnore(root)) ok(`.ignore 已加上 ${IGNORE_LINE}（需求产物不参与代码搜索）`);
   const L = layout(root);

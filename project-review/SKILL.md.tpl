@@ -75,3 +75,7 @@ description: "Review source code (any language; Java/Spring, Go, TypeScript, Pyt
 - 涉及跨分支对比时，确保 diff 基于正确的 base 分支（默认 `main`）。
 - CRITICAL / HIGH 都经过第 6 步复核，写得出触发条件；复核不了的标「⚠ 待确认」，不计入「不建议合并」的结论。
 - 分批审查时，没精读的文件列在「未覆盖与待确认」里，不能让读者以为全部审过。
+
+## 终端命令
+
+本 skill 给出的 `node …`、`git …` 命令在 bash、zsh、PowerShell 里写法一样，原样运行即可。需要自己写其他终端命令时，先看本机的系统和终端：`node <skills>/workflow/scripts/resolve.mjs env`（安装时记录，一次对话查一次就够；`resolve.mjs profile` / `status` 的输出里也带着 `env`）。按输出的 `os`、`shell`、`note` 写命令，不要再用 `uname`、`$PSVersionTable`、`ver` 之类去探测。

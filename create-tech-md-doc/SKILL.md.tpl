@@ -22,7 +22,7 @@ description: "Generate a Markdown technical design doc (技术方案) from the d
 ### Step 0 — 前置校验
 
 1. `git rev-parse --is-inside-work-tree` 为 `true`，否则停。
-2. 两个分支都能 `git rev-parse --verify`（或 `origin/<branch>`）；不存在 → 列出 `git branch -a | grep -i <关键词>` 的候选让用户挑，停。
+2. 两个分支都能 `git rev-parse --verify`（或 `origin/<branch>`）；不存在 → 列出 `git branch -a -i --list "*<关键词>*"` 的候选让用户挑，停。
 3. 读 `workflow/profile.json`：发布平台、Region、配置中心、定时任务注解、是否需要数据评审都取自这里；未配置的写「待填写」，**不要沿用其他项目的取值**。
 4. DocNexus 可用时运行 `node <skills>/workflow/scripts/knowledge.mjs create-tech-md-doc --match <模块名 / 业务名词> --query "<一句话：本次改动做了什么>"`（模块名取分支名或 diff 涉及的模块），看以往技术方案沉淀的决策与约定、相关开发沉淀；相关的在文档对应章节引用 `docnexus/library/<path>`（见 `<skills>/workflow/references/docnexus.md`「按分类参考知识库」）。未接入就跳过。
 
@@ -87,3 +87,7 @@ description: "Generate a Markdown technical design doc (技术方案) from the d
 - 只给了一个分支，或只给了 `--prd`
 - 单层 diff > 500 个文件且无法再过滤 → 请用户缩小范围
 - 正在编造 diff 中看不到的业务语义
+
+## 终端命令
+
+本 skill 给出的 `node …`、`git …` 命令在 bash、zsh、PowerShell 里写法一样，原样运行即可。需要自己写其他终端命令时，先看本机的系统和终端：`node <skills>/workflow/scripts/resolve.mjs env`（安装时记录，一次对话查一次就够；`resolve.mjs profile` / `status` 的输出里也带着 `env`）。按输出的 `os`、`shell`、`note` 写命令，不要再用 `uname`、`$PSVersionTable`、`ver` 之类去探测。

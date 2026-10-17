@@ -76,7 +76,7 @@ dev（需求 → 方案 → 实现 → 测试 → 自审）
 | 能力 | 判定为可用 | 用途 |
 |---|---|---|
 | wiki | `md-to-wiki/wiki-config.json` 中 `enabled=true` 且 `wiki.base_url` 非空；或环境存在 wiki MCP 工具 | 读 PRD（各 skill 按 `references/prd-fetch.md`，REST 通道统一调 `md-to-wiki/scripts/upload.mjs get`）、发布文档 |
-| DocNexus | 有 `skills-init/docnexus/project.json`，且 CLI 可执行：`skills-init/docnexus/node_modules/.bin/docnexus`（`resolve.mjs status` 的 `docnexus.bin`）；DocNexus 以 `skills-init/` 为项目根，按 `references/docnexus.md`「DocNexus 在 skills-init/ 里」运行 | 查约定与历史决策、沉淀知识、提供文档模板 |
+| DocNexus | 有 `skills-init/docnexus/project.json`，且 CLI 可执行：`skills-init/docnexus/node_modules/.bin/docnexus`（`resolve.mjs status` 的 `docnexus.bin`）；命令用 `node <skills>/workflow/scripts/docnexus.mjs <参数>` 运行（`docnexus.run`），见 `references/docnexus.md`「DocNexus 在 skills-init/ 里」 | 查约定与历史决策、沉淀知识、提供文档模板 |
 | 数据库 | `database-query/config.json` 存在且 `connections` 非空 | 查表结构、核对数据 |
 | 代码图谱（CodeGraph） | 项目根有 `.codegraph/` 索引，且 `codegraph` 命令可用（`resolve.mjs status` 的 `codegraph.ok`） | 读代码、查调用链与影响面、找受影响的测试；用法见 `references/codegraph.md` |
 | 项目画像 | `workflow/profile.json` 中 `main_branch` 与 `build` / `test` 非空 | dev 构建与测试 |
@@ -86,3 +86,7 @@ dev（需求 → 方案 → 实现 → 测试 → 自审）
 - 本 skill 只路由和维护 `profile.json`，不写业务代码；具体工作交给对应 skill，并遵守该 skill 的规则。
 - `profile.json` 只记录项目事实，不写密码、token、内网凭据。
 - 用户的请求明显只属于某个 skill 时，不要先跑完整链路或状态检查，直接进入那个 skill。
+
+## 终端命令
+
+本 skill 给出的 `node …`、`git …` 命令在 bash、zsh、PowerShell 里写法一样，原样运行即可。需要自己写其他终端命令时，先看本机的系统和终端：`node <skills>/workflow/scripts/resolve.mjs env`（安装时记录，一次对话查一次就够；`resolve.mjs profile` / `status` 的输出里也带着 `env`）。按输出的 `os`、`shell`、`note` 写命令，不要再用 `uname`、`$PSVersionTable`、`ver` 之类去探测。

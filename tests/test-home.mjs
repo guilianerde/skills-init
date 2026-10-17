@@ -69,7 +69,9 @@ test('DocNexus 在 skills-init/docnexus/：本项目链接它的 skills（相对
   const claude = p.read('CLAUDE.md');
   assert.match(claude, /^# 项目说明\n\n手写的内容\n\n<!-- skills-init:docnexus:start -->/);
   assert.match(claude, /@skills-init\/docnexus\/CONCEPTS\.md/);
-  assert.match(claude, /先 `cd skills-init` 再运行/);
+  assert.match(claude, /`node \.claude\/skills\/workflow\/scripts\/docnexus\.mjs <参数>`/);
+  assert.doesNotMatch(claude, /cd skills-init/);
+  assert.match(p.read('AGENTS.md'), /`node \.agents\/skills\/workflow\/scripts\/docnexus\.mjs --node docnexus\/skills\/<…>\.mjs <参数>`/);
   assert.match(p.read('AGENTS.md'), /`skills-init\/docnexus\/CONCEPTS\.md`（每个任务开始时读）/);
   assert.ok(!p.exists('skills-init/CLAUDE.md'), '不往 skills-init/ 里写 agent 段落');
   assert.equal(p.install().stdout.match(/CLAUDE\.md 已写入/g), null, '重跑段落不变');
@@ -82,7 +84,15 @@ test('脚本：status 给出位置与运行前缀；模板从 skills-init/docnex
   fakeDocNexus(p.root, 'skills-init');
   p.install();
   const st = p.script('resolve.mjs', 'status').out.docnexus;
-  assert.deepEqual([st.ok, st.root, st.bin, st.run_in], [true, 'skills-init', './skills-init/docnexus/node_modules/.bin/docnexus', 'cd skills-init && ']);
+  assert.deepEqual([st.ok, st.root, st.bin, st.run], [true, 'skills-init', './skills-init/docnexus/node_modules/.bin/docnexus', 'node .agents/skills/workflow/scripts/docnexus.mjs']);
+  // 包装脚本：在 skills-init/ 下运行 CLI 与 node 脚本，输出、退出码透传
+  let w = p.script('docnexus.mjs', 'recall', '订单');
+  assert.equal(w.code, 0, w.err);
+  assert.equal(w.out.query, '订单');
+  p.put('skills-init/docnexus/skills/docnexus-library/scripts/q.mjs', "console.log(JSON.stringify({ cwd: process.cwd(), args: process.argv.slice(2) })); process.exit(3);\n");
+  w = p.script('docnexus.mjs', '--node', 'docnexus/skills/docnexus-library/scripts/q.mjs', '--category', 'dev-notes');
+  assert.deepEqual([w.code, fs.realpathSync(w.out.cwd), w.out.args], [3, fs.realpathSync(path.join(p.root, 'skills-init')), ['--category', 'dev-notes']]);
+  assert.equal(p.script('docnexus.mjs', 'bogus').code, 1);
   const t = p.script('resolve.mjs', 'template', 'create-tech-md-doc', 'template.md').out;
   assert.deepEqual([t.source, t.path], ['docnexus', 'skills-init/docnexus/library/templates/create-tech-md-doc/template.md']);
   const k = p.script('knowledge.mjs', 'dev');

@@ -6,7 +6,11 @@
 
 DocNexus 工作区在 `skills-init/docnexus/`，以 `skills-init/` 为项目根运行：
 
-- docnexus 系列 skill（`docnexus`、`docnexus-recall` 等）里写的「在项目根运行 `./docnexus/node_modules/.bin/docnexus …`」「`node docnexus/skills/…`」，都先切到 `skills-init/` 再运行：`cd skills-init && ./docnexus/node_modules/.bin/docnexus …`（`resolve.mjs status` 的 `docnexus.run_in` 就是这个前缀）。草稿、`docnexus/library/<path>` 等路径也相对 `skills-init/`，读写文件时加上它，例如 `skills-init/docnexus/library/<path>`。
+- docnexus 系列 skill（`docnexus`、`docnexus-recall` 等）里写的命令，在项目根换成下面的写法运行，不用先 `cd`，任何终端都一样（`resolve.mjs status` 的 `docnexus.run` 就是这个前缀）：
+  - `./docnexus/node_modules/.bin/docnexus <参数>` → `node <skills>/workflow/scripts/docnexus.mjs <参数>`；
+  - `node docnexus/skills/<…>.mjs <参数>` → `node <skills>/workflow/scripts/docnexus.mjs --node docnexus/skills/<…>.mjs <参数>`。
+
+  参数里的路径（草稿、`docnexus/library/<path>`）照旧相对 `skills-init/`；自己读写这些文件时加上 `skills-init/`，例如 `skills-init/docnexus/library/<path>`。
 - 本工作流的脚本已处理位置：`knowledge.mjs` 在那里运行，输出的 `file` 是从项目根读正文的路径；`resolve.mjs template` 给出的模板路径、`expected` 都已带上位置。
 - 引用知识文档仍写 `docnexus/library/<path>`（产物里的「DocNexus：」行也一样）。
 - `skills-init/` 是独立文档仓库时（见 `references/requirements.md`），知识库由共用这个仓库的各服务一起使用：按分类参考和 recall 都会看到其他服务的沉淀，引用前确认和本次任务相关。写入（capture）完成后运行 `requirement.mjs pending`，`knowledge_files` 是知识库里没提交的文件，`knowledge_commands` 是提交命令（把提交信息换成这次沉淀了什么）。和产物一样，给用户看、用户确认后再提交，推送另外问。

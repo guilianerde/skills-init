@@ -23,7 +23,7 @@ import { seedTemplates, updateTemplates } from './seed-templates.mjs';
 import { TPL_DIR, PKG, ENV_NAMES, CANON_DIR, HOME, SKILLS, resolveSkillSelection, step, ok, warn, CliError, fail, isAdminTerminal } from './lib/core.mjs';
 import { ask, closePrompt } from './lib/prompt.mjs';
 import { findExistingDbConfig, getDb } from './lib/db.mjs';
-import { report, installSkills, linkSkills, updateGitignore, preserveRetiredTemplates, setupHome } from './lib/install.mjs';
+import { report, installSkills, linkSkills, updateGitignore, preserveRetiredTemplates, setupHome, recordEnv } from './lib/install.mjs';
 import { setupCodeGraph } from './lib/codegraph.mjs';
 import { uninstall } from './lib/uninstall.mjs';
 import { checkNodeForDocNexus, setupDocNexus, refreshDocNexusLinks, templateRecords, saveTemplateRecords, reportTemplateStatus, installedSkills, docnexusConnected, printTemplateDiffs } from './lib/docnexus.mjs';
@@ -232,6 +232,7 @@ async function main() {
 
   updateGitignore(o.root, o.withDocNexus, o.withCodeGraph);
   setupHome(o.root);
+  recordEnv(o.root);
   const docnexus = o.withDocNexus ? setupDocNexus(o.root, sel) : 'skipped';
   // 升级 / 重装都刷新本项目里的 DocNexus skills 链接与 CLAUDE.md / AGENTS.md 段落
   if (!o.withDocNexus) refreshDocNexusLinks(o.root, sel);

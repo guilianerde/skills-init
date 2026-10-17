@@ -88,3 +88,7 @@ description: "Generate a Markdown release/deployment plan (上线方案) from th
 - 只给了一个分支，或只给了 `--prd` / `--tech`
 - 单层 diff > 500 个文件且无法再过滤 → 请用户缩小范围
 - 正在编造灰度 / 回滚策略而没有标「待人工确认」
+
+## 终端命令
+
+本 skill 给出的 `node …`、`git …` 命令在 bash、zsh、PowerShell 里写法一样，原样运行即可。需要自己写其他终端命令时，先看本机的系统和终端：`node <skills>/workflow/scripts/resolve.mjs env`（安装时记录，一次对话查一次就够；`resolve.mjs profile` / `status` 的输出里也带着 `env`）。按输出的 `os`、`shell`、`note` 写命令，不要再用 `uname`、`$PSVersionTable`、`ver` 之类去探测。

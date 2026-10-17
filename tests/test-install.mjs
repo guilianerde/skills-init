@@ -319,6 +319,30 @@ test('两份独立拷贝的同一配置都填过且不同：保留那个目录�
   assertLinked(p, '.qwen/skills', SKILLS.filter((s) => s !== 'md-to-wiki'));
 });
 
+test('本机系统与终端：安装时写进 workflow/profile.local.json（不提交），resolve.mjs env / profile / status 读它；保留已有的个人设置', () => {
+  const p = project('env');
+  const os = { win32: 'windows', darwin: 'macos', linux: 'linux' }[process.platform] ?? process.platform;
+  p.write('.agents/skills/workflow/profile.local.json', '{ "artifacts": { "commit_prompt": false } }\n');
+  const r = p.install(['--envs', 'claude,qwen', '--yes', '--skip-db'], { env: { SHELL: '/bin/zsh' } });
+  ok(r);
+  const local = p.json('.agents/skills/workflow/profile.local.json');
+  assert.equal(local.env.os, os);
+  assert.deepEqual(local.artifacts, { commit_prompt: false }, '已有的个人设置保留');
+  if (IS_WIN) assert.ok(['pwsh', 'powershell'].includes(local.env.shell));
+  else assert.equal(local.env.shell, 'zsh');
+  assert.match(r.log, new RegExp(`本机环境：${os} / ${local.env.shell}`));
+  const resolve = (cmd) => JSON.parse(spawnSync(process.execPath, [p.at('.agents/skills/workflow/scripts/resolve.mjs'), cmd], { cwd: p.P, encoding: 'utf8' }).stdout);
+  assert.deepEqual(resolve('env'), { os, shell: local.env.shell, source: 'install', ...(IS_WIN ? { note: resolve('env').note } : {}) });
+  assert.equal(resolve('profile').env.source, 'install');
+  assert.equal(resolve('status').env.os, os);
+  spawnSync('git', ['init', '-q'], { cwd: p.P });
+  assert.equal(spawnSync('git', ['check-ignore', '-q', '.agents/skills/workflow/profile.local.json'], { cwd: p.P }).status, 0, '不提交');
+  // --copy：每份独立拷贝各写一份
+  const q = project('env-copy');
+  ok(q.install(['--envs', 'claude,qwen', '--copy', '--yes', '--skip-db']));
+  for (const d of ['.claude', '.qwen']) assert.equal(q.json(`${d}/skills/workflow/profile.local.json`).env.os, os, d);
+});
+
 test('.gitignore 只追加缺失的规则，重跑不重复', () => {
   const p = project('gitignore');
   p.write('.gitignore', 'node_modules/\n**/wiki-config.json\n.env');

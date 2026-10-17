@@ -47,6 +47,7 @@ export function linkDocNexusSkills(root, dirs) {
 const CTX_START = '<!-- skills-init:docnexus:start -->';
 const CTX_END = '<!-- skills-init:docnexus:end -->';
 function contextBlock(file) {
+  const run = `${file === 'CLAUDE.md' ? '.claude/skills' : '.agents/skills'}/workflow/scripts/docnexus.mjs`;
   const index = file === 'CLAUDE.md' ? `@${HOME}/docnexus/CONCEPTS.md` : `\`${HOME}/docnexus/CONCEPTS.md\`（每个任务开始时读）`;
   return [
     CTX_START,
@@ -54,7 +55,7 @@ function contextBlock(file) {
     '',
     `本项目的 DocNexus 工作区在 \`${HOME}/docnexus/\`，概念索引：${index}`,
     '',
-    `- docnexus 系列 skill 里说的「项目根」指 \`${HOME}\`：其中的命令（\`./docnexus/node_modules/.bin/docnexus …\`、\`node docnexus/skills/…\`）先 \`cd ${HOME}\` 再运行，\`docnexus/library/<path>\` 等路径也相对 \`${HOME}\`。`,
+    `- docnexus 系列 skill 里说的「项目根」指 \`${HOME}\`。其中的命令在本项目根这样运行，不用先 cd，任何终端写法都一样：\`./docnexus/node_modules/.bin/docnexus <参数>\` → \`node ${run} <参数>\`；\`node docnexus/skills/<…>.mjs <参数>\` → \`node ${run} --node docnexus/skills/<…>.mjs <参数>\`。参数里的 \`docnexus/library/<path>\`、草稿等路径照旧相对 \`${HOME}\`。`,
     '- 规划或改代码前，看任务是否涉及概念索引里的概念，或已记录的决定、组件、约定；涉及就用 `docnexus-recall` skill 查，并以查到的内容为依据。',
     '- 任务产生值得保留的决定或知识时，提出用 `docnexus` skill 沉淀；没有用户同意不写入。',
     CTX_END,

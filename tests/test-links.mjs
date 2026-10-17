@@ -64,6 +64,6 @@ test('DocNexus CLI 位置：skills-init/docnexus/node_modules/.bin；项目根�
   assert.equal(path.relative(root, docnexusBin(root)), path.join('skills-init', 'docnexus', 'node_modules', '.bin', name));
   assert.equal(skillBin(root), path.join('skills-init', 'docnexus', 'node_modules', '.bin', name));
   assert.equal(docnexusConnected(root), true);
-  assert.match(docnexusUpgradeCmd(), /^cd skills-init && npm install --prefix \.\/docnexus --save-exact /);
+  assert.match(docnexusUpgradeCmd(), /^npm install --prefix \.\/skills-init\/docnexus --save-exact /);
   fs.rmSync(root, { recursive: true, force: true });
 });

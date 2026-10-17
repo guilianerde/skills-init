@@ -9,6 +9,7 @@
 //   node .agents/skills/workflow/scripts/resolve.mjs infer-profile               # 从仓库推断画像草稿（带依据，不写文件）
 //   node .agents/skills/workflow/scripts/resolve.mjs category <skill>             # 该 skill 写入 DocNexus 时的显式分类
 //   node .agents/skills/workflow/scripts/resolve.mjs status                      # 能力探测（/workflow status）
+//   node .agents/skills/workflow/scripts/resolve.mjs env                         # 本机系统与终端（安装时记录），写终端命令按它来
 // 输出 JSON。退出码：0 正常；2 已接入 DocNexus 但知识库缺该模板（按输出的 hint 处理）；1 参数错误 / 该 skill 没有声明分类
 
 import fs from 'node:fs';
@@ -125,6 +126,29 @@ export function resolveCategory(root, skill) {
   };
 }
 
+// 本机系统与终端：安装时检测一次，写进 workflow/profile.local.json 的 env（个人设置，不提交，各人各机器不同）。
+// agent 写命令时按它来，不必每次自己探测（uname、$PSVersionTable）。没记录时（还没重跑安装器）当场检测系统，终端为 null
+const OS_NAMES = { win32: 'windows', darwin: 'macos', linux: 'linux' };
+export function detectEnv() {
+  const os = OS_NAMES[process.platform] ?? process.platform;
+  let shell;
+  if (process.platform === 'win32') {
+    shell = spawnSync('pwsh', ['-NoProfile', '-NonInteractive', '-Command', 'exit 0'], { stdio: 'ignore', timeout: 15000 }).status === 0 ? 'pwsh' : 'powershell';
+  } else shell = path.basename(process.env.SHELL || 'sh');
+  return { os, shell };
+}
+// 终端的写法提示：PowerShell 5.1 没有 && / ||，pwsh 7 有
+export const SHELL_NOTES = {
+  powershell: 'Windows PowerShell 5.1：没有 && 和 ||，多条命令用 ; 分开；不要用 2>/dev/null、grep、head 等 Unix 命令',
+  pwsh: 'PowerShell 7：支持 &&；不要用 2>/dev/null、grep、head 等 Unix 命令',
+};
+export function readEnv() {
+  const rec = readJson(path.join(SKILLS_DIR, 'workflow', 'profile.local.json'))?.env;
+  const env = rec?.os ? { os: rec.os, shell: rec.shell ?? null, source: 'install' } : { os: OS_NAMES[process.platform] ?? process.platform, shell: null, source: 'runtime' };
+  const note = SHELL_NOTES[env.shell];
+  return { ...env, ...(note ? { note } : {}) };
+}
+
 export function readProfile(root) {
   const f = path.join(SKILLS_DIR, 'workflow', 'profile.json');
   const profile = readJson(f);
@@ -132,7 +156,7 @@ export function readProfile(root) {
   const isEmpty = (v) => v == null || v === '' || (Array.isArray(v) && !v.length);
   const empty = profile ? PROFILE_FIELDS.filter((k) => isEmpty(get(k))) : PROFILE_FIELDS;
   return {
-    path: rel(root, f), exists: !!profile, profile: profile ?? {}, empty,
+    path: rel(root, f), exists: !!profile, profile: profile ?? {}, empty, env: readEnv(),
     complete: !!profile && PROFILE_REQUIRED.every((k) => !empty.includes(k)),
   };
 }
@@ -146,6 +170,8 @@ export function status(root) {
   return {
     // 已安装的 skill（--skills 子集安装时只有一部分），路由前据此判断目标 skill 是否可用
     skills: skillMetas().map((m) => m.name),
+    // 本机系统与终端（安装时记录），写命令按它来
+    env: readEnv(),
     profile: { ok: p.complete, empty: p.empty, how: p.complete ? null : '运行 /workflow profile' },
     wiki: {
       ok: wikiCfg?.enabled === true && !!wikiCfg?.wiki?.base_url,
@@ -155,9 +181,10 @@ export function status(root) {
       ok: dn,
       // 调用 DocNexus CLI 时用这个路径（在项目根执行）
       bin: dn ? cmdPath(docnexusBin(root)) : null,
-      // DocNexus 的项目根（相对本项目）：docnexus 系列 skill 里的命令（./docnexus/...、docnexus/library/<path>）都在这个目录下运行和解析
+      // DocNexus 的项目根（相对本项目）：docnexus 系列 skill 里的路径（docnexus/library/<path>、草稿）都相对这个目录
       root: HOME,
-      run_in: `cd ${HOME} && `,
+      // 运行 DocNexus 命令的写法（在项目根执行，任何终端都一样）：后面接原命令的参数；node 脚本前加 --node
+      run: `node ${(rel(root, path.join(SKILLS_DIR, 'workflow', 'scripts', 'docnexus.mjs')))}`,
       missing_templates: dn ? templates.filter((t) => !t.ok && !t.on_demand).map((t) => t.expected) : [],
       stale_project_templates: dn ? templates.map((t) => t.stale_project_file).filter(Boolean) : [],
       // 各 skill 写入时使用的显式分类（没声明的 skill 不列出）
@@ -206,8 +233,9 @@ function main(argv) {
       return r.ok ? 0 : 1;
     }
     case 'status': print(status(root)); return 0;
+    case 'env': print(readEnv()); return 0;
   }
-  console.error('用法: resolve.mjs [--root <项目根>] template <skill> <文件名> | templates | profile | infer-profile | category <skill> | status');
+  console.error('用法: resolve.mjs [--root <项目根>] template <skill> <文件名> | templates | profile | infer-profile | category <skill> | status | env');
   return 1;
 }
 

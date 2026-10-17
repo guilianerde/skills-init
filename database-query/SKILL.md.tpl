@@ -93,3 +93,7 @@ node <skills>/database-query/scripts/query.mjs --schema --tables a,b --indexes  
 
 - 查询结果默认只在对话内输出，不落盘。
 - 用户明确要求导出时写入 `skills-init/tmp/database-query/result-<YYYYMMDD-HHmmss>.csv`（已被 gitignore），并告知路径。
+
+## 终端命令
+
+本 skill 给出的 `node …`、`git …` 命令在 bash、zsh、PowerShell 里写法一样，原样运行即可。需要自己写其他终端命令时，先看本机的系统和终端：`node <skills>/workflow/scripts/resolve.mjs env`（安装时记录，一次对话查一次就够；`resolve.mjs profile` / `status` 的输出里也带着 `env`；没装 workflow skill 时没有这条命令，按你所在的环境写）。按输出的 `os`、`shell`、`note` 写命令，不要再用 `uname`、`$PSVersionTable`、`ver` 之类去探测。

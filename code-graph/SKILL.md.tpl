@@ -54,3 +54,7 @@ description: "Answer structural questions about this project's source code from 
 - 只读：不运行 `codegraph init` / `index` / `uninit` / `install` / `uninstall` / `telemetry`；`cg.mjs` 只在索引落后于工作区时调用 `codegraph sync` 做增量同步。
 - 结论必须能落到 `文件:行号`；图谱给不出的不要编。
 - 不输出源码以外的敏感信息（配置值、密钥）；`config_keys` 只列 key。
+
+## 终端命令
+
+本 skill 给出的 `node …`、`git …` 命令在 bash、zsh、PowerShell 里写法一样，原样运行即可。需要自己写其他终端命令时，先看本机的系统和终端：`node <skills>/workflow/scripts/resolve.mjs env`（安装时记录，一次对话查一次就够；`resolve.mjs profile` / `status` 的输出里也带着 `env`）。按输出的 `os`、`shell`、`note` 写命令，不要再用 `uname`、`$PSVersionTable`、`ver` 之类去探测。

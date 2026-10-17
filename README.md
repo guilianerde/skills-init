@@ -175,6 +175,8 @@ npx @rowansenne/skills-init doctor
 | `job_annotation` | 技术方案「定时任务变更」识别任务类 |
 | `data_review` | 是否输出技术方案模块 7 与上线方案 2.3 的库表评审块 |
 
+**本机系统与终端**：安装 / 升级时检测一次，写进 `workflow/profile.local.json` 的 `env`（个人设置，已在 `.gitignore` 里，团队里各人各机器不同），例如 `{ "os": "windows", "shell": "powershell" }`。Windows 上区分 `pwsh`（PowerShell 7）和 `powershell`（Windows PowerShell 5.1，没有 `&&`），其他系统取 `$SHELL`。skill 写终端命令时读 `resolve.mjs env`（`profile` / `status` 的输出里也有），不再每次对话自己探测；skill 里给出的命令本身都是 `node …` / `git …`，在哪个终端都一样。换了终端或机器，重跑一次安装器即可。
+
 ## dev：开发与修 bug
 
 ```
@@ -237,8 +239,8 @@ npx @rowansenne/skills-init doctor
 ### DocNexus 的位置
 
 * DocNexus 装在 `skills-init/docnexus/`，以 `skills-init/` 为项目根运行（`docnexus init --agent none`：它自己不往 `skills-init/` 里链接 skills、写 `CLAUDE.md`）。
-* 本项目里由 skills-init 接上：把 `skills-init/docnexus/skills/*` 相对链接到 `.claude/skills` / `.agents/skills` / `.qwen/skills`，在 `CLAUDE.md` / `AGENTS.md` 写一段说明（概念索引 `@skills-init/docnexus/CONCEPTS.md`；docnexus 系列 skill 的命令先 `cd skills-init` 再运行），用自己的标记，不碰手写内容。升级时刷新，卸载时撤掉，`skills-init/docnexus/` 本身不动。
-* 各 skill 的脚本已按位置处理：`resolve.mjs status` 给出 `docnexus.root` 与 `run_in`，`knowledge.mjs` 在那里运行并给出从项目根读正文的路径。
+* 本项目里由 skills-init 接上：把 `skills-init/docnexus/skills/*` 相对链接到 `.claude/skills` / `.agents/skills` / `.qwen/skills`，在 `CLAUDE.md` / `AGENTS.md` 写一段说明（概念索引 `@skills-init/docnexus/CONCEPTS.md`；docnexus 系列 skill 的命令改用 `node <skills>/workflow/scripts/docnexus.mjs` 运行，不用先 `cd`），用自己的标记，不碰手写内容。升级时刷新，卸载时撤掉，`skills-init/docnexus/` 本身不动。
+* 各 skill 的脚本已按位置处理：`resolve.mjs status` 给出 `docnexus.root` 与 `run`（`node <skills>/workflow/scripts/docnexus.mjs`），`knowledge.mjs` 在那里运行并给出从项目根读正文的路径。
 * `skills-init/` 是独立文档仓库时，知识库随文档仓库提交，各服务共用；沉淀后的改动和产物一样由你确认后提交（`requirement.mjs pending` 单独列出）。DocNexus 的依赖和检索库（`node_modules/`、`store/`）不进仓库，各自 `--with-docnexus` 装一次。
 
 ## CodeGraph 代码图谱与 code-graph skill（可选）
@@ -383,12 +385,14 @@ dev、project-review、技术方案、上线方案都在对应环节调用它：
 | --- | --- |
 | `workflow/scripts/resolve.mjs template <skill> <文件名>` | 判定用哪份模板：已接入 DocNexus 只用知识库，缺失时退出码 2 并给出导入来源；未接入时项目文件优先，其次默认模板 |
 | `workflow/scripts/resolve.mjs profile` | 读项目画像，列出空字段 |
+| `workflow/scripts/resolve.mjs env` | 本机系统与终端（安装时记录在 `profile.local.json`），写终端命令按它来 |
+| `workflow/scripts/docnexus.mjs <参数>` / `--node <脚本> <参数>` | 在 `skills-init/` 下运行 DocNexus CLI 或它的 node 脚本，不用先 `cd`，各终端写法一样；Windows 上直接用 node 跑 CLI 入口，不经过 `.cmd` |
 | `workflow/scripts/knowledge.mjs <skill> [--match 词] [--limit n] [--query 问题]` | 按 `readFrom` 的分类列出 DocNexus 文档（标题、摘要、路径，不含正文）；`--query` 再在每个分类内 `recall --category`（DocNexus 0.16.0 起），旧版自动退回只列文档并提示。未接入时退出码 2 |
 | `workflow/scripts/resolve.mjs category <skill>` | 该 skill 写入 DocNexus 时的显式分类（画像 `docnexus_categories` 优先，其次 skill.json），输出 `seal_args` 与 `metadata`；未声明时退出码 1 |
 | `workflow/scripts/resolve.mjs status` | `/workflow status` 的能力探测（不输出任何凭据） |
 | `workflow/scripts/resolve.mjs infer-profile` | 按固定规则从构建文件、Makefile、依赖与配置文件、git 推断项目画像草稿，每个字段附依据；不写文件 |
 | `workflow/scripts/lint-doc.mjs <文档> --skill <skill> [--facts]` | 对照当前生效的模板检查生成的文档：必填章节、残留 `{{...}}` 占位符、元信息行为错误；缺普通章节、顺序不一致为警告；列出待填写位置。`--facts` 再核对正文里的类名、文件、接口、表名：在对比分支的 diff 和代码里都找不到的记为警告（防编造） |
-| `workflow/scripts/requirement.mjs which / bind / path / sync / pending / list / config` | 产物按需求归档（`skills-init/docs/requirements/<需求>/`，独立文档仓库模式再分 `<项目>/`）：查当前分支绑定的需求（没绑定时给出按分支名生成的建议名）、绑定需求名、给出本次落盘路径（不覆盖，带上一版的 wiki 记录）、重建 `meta.json`、列出所有需求、把旧布局的产物迁进需求目录；`config` 设置产物位置（文档仓库、项目名、提交提示），`pending` 看文档仓库里还没提交的产物 |
+| `workflow/scripts/requirement.mjs which / bind / path / sync / pending / list / config` | 产物按需求归档（`skills-init/docs/requirements/<需求>/`，独立文档仓库模式再分 `<项目>/`）：查当前分支绑定的需求（没绑定时给出按分支名生成的建议名）、绑定需求名、给出本次落盘路径（不覆盖，带上一版的 wiki 记录）、重建 `meta.json`、列出所有需求；`config` 设置产物位置（文档仓库、项目名、提交提示），`pending` 看文档仓库里还没提交的产物 |
 | `workflow/scripts/view.mjs [--out f] [--open]` | 项目文档视图（`/workflow view`、`skills-init view`）：读需求目录里的产物，生成单个 HTML，按需求列出各阶段、审查记录（各级别数量、复核、与上次对比）、交付记录、沉淀到的知识文档，正文直接渲染；顶部「知识文档」列出每篇知识文档来自哪个需求、哪份产物；数据内嵌，只读、不联网，默认写到 `skills-init/tmp/view/index.html` |
 | `workflow/scripts/artifacts.mjs [--branch b \| --all]` | 按分支汇总 `skills-init/docs/requirements/` 下的开发方案、交付说明、审查报告、技术方案、上线方案及其 wiki 发布记录，给出下一步建议；分支取自文档元信息行，不另存记录。上线方案没传 `--tech` 时据此自动引用同分支的技术方案；project-review 据此对照本分支方案、识别复审 |
 | `workflow/scripts/report.mjs [--since d] [--all-branches] [--json]` | 本地效果报告（`/workflow report`、`skills-init report`）：审查发现与修复率、复核率、需求澄清、沉淀率、知识引用、各分支链路 |

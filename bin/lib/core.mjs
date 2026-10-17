@@ -35,8 +35,8 @@ export function docnexusBin(root) {
   for (const dir of DOCNEXUS_BIN_DIRS) { const p = path.join(dn, ...dir, name); if (fs.existsSync(p)) return p; }
   return null;
 }
-// 升级 DocNexus 的命令（在项目根执行）
-export const docnexusUpgradeCmd = () => `cd ${HOME} && npm install --prefix ./docnexus --save-exact ${DOCNEXUS_PKG}@latest`;
+// 升级 DocNexus 的命令（在项目根执行；不用 cd / &&，PowerShell 5.1 也能直接运行）
+export const docnexusUpgradeCmd = () => `npm install --prefix ./${HOME}/docnexus --save-exact ${DOCNEXUS_PKG}@latest`;
 export const MANIFEST = '.skills-init.json'; // 安装清单，位于每个安装目录（单一来源时只有 .agents/skills 一份）
 
 // ---------------------------------------------------------------- 输出
