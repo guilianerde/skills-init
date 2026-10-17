@@ -4,6 +4,8 @@
 
 ## [Unreleased]
 
+## [0.15.0] - 2026-10-17
+
 ### 新增
 - **DocNexus 可以和产物共用团队文档仓库**：`--docnexus-root <dir>`（PowerShell `-DocnexusRoot`）写入 `workflow/profile.json` 的 `docnexus.root`，DocNexus 装在 `<dir>/docnexus/` 并以 `<dir>` 为项目根运行（`init --agent none`），知识随文档仓库提交；DocNexus 本身不用改，也不需要它的 `--git-remote`。
   - 本项目里由 skills-init 接上：DocNexus 的 skills 相对链接到 `.claude/skills` / `.agents/skills` / `.qwen/skills`；`CLAUDE.md` / `AGENTS.md` 写入带自己标记的段落（概念索引位置、docnexus 系列 skill 的命令先 `cd <dir>` 再运行）。升级时刷新（DocNexus 新增的 skill 也接上），卸载时撤掉，文档仓库里的 DocNexus 不动。
@@ -203,7 +205,8 @@
 - 安装器改为单一 Node 实现，`init-skills.sh` / `init-skills.ps1` 只是薄封装。
 - `code-review` 改名为 `project-review`，升级时自动清理旧名。
 
-[Unreleased]: https://github.com/guilianerde/skills-init/compare/v0.14.0...HEAD
+[Unreleased]: https://github.com/guilianerde/skills-init/compare/v0.15.0...HEAD
+[0.15.0]: https://github.com/guilianerde/skills-init/compare/v0.14.0...v0.15.0
 [0.14.0]: https://github.com/guilianerde/skills-init/compare/v0.13.0...v0.14.0
 [0.13.0]: https://github.com/guilianerde/skills-init/compare/v0.12.0...v0.13.0
 [0.12.0]: https://github.com/guilianerde/skills-init/compare/v0.11.0...v0.12.0
