@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// 本地效果报告：只读扫描 skills-init/docs/requirements/（以及旧版 docs/skills/<skill>/）下的产物，回答「用了这套工作流以后有没有更好」。
+// 本地效果报告：只读扫描 skills-init/docs/requirements/下的产物，回答「用了这套工作流以后有没有更好」。
 // 数据全部来自已经落盘的产物，不上报、不另存记录：
 //   - 审查：每份报告的 CRITICAL / HIGH / MEDIUM / LOW 条数、复核通过率；复审报告里上次问题的「已修复 / 仍存在 / 不再适用」→ 修复率
 //   - 交付：功能 / 缺陷、S / M / L、需求澄清中确认的决定条数、带「未验证项」的交付
