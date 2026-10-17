@@ -10,6 +10,9 @@
   - 脚本按位置处理：`resolve.mjs status` 的 `docnexus` 增加 `root`、`run_in`，`bin` 给出实际路径；模板从文档仓库的知识库取；`knowledge.mjs` 在那里运行，文档多一个从本项目读正文的 `file`；`seed-templates`、`doctor`（报告位置与链接、段落是否齐全）、升级命令同步支持。
   - 文档仓库里的 `docnexus/` 不当作需求目录；`requirement.mjs pending` 单独列出知识库里未提交的改动（`knowledge_files` / `knowledge_commands`）。说明见 `workflow/references/docnexus.md`「DocNexus 在团队文档仓库里」。
 
+### 修复
+- `view` 在 Windows 上打印的页面路径是反斜杠，导致 Windows CI 从 0.13.0 起一直失败（页面本身生成正常）；改为统一用 `/`。
+
 ## [0.14.0] - 2026-10-17
 
 ### 新增
