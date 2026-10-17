@@ -140,3 +140,21 @@ test('workflow-run/ 是独立文档仓库：DocNexus 在里面，知识库改动
   assert.match(p.read('.gitignore'), /^\/workflow-run\/$/m, '代码仓库忽略整个 workflow-run/');
   fs.rmSync(p.ws, { recursive: true, force: true });
 });
+
+test('WorkBuddy：DocNexus skills 链接到 .codebuddy/skills，段落写 AGENTS.md；--copy 只装 workbuddy 时命令指向 .codebuddy/skills', { skip }, () => {
+  const p = project();
+  fakeDocNexus(p.root, 'workflow-run');
+  p.install('workbuddy');
+  assert.ok(fs.lstatSync(path.join(p.root, '.codebuddy/skills/docnexus-recall')).isSymbolicLink());
+  assert.match(p.read('AGENTS.md'), /`node \.agents\/skills\/workflow\/scripts\/docnexus\.mjs <参数>`/);
+  assert.doesNotMatch(p.read('CLAUDE.md'), /workflow-run:docnexus/, '没选 claude 不写 CLAUDE.md');
+  fs.rmSync(p.ws, { recursive: true, force: true });
+
+  const q = project();
+  fakeDocNexus(q.root, 'workflow-run');
+  const r = q.cli('--envs', 'workbuddy', '--copy', '--skip-db', '--yes');
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  assert.ok(!q.exists('.agents/skills/workflow'));
+  assert.match(q.read('AGENTS.md'), /`node \.codebuddy\/skills\/workflow\/scripts\/docnexus\.mjs <参数>`/);
+  fs.rmSync(q.ws, { recursive: true, force: true });
+});

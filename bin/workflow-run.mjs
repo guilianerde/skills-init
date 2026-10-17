@@ -5,7 +5,7 @@
 //   npx @rowansenne/workflow-run [命令] [选项]          # 在项目根执行（唯一的安装方式）
 //
 // 单一来源：skills 只完整安装到 .agents/skills（codex / doubao 直接使用）；
-//           .claude/skills、.qwen/skills 下按 skill 建相对软链接指向它；--copy 退回各环境独立拷贝。
+//           .claude/skills、.qwen/skills、.codebuddy/skills（WorkBuddy）下按 skill 建相对软链接指向它；--copy 退回各环境独立拷贝。
 // 重跑安全：SKILL.md / references / 模板会更新；用户已填写的 wiki-config.json、schema.md、
 //           workflow/profile.json 保留不覆盖；database-query/config.json 仅在本次提供了数据库配置时写入。
 // 安装清单：每个安装目录写 .workflow-run.json，记录模板文件的 sha256。重跑时据此判断模板文件是否被手改过
@@ -18,7 +18,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { seedTemplates, updateTemplates } from './seed-templates.mjs';
-import { TPL_DIR, PKG, ENV_NAMES, CANON_DIR, HOME, SKILLS, resolveSkillSelection, step, ok, warn, CliError, fail, isAdminTerminal } from './lib/core.mjs';
+import { TPL_DIR, PKG, ENV_NAMES, CANON_DIR, LINK_ENVS, HOME, SKILLS, resolveSkillSelection, step, ok, warn, CliError, fail, isAdminTerminal } from './lib/core.mjs';
 import { ask, closePrompt } from './lib/prompt.mjs';
 import { findExistingDbConfig, getDb } from './lib/db.mjs';
 import { report, installSkills, linkSkills, updateGitignore, setupHome, recordEnv } from './lib/install.mjs';
@@ -46,7 +46,7 @@ const HELP = `用法: workflow-run [命令] [选项]
                        不带地址时显示当前状态
 
 init 选项：
-  --envs <列表>        环境，逗号分隔：codex,claude,doubao,qwen；all = 全部（不传则交互选择）
+  --envs <列表>        环境，逗号分隔：codex,claude,doubao,qwen,workbuddy；all = 全部（不传则交互选择）
   --skip-db            跳过数据库连接配置
   --yes                非交互：使用已有数据库配置；都没有且未 --skip-db 时报错退出
   --with-docnexus      同时接入 DocNexus 文档库（装在 workflow-run/docnexus/，需 Node >= 22.13 与 npm），并导入文档模板
@@ -126,9 +126,10 @@ async function resolveEnvs(o) {
   console.log('  2) claude    -> .claude/skills （Claude Code 项目级）');
   console.log('  3) doubao    -> .agents/skills （豆包办公项目级）');
   console.log('  4) qwen      -> .qwen/skills   （Qwen Code 项目级）');
+  console.log('  5) workbuddy -> .codebuddy/skills（腾讯 WorkBuddy 项目级）');
   const choice = await ask('输入编号（逗号分隔，如 1,3；直接回车 = 全部）: ');
   if (!choice) return [...ENV_NAMES];
-  const sel = choice.split(/[,，\s]+/).filter((p) => /^[1-4]$/.test(p)).map((p) => ENV_NAMES[Number(p) - 1]);
+  const sel = choice.split(/[,，\s]+/).filter((p) => /^[1-5]$/.test(p)).map((p) => ENV_NAMES[Number(p) - 1]);
   if (!sel.length) { warn('未识别到有效编号，按全部安装'); return [...ENV_NAMES]; }
   return [...new Set(sel)].sort();
 }
@@ -207,12 +208,10 @@ async function main() {
   const links = [];
   if (o.copy) {
     if (sel.includes('codex') || sel.includes('doubao')) targets.push(['codex/doubao', CANON_DIR]);
-    if (sel.includes('claude')) targets.push(['claude', path.join('.claude', 'skills')]);
-    if (sel.includes('qwen')) targets.push(['qwen', path.join('.qwen', 'skills')]);
+    for (const [env, dir] of Object.entries(LINK_ENVS)) if (sel.includes(env)) targets.push([env, dir]);
   } else {
     targets.push(['单一来源', CANON_DIR]);
-    if (sel.includes('claude')) links.push(['claude', path.join('.claude', 'skills')]);
-    if (sel.includes('qwen')) links.push(['qwen', path.join('.qwen', 'skills')]);
+    for (const [env, dir] of Object.entries(LINK_ENVS)) if (sel.includes(env)) links.push([env, dir]);
   }
   if (sel.includes('codex') && !o.yes) {
     const a = (await ask('是否同时安装到 Codex 用户级 ~/.codex/skills（所有项目可用）？[y/N]: ')).toLowerCase();
@@ -260,6 +259,7 @@ async function main() {
   console.log('  claude    : Claude Code 自动发现 .claude/skills，无需额外配置');
   console.log('  doubao    : 豆包办公自动发现 .agents/skills（新会话生效）');
   console.log('  qwen      : Qwen Code 自动发现 .qwen/skills；/skills 面板可查看与切换');
+  console.log('  workbuddy : WorkBuddy 打开本项目目录后读取 .codebuddy/skills（项目级优先于用户级）；DocNexus 段落写在 AGENTS.md');
   if (db) ok('database-query 连接已生成并写入；凭据已加入 .gitignore，请勿提交。');
   else if (fs.existsSync(path.join(o.root, CANON_DIR, 'database-query', 'config.json'))) ok('database-query/config.json 已存在，保留不动。');
   else warn('注意：本次未写入数据库连接。可重跑补配，或手动放置 database-query/config.json（已有的保留不动）。');

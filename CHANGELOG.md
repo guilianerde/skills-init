@@ -4,6 +4,9 @@
 
 ## [Unreleased]
 
+### 新增
+- **支持腾讯 WorkBuddy**（`--envs workbuddy`，交互菜单第 5 项）：skills 按 skill 软链接到 `.codebuddy/skills/`（WorkBuddy 读项目的 `.codebuddy/`，与 CodeBuddy Code 一致；`--copy` 时独立拷贝），DocNexus 的 skills 也链接过去，段落写在 `AGENTS.md`。`doctor`、`uninstall`、数据库配置查找、画像查找都认这个目录。
+
 ## [0.18.0] - 2026-10-18
 
 ### 变更（破坏性，不兼容旧版本）

@@ -11,8 +11,10 @@ export const TPL_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url))
 export const PKG = JSON.parse(fs.readFileSync(path.join(TPL_DIR, 'package.json'), 'utf8'));
 export const IS_WIN = process.platform === 'win32';
 
-export const ENV_NAMES = ['codex', 'claude', 'doubao', 'qwen'];
+export const ENV_NAMES = ['codex', 'claude', 'doubao', 'qwen', 'workbuddy'];
 export const CANON_DIR = path.join('.agents', 'skills'); // 单一来源目录
+// 建软链接（或 --copy 各装一份）的环境 → 项目级 skills 目录。WorkBuddy 读项目的 .codebuddy/（与 CodeBuddy Code 一致）
+export const LINK_ENVS = { claude: path.join('.claude', 'skills'), qwen: path.join('.qwen', 'skills'), workbuddy: path.join('.codebuddy', 'skills') };
 // skill 列表、用户配置、文档模板都来自各 skill 目录的 skill.json（见 bin/skills.mjs）
 export const SKILL_LIST = loadSkills(TPL_DIR);
 export const META = deriveMeta(SKILL_LIST);
@@ -113,7 +115,7 @@ export function timestamp() {
   return `${d.getFullYear()}${z(d.getMonth() + 1)}${z(d.getDate())}-${z(d.getHours())}${z(d.getMinutes())}${z(d.getSeconds())}`;
 }
 
-export const INSTALL_BASES = [CANON_DIR, path.join('.claude', 'skills'), path.join('.qwen', 'skills')];
+export const INSTALL_BASES = [CANON_DIR, ...Object.values(LINK_ENVS)];
 // 找到本项目的安装清单（单一来源优先；--copy 安装时各目录各有一份）
 export function findManifests(root) {
   return INSTALL_BASES.map((rel) => ({ rel, base: path.join(root, rel), m: readManifest(path.join(root, rel)) })).filter((x) => x.m);

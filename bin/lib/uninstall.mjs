@@ -2,7 +2,7 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { IS_WIN, CANON_DIR, MANIFEST, step, ok, warn, toPosix, fileHash, readManifest, removeEmptyDirs, lstat, timestamp, removeLink, docnexusRoot } from './core.mjs';
+import { IS_WIN, CANON_DIR, INSTALL_BASES, MANIFEST, step, ok, warn, toPosix, fileHash, readManifest, removeEmptyDirs, lstat, timestamp, removeLink, docnexusRoot } from './core.mjs';
 import { removeDocNexusContext } from './docnexus.mjs';
 
 // 软链接是否指向 absTarget（按解析后的绝对路径比较，兼容 Windows 上 readlink 返回的 \\?\ 前缀）
@@ -17,14 +17,14 @@ export function linkPointsTo(link, absTarget) {
 export function rmdirIfEmpty(dir) { try { fs.rmdirSync(dir); return true; } catch { return false; } }
 
 export function uninstall(root) {
-  const bases = [CANON_DIR, path.join('.claude', 'skills'), path.join('.qwen', 'skills')];
+  const bases = INSTALL_BASES;
   const found = bases.map((rel) => [rel, readManifest(path.join(root, rel))]).filter(([, m]) => m);
   if (!found.length) { warn(`未找到安装清单（${bases.map((b) => toPosix(path.join(b, MANIFEST))).join(' / ')}），没有可卸载的内容`); return 0; }
   const backupRoot = path.join(root, 'workflow-run', 'tmp', 'uninstall-backup', timestamp());
   const backedUp = [];
   const leftovers = [];
 
-  // 1. .claude / .qwen 下指向单一来源、且在清单里的 skill 链接；用户自己的链接和目录不动
+  // 1. .claude / .qwen / .codebuddy 下指向单一来源、且在清单里的 skill 链接；用户自己的链接和目录不动
   const canon = found.find(([rel]) => rel === CANON_DIR)?.[1];
   for (const rel of bases.slice(1)) {
     const dir = path.join(root, rel);
@@ -81,7 +81,7 @@ export function uninstall(root) {
     fs.rmSync(path.join(base, MANIFEST), { force: true });
   }
 
-  // 3. 清空后的环境目录一并移除（.claude/.qwen 里还有别的东西时保留）
+  // 3. 清空后的环境目录一并移除（.claude / .qwen / .codebuddy 里还有别的东西时保留）
   for (const rel of bases) if (rmdirIfEmpty(path.join(root, rel))) rmdirIfEmpty(path.dirname(path.join(root, rel)));
 
   step('卸载完成');

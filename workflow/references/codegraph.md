@@ -18,7 +18,7 @@
 ## 读代码：CodeGraph 原生工具
 
 - **有 MCP 工具时**（Claude Code / Codex 经 `--with-codegraph` 写了配置）：用 `codegraph_explore`，一次调用返回相关符号的源码（带行号）、调用路径和影响面摘要。问题里点名类名 / 方法名 / 文件，结果更准。
-- **没有 MCP 工具时**（doubao、qwen、子 agent，或 MCP 没加载）：在项目根用同名 CLI，输出相同：
+- **没有 MCP 工具时**（doubao、qwen、workbuddy、子 agent，或 MCP 没加载）：在项目根用同名 CLI，输出相同：
 
 | 要做的事 | 命令 |
 |---|---|

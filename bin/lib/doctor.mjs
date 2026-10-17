@@ -3,7 +3,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { PKG, CANON_DIR, HOME, DOCNEXUS_PKG, docnexusUpgradeCmd, SKILLS, step, ok, warn, fail, toPosix, fileHash, readManifest, lstat, findManifests, cmpVersion } from './core.mjs';
+import { PKG, CANON_DIR, INSTALL_BASES, LINK_ENVS, HOME, DOCNEXUS_PKG, docnexusUpgradeCmd, SKILLS, step, ok, warn, fail, toPosix, fileHash, readManifest, lstat, findManifests, cmpVersion } from './core.mjs';
 import { reportTemplateStatus, docnexusSupportsCategory, docnexusSupportsRecallCategory } from './docnexus.mjs';
 import { codegraphVersion } from './codegraph.mjs';
 
@@ -59,19 +59,20 @@ export function doctor(root, offline) {
   const canon = found.find((x) => x.rel === CANON_DIR);
   if (canon && m.mode !== 'copy') {
     step('软链接');
-    for (const env of ['claude', 'qwen']) {
+    for (const [env, rel] of Object.entries(LINK_ENVS)) {
       if (!(m.envs ?? []).includes(env)) continue;
-      const dir = path.join(root, `.${env}`, 'skills');
+      const dir = path.join(root, rel);
+      const d = toPosix(rel);
       let good = 0;
       for (const skill of Object.keys(canon.m.skills)) {
         const link = path.join(dir, skill);
         const st = lstat(link);
-        if (!st) bad(`.${env}/skills/${skill} 不存在：运行 workflow-run upgrade 重建`);
-        else if (!st.isSymbolicLink()) { if (!readManifest(dir)) meh(`.${env}/skills/${skill} 是普通目录而非软链接（可能是建链接失败后的独立拷贝）`); else good++; }
-        else if (!fs.existsSync(link)) bad(`.${env}/skills/${skill} 是断开的软链接`);
+        if (!st) bad(`${d}/${skill} 不存在：运行 workflow-run upgrade 重建`);
+        else if (!st.isSymbolicLink()) { if (!readManifest(dir)) meh(`${d}/${skill} 是普通目录而非软链接（可能是建链接失败后的独立拷贝）`); else good++; }
+        else if (!fs.existsSync(link)) bad(`${d}/${skill} 是断开的软链接`);
         else good++;
       }
-      if (good === Object.keys(canon.m.skills).length) ok(`.${env}/skills 全部指向 ${toPosix(CANON_DIR)}`);
+      if (good === Object.keys(canon.m.skills).length) ok(`${d} 全部指向 ${toPosix(CANON_DIR)}`);
     }
   }
 
@@ -89,7 +90,7 @@ export function doctor(root, offline) {
     if (st.wiki.ok) ok('wiki 已配置'); else console.log('    --  wiki 未配置（可选；也可能通过 wiki MCP 提供）');
     if (st.docnexus.ok) {
       // DocNexus 以 workflow-run/ 为项目根：本项目要有 docnexus skill 的链接和 CLAUDE.md / AGENTS.md 段落，agent 才知道去哪里找
-      const linked = [CANON_DIR, path.join('.claude', 'skills'), path.join('.qwen', 'skills')].some((b) => lstat(path.join(root, b, 'docnexus-recall'))?.isSymbolicLink());
+      const linked = INSTALL_BASES.some((b) => lstat(path.join(root, b, 'docnexus-recall'))?.isSymbolicLink());
       const ctx = ['CLAUDE.md', 'AGENTS.md'].some((f) => { try { return fs.readFileSync(path.join(root, f), 'utf8').includes('workflow-run:docnexus:start'); } catch { return false; } });
       if (linked && ctx) ok(`DocNexus 在 ${HOME}/docnexus/，本项目已链接它的 skills 并写入段落`);
       else meh(`DocNexus 在 ${HOME}/docnexus/，但本项目${linked ? '' : '缺少 docnexus skill 链接'}${!linked && !ctx ? '、' : ''}${ctx ? '' : '缺少 CLAUDE.md / AGENTS.md 里的 DocNexus 段落'}：运行 workflow-run upgrade`);

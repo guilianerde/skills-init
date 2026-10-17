@@ -1,6 +1,6 @@
 // CodeGraph（https://github.com/colbymchenry/codegraph）：预建的代码知识图谱（符号、调用边、影响面），100% 本地。
 // --with-codegraph 时：没有 CLI 就 npm 全局安装 → 给 claude / codex 写项目级 MCP 配置 → 建本项目索引（.codegraph/）。
-// doubao / qwen 不在 CodeGraph 支持的 agent 里，skill 在这些环境直接调用 codegraph CLI。
+// doubao / qwen / workbuddy 不在 CodeGraph 支持的 agent 里，skill 在这些环境直接调用 codegraph CLI。
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -19,7 +19,7 @@ export function codegraphVersion(cwd) {
 
 export const codegraphIndexed = (root) => fs.existsSync(path.join(root, '.codegraph'));
 
-// 我们的环境 → codegraph install 的 target id；doubao / qwen 没有对应 target
+// 我们的环境 → codegraph install 的 target id；doubao / qwen / workbuddy 没有对应 target
 const TARGETS = { claude: 'claude', codex: 'codex' };
 
 const run = (cmd, args, cwd) => spawnSync(cmd, args, { cwd, stdio: 'inherit', shell: IS_WIN, env: ENV }).status === 0;

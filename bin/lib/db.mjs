@@ -15,7 +15,7 @@ export function defaultConn(cfg) {
 }
 export function findExistingDbConfig(root) {
   for (const rel of ['.codex/database-query/config.json', '.agents/skills/database-query/config.json',
-    '.claude/skills/database-query/config.json', '.qwen/skills/database-query/config.json']) {
+    '.claude/skills/database-query/config.json', '.qwen/skills/database-query/config.json', '.codebuddy/skills/database-query/config.json']) {
     const f = path.join(root, rel);
     const cfg = readJson(f);
     const d = defaultConn(cfg);

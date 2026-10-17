@@ -414,3 +414,33 @@ test('旧包 skills-init 装过的项目：列出改名命令后停下，不做�
   assert.match(r.log, /旧版残留：\.gitignore/);
   assert.ok(p.read('.gitignore').includes('/workflow-run/tmp/'));
 });
+
+test('WorkBuddy：.codebuddy/skills 按 skill 软链接到单一来源；交互菜单第 5 项；doctor 检查链接；卸载后 .codebuddy 里别的文件保留', () => {
+  const p = project('workbuddy');
+  p.write('.codebuddy/CODEBUDDY.md', '# 团队约定\n');
+  ok(p.install(['--envs', 'workbuddy', '--yes', '--skip-db']));
+  for (const s of SKILLS) assert.ok(p.isFile(`.agents/skills/${s}/SKILL.md`), s);
+  assertLinked(p, '.codebuddy/skills');
+  assert.deepEqual(p.json('.agents/skills/.workflow-run.json').envs, ['workbuddy']);
+  const d = p.install(['doctor']);
+  if (SYMLINK_OK) assert.match(d.log, /\.codebuddy\/skills 全部指向 \.agents\/skills/);
+  ok(p.install(['uninstall']));
+  assert.ok(!p.exists('.codebuddy/skills'));
+  assert.equal(p.read('.codebuddy/CODEBUDDY.md'), '# 团队约定\n');
+
+  const q = project('workbuddy-menu');
+  ok(q.install(['--skip-db'], { input: '5\n' }));
+  assert.deepEqual(q.json('.agents/skills/.workflow-run.json').envs, ['workbuddy']);
+  assertLinked(q, '.codebuddy/skills');
+});
+
+test('WorkBuddy --copy：.codebuddy/skills 独立拷贝，带自己的安装清单', () => {
+  const p = project('workbuddy-copy');
+  ok(p.install(['--envs', 'workbuddy', '--copy', '--yes', '--skip-db']));
+  assert.ok(p.isDir('.codebuddy/skills/workflow') && p.isFile('.codebuddy/skills/workflow/SKILL.md'));
+  assert.equal(p.json('.codebuddy/skills/.workflow-run.json').mode, 'copy');
+  assert.ok(!p.exists('.agents/skills'));
+  ok(p.install(['upgrade']));
+  ok(p.install(['uninstall']));
+  assert.ok(!p.exists('.codebuddy'));
+});

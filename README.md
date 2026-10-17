@@ -8,7 +8,7 @@
 
 技能目录，团队共享（可提交 git）。
 
-支持环境：**Codex CLI / Claude Code / 豆包办公（Doubao）/ 千问（Qwen Code）**。
+支持环境：**Codex CLI / Claude Code / 豆包办公（Doubao）/ 千问（Qwen Code）/ 腾讯 WorkBuddy**。
 
 > 本工具在项目里的产出（需求产物、DocNexus 工作区、项目模板、临时文件）都放在项目根的
 > `workflow-run/`
@@ -64,8 +64,9 @@ npx @rowansenne/workflow-run docs-repo git@git.example.com:team/team-docs.git
 | claude-code | `.claude/skills/<skill>` → 软链接到 `.agents/skills/<skill>` | Claude Code 自动发现，无需额外配置                  |
 | doubao      | `.agents/skills/`（与 codex 共用）   | 豆包办公自动发现（新会话生效）                          |
 | qwen        | `.qwen/skills/<skill>` → 软链接到 `.agents/skills/<skill>` | Qwen Code 自动发现；`/skills` 面板可查看与切换        |
+| workbuddy   | `.codebuddy/skills/<skill>` → 软链接到 `.agents/skills/<skill>` | WorkBuddy 打开项目目录后读取（项目级优先于用户级 `~/.workbuddy/skills/`） |
 
-**单一来源 + 软链接**：skills 只在 `.agents/skills/` 装一份完整文件，`.claude/skills`、`.qwen/skills` 下按 skill 建相对软链接（`../../.agents/skills/<skill>`），改模板、填配置都只需改一处。因此即使只选了 claude 或 qwen，`.agents/skills/` 也会生成。
+**单一来源 + 软链接**：skills 只在 `.agents/skills/` 装一份完整文件，`.claude/skills`、`.qwen/skills`、`.codebuddy/skills` 下按 skill 建相对软链接（`../../.agents/skills/<skill>`），改模板、填配置都只需改一处。因此即使只选了 claude、qwen 或 workbuddy，`.agents/skills/` 也会生成。
 
 * 按 skill 建链接而不是链接整个目录，这样 `.claude/skills/` 里还能放其他 skill（例如 DocNexus 的链接）。
 * 之前用 `--copy`（或建不了链接时）装的独立拷贝，再不带 `--copy` 安装时会换成链接：拷贝里填过的用户配置（`config.json`、`schema.md`、`wiki-config.json`、`profile.json`）先并入 `.agents/skills/`，原目录移到 `workflow-run/tmp/backup/<时间>/<环境>/`；两份都填过且内容不同时不会自动合并，会保留那个目录并提示手动处理。
@@ -181,7 +182,7 @@ npx @rowansenne/workflow-run docs-repo git@git.example.com:team/team-docs.git
 
 | 参数                      | 说明                                                                    |
 | ----------------------- | --------------------------------------------------------------------- |
-| `--envs`      | 环境列表，逗号分隔：`codex,claude,doubao,qwen`；`all` = 全部                       |
+| `--envs`      | 环境列表，逗号分隔：`codex,claude,doubao,qwen,workbuddy`；`all` = 全部                       |
 | `--skip-db` | 跳过数据库连接配置（database-query 不生成 config.json）                             |
 | `--with-docnexus` | 可选：接入 [DocNexus](https://www.npmjs.com/package/@rowansenne/docnexus) 项目文档库（需 Node >= 22.13），见下方「DocNexus 文档库（可选）」 |
 | `--with-codegraph` | 可选：接入 [CodeGraph](https://github.com/colbymchenry/codegraph) 代码图谱，见下方「CodeGraph 代码图谱（可选）」 |
@@ -210,12 +211,13 @@ npx @rowansenne/workflow-run docs-repo git@git.example.com:team/team-docs.git
 | --- | --- | --- |
 | claude | `.claude/skills/` | `CLAUDE.md` |
 | codex / doubao | `.agents/skills/`（两者共用） | `AGENTS.md` |
+| workbuddy | `.codebuddy/skills/` | `AGENTS.md`（WorkBuddy 读项目的 `AGENTS.md`，与 `CODEBUDDY.md` 并存） |
 | qwen | `.qwen/skills/` | 不写 `QWEN.md`；需要自动召回时可在 `QWEN.md` 引用 `AGENTS.md` 的 DocNexus 段落，或在 `.qwen/settings.json` 的 `context.fileName` 加入 `AGENTS.md` |
 
 说明：
 
 * DocNexus 的 skills 不在本仓库中，始终以安装的 npm 包为准；重跑脚本会按包版本重新同步与链接（`docnexus init` 可重复执行，不影响已有记忆）。
-* `.qwen/skills/` 下已存在的同名**真实目录**不会被替换，脚本会提示跳过。
+* `.qwen/skills/`、`.codebuddy/skills/` 下已存在的同名**真实目录**不会被替换，脚本会提示跳过。
 * npm 安装或 `docnexus init` 失败时只跳过 DocNexus，本仓库的 skills 照常安装，脚本最后以退出码 1 结束；修好后重跑即可。
 * 安装后 `dev`、`project-review` 会先按 `docnexus-recall` 查项目约定；`dev`、`project-review` 交付时**每次都问**要不要沉淀（写入后把库内路径记回交付说明 / 审查报告的「DocNexus」元信息行），`create-tech-md-doc`、`create-release-md-doc` 结束时有值得记的内容才**提议**沉淀；**任何写入 DocNexus 的操作都必须经你授权**。
 * 离线或测试时可用环境变量指定安装来源，例如 `DOCNEXUS_PKG=/path/to/rowansenne-docnexus-0.13.0.tgz npx @rowansenne/workflow-run --with-docnexus`（PowerShell：`$env:DOCNEXUS_PKG=...`）。
@@ -224,7 +226,7 @@ npx @rowansenne/workflow-run docs-repo git@git.example.com:team/team-docs.git
 ### DocNexus 的位置
 
 * DocNexus 装在 `workflow-run/docnexus/`，以 `workflow-run/` 为项目根运行（`docnexus init --agent none`：它自己不往 `workflow-run/` 里链接 skills、写 `CLAUDE.md`）。
-* 本项目里由 workflow-run 接上：把 `workflow-run/docnexus/skills/*` 相对链接到 `.claude/skills` / `.agents/skills` / `.qwen/skills`，在 `CLAUDE.md` / `AGENTS.md` 写一段说明（概念索引 `@workflow-run/docnexus/CONCEPTS.md`；docnexus 系列 skill 的命令改用 `node <skills>/workflow/scripts/docnexus.mjs` 运行，不用先 `cd`），用自己的标记，不碰手写内容。升级时刷新，卸载时撤掉，`workflow-run/docnexus/` 本身不动。
+* 本项目里由 workflow-run 接上：把 `workflow-run/docnexus/skills/*` 相对链接到 `.claude/skills` / `.agents/skills` / `.qwen/skills` / `.codebuddy/skills`，在 `CLAUDE.md` / `AGENTS.md` 写一段说明（概念索引 `@workflow-run/docnexus/CONCEPTS.md`；docnexus 系列 skill 的命令改用 `node <skills>/workflow/scripts/docnexus.mjs` 运行，不用先 `cd`），用自己的标记，不碰手写内容。升级时刷新，卸载时撤掉，`workflow-run/docnexus/` 本身不动。
 * 各 skill 的脚本已按位置处理：`resolve.mjs status` 给出 `docnexus.root` 与 `run`（`node <skills>/workflow/scripts/docnexus.mjs`），`knowledge.mjs` 在那里运行并给出从项目根读正文的路径。
 * `workflow-run/` 是独立文档仓库时，知识库随文档仓库提交，各服务共用；沉淀后的改动和产物一样由你确认后提交（`requirement.mjs pending` 单独列出）。DocNexus 的依赖和检索库（`node_modules/`、`store/`）不进仓库，各自 `--with-docnexus` 装一次。
 
@@ -267,7 +269,7 @@ dev、project-review、技术方案、上线方案都在对应环节调用它：
 2. 所选环境里有 claude / codex 时，执行 `codegraph install --target=<claude,codex> --location=local --yes`，把 MCP 配置写进本项目：
    - claude：`.mcp.json`、`.claude/settings.json`（自动放行 `codegraph_explore`）、`.claude/CLAUDE.md`；
    - codex：`.codex/config.toml`、`AGENTS.md`；Codex 只在受信任的项目里加载项目级配置。
-   - doubao、qwen 不在 CodeGraph 支持的 agent 里，在这两个环境用 code-graph skill 和 `codegraph` CLI。
+   - doubao、qwen、workbuddy 不在 CodeGraph 支持的 agent 里，在这些环境用 code-graph skill 和 `codegraph` CLI。
 3. 执行 `codegraph init <项目根> --yes` 建索引，生成 `.codegraph/`（本地 SQLite），并把它加入 `.gitignore`。之后 agent 使用期间自动增量同步；`cg.mjs` 发现索引落后于工作区时也会先 `codegraph sync`。
 
 * 能力探测：`resolve.mjs status` 的 `codegraph`（`ok` = 有 `.codegraph/` 且 `codegraph` 命令可用）。`/workflow status` 和 `doctor` 都会显示。
@@ -325,7 +327,7 @@ mv .agents/skills/.skills-init.json .agents/skills/.workflow-run.json
 npx @rowansenne/workflow-run uninstall
 ```
 
-按清单移除本项目安装的 skill 文件、`.claude/skills` 与 `.qwen/skills` 下指向 `.agents/skills` 的软链接，以及清单本身：
+按清单移除本项目安装的 skill 文件、`.claude/skills`、`.qwen/skills`、`.codebuddy/skills` 下指向 `.agents/skills` 的软链接，以及清单本身：
 
 * 用户配置（`config.json`、`schema.md`、`wiki-config.json`、`profile.json`）和手改过的模板文件先移到 `workflow-run/tmp/uninstall-backup/<时间戳>/<安装目录>/<skill>/`，结尾列出；
 * 不在清单里的文件、你自己的 skill 和链接都不动；skill 目录里还有你自己加的文件时保留该目录并提示；目录清空后才删除；
@@ -660,3 +662,5 @@ node scripts/eval-triggers.mjs --only dev   # 只跑期望为 dev 的用例
 * **Claude Code** 项目级为 `.claude/skills/`，自动发现。
 
 * **Qwen Code** 项目级为 `.qwen/skills/`，自动发现。
+
+* **腾讯 WorkBuddy** 读项目工作目录下的 `.codebuddy/`（与 CodeBuddy Code 一致），项目级技能在 `.codebuddy/skills/`，同名时优先于用户级；它也读 `AGENTS.md`。

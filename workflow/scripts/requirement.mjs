@@ -38,7 +38,7 @@ export const homeIsRepo = (root) => fs.existsSync(path.join(root, HOME, '.git'))
 export const FILES = { plan: 'plan', delivery: 'delivery', review: 'review', tech: 'tech-doc', release: 'release-doc' };
 const LABELS = { plan: '开发方案', delivery: '交付说明', review: '审查报告', tech: '技术方案', release: '上线方案' };
 // 安装后的 skills 目录（安装器从安装包调用本脚本时，到项目里找画像）
-const INSTALL_BASES = ['.agents/skills', '.claude/skills', '.qwen/skills'];
+const INSTALL_BASES = ['.agents/skills', '.claude/skills', '.qwen/skills', '.codebuddy/skills'];
 
 const git = (cwd, args) => spawnSync('git', args, { cwd, encoding: 'utf8' });
 const readJson = (f) => { try { return JSON.parse(fs.readFileSync(f, 'utf8')); } catch { return null; } };

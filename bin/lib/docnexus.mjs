@@ -46,8 +46,11 @@ export function linkDocNexusSkills(root, dirs) {
 // 用自己的标记，不碰 DocNexus 自己的段落
 const CTX_START = '<!-- workflow-run:docnexus:start -->';
 const CTX_END = '<!-- workflow-run:docnexus:end -->';
-function contextBlock(file) {
-  const run = `${file === 'CLAUDE.md' ? '.claude/skills' : '.agents/skills'}/workflow/scripts/docnexus.mjs`;
+// AGENTS.md 由 codex / doubao / workbuddy 共用：命令指向装了 workflow 的那个目录（--copy 只装 workbuddy 时没有 .agents/skills）
+function contextBlock(root, file) {
+  const has = (dir) => fs.existsSync(path.join(root, dir, 'workflow', 'scripts', 'docnexus.mjs'));
+  const dir = file === 'CLAUDE.md' ? '.claude/skills' : ['.agents/skills', '.codebuddy/skills'].find(has) ?? '.agents/skills';
+  const run = `${dir}/workflow/scripts/docnexus.mjs`;
   const index = file === 'CLAUDE.md' ? `@${HOME}/docnexus/CONCEPTS.md` : `\`${HOME}/docnexus/CONCEPTS.md\`（每个任务开始时读）`;
   return [
     CTX_START,
@@ -79,7 +82,7 @@ export function writeDocNexusContext(root, files) {
   for (const file of files) {
     const f = path.join(root, file);
     const cur = fs.existsSync(f) ? fs.readFileSync(f, 'utf8') : '';
-    const next = insertBlock(cur, CTX_START, CTX_END, contextBlock(file));
+    const next = insertBlock(cur, CTX_START, CTX_END, contextBlock(root, file));
     if (next !== cur) { fs.writeFileSync(f, next); ok(`${file} 已写入 DocNexus 段落（工作区在 ${HOME}/docnexus/）`); }
   }
 }
@@ -91,6 +94,8 @@ function agentTargets(sel) {
   if (sel.includes('claude')) { dirs.add(path.join('.claude', 'skills')); files.add('CLAUDE.md'); }
   if (sel.includes('codex') || sel.includes('doubao')) { dirs.add(CANON_DIR); files.add('AGENTS.md'); }
   if (sel.includes('qwen')) dirs.add(path.join('.qwen', 'skills'));
+  // WorkBuddy 读项目的 AGENTS.md（与 CODEBUDDY.md 并存）
+  if (sel.includes('workbuddy')) { dirs.add(path.join('.codebuddy', 'skills')); files.add('AGENTS.md'); }
   return { dirs: [...dirs], files: [...files] };
 }
 
