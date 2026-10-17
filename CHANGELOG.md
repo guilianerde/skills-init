@@ -4,6 +4,10 @@
 
 ## [Unreleased]
 
+### 变更（破坏性）
+- **去掉「同时安装到 Codex 用户级 `~/.codex/skills`」的询问**：只装到项目里。之前选过的，`~/.codex/skills` 下本工具的 skill 需要自己删除。
+- 目录里没有安装清单时，和新版不同的文件仍然备份后覆盖，但不再逐个报「被手动修改过」，改为一行汇总（哪个目录、备份了几个文件）。
+
 ### 新增
 - **支持腾讯 WorkBuddy**（`--envs workbuddy`，交互菜单第 5 项）：skills 按 skill 软链接到 `.codebuddy/skills/`（WorkBuddy 读项目的 `.codebuddy/`，与 CodeBuddy Code 一致；`--copy` 时独立拷贝），DocNexus 的 skills 也链接过去，段落写在 `AGENTS.md`。`doctor`、`uninstall`、数据库配置查找、画像查找都认这个目录。
 

@@ -7,8 +7,9 @@ import { writeDbConfig } from './db.mjs';
 import { layout, ensureIgnore, homeIsRepo, IGNORE_LINE, TMP_DIR } from '../../workflow/scripts/requirement.mjs';
 import { detectEnv } from '../../workflow/scripts/resolve.mjs';
 
-// 结尾汇总：被手改过、已用新版覆盖（原文件已备份）的 / 模板已删除、手改过而备份后删除的文件
-export const report = { overwritten: [], removed: [], backupDir: null };
+// 结尾汇总：被手改过、已用新版覆盖（原文件已备份）的 / 模板已删除、手改过而备份后删除的文件 /
+// 没有安装清单、内容与新版不同而备份后覆盖的文件（无从判断是否手改）
+export const report = { overwritten: [], removed: [], unlisted: [], unlistedDirs: [], backupDir: null };
 
 // skills 目录里的文件一律以安装包为准：手改过的先备份到 <项目根>/workflow-run/tmp/upgrade-backup/<时间>/（同一次运行共用一个目录），
 // 再覆盖或删除。项目自己的定制应放在不会被升级覆盖的地方：workflow/profile.json、workflow-run/templates/、DocNexus、CLAUDE.md / AGENTS.md
@@ -17,8 +18,7 @@ function backup(root, file) {
   stamp ??= timestamp();
   const dir = path.join(root, TMP_DIR, 'upgrade-backup', stamp);
   const rel = path.relative(root, file);
-  // 装在项目外（如 ~/.codex/skills）的文件按绝对路径放在 outside-project/ 下
-  const target = rel.startsWith('..') || path.isAbsolute(rel) ? path.join(dir, 'outside-project', file.replace(/^[A-Za-z]:/, '').replace(/^[\\/]+/, '')) : path.join(dir, rel);
+  const target = path.join(dir, rel);
   fs.mkdirSync(path.dirname(target), { recursive: true });
   fs.copyFileSync(file, target);
   report.backupDir = toPosix(path.relative(root, dir));
@@ -34,12 +34,13 @@ export function pruneFile(file, recorded, stop, label, root) {
 }
 
 // 模板文件：总是写成新版。和上次安装记录的哈希不同（被手改过）时先备份原文件。
-// 没有清单时无从判断是否手改，内容不同就备份后覆盖
+// 没有清单时无从判断是否手改，内容不同就备份后覆盖（单独汇总，不报「手动修改过」）
 export function installTemplate(dst, content, recorded, hasManifest, ctx, label) {
   if (!fs.existsSync(dst)) { writeFile(dst, content); return; }
   const cur = fileHash(dst);
   if (cur === sha256(content)) return;
-  if (!hasManifest || cur !== recorded) { backup(ctx.root, dst); report.overwritten.push(label); }
+  if (!hasManifest) { backup(ctx.root, dst); report.unlisted.push(label); }
+  else if (cur !== recorded) { backup(ctx.root, dst); report.overwritten.push(label); }
   writeFile(dst, content);
 }
 
@@ -59,6 +60,7 @@ export function pruneSkill(base, skill, prevSkill, entry, root) {
 export async function installSkills(base, db, ctx) {
   const selected = ctx.skills ?? SKILLS;
   const prev = readManifest(base);
+  const unlistedBefore = report.unlisted.length;
   const manifest = { installer: PKG.name, version: PKG.version, installedAt: new Date().toISOString(), envs: ctx.envs, mode: ctx.mode, skills: {}, templates: prev?.templates ?? {} };
   for (const skill of selected) {
     const srcDir = path.join(TPL_DIR, skill);
@@ -109,6 +111,7 @@ export async function installSkills(base, db, ctx) {
     // 清单里有、本版本已不再提供的 skill：按同样规则清理
     else pruneSkill(base, skill, prevSkill, null, ctx.root);
   }
+  if (report.unlisted.length > unlistedBefore) report.unlistedDirs.push(toPosix(path.relative(ctx.root, base)));
   writeFile(path.join(base, MANIFEST), JSON.stringify(manifest, null, 2) + '\n');
 }
 

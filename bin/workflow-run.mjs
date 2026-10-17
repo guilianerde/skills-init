@@ -15,7 +15,6 @@
 // install（安装 / 软链接 / 改名清理 / .gitignore）、uninstall、docnexus（接入与模板记录）、doctor（upgrade / doctor）。
 
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { seedTemplates, updateTemplates } from './seed-templates.mjs';
 import { TPL_DIR, PKG, ENV_NAMES, CANON_DIR, LINK_ENVS, HOME, SKILLS, resolveSkillSelection, step, ok, warn, CliError, fail, isAdminTerminal } from './lib/core.mjs';
@@ -213,10 +212,6 @@ async function main() {
     targets.push(['单一来源', CANON_DIR]);
     for (const [env, dir] of Object.entries(LINK_ENVS)) if (sel.includes(env)) links.push([env, dir]);
   }
-  if (sel.includes('codex') && !o.yes) {
-    const a = (await ask('是否同时安装到 Codex 用户级 ~/.codex/skills（所有项目可用）？[y/N]: ')).toLowerCase();
-    if (a === 'y') targets.push(['codex(user)', path.join(os.homedir(), '.codex', 'skills')]);
-  }
 
   const ctx = { root: o.root, yes: o.yes, envs: sel, mode: o.copy ? 'copy' : 'symlink', skills };
   for (const [name, dir] of targets) {
@@ -270,10 +265,15 @@ async function main() {
   if (docnexusConnected(o.root)) reportTemplateStatus(o.root);
   if (docnexus === 'failed') warn('注意：DocNexus 接入失败（见上方输出），其他 skills 不受影响；修复后可重跑（加 --with-docnexus）。');
   if (codegraph === 'failed') warn('注意：CodeGraph 接入失败（见上方输出），其他 skills 不受影响；skills 会退回 grep / 读文件；修复后可重跑（加 --with-codegraph）。');
+  const keep = '（skills 目录里的文件以安装包为准；项目定制请放到 workflow/profile.json、workflow-run/templates/、DocNexus 或 CLAUDE.md / AGENTS.md）';
   if (report.overwritten.length || report.removed.length) {
-    warn(`以下文件被手动修改过，已按新版${report.removed.length ? '覆盖或删除' : '覆盖'}，原文件备份在 ${report.backupDir}/（skills 目录里的文件以安装包为准；项目定制请放到 workflow/profile.json、workflow-run/templates/、DocNexus 或 CLAUDE.md / AGENTS.md）：`);
+    warn(`以下文件被手动修改过，已按新版${report.removed.length ? '覆盖或删除' : '覆盖'}，原文件备份在 ${report.backupDir}/${keep}：`);
     for (const f of report.overwritten) warn(`  ${f}`);
     for (const f of report.removed) warn(`  ${f}（新版已不提供，已删除）`);
+  }
+  // 目录里没有安装清单（不是本工具装的，或清单丢了）：无从判断是否手改，内容和新版不同就备份后覆盖，汇总成一行
+  if (report.unlisted.length) {
+    ok(`${report.unlistedDirs.join('、')} 里没有安装清单，${report.unlisted.length} 个和新版不同的文件已备份到 ${report.backupDir}/ 后覆盖（无从判断是否手改过）`);
   }
   console.log('先运行 /workflow profile 填写项目画像；说明见 workflow-run README。');
   // skills 已装好，但显式要求的 DocNexus 未接入：返回非 0 便于自动化感知

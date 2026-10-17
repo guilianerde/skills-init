@@ -444,3 +444,16 @@ test('WorkBuddy --copy：.codebuddy/skills 独立拷贝，带自己的安装清�
   ok(p.install(['uninstall']));
   assert.ok(!p.exists('.codebuddy'));
 });
+
+test('目录里没有安装清单：和新版不同的文件备份后覆盖，只汇总一行，不报「被手动修改过」；交互安装不再问用户级 Codex', () => {
+  const p = project('unlisted');
+  ok(p.install(['--envs', 'codex', '--yes', '--skip-db']));
+  fs.rmSync(p.at('.agents/skills/.workflow-run.json'));
+  p.write('.agents/skills/dev/SKILL.md', 'old\n');
+  const r = p.install(['--envs', 'codex', '--skip-db']); ok(r);
+  assert.ok(!r.log.includes('被手动修改过'), r.log.slice(-1500));
+  assert.match(r.log, /\.agents\/skills 里没有安装清单，1 个和新版不同的文件已备份到 workflow-run\/tmp\/upgrade-backup\/\d{8}-\d{6}\/ 后覆盖/);
+  assert.deepEqual(upgradeBackups(p, '.agents/skills/dev/SKILL.md'), ['old\n']);
+  assert.equal(p.read('.agents/skills/dev/SKILL.md'), repoFile('dev/SKILL.md.tpl'));
+  assert.ok(!r.log.includes('.codex/skills'), '不再询问用户级 Codex');
+});

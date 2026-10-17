@@ -73,10 +73,6 @@ npx @rowansenne/workflow-run docs-repo git@git.example.com:team/team-docs.git
 * Windows：安装与升级（`init` / `upgrade`）**必须在管理员终端执行**（建目录软链接需要该权限）；在普通终端运行会直接停下、不做任何改动，并提示改用「以管理员身份运行」的终端。`doctor`、`seed-templates`、`uninstall` 不要求管理员。少数文件系统仍建不了软链接时，该环境自动退回独立拷贝。在 Windows 上 clone 含软链接的仓库需要 `git config core.symlinks true`。
 * 不想用软链接：加 `--copy`，每个环境各装一份完整文件。
 
-> Codex 也可选择额外安装到用户级
-> `~/.codex/skills/`
-> （所有项目可用），脚本会询问。
-
 每个 skill 目录结构（四环境一致）：
 
 
@@ -314,7 +310,8 @@ mv .agents/skills/.skills-init.json .agents/skills/.workflow-run.json
 | 情况 | 处理 |
 | --- | --- |
 | 当前内容与清单记录一致（没改过） | 直接更新 |
-| 与清单记录不同（手改过），或没有清单无从判断 | 原文件先备份到 `workflow-run/tmp/upgrade-backup/<时间>/<相对项目根的路径>`，再更新为新版；结尾列出这些文件和备份目录 |
+| 与清单记录不同（手改过） | 原文件先备份到 `workflow-run/tmp/upgrade-backup/<时间>/<相对项目根的路径>`，再更新为新版；结尾列出这些文件和备份目录 |
+| 目录里没有清单，无从判断 | 和新版不同的文件同样备份后更新；结尾只用一行说明哪个目录没有清单、备份了几个文件，不当作手改过 |
 | 清单里有、新版里已没有 | 没改过直接删除；改过的备份后删除 |
 
 * 这样 `SKILL.md`、`skill.json`、脚本始终是同一个版本，不会出现「新 SKILL.md 配旧 skill.json」的混搭。
@@ -332,7 +329,6 @@ npx @rowansenne/workflow-run uninstall
 * 用户配置（`config.json`、`schema.md`、`wiki-config.json`、`profile.json`）和手改过的模板文件先移到 `workflow-run/tmp/uninstall-backup/<时间戳>/<安装目录>/<skill>/`，结尾列出；
 * 不在清单里的文件、你自己的 skill 和链接都不动；skill 目录里还有你自己加的文件时保留该目录并提示；目录清空后才删除；
 * `.gitignore` 里追加的规则和 DocNexus 不处理；没有清单时什么也不做。
-* 用户级 `~/.codex/skills` 不在卸载范围内。
 
 ### skill.json
 
