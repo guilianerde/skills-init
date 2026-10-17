@@ -14,7 +14,7 @@
 - **去掉 `--docnexus-root` / `-DocnexusRoot`**（`docnexus.root` 配置）。
 - **安装器放在项目外**：`init-skills.sh` / `init-skills.ps1` 改为以当前目录为项目根；推荐用 `npx`。安装器克隆在项目的 `skills-init/` 里时停下并提示挪走。
 - **不再迁移旧版本的产物**：去掉 `requirement.mjs migrate`、升级时的自动归档，以及对旧布局 `docs/skills/<skill>/` 的识别。旧位置的文件需要的话自己搬。
-- **安装器去掉旧版本兼容**：不再把 `dev/profile.json` 迁成 `workflow/profile.json`、不再清理旧版本留下的 `<文件>.new`、不再移除改名前的 `code-review`（`skill.json` 去掉 `renamedFrom`）。`--copy` 拷贝换成链接时合并用户配置仍保留。
+- **安装器去掉旧版本兼容**：不再把 `dev/profile.json` 迁成 `workflow/profile.json`、不再清理旧版本留下的 `<文件>.new`、不再移除改名前的 `code-review`（`skill.json` 去掉 `renamedFrom`）。升级时也不再把旧版本装进 skills 目录的技术方案、上线方案默认模板复制到项目模板目录。`--copy` 拷贝换成链接时合并用户配置仍保留。
 
 - **DocNexus 命令不再要求先 `cd skills-init`**：新增 `workflow/scripts/docnexus.mjs`，在项目根运行即在 `skills-init/` 下执行 DocNexus（`--node <脚本>` 运行它的 node 脚本），bash / PowerShell 5.1 写法一样，Windows 上直接用 node 跑 CLI 入口。`resolve.mjs status` 的 `docnexus.run_in` 改为 `docnexus.run`；`CLAUDE.md` / `AGENTS.md` 段落与 DocNexus 升级命令同步改写，不再含 `cd … &&`。
 

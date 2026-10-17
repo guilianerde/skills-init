@@ -2,9 +2,9 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { TPL_DIR, PKG, CANON_DIR, INSTALL_BASES, SKILLS, SKILL_LIST, USER_FILES, MANIFEST, ok, warn, readJson, walk, toPosix, sameFile, writeFile, render, sha256, fileHash, readManifest, removeEmptyDirs, lstat, timestamp, removeLink, docnexusRoot, HOME } from './core.mjs';
+import { TPL_DIR, PKG, CANON_DIR, INSTALL_BASES, SKILLS, SKILL_LIST, USER_FILES, MANIFEST, ok, warn, readJson, walk, toPosix, sameFile, writeFile, render, sha256, fileHash, readManifest, removeEmptyDirs, lstat, timestamp, removeLink, HOME } from './core.mjs';
 import { writeDbConfig } from './db.mjs';
-import { layout, ensureIgnore, homeIsRepo, IGNORE_LINE, TEMPLATES_DIR, TMP_DIR } from '../../workflow/scripts/requirement.mjs';
+import { layout, ensureIgnore, homeIsRepo, IGNORE_LINE, TMP_DIR } from '../../workflow/scripts/requirement.mjs';
 import { detectEnv } from '../../workflow/scripts/resolve.mjs';
 
 // 结尾汇总：被手改过、已用新版覆盖（原文件已备份）的 / 模板已删除、手改过而备份后删除的文件
@@ -239,24 +239,4 @@ export function setupHome(root) {
   if (ensureIgnore(root)) ok(`.ignore 已加上 ${IGNORE_LINE}（需求产物不参与代码搜索）`);
   const L = layout(root);
   if (L.mode === 'repo' && !L.ok) warn(`${HOME}/ 是独立的文档仓库，还没配置本项目的项目名：${L.hint}`);
-}
-
-// 不再随 skills 提供默认版本的模板（skill.json 里没有 src 的：技术方案、上线方案）。老项目还在用装进 skills 目录的默认版本时，
-// 升级 / 重装前把它复制到项目模板目录 skills-init/templates/<skill>/<id>，生成效果不变；之后安装清单会按「模板已删除」清理 skills 目录里那份。
-// 项目里已有自己的模板、或 DocNexus 知识库里已有这份时不动。返回复制了哪些
-export function preserveRetiredTemplates(root) {
-  const kept = [];
-  for (const s of SKILL_LIST) {
-    for (const t of s.templates.filter((x) => !x.src)) {
-      const project = path.join(root, TEMPLATES_DIR, s.name, t.id);
-      const lib = path.join(docnexusRoot(root), 'docnexus', 'library', 'templates', s.name, t.id);
-      if (fs.existsSync(project) || fs.existsSync(lib)) continue;
-      const old = INSTALL_BASES.map((b) => path.join(root, b, s.name, t.id)).find((f) => fs.existsSync(f) && fs.statSync(f).isFile());
-      if (!old) continue;
-      writeFile(project, fs.readFileSync(old, 'utf8'));
-      kept.push(toPosix(path.relative(root, project)));
-      ok(`${s.name} 的模板 ${t.id} 不再随 skills 提供，已把项目在用的版本保存到 ${toPosix(path.relative(root, project))}（之后生成文档用它）`);
-    }
-  }
-  return kept;
 }

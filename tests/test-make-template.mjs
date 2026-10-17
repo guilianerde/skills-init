@@ -1,7 +1,6 @@
 // 技术方案 / 上线方案模板改为按样例创建：make-template.mjs 抽骨架；老项目升级时保留原来在用的默认模板
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -76,44 +75,4 @@ test('CLI：文件 / stdin / --out；没有标题时退出 1', () => {
   assert.equal(node([SCRIPT, '-'], { input: '只有正文，没有标题\n' }).status, 1);
   assert.equal(node([SCRIPT]).status, 1);
   fs.rmSync(dir, { recursive: true, force: true });
-});
-
-// 模拟老版本装过的项目：skills 目录里有默认模板，并记在安装清单里
-function oldProject({ withLibrary = false, withProject = false } = {}) {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'retired-'));
-  const cli = (...a) => node([path.join(REPO, 'bin/skills-init.mjs'), '--project-root', root, ...a], { cwd: root, env: { ...process.env, SKILLS_INIT_ADMIN: '1' } });
-  assert.equal(cli('--envs', 'codex', '--skip-db', '--yes').status, 0);
-  const base = path.join(root, '.agents/skills');
-  const man = JSON.parse(fs.readFileSync(path.join(base, '.skills-init.json'), 'utf8'));
-  for (const s of ['create-tech-md-doc', 'create-release-md-doc']) {
-    const content = `# 【${s}】旧默认模板\n## 章节 *\n`;
-    fs.writeFileSync(path.join(base, s, 'template.md'), content);
-    man.skills[s].files['template.md'] = crypto.createHash('sha256').update(content).digest('hex');
-  }
-  fs.writeFileSync(path.join(base, '.skills-init.json'), JSON.stringify(man, null, 2));
-  if (withLibrary) { fs.mkdirSync(path.join(root, 'skills-init/docnexus/library/templates/create-tech-md-doc'), { recursive: true }); fs.writeFileSync(path.join(root, 'skills-init/docnexus/library/templates/create-tech-md-doc/template.md'), '# 库里的\n'); }
-  if (withProject) { fs.mkdirSync(path.join(root, 'skills-init/templates/create-release-md-doc'), { recursive: true }); fs.writeFileSync(path.join(root, 'skills-init/templates/create-release-md-doc/template.md'), '# 项目自己的\n'); }
-  return { root, base, cli };
-}
-
-test('升级：老项目还在用的默认模板保存到项目模板目录，skills 目录里那份按清单清理', () => {
-  const { root, base, cli } = oldProject();
-  const r = cli('upgrade');
-  assert.equal(r.status, 0, r.stdout + r.stderr);
-  assert.match(r.stdout, /不再随 skills 提供，已把项目在用的版本保存到 skills-init\/templates\/create-tech-md-doc\/template\.md/);
-  for (const s of ['create-tech-md-doc', 'create-release-md-doc']) {
-    assert.equal(fs.readFileSync(path.join(root, 'skills-init/templates', s, 'template.md'), 'utf8'), `# 【${s}】旧默认模板\n## 章节 *\n`);
-    assert.ok(!fs.existsSync(path.join(base, s, 'template.md')), `${s}：skills 目录里的旧默认模板应被清理`);
-  }
-  const res = node([path.join(base, 'workflow/scripts/resolve.mjs'), 'template', 'create-tech-md-doc', 'template.md'], { cwd: root });
-  assert.equal(JSON.parse(res.stdout).source, 'project', '升级后生成效果不变');
-  fs.rmSync(root, { recursive: true, force: true });
-});
-
-test('升级：项目或 DocNexus 里已有自己的模板时不覆盖、不复制', () => {
-  const { root, cli } = oldProject({ withLibrary: true, withProject: true });
-  assert.equal(cli('upgrade').status, 0);
-  assert.ok(!fs.existsSync(path.join(root, 'skills-init/templates/create-tech-md-doc/template.md')), 'DocNexus 里已有，不复制');
-  assert.equal(fs.readFileSync(path.join(root, 'skills-init/templates/create-release-md-doc/template.md'), 'utf8'), '# 项目自己的\n');
-  fs.rmSync(root, { recursive: true, force: true });
 });
