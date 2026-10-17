@@ -30,13 +30,11 @@
     "create-tech-md-doc",
     "create-release-md-doc",
     "code-graph",
-    "init-skills.sh",
-    "init-skills.ps1",
     "README.md",
     "CHANGELOG.md"
   ],
   "scripts": {
-    "test": "bash tests/test-init-skills.sh && node --test \"tests/*.mjs\"",
+    "test": "node --test \"tests/*.mjs\"",
     "eval:triggers": "node scripts/eval-triggers.mjs"
   },
   "publishConfig": {

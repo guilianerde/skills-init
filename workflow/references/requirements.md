@@ -49,13 +49,13 @@ node <skills>/workflow/scripts/requirement.mjs path <plan|delivery|review|tech|r
 
 ## 独立文档仓库（克隆到 skills-init/）
 
-团队想让代码仓库保持干净、或者一个需求横跨多个服务时，把团队文档仓库克隆到项目根的 `skills-init/`（在安装之前，或 `skills-init/` 还不存在时）：
+团队想让代码仓库保持干净、或者一个需求横跨多个服务时，用户在项目根运行（由用户执行，克隆可能要他们自己认证）：
 
 ```
-git clone <团队文档仓库地址> skills-init
+npx @rowansenne/skills-init docs-repo <团队文档仓库地址> [--project <项目名>]
 ```
 
-`skills-init/` 自己是 git 仓库就是这个模式，不用别的配置；安装 / 升级时代码仓库的 `.gitignore` 会加上 `/skills-init/`。
+它把文档仓库克隆到 `skills-init/`，代码仓库的 `.gitignore` 加 `/skills-init/`，并配置好项目名。`skills-init/` 自己是 git 仓库就是这个模式，不用别的配置。
 
 - 布局：`skills-init/docs/requirements/<需求名>/<项目名>/plan.md`、`delivery.md`……一个需求横跨多个服务时，各服务在同一个需求目录下各占一个子目录。绑定需求时 `which` 会列出 `other_projects`（其他服务已有、已拉到本地的需求），用同一个名字 `bind` 就加入了那个需求。
 - DocNexus 也在这个仓库里（`skills-init/docnexus/`），各服务共用一个知识库。

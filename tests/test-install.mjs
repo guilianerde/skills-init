@@ -1,5 +1,4 @@
 // 安装器黑盒测试（三个平台都跑）：每个用例在临时目录放一份 skills-init 副本，执行安装后检查目录、软链接与配置。
-// 原来 bash / PowerShell 各维护一份的场景都在这里；tests/test-init-skills.* 只保留封装脚本的冒烟用例。
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';

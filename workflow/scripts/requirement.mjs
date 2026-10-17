@@ -133,7 +133,7 @@ function remoteName(home) {
 }
 
 // 项目名建议：git 远端仓库名，取不到用项目目录名
-function suggestProject(root) {
+export function suggestProject(root) {
   const url = git(root, ['remote', 'get-url', 'origin']).stdout?.trim();
   const name = url ? url.replace(/[/\\]+$/, '').replace(/\.git$/, '').split(/[/\\:]/).pop() : path.basename(path.resolve(root));
   return dirName(name);

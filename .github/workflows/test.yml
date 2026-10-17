@@ -7,29 +7,23 @@ on:
   workflow_dispatch:
 
 jobs:
-  bash:
-    name: bash (${{ matrix.os }})
+  unix:
+    name: node 22 (${{ matrix.os }})
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - os: macos-latest
-            shell: /bin/bash   # macOS 自带 bash 3.2
-          - os: ubuntu-latest
-            shell: bash
+        os: [macos-latest, ubuntu-latest]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Run bash tests
-        run: ${{ matrix.shell }} tests/test-init-skills.sh
       - name: Run node tests
         run: node --test "tests/*.mjs"
 
-  pwsh:
-    name: pwsh (windows-latest, node ${{ matrix.node }})
+  windows:
+    name: node ${{ matrix.node }} (windows-latest)
     strategy:
       fail-fast: false
       matrix:
@@ -40,8 +34,5 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node }}
-      - name: Run PowerShell tests
-        shell: pwsh
-        run: pwsh -NoProfile -File tests/test-init-skills.ps1
       - name: Run node tests
         run: node --test "tests/*.mjs"

@@ -134,3 +134,42 @@ test('跨服务需求：其他项目在 which 里看到已有需求（推送后�
   assert.equal(av.latest.delivery.cite, 'team-docs:docs/requirements/订单导出/pay-service/delivery.md');
   fs.rmSync(ws, { recursive: true, force: true });
 });
+
+test('docs-repo 一条命令切到文档仓库：克隆、忽略、项目名、tmp/ 保留且不进文档仓库；已有产物时停下', () => {
+  const { ws, remote, project } = workspace();
+  const p = project('order-service', 'feature/order-export');
+  fs.mkdirSync(path.join(p.root, 'skills-init/tmp/view'), { recursive: true });
+  fs.writeFileSync(path.join(p.root, 'skills-init/tmp/view/index.html'), 'x');
+  let r = p.cli('docs-repo');
+  assert.equal(r.status, 0);
+  assert.match(r.stdout, /随项目提交（不是独立文档仓库）/);
+
+  r = p.cli('docs-repo', remote);
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  assert.ok(fs.existsSync(path.join(p.docs, '.git')));
+  assert.equal(fs.readFileSync(path.join(p.docs, 'tmp/view/index.html'), 'utf8'), 'x', 'tmp/ 放回');
+  assert.equal(p.docsGit('status', '--porcelain').stdout, '', 'tmp/ 不进文档仓库');
+  assert.match(fs.readFileSync(path.join(p.root, '.gitignore'), 'utf8'), /^\/skills-init\/$/m);
+  assert.match(r.stdout, /项目名：order-service/);
+  const w = p.req('which').out;
+  assert.deepEqual([w.mode, w.project], ['repo', 'order-service']);
+
+  // 只改项目名；同一地址重跑不变；换地址拒绝
+  assert.equal(p.cli('docs-repo', '--project', 'orders').status, 0);
+  assert.equal(p.req('which').out.project, 'orders');
+  assert.equal(p.cli('docs-repo', remote).status, 0);
+  r = p.cli('docs-repo', path.join(ws, 'other.git'));
+  assert.equal(r.status, 1);
+  assert.match(r.stdout + r.stderr, /已经是文档仓库/);
+  assert.match(p.cli('docs-repo').stdout, /仓库名（引用前缀）：team-docs[\s\S]*项目名：orders/);
+
+  // 随项目提交的产物还在 skills-init/ 里：不克隆、不改动
+  const q = project('pay-service', 'feature/pay');
+  q.req('bind', '--name', '支付');
+  r = q.cli('docs-repo', remote);
+  assert.equal(r.status, 1);
+  assert.match(r.stdout + r.stderr, /已有 docs/);
+  assert.ok(!fs.existsSync(path.join(q.docs, '.git')));
+  assert.equal(q.req('which').out.mode, 'project');
+  fs.rmSync(ws, { recursive: true, force: true });
+});

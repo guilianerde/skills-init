@@ -2,9 +2,7 @@
 // skills-init — 项目级 Agent Skills 一键初始化（Node 版，跨平台单一实现）
 //
 // 用法：
-//   npx @rowansenne/skills-init [选项]                 # 在项目根执行
-//   node skills-init/bin/skills-init.mjs [选项]        # 仓库放在 <项目根>/skills-init/ 时
-//   ./skills-init/init-skills.sh / .\skills-init\init-skills.ps1   # 薄封装，等价于上一行
+//   npx @rowansenne/skills-init [命令] [选项]          # 在项目根执行（唯一的安装方式）
 //
 // 单一来源：skills 只完整安装到 .agents/skills（codex / doubao 直接使用）；
 //           .claude/skills、.qwen/skills 下按 skill 建相对软链接指向它；--copy 退回各环境独立拷贝。
@@ -28,9 +26,10 @@ import { setupCodeGraph } from './lib/codegraph.mjs';
 import { uninstall } from './lib/uninstall.mjs';
 import { checkNodeForDocNexus, setupDocNexus, refreshDocNexusLinks, templateRecords, saveTemplateRecords, reportTemplateStatus, installedSkills, docnexusConnected, printTemplateDiffs } from './lib/docnexus.mjs';
 import { upgradeOptions, doctor } from './lib/doctor.mjs';
+import { docsRepo } from './lib/docsrepo.mjs';
 
 // ---------------------------------------------------------------- 参数
-const COMMANDS = ['init', 'upgrade', 'doctor', 'uninstall', 'seed-templates', 'report', 'view'];
+const COMMANDS = ['init', 'upgrade', 'doctor', 'uninstall', 'seed-templates', 'report', 'view', 'docs-repo'];
 const HELP = `用法: skills-init [命令] [选项]
 
 命令：
@@ -42,6 +41,8 @@ const HELP = `用法: skills-init [命令] [选项]
   seed-templates       只把自带的文档模板导入 DocNexus（skills-init/docnexus/library/templates/，已有的不覆盖）
   report               本地效果报告：只读统计 skills-init/docs/requirements/ 下的产物（审查发现与修复率、需求澄清、DocNexus 沉淀与复用、各分支链路）
   view                 项目文档视图：按需求浏览方案、交付、审查（含复审修复情况）、技术 / 上线方案，生成本地静态页面
+  docs-repo <仓库地址> 改用团队文档仓库：克隆到 skills-init/、代码仓库忽略它、配置本项目的项目名、接上仓库里的 DocNexus；
+                       不带地址时显示当前状态
 
 init 选项：
   --envs <列表>        环境，逗号分隔：codex,claude,doubao,qwen；all = 全部（不传则交互选择）
@@ -62,6 +63,8 @@ report 选项：
   --since <YYYY-MM-DD> 只统计该日期起的产物
   --json               输出 JSON
   --all-branches       同时用 git 只读扫描所有本地分支里提交过的产物（默认只看工作区）
+docs-repo 选项：
+  --project <名称>     本项目在文档仓库里的名字（默认沿用已配置的，其次 git 远端仓库名）；只改项目名时可不带地址
 view 选项：
   --out <文件>         页面写到哪里（默认 skills-init/tmp/view/index.html）
   --open               生成后用默认浏览器打开
@@ -95,10 +98,12 @@ function parseArgs(argv) {
       case '--out': o.out = val(); break;
       case '--open': o.open = true; break;
       case '--project-root': o.root = path.resolve(val()); break;
+      case '--project': o.project = val(); break;
       case '-v': case '--version': console.log(PKG.version); process.exit(0); break;
       case '-h': case '--help': console.log(HELP); process.exit(0); break;
       default:
         if (!cmdGiven && COMMANDS.includes(a)) { o.cmd = a; cmdGiven = true; break; }
+        if (o.cmd === 'docs-repo' && !o.url && !a.startsWith('-')) { o.url = a; break; }
         fail(`未知参数: ${a}\n${HELP}`);
     }
   }
@@ -134,6 +139,7 @@ async function main() {
   if (Number(process.versions.node.split('.')[0]) < 22) warn(`当前 Node v${process.versions.node} 低于 22：skills-init 只在 Node 22 / 24 上测试（18、20 已停止维护），建议升级`);
   if (o.cmd === 'uninstall') { step(`按安装清单卸载 ${o.root} 中的 skills`); return uninstall(o.root); }
   if (o.cmd === 'doctor') return doctor(o.root, o.offline);
+  if (o.cmd === 'docs-repo') return docsRepo(o.root, { url: o.url, project: o.project });
   if (o.cmd === 'report') {
     const { main: report } = await import(new URL('../workflow/scripts/report.mjs', import.meta.url));
     return report(['--root', o.root, ...(o.since ? ['--since', o.since] : []), ...(o.json ? ['--json'] : []), ...(o.allBranches ? ['--all-branches'] : [])]);
@@ -163,19 +169,10 @@ async function main() {
       return failed ? 1 : 0;
     } catch (e) { warn(e.message); return 1; }
   }
-  // skills-init/ 是本工具放产出的目录；以前 README 建议把安装器仓库克隆到这里，那份克隆要先挪走
-  if (fs.existsSync(path.join(o.root, HOME, 'bin', 'skills-init.mjs'))) {
-    fail(`项目根的 ${HOME}/ 里是 skills-init 安装器的源码。从 0.16.0 起这个目录用来放本工具的产出（需求产物、DocNexus、项目模板、临时文件），已停止（没有做任何改动）。
-请把安装器移到项目外，再用它或 npx 重新执行，例如：
-  mv ${HOME} ../skills-init-installer        # PowerShell：Move-Item ${HOME} ..\skills-init-installer
-  node ../skills-init-installer/bin/skills-init.mjs --project-root . ${o.cmd}
-或：npx @rowansenne/skills-init ${o.cmd}`);
-  }
   // Windows：安装 / 升级只在管理员终端进行（建目录软链接需要该权限），否则直接停下，不做任何改动
   if (!isAdminTerminal()) {
     const args = process.argv.slice(2);
-    // 经 init-skills.ps1 / .sh 调用时会带 --project-root，给不出原命令，只提示重跑脚本
-    const again = args.includes('--project-root') ? '重新运行刚才的 init-skills 脚本（参数不变）' : `npx @rowansenne/skills-init ${args.join(' ')}`.trim();
+    const again = `npx @rowansenne/skills-init ${args.join(' ')}`.trim();
     fail(`当前终端没有管理员权限，已停止${o.cmd === 'upgrade' ? '升级' : '安装'}（没有做任何改动）。
 请以管理员身份打开终端：开始菜单搜索「PowerShell」或「终端」→ 右键「以管理员身份运行」，进入项目目录后重新执行：
   cd "${o.root}"

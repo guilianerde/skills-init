@@ -235,8 +235,21 @@ export function recordEnv(root) {
   return env;
 }
 
+// skills-init/ 是独立文档仓库时，tmp/（本机临时文件）不能进文档仓库：写进它的 .git/info/exclude（只在本机生效，不改仓库内容）
+export function excludeHomeTmp(root) {
+  if (!homeIsRepo(root)) return false;
+  const f = path.join(root, HOME, '.git', 'info', 'exclude');
+  const cur = fs.existsSync(f) ? fs.readFileSync(f, 'utf8') : '';
+  if (cur.split(/\r?\n/).some((l) => l.trim() === '/tmp/')) return false;
+  fs.mkdirSync(path.dirname(f), { recursive: true });
+  fs.writeFileSync(f, `${cur}${cur && !cur.endsWith('\n') ? '\n' : ''}# skills-init：本机临时文件\n/tmp/\n`);
+  ok(`${HOME}/tmp/ 已加入文档仓库的 .git/info/exclude（不会提交到文档仓库）`);
+  return true;
+}
+
 export function setupHome(root) {
   if (ensureIgnore(root)) ok(`.ignore 已加上 ${IGNORE_LINE}（需求产物不参与代码搜索）`);
+  excludeHomeTmp(root);
   const L = layout(root);
   if (L.mode === 'repo' && !L.ok) warn(`${HOME}/ 是独立的文档仓库，还没配置本项目的项目名：${L.hint}`);
 }

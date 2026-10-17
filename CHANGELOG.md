@@ -4,6 +4,12 @@
 
 ## [Unreleased]
 
+### 新增
+- **`skills-init docs-repo <仓库地址> [--project <项目名>]`：一条命令改用团队文档仓库**。克隆到 `skills-init/`（里面只有 `tmp/` 时先挪开再放回；已有产物、DocNexus 或项目模板时停下，不自动合并），代码仓库 `.gitignore` 加 `/skills-init/`，文档仓库 `.git/info/exclude` 加 `/tmp/`，项目名写进 `workflow/profile.json`（默认沿用已配置的，其次 git 远端仓库名），文档仓库里有 DocNexus 时接上本项目的链接与段落。不带地址显示当前状态；`--project` 单独使用时只改项目名。安装 / 升级时也会给文档仓库加上 `/tmp/` 排除。
+
+### 变更（破坏性）
+- **只保留 npx 安装**：删除 `init-skills.sh` / `init-skills.ps1` 及其冒烟测试，npm 包不再带它们；去掉「安装器克隆在项目的 `skills-init/` 里时停下」的检查。CI 的 4 个任务改为只跑 node 测试（macOS、Ubuntu 的 Node 22，Windows 的 Node 22 / 24）。
+
 ## [0.16.0] - 2026-10-17
 
 ### 变更（破坏性，不兼容旧版本）
