@@ -4,6 +4,8 @@
 
 ## [Unreleased]
 
+## [0.19.0] - 2026-10-18
+
 ### 变更（破坏性）
 - **去掉「同时安装到 Codex 用户级 `~/.codex/skills`」的询问**：只装到项目里。之前选过的，`~/.codex/skills` 下本工具的 skill 需要自己删除。
 - 目录里没有安装清单时，和新版不同的文件仍然备份后覆盖，但不再逐个报「被手动修改过」，改为一行汇总（哪个目录、备份了几个文件）。
@@ -249,7 +251,8 @@
 - 安装器改为单一 Node 实现，`init-skills.sh` / `init-skills.ps1` 只是薄封装。
 - `code-review` 改名为 `project-review`，升级时自动清理旧名。
 
-[Unreleased]: https://github.com/guilianerde/skills-init/compare/v0.18.0...HEAD
+[Unreleased]: https://github.com/guilianerde/skills-init/compare/v0.19.0...HEAD
+[0.19.0]: https://github.com/guilianerde/skills-init/compare/v0.18.0...v0.19.0
 [0.18.0]: https://github.com/guilianerde/skills-init/compare/v0.17.0...v0.18.0
 [0.17.0]: https://github.com/guilianerde/skills-init/compare/v0.16.0...v0.17.0
 [0.16.0]: https://github.com/guilianerde/skills-init/compare/v0.15.0...v0.16.0
