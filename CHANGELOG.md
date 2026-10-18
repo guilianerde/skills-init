@@ -4,6 +4,11 @@
 
 ## [Unreleased]
 
+## [0.21.1] - 2026-10-18
+
+### 修复
+- 提示里的命令改成完整的 `npx @rowansenne/workflow-run <子命令>`（如 `seed-templates --update`、`upgrade`）：之前写的是 `workflow-run ...`，用 npx 安装、没有全局安装时会报命令找不到。
+
 ## [0.21.0] - 2026-10-18
 
 ### 变更（破坏性）
