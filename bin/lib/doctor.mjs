@@ -50,7 +50,7 @@ export function doctor(root, offline) {
         const file = path.join(dir, f);
         const label = toPosix(path.join(rel, skill, f));
         if (!fs.existsSync(file)) { missing++; meh(`缺少 ${label}：运行 workflow-run upgrade 恢复`); }
-        else if (fileHash(file) !== h) { modified++; meh(`${label} 被手动修改过（升级时会被新版覆盖，原文件备份到 workflow-run/tmp/upgrade-backup/；项目定制请放到 profile.json、workflow-run/templates/ 或 DocNexus）`); }
+        else if (fileHash(file) !== h) { modified++; meh(`${label} 被手动修改过（升级时会被新版覆盖，原文件备份到 workflow-run/tmp/upgrade-backup/；项目定制请放到 profile.json 或 DocNexus，模板只能在 DocNexus 里定制）`); }
       }
     }
     if (!modified && !missing) ok(`${toPosix(rel)}：${Object.keys(man.skills).length} 个 skill 的模板文件与安装时一致`);
@@ -101,12 +101,14 @@ export function doctor(root, offline) {
     else ok(`产出目录 ${HOME}/：${mode}`);
     if (st.docnexus.ok) {
       if (!reportTemplateStatus(root, meh)) ok('DocNexus 已接入，文档模板齐全且与默认模板同步（或为团队定制版）');
-      for (const f of st.docnexus.stale_project_templates) meh(`${f} 在接入 DocNexus 后已不再生效，建议删除`);
       if (docnexusSupportsCategory(root) === false) meh(`已装的 DocNexus 不支持 draft seal --category：各 skill 的分类只能经 metadata.category 写入，不记为调用方指定。升级：${docnexusUpgradeCmd()}`);
       else ok('DocNexus 支持调用方显式分类（draft seal --category）');
       if (docnexusSupportsRecallCategory(root) === false) meh(`已装的 DocNexus 不支持 recall --category：knowledge.mjs --query 只列文档，skill 改用不带分类的 recall。升级：${docnexusUpgradeCmd()}`);
       else ok('DocNexus 支持按分类检索（recall --category）');
-    } else console.log('    --  DocNexus 未接入（可选）');
+    } else console.log('    --  DocNexus 未接入（可选；未接入时只能用 skills 自带的默认模板，不能修改）');
+    // workflow-run/templates/ 已不再生效：模板定制只放 DocNexus
+    for (const f of st.docnexus.stale_project_templates ?? []) meh(st.docnexus.ok ? `${f} 已不再生效：确认已导入 DocNexus 知识库后删除` : `${f} 已不再生效（模板定制只放 DocNexus）：重跑 workflow-run 并加 --with-docnexus 接入后导入知识库，再删除`);
+    for (const t of st.templates_need_docnexus ?? []) console.log(`    --  ${t.skill} 的模板 ${t.id} 不随 skills 提供，要先接入 DocNexus 才能创建（重跑 workflow-run 并加 --with-docnexus）`);
     for (const t of st.templates_to_create ?? []) console.log(`    --  ${t.skill} 的模板 ${t.id} 还没有创建（不随 skills 提供）：第一次生成文档时会请你给一份样例文档来创建，保存到 ${t.expected}`);
     if (st.codegraph?.ok) ok(`CodeGraph 已接入（codegraph ${codegraphVersion(root)}，索引在 .codegraph/）`);
     else if (st.codegraph?.indexed) meh('有 .codegraph/ 索引但找不到 codegraph 命令：npm i -g @colbymchenry/codegraph，或重跑 workflow-run 并加 --with-codegraph');

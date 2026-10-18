@@ -12,7 +12,7 @@ import { detectEnv } from '../../workflow/scripts/resolve.mjs';
 export const report = { overwritten: [], removed: [], unlisted: [], unlistedDirs: [], backupDir: null };
 
 // skills 目录里的文件一律以安装包为准：手改过的先备份到 <项目根>/workflow-run/tmp/upgrade-backup/<时间>/（同一次运行共用一个目录），
-// 再覆盖或删除。项目自己的定制应放在不会被升级覆盖的地方：workflow/profile.json、workflow-run/templates/、DocNexus、CLAUDE.md / AGENTS.md
+// 再覆盖或删除。项目自己的定制应放在不会被升级覆盖的地方：workflow/profile.json、DocNexus（文档模板只能在这里定制）、CLAUDE.md / AGENTS.md
 let stamp = null;
 function backup(root, file) {
   stamp ??= timestamp();

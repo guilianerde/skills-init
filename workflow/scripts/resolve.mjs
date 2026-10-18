@@ -10,7 +10,7 @@
 //   node .agents/skills/workflow/scripts/resolve.mjs category <skill>             # 该 skill 写入 DocNexus 时的显式分类
 //   node .agents/skills/workflow/scripts/resolve.mjs status                      # 能力探测（/workflow status）
 //   node .agents/skills/workflow/scripts/resolve.mjs env                         # 本机系统与终端（安装时记录），写终端命令按它来
-// 输出 JSON。退出码：0 正常；2 已接入 DocNexus 但知识库缺该模板（按输出的 hint 处理）；1 参数错误 / 该 skill 没有声明分类
+// 输出 JSON。退出码：0 正常；2 缺该模板（知识库里没有，或未接入 DocNexus 而该模板没有默认版本；按输出的 hint 处理）；1 参数错误 / 该 skill 没有声明分类
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -75,8 +75,10 @@ export function resolveTemplate(root, skill, id) {
   // 没有 src 的模板（技术方案、上线方案）不随 skills 提供，缺失时按「创建模板」由用户给样例生成
   const builtin = t.src ? path.join(SKILLS_DIR, skill, t.src.replace(/\.tpl$/, '')) : null;
   const CREATE = '按 <skills>/workflow/references/templates.md「创建模板」处理：请用户给一份团队现有的同类文档作样例（本地 md 或 wiki pageId / URL），用 workflow/scripts/make-template.mjs 抽骨架，和用户确认后保存到 expected';
+  // workflow-run/templates/ 下的项目模板已不再生效（定制模板只放 DocNexus，便于共享），留着的只用来提示导入
+  const stale = fs.existsSync(project) ? rel(root, project) : null;
   if (docnexusConnected(root)) {
-    const res = { skill, id, docnexus: true, stale_project_file: fs.existsSync(project) ? rel(root, project) : null };
+    const res = { skill, id, docnexus: true, stale_project_file: stale };
     if (fs.existsSync(lib)) return { ok: true, ...res, source: 'docnexus', path: rel(root, lib) };
     if (!builtin) {
       return {
@@ -91,14 +93,15 @@ export function resolveTemplate(root, skill, id) {
       hint: '已接入 DocNexus，只使用知识库中的模板。停下这一步告诉用户缺这份模板：可在项目根运行 workflow-run seed-templates（或重跑安装加 --seed-templates），或经用户确认后把 import_from 按 capture 流程写入 expected（以显式分类 --category doc-template 封存）。',
     };
   }
-  if (fs.existsSync(project)) return { ok: true, skill, id, docnexus: false, source: 'project', path: rel(root, project) };
+  // 未接入 DocNexus：只用 skill 自带的默认模板（只读，不能改）；没有默认版本的（技术方案、上线方案）要先接入 DocNexus 才能创建
+  const res = { skill, id, docnexus: false, stale_project_file: stale };
   if (!builtin) {
     return {
-      ok: false, skill, id, docnexus: false, error: 'missing', on_demand: true, expected: rel(root, project),
-      hint: `这份模板不随 skills 提供，项目里还没有创建。停下这一步告诉用户，${CREATE}。`,
+      ok: false, ...res, error: 'missing', need_docnexus: true, expected: rel(root, lib),
+      hint: `这份模板不随 skills 提供，自定义模板只保存在 DocNexus 知识库里（便于团队共享），本项目还没有接入 DocNexus。停下这一步告诉用户：先重跑 workflow-run 并加 --with-docnexus 接入${stale ? `（项目里的 ${stale} 已不再生效，接入后可导入知识库）` : ''}，再${CREATE}。`,
     };
   }
-  return { ok: true, skill, id, docnexus: false, source: 'default', path: rel(root, builtin) };
+  return { ok: true, ...res, source: 'default', path: rel(root, builtin) };
 }
 
 // DocNexus 对显式分类名的约束：1–80 字符，无首尾空白与控制字符（与 bin/skills.mjs 一致）
@@ -186,7 +189,8 @@ export function status(root) {
       // 运行 DocNexus 命令的写法（在项目根执行，任何终端都一样）：后面接原命令的参数；node 脚本前加 --node
       run: `node ${(rel(root, path.join(SKILLS_DIR, 'workflow', 'scripts', 'docnexus.mjs')))}`,
       missing_templates: dn ? templates.filter((t) => !t.ok && !t.on_demand).map((t) => t.expected) : [],
-      stale_project_templates: dn ? templates.map((t) => t.stale_project_file).filter(Boolean) : [],
+      // workflow-run/templates/ 下已不生效的项目模板：接入 DocNexus 后导入知识库再删除
+      stale_project_templates: templates.map((t) => t.stale_project_file).filter(Boolean),
       // 各 skill 写入时使用的显式分类（没声明的 skill 不列出）
       categories: Object.fromEntries(skillMetas().map((m) => [m.name, resolveCategory(root, m.name)]).filter(([, c]) => c.ok).map(([n, c]) => [n, c.category])),
       how: dn ? '缺模板时运行 workflow-run seed-templates' : '重跑 workflow-run 并加 --with-docnexus',
@@ -201,9 +205,11 @@ export function status(root) {
       connections: Object.fromEntries(Object.entries(db?.connections ?? {}).map(([k, c]) => [k, { driver: c.driver ?? 'mysql', readonly: c.readonly !== false }])),
       how: '重跑 workflow-run 补配数据库',
     },
-    templates: templates.map(({ skill, id, source, path: p2, ok, on_demand, expected }) => ({ skill, id, ok, source: source ?? 'missing', path: p2 ?? null, ...(on_demand ? { on_demand: true, expected } : {}) })),
+    templates: templates.map(({ skill, id, source, path: p2, ok, on_demand, need_docnexus, expected }) => ({ skill, id, ok, source: source ?? 'missing', path: p2 ?? null, ...(on_demand ? { on_demand: true, expected } : {}), ...(need_docnexus ? { need_docnexus: true } : {}) })),
     // 不随 skills 提供、还没创建的模板（技术方案、上线方案）：第一次生成文档时按「创建模板」引导用户创建
     templates_to_create: templates.filter((t) => t.on_demand).map((t) => ({ skill: t.skill, id: t.id, expected: t.expected })),
+    // 没有默认版本、要先接入 DocNexus 才能创建的模板（未接入时）
+    templates_need_docnexus: templates.filter((t) => t.need_docnexus).map((t) => ({ skill: t.skill, id: t.id })),
   };
 }
 

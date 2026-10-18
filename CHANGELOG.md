@@ -4,6 +4,11 @@
 
 ## [Unreleased]
 
+### 变更（破坏性）
+- **默认模板只读，定制模板只放 DocNexus**：skills 自带的模板不能改；修改或新建模板一律写进 DocNexus 知识库，便于团队共享（每次变更有 timeline）。`workflow-run/templates/` 下的项目模板不再生效，`resolve.mjs` 输出 `stale_project_file`，`doctor` 提示导入知识库后删除；接入 DocNexus 后缺模板时仍把它作为 `import_from` 提议导入。
+- 未接入 DocNexus 时：只用默认模板；`template.mjs draft` / `save` 退出码 2、输出 `need_docnexus: true`，提示先 `--with-docnexus` 接入。技术方案、上线方案没有默认模板，`resolve.mjs template` 同样返回 `need_docnexus`，要先接入 DocNexus 才能创建模板和生成文档；`resolve.mjs status` 新增 `templates_need_docnexus`。
+- `template.mjs save` 不再写项目文件、不再备份到 `workflow-run/tmp/template-backup/`，只给出写入知识库的 capture 指引；撤销按 DocNexus 的 timeline 恢复。
+
 ## [0.20.0] - 2026-10-18
 
 ### 变更

@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // 修改 / 创建文档模板（/workflow template）的确定性步骤：起草稿 → 校验并与当前模板、已生成文档比对 → 确认后保存。
-// 来源判定沿用 resolve.mjs template；改动只落在草稿 workflow-run/tmp/template-draft/<skill>/<模板>，save 时才写到生效位置。
-// 已接入 DocNexus 时 save 不直接写知识库（写入需按 capture 流程、经用户授权），退出码 2 并给出指引。
+// 来源判定沿用 resolve.mjs template；改动只落在草稿 workflow-run/tmp/template-draft/<skill>/<模板>。
+// skill 自带的默认模板只读：定制模板只保存在 DocNexus 知识库里（便于团队共享），未接入 DocNexus 时 draft / save 退出码 2 提示先接入；
+// save 也不直接写知识库（写入需按 capture 流程、经用户授权），退出码 2 并给出指引。
 // 流程说明见 workflow/references/templates.md「修改模板」。
 //
 // 用法（在项目根执行；--root 可指定项目根）：
@@ -12,8 +13,8 @@
 // <模板>：tech | release | plan | delivery | review | checklist，或 <skill>[/<模板文件名>]（如 create-tech-md-doc/template.md）
 // draft：把当前生效的模板复制成草稿；还没有模板（或 --from）时按样例抽骨架（make-template.mjs）。草稿已存在时不覆盖，--force 重来
 // check：草稿本身的格式问题、与当前模板相比的章节变化、拿最近几份已生成文档按新旧模板各跑一次 lint-doc 看影响
-// save：check 无错误才写入；原模板备份到 workflow-run/tmp/template-backup/<时间>/，写入后重新 resolve 确认生效，删除草稿
-// 输出 JSON。退出码：0 正常；1 参数错误 / 草稿有错误；2 需要按输出的 hint 处理（缺样例、已接入 DocNexus 需 capture）
+// save：check 无错误后给出写入知识库的 capture 指引（写入后重新运行 resolve.mjs template 确认生效）
+// 输出 JSON。退出码：0 正常；1 参数错误 / 草稿有错误；2 需要按输出的 hint 处理（缺样例、未接入 DocNexus、需 capture 写入）
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -37,7 +38,6 @@ const SAMPLE_DOCS = 5;
 
 const rel = (root, p) => path.relative(root, p).split(path.sep).join('/');
 const read = (f) => { try { return fs.readFileSync(f, 'utf8'); } catch { return null; } };
-const stamp = () => new Date().toISOString().replace(/[-:]/g, '').replace(/\..*$/, '').replace('T', '-');
 
 // <模板> → { skill, id }；未知返回 null
 export function target(name) {
@@ -49,6 +49,10 @@ export function target(name) {
   const t = id ? meta.templates.find((x) => x.id === id) : meta.templates[0];
   return t ? { skill, id: t.id } : null;
 }
+
+// 未接入 DocNexus：默认模板只读，不能改也不能新建
+const NEED_DOCNEXUS = '默认模板随 skills 提供、只读不能改；自定义模板只保存在 DocNexus 知识库里，便于团队共享。告诉用户先重跑 workflow-run 并加 --with-docnexus 接入，再修改或创建模板。';
+const needDocNexus = (t, r) => ({ code: 2, out: { ok: false, skill: t.skill, id: t.id, docnexus: false, need_docnexus: true, current: r.ok ? r.path : null, hint: NEED_DOCNEXUS } });
 
 const draftPath = (root, { skill, id }) => path.join(root, 'workflow-run', 'tmp', 'template-draft', skill, id);
 
@@ -118,8 +122,9 @@ function current(root, t) {
 export function draft(root, t, { from = null, force = false, stdin = () => fs.readFileSync(0, 'utf8') } = {}) {
   const file = draftPath(root, t);
   const { r, text } = current(root, t);
-  const base = { skill: t.skill, id: t.id, draft: rel(root, file), source: r.ok ? r.source : null, current: r.ok ? r.path : null, docnexus: !!r.docnexus, expected: r.ok ? (r.source === 'default' ? rel(root, path.join(root, 'workflow-run', 'templates', t.skill, t.id)) : r.path) : r.expected };
-  if (r.error === 'unknown') return { code: 1, out: { ok: false, ...base, message: r.message } };
+  if (r.error === 'unknown') return { code: 1, out: { ok: false, skill: t.skill, id: t.id, message: r.message } };
+  if (!r.docnexus) return needDocNexus(t, r);
+  const base = { skill: t.skill, id: t.id, draft: rel(root, file), source: r.ok ? r.source : null, current: r.ok ? r.path : null, docnexus: true, expected: r.ok ? r.path : r.expected };
   if (fs.existsSync(file) && !force && !from) return { code: 0, out: { ok: true, ...base, created: false, note: '草稿已存在，沿用上次的草稿；要从当前模板重来加 --force' } };
   let content;
   let origin;
@@ -164,28 +169,14 @@ export function save(root, t, file = null) {
   if (c.code) return c;
   if (c.out.unchanged) return { code: 0, out: { ok: true, skill: t.skill, id: t.id, saved: null, note: '草稿与当前模板相同，没有写入' } };
   const r = resolveTemplate(root, t.skill, t.id);
-  if (r.docnexus) {
-    return {
-      code: 2, out: {
-        ok: false, skill: t.skill, id: t.id, docnexus: true, draft: c.out.draft, expected: r.ok ? r.path : r.expected,
-        hint: '已接入 DocNexus，模板只认知识库里的那份，写入要按 capture 流程并经用户授权：已有模板时先 document get --include document,metadata,timeline 取 record_version，以草稿内容 --base-version <record_version> --category doc-template 封存，用户确认后 document add --draft <id> --replace；还没有时以 --category doc-template 新建。完成后重新运行 resolve.mjs template 确认。',
-      },
-    };
-  }
-  const dst = path.join(root, 'workflow-run', 'templates', t.skill, t.id);
-  let backup = null;
-  if (fs.existsSync(dst)) {
-    backup = path.join(root, 'workflow-run', 'tmp', 'template-backup', stamp(), t.skill, t.id);
-    fs.mkdirSync(path.dirname(backup), { recursive: true });
-    fs.copyFileSync(dst, backup);
-  }
-  const src = path.resolve(root, c.out.draft);
-  fs.mkdirSync(path.dirname(dst), { recursive: true });
-  fs.writeFileSync(dst, fs.readFileSync(src, 'utf8'));
-  const after = resolveTemplate(root, t.skill, t.id);
-  const effective = after.ok && after.path === rel(root, dst);
-  if (effective && src === draftPath(root, t)) fs.rmSync(src);
-  return { code: effective ? 0 : 1, out: { ok: effective, skill: t.skill, id: t.id, saved: rel(root, dst), backup: backup && rel(root, backup), effective, source: after.source ?? null, warnings: c.out.warnings, changes: c.out.changes } };
+  if (!r.docnexus) return needDocNexus(t, r);
+  return {
+    code: 2, out: {
+      ok: false, skill: t.skill, id: t.id, docnexus: true, draft: c.out.draft, expected: r.ok ? r.path : r.expected,
+      hint: '模板只认知识库里的那份，写入要按 capture 流程并经用户授权：已有模板时先 document get --include document,metadata,timeline 取 record_version，以草稿内容 --base-version <record_version> --category doc-template 封存，用户确认后 document add --draft <id> --replace；还没有时以 --category doc-template 新建。完成后重新运行 resolve.mjs template 确认，再删除草稿。',
+      warnings: c.out.warnings, changes: c.out.changes,
+    },
+  };
 }
 
 export function list(root) {

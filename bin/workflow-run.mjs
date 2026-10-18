@@ -265,7 +265,7 @@ async function main() {
   if (docnexusConnected(o.root)) reportTemplateStatus(o.root);
   if (docnexus === 'failed') warn('注意：DocNexus 接入失败（见上方输出），其他 skills 不受影响；修复后可重跑（加 --with-docnexus）。');
   if (codegraph === 'failed') warn('注意：CodeGraph 接入失败（见上方输出），其他 skills 不受影响；skills 会退回 grep / 读文件；修复后可重跑（加 --with-codegraph）。');
-  const keep = '（skills 目录里的文件以安装包为准；项目定制请放到 workflow/profile.json、workflow-run/templates/、DocNexus 或 CLAUDE.md / AGENTS.md）';
+  const keep = '（skills 目录里的文件以安装包为准；项目定制请放到 workflow/profile.json、DocNexus（文档模板只能在这里定制）或 CLAUDE.md / AGENTS.md）';
   if (report.overwritten.length || report.removed.length) {
     warn(`以下文件被手动修改过，已按新版${report.removed.length ? '覆盖或删除' : '覆盖'}，原文件备份在 ${report.backupDir}/${keep}：`);
     for (const f of report.overwritten) warn(`  ${f}`);

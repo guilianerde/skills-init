@@ -38,8 +38,9 @@ description: "Generate a Markdown technical design doc (技术方案) from the d
 
 - 模板：在项目根运行 `node <skills>/workflow/scripts/resolve.mjs template create-tech-md-doc template.md`（`<skills>` 是本 skill 所在的 skills 目录，如 `.agents/skills`），读输出的 `path`，并把 `source` 写进元数据行。技术方案模板**不随 skills 提供**，由各团队按自己 wiki 上的格式创建：
   - 退出码 2 且 `on_demand: true` → 还没有创建模板：**停下这一步**，按 `<skills>/workflow/references/templates.md`「创建模板」请用户给一份团队现有的技术方案作样例，生成模板、用户确认后保存到输出的 `expected`，再继续。不要自己编一份通用模板凑数。
-  - 退出码 2 且没有 `on_demand` → 已接入 DocNexus 但知识库缺模板，按输出的 `hint` 处理。
-  - 用户要修改、重新生成或换一份技术方案模板时，按 `<skills>/workflow/references/templates.md`「修改模板」用 `template.mjs` 处理（模板别名 `tech`；按样例重做用 `draft tech --from <样例>`），保存时会备份旧模板。
+  - 退出码 2 且 `need_docnexus: true` → 未接入 DocNexus：技术方案模板只保存在 DocNexus 里，**停下这一步**告诉用户先重跑 workflow-run 并加 `--with-docnexus` 接入，再按「创建模板」创建。不要另存到别处。
+  - 退出码 2 的其他情况 → 按输出的 `hint` 处理。
+  - 用户要修改、重新生成或换一份技术方案模板时，按 `<skills>/workflow/references/templates.md`「修改模板」用 `template.mjs` 处理（模板别名 `tech`；按样例重做用 `draft tech --from <样例>`），保存写入 DocNexus 知识库。
 - 填充：模板的章节和编号因团队而异，**按章节含义**放事实，不按编号。下表是事实的来源，放进模板里含义对应的章节；模板里没有对应章节的事实不擅自加章节，在交付摘要里列出「模板中没有位置的事实」；模板有、但 diff 和 PRD 都给不出内容的章节写「待补充」。
 
 | 事实 | 来源 |

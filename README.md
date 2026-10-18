@@ -315,7 +315,7 @@ mv .agents/skills/.skills-init.json .agents/skills/.workflow-run.json
 | 清单里有、新版里已没有 | 没改过直接删除；改过的备份后删除 |
 
 * 这样 `SKILL.md`、`skill.json`、脚本始终是同一个版本，不会出现「新 SKILL.md 配旧 skill.json」的混搭。
-* 项目自己的定制不要改 skills 目录里的文件，放到不会被覆盖的地方：项目事实和约定写 `workflow/profile.json`（约定写 `notes`），文档结构用 `workflow-run/templates/<skill>/` 或 DocNexus 里的模板，通用规则写 `CLAUDE.md` / `AGENTS.md`。
+* 项目自己的定制不要改 skills 目录里的文件，放到不会被覆盖的地方：项目事实和约定写 `workflow/profile.json`（约定写 `notes`），文档模板只能在 DocNexus 里定制（skills 自带的默认模板只读），通用规则写 `CLAUDE.md` / `AGENTS.md`。
 * 需要找回手改内容时到备份目录里取。
 
 ### 卸载
@@ -394,7 +394,7 @@ npx @rowansenne/workflow-run uninstall
 | `workflow/scripts/artifacts.mjs [--branch b \| --all]` | 按分支汇总 `workflow-run/docs/requirements/` 下的开发方案、交付说明、审查报告、技术方案、上线方案及其 wiki 发布记录，给出下一步建议；分支取自文档元信息行，不另存记录。上线方案没传 `--tech` 时据此自动引用同分支的技术方案；project-review 据此对照本分支方案、识别复审 |
 | `workflow/scripts/report.mjs [--since d] [--all-branches] [--json]` | 本地效果报告（`/workflow report`、`workflow-run report`）：审查发现与修复率、复核率、需求澄清、沉淀率、知识引用、各分支链路 |
 | `workflow/scripts/tables.mjs [--diff b...h \| --base b \| --files a,b]` | 找出改动涉及哪些表：实体注解（`@TableName` / `@Table`，没写表名时按类名推断）、Mapper XML 与代码里的 SQL、DDL 脚本；标出 DDL、是否在 `schema.md` 里，并给出拉表结构的命令。dev 调研 / 自检与 project-review 审 SQL / DDL 时使用 |
-| `workflow/scripts/template.mjs list / draft / check / save <模板>` | 修改 / 创建模板（`/workflow template`）：把当前模板复制成草稿（或 `--from <样例>` 抽骨架），`check` 校验格式、列出章节变化、拿最近几份已生成文档试跑 lint 看影响，`save` 备份旧模板后写入项目模板并确认生效；已接入 DocNexus 时 `save` 给出 capture 指引，不直接写知识库 |
+| `workflow/scripts/template.mjs list / draft / check / save <模板>` | 修改 / 创建模板（`/workflow template`）：把当前模板复制成草稿（或 `--from <样例>` 抽骨架），`check` 校验格式、列出章节变化、拿最近几份已生成文档试跑 lint 看影响，`save` 给出写入 DocNexus 知识库的 capture 指引，不直接写知识库；未接入 DocNexus 时 `draft` / `save` 提示先接入（默认模板只读） |
 | `workflow/scripts/pr-desc.mjs [--branch b] [--base m] [--out f]` | 按本分支产物生成 PR / MR 描述；没有交付说明时退回用 git 记录 |
 | `database-query/scripts/query.mjs` | 执行 SQL：选连接、取密码（只通过环境变量传给客户端）、会话层只读、拦截写语句和多语句、自动补 LIMIT、超时、脱敏敏感列；支持 mysql / psql 客户端，其他 driver 退回 JDBC |
 | `database-query/scripts/query.mjs --schema [--tables a,b] [--write]` | 按只读会话导出表结构为 Markdown；`--write` 写入 `references/schema.md` 的 `schema:begin` / `schema:end` 之间，标记外的补充说明保留；指定的表在库里不存在时标出 |
@@ -508,11 +508,10 @@ npx @rowansenne/workflow-run docs-repo <团队文档仓库地址> [--project <�
 | --- | --- | --- |
 | database-query | 查询结果 | 默认对话输出；导出时 `workflow-run/tmp/database-query/result-<时间戳>.csv` |
 | md-to-wiki | 转换临时 XHTML | `workflow-run/tmp/md-to-wiki/_wiki_upload_<时间戳>.html`（上传后可删） |
-| 各文档类 skill | 项目模板 | `workflow-run/templates/<skill>/`（见下文「模板」） |
 
 规则：
 
-* 本工具的产出都在 `workflow-run/`：`docs/requirements/`（需求产物）、`docnexus/`（DocNexus 工作区）、`templates/`（项目模板）是**持久产物**，随代码提交或在独立文档仓库里提交，团队共享。
+* 本工具的产出都在 `workflow-run/`：`docs/requirements/`（需求产物）、`docnexus/`（DocNexus 工作区，含定制的文档模板）是**持久产物**，随代码提交或在独立文档仓库里提交，团队共享。
 * `workflow-run/tmp/` 是**临时产物**目录，安装时自动把 `/workflow-run/tmp/` 加入 `.gitignore`，不入库。
 
 ## 自定义模板
@@ -593,8 +592,9 @@ workflow-run（安装器仓库）/
 
 文档类 skill 的模板来源取决于项目是否接入了 DocNexus，生成的文档开头会注明「模板来源」：
 
-* **已接入 DocNexus：只用知识库里的模板** `workflow-run/docnexus/library/templates/<skill>/<文件名>`（分类 `doc-template`）。不再使用 skill 自带的默认模板，也不使用 `workflow-run/templates/` 下的文件。库里缺模板时 skill 会停下来，提示你导入后再继续，不会悄悄回退到默认模板。
-* **未接入 DocNexus**：依次取项目文件 `workflow-run/templates/<skill>/<文件名>`、skill 自带默认模板。
+* **已接入 DocNexus：只用知识库里的模板** `workflow-run/docnexus/library/templates/<skill>/<文件名>`（分类 `doc-template`）。不再使用 skill 自带的默认模板。库里缺模板时 skill 会停下来，提示你导入后再继续，不会悄悄回退到默认模板。
+* **未接入 DocNexus**：只用 skill 自带的默认模板。
+* **默认模板只读，定制只走 DocNexus**：要改模板或新建模板，都写进 DocNexus 知识库，团队共享同一份、每次变更有 timeline。不要直接改 skills 目录里的模板（升级会覆盖）；`workflow-run/templates/` 下的项目模板已不再生效，`doctor` 会提示你导入知识库后删除。
 
 | skill | 文件名 | 用途 | 默认模板 |
 | --- | --- | --- | --- |
@@ -605,18 +605,17 @@ workflow-run（安装器仓库）/
 | project-review | `checklist.md` | 审查清单 | 有 |
 | project-review | `report.md` | 审查报告模板 | 有 |
 
-**技术方案、上线方案的模板按团队自己的格式创建**：各团队发到 wiki 的文档格式不同，skills 不再自带固定格式。第一次生成时 skill 会停下来，请你给一份团队现有的同类文档（本地 Markdown，或 wiki 的 pageId / URL）作样例，用 `workflow/scripts/make-template.mjs` 抽出章节和表格结构，把正文换成填写说明，你确认后保存：未接入 DocNexus 时存到 `workflow-run/templates/<skill>/template.md`（建议提交，团队共用），已接入时经你授权写入 DocNexus。之后想换格式，直接说「重新生成技术方案模板」。
+**技术方案、上线方案的模板按团队自己的格式创建**：各团队发到 wiki 的文档格式不同，skills 不再自带固定格式。第一次生成时 skill 会停下来，请你给一份团队现有的同类文档（本地 Markdown，或 wiki 的 pageId / URL）作样例，用 `workflow/scripts/make-template.mjs` 抽出章节和表格结构，把正文换成填写说明，你确认后经你授权写入 DocNexus。因此这两类文档**需要先接入 DocNexus**（`--with-docnexus`），未接入时 skill 会停下来提示。之后想换格式，直接说「重新生成技术方案模板」。
 
 **修改模板**：说「改技术方案模板，加一节回滚方案」或 `/workflow template release 去掉灰度那节`，agent 会一路走完：
 
 1. 把当前生效的模板复制成草稿 `workflow-run/tmp/template-draft/<skill>/<文件名>`，只改草稿；
 2. `template.mjs check` 校验格式（必填 ` *`、可选「（如有）」、占位符），列出新增 / 删除的章节、必填变化，并拿最近几份已生成的文档试跑，告诉你新模板下它们会多出哪些错误；
-3. 你确认后 `template.mjs save`：旧模板备份到 `workflow-run/tmp/template-backup/<时间>/`，写入 `workflow-run/templates/<skill>/`，再确认生效；已接入 DocNexus 时经你授权按 capture 流程写入知识库。
+3. 你确认后经你授权按 capture 流程写入 DocNexus 知识库，再确认生效；要撤销按 DocNexus 的 timeline 恢复旧版本。
 
-模板别名：`tech`、`release`、`plan`、`delivery`、`review`、`checklist`。改带默认版本的模板（开发方案、交付说明、审查报告、审查清单）也走这条路，保存后项目文件优先，升级不会覆盖。
+模板别名：`tech`、`release`、`plan`、`delivery`、`review`、`checklist`。改带默认版本的模板（开发方案、交付说明、审查报告、审查清单）也走这条路，知识库里的版本取代默认版本，升级不会覆盖。未接入 DocNexus 时不能修改模板，agent 会提示你先接入。
 
-* 老项目升级时，如果还在用原来自带的默认模板（项目和 DocNexus 里都没有自己的版本），安装器会先把它保存到 `workflow-run/templates/<skill>/template.md`，生成效果不变。
-* `doctor` 和 `/workflow status` 会列出还没创建的模板。
+* `doctor` 和 `/workflow status` 会列出还没创建的模板，以及要先接入 DocNexus 才能创建的模板。
 
 **模板导入 DocNexus**：
 
@@ -630,7 +629,7 @@ npx @rowansenne/workflow-run seed-templates --diff               # 团队改过�
 * 只导入 DocNexus 里还没有的、有默认版本的模板（技术方案、上线方案不在内），已有的不覆盖；项目已接入但缺模板时，安装结束会列出缺哪几份。
 * 之后模板随知识库更新：直接编辑 `workflow-run/docnexus/library/templates/...` 后在 `workflow-run/` 下执行 `./docnexus/node_modules/.bin/docnexus document sync --id <id>` 采纳；或者在生成文档后，skill 发现你做了结构性调整时会提议同步回模板（你确认后才写入）。每次变更都记录在 DocNexus 的 timeline 里，可追溯。
 * 模板里的 `{{...}}` 是给 agent 的填写提示，DocNexus 原样保存；不要写成单独一行的 `{{fact:...}}`（那是 DocNexus 的事实引用语法）。
-* 没接入 DocNexus 时，可用 `workflow-run/templates/` 下的同名文件覆盖默认模板；之后接入 DocNexus，skill 会提示你把这些文件导入知识库（导入后它们不再生效）。
+* 以前放在 `workflow-run/templates/` 下的项目模板：接入 DocNexus 后，缺模板时 skill 会把它作为 `import_from` 提议导入知识库；导入后删除这些文件。
 
 ## 触发准确度评估
 

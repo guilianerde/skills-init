@@ -1,4 +1,4 @@
-// /workflow template：template.mjs 起草稿 → 校验与影响 → 保存（备份、确认生效）；已接入 DocNexus 时不直接写知识库
+// /workflow template：template.mjs 起草稿 → 校验与影响 → 保存（给出写入 DocNexus 的指引）；未接入 DocNexus 时默认模板只读
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -38,36 +38,63 @@ test('compare：按归一化标题比对，改编号不算变化；列出增删�
   assert.equal(c.reordered, true);
 });
 
-test('没有模板时 draft 要样例；--from 抽骨架 → check → save 写入项目模板并生效', () => {
+const connect = (root) => {
+  fs.mkdirSync(path.join(root, 'workflow-run/docnexus/node_modules/.bin'), { recursive: true });
+  fs.writeFileSync(path.join(root, 'workflow-run/docnexus/project.json'), '{}');
+  fs.writeFileSync(path.join(root, 'workflow-run/docnexus/node_modules/.bin', process.platform === 'win32' ? 'docnexus.cmd' : 'docnexus'), '');
+};
+const libFile = (root, skill, id = 'template.md') => path.join(root, 'workflow-run/docnexus/library/templates', skill, id);
+
+test('未接入 DocNexus：默认模板只读，draft / save 退出码 2 提示先接入，不写任何模板', () => {
   const { root, run, draftFile } = project();
+  let r = run('draft', 'delivery');
+  assert.equal(r.code, 2);
+  assert.deepEqual([r.out.need_docnexus, r.out.current], [true, '.agents/skills/dev/references/delivery-template.md']);
+  assert.match(r.out.hint, /--with-docnexus/);
+  assert.ok(!fs.existsSync(draftFile('dev', 'delivery-template.md')), '不起草稿');
+  fs.mkdirSync(path.dirname(draftFile('dev', 'delivery-template.md')), { recursive: true });
+  fs.writeFileSync(draftFile('dev', 'delivery-template.md'), '# 交付\n\n## 验证 *\n');
+  r = run('save', 'delivery');
+  assert.equal(r.code, 2);
+  assert.equal(r.out.need_docnexus, true);
+  assert.ok(!fs.existsSync(path.join(root, 'workflow-run/templates')), '不写项目模板');
+  assert.equal(run('draft', 'tech').out.need_docnexus, true, '技术方案没有默认模板，也要先接入');
+  fs.rmSync(root, { recursive: true, force: true });
+});
+
+test('已接入 DocNexus、没有模板时 draft 要样例；--from 抽骨架 → check → save 给出 capture 指引', () => {
+  const { root, run, draftFile } = project();
+  connect(root);
   let r = run('draft', 'tech');
   assert.equal(r.code, 2);
   assert.equal(r.out.need_sample, true);
   fs.writeFileSync(path.join(root, 'sample.md'), '# 【技术方案】订单导出\n\n## 一、背景 *\n\n运营要按渠道导出\n\n## 二、接口\n\n| 接口 | 说明 |\n|---|---|\n| /order/export | 加参数 |\n');
   r = run('draft', 'tech', '--from', 'sample.md');
   assert.equal(r.code, 0, r.err);
-  assert.equal(r.out.from, 'sample');
+  assert.deepEqual([r.out.from, r.out.expected], ['sample', 'workflow-run/docnexus/library/templates/create-tech-md-doc/template.md']);
   assert.ok(!fs.readFileSync(draftFile('create-tech-md-doc'), 'utf8').includes('/order/export'));
   r = run('check', 'tech');
   assert.equal(r.code, 0);
   assert.equal(r.out.changes, null, '还没有当前模板');
   r = run('save', 'tech');
-  assert.equal(r.code, 0, JSON.stringify(r.out));
-  assert.deepEqual([r.out.saved, r.out.backup, r.out.effective, r.out.source], ['workflow-run/templates/create-tech-md-doc/template.md', null, true, 'project']);
-  assert.ok(!fs.existsSync(draftFile('create-tech-md-doc')), '保存后删除草稿');
+  assert.equal(r.code, 2, JSON.stringify(r.out));
+  assert.match(r.out.hint, /--category doc-template/);
+  assert.ok(!fs.existsSync(libFile(root, 'create-tech-md-doc')), '不直接写知识库');
   fs.rmSync(root, { recursive: true, force: true });
 });
 
-test('修改已有模板：草稿沿用 / --force 重来；check 列出变化与对已生成文档的影响；save 备份旧模板', () => {
+test('修改知识库里的模板：草稿沿用 / --force 重来；check 列出变化与对已生成文档的影响；save 不改知识库', () => {
   const { root, run, draftFile } = project();
-  const tplFile = path.join(root, 'workflow-run/templates/create-release-md-doc/template.md');
+  connect(root);
+  const tplFile = libFile(root, 'create-release-md-doc');
+  const TPL = '# 【上线方案】{{文档标题}}\n\n## 一、上线服务 *\n\n{{服务}}\n\n## 二、灰度\n\n{{灰度}}\n';
   fs.mkdirSync(path.dirname(tplFile), { recursive: true });
-  fs.writeFileSync(tplFile, '# 【上线方案】{{文档标题}}\n\n## 一、上线服务 *\n\n{{服务}}\n\n## 二、灰度\n\n{{灰度}}\n');
+  fs.writeFileSync(tplFile, TPL);
   fs.mkdirSync(path.join(root, 'workflow-run/docs/requirements/x'), { recursive: true });
-  fs.writeFileSync(path.join(root, 'workflow-run/docs/requirements/x/release-doc.md'), '# 【上线方案】x\n\n> 自动生成\n> 对比分支：`a` ←→ `main`\n> diff 概览\n> 模板来源：项目文件\n\n## 一、上线服务\n\norder\n\n## 二、灰度\n\n无\n');
+  fs.writeFileSync(path.join(root, 'workflow-run/docs/requirements/x/release-doc.md'), '# 【上线方案】x\n\n> 自动生成\n> 对比分支：`a` ←→ `main`\n> diff 概览\n> 模板来源：DocNexus\n\n## 一、上线服务\n\norder\n\n## 二、灰度\n\n无\n');
 
   let r = run('draft', 'release');
-  assert.equal(r.out.from, 'project');
+  assert.equal(r.out.from, 'docnexus');
   const d = draftFile('create-release-md-doc');
   fs.writeFileSync(d, '# 【上线方案】{{文档标题}}\n\n## 一、上线服务 *\n\n{{服务}}\n\n## 二、回滚 *\n\n{{回滚步骤}}\n');
   r = run('draft', 'release');
@@ -82,52 +109,35 @@ test('修改已有模板：草稿沿用 / --force 重来；check 列出变化与
   assert.deepEqual(r.out.impact.affected[0].new_errors, ['缺少必填章节「二、回滚」']);
 
   r = run('save', 'release');
-  assert.equal(r.code, 0);
-  assert.match(r.out.backup, /^workflow-run\/tmp\/template-backup\/[\d-]+\/create-release-md-doc\/template\.md$/);
-  assert.match(fs.readFileSync(path.join(root, r.out.backup), 'utf8'), /灰度/);
-  assert.match(fs.readFileSync(tplFile, 'utf8'), /回滚/);
+  assert.equal(r.code, 2);
+  assert.deepEqual([r.out.docnexus, r.out.expected], [true, 'workflow-run/docnexus/library/templates/create-release-md-doc/template.md']);
+  assert.match(r.out.hint, /capture/);
+  assert.deepEqual(r.out.changes.added, ['二、回滚 *']);
+  assert.equal(fs.readFileSync(tplFile, 'utf8'), TPL, '知识库里的模板没被改');
 
-  run('draft', 'release');
+  run('draft', 'release', '--force');
   r = run('save', 'release');
   assert.equal(r.out.saved, null, '没改动时不写入');
   fs.writeFileSync(d, '正文没有标题\n');
   r = run('save', 'release');
   assert.equal(r.code, 1, '草稿有错误时拒绝保存');
-  assert.match(fs.readFileSync(tplFile, 'utf8'), /回滚/);
   r = run('draft', 'release', '--force');
   assert.equal(r.out.created, true);
   fs.rmSync(root, { recursive: true, force: true });
 });
 
-test('带默认版本的模板：草稿取默认模板，保存到项目后优先生效', () => {
+test('带默认版本的模板、知识库里还没有：草稿取默认模板，保存目标是知识库', () => {
   const { root, run, draftFile } = project();
+  connect(root);
   let r = run('draft', 'delivery');
-  assert.equal(r.out.source, 'default');
-  assert.equal(r.out.expected, 'workflow-run/templates/dev/delivery-template.md');
+  assert.equal(r.out.from, 'import_from');
+  assert.equal(r.out.expected, 'workflow-run/docnexus/library/templates/dev/delivery-template.md');
+  assert.equal(fs.readFileSync(draftFile('dev', 'delivery-template.md'), 'utf8'), fs.readFileSync(path.join(root, '.agents/skills/dev/references/delivery-template.md'), 'utf8'));
   fs.appendFileSync(draftFile('dev', 'delivery-template.md'), '\n## 上线关注点（如有）\n\n{{要盯的指标}}\n');
   r = run('save', 'delivery');
-  assert.equal(r.code, 0, JSON.stringify(r.out));
-  assert.equal(r.out.source, 'project');
-  assert.deepEqual(r.out.changes.added, ['上线关注点（如有）']);
-  fs.rmSync(root, { recursive: true, force: true });
-});
-
-test('已接入 DocNexus：save 不写知识库，退出码 2 给出 capture 指引', () => {
-  const { root, run } = project();
-  fs.mkdirSync(path.join(root, 'workflow-run/docnexus/node_modules/.bin'), { recursive: true });
-  fs.writeFileSync(path.join(root, 'workflow-run/docnexus/project.json'), '{}');
-  fs.writeFileSync(path.join(root, 'workflow-run/docnexus/node_modules/.bin', process.platform === 'win32' ? 'docnexus.cmd' : 'docnexus'), '');
-  const lib = path.join(root, 'workflow-run/docnexus/library/templates/create-tech-md-doc/template.md');
-  fs.mkdirSync(path.dirname(lib), { recursive: true });
-  fs.writeFileSync(lib, '# 【技术方案】{{文档标题}}\n\n## 背景 *\n');
-  let r = run('draft', 'tech');
-  assert.equal(r.out.source, 'docnexus');
-  fs.appendFileSync(path.join(root, r.out.draft), '\n## 回滚 *\n');
-  r = run('save', 'tech');
-  assert.equal(r.code, 2);
-  assert.equal(r.out.docnexus, true);
-  assert.match(r.out.hint, /capture/);
-  assert.equal(fs.readFileSync(lib, 'utf8'), '# 【技术方案】{{文档标题}}\n\n## 背景 *\n', '知识库里的模板没被改');
+  assert.equal(r.code, 2, JSON.stringify(r.out));
+  assert.equal(r.out.expected, 'workflow-run/docnexus/library/templates/dev/delivery-template.md');
+  assert.doesNotMatch(fs.readFileSync(path.join(root, '.agents/skills/dev/references/delivery-template.md'), 'utf8'), /上线关注点/, '默认模板没被改');
   fs.rmSync(root, { recursive: true, force: true });
 });
 

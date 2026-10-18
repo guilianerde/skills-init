@@ -24,20 +24,26 @@ function project() {
 }
 const connect = (put) => { put('workflow-run/docnexus/project.json', '{}'); put('workflow-run/docnexus/node_modules/.bin/docnexus', ''); put('workflow-run/docnexus/node_modules/.bin/docnexus.cmd', ''); };
 
-test('未接入 DocNexus：项目文件优先，其次默认模板；技术方案没有默认模板，缺失时退出 2 引导按样例创建', () => {
+test('未接入 DocNexus：只用默认模板，项目文件不生效；技术方案没有默认模板，退出 2 提示先接入 DocNexus', () => {
   const { root, resolve, put } = project();
   let r = resolve('template', 'create-tech-md-doc', 'template.md');
   assert.equal(r.status, 2);
-  assert.deepEqual([r.out.error, r.out.on_demand, r.out.docnexus, r.out.expected], ['missing', true, false, 'workflow-run/templates/create-tech-md-doc/template.md']);
-  assert.match(r.out.hint, /创建模板/);
-  assert.match(r.out.hint, /make-template\.mjs/);
+  assert.deepEqual([r.out.error, r.out.need_docnexus, r.out.on_demand, r.out.docnexus], ['missing', true, undefined, false]);
+  assert.match(r.out.hint, /--with-docnexus/);
   assert.equal(resolve('template', 'project-review', 'checklist.md').out.path, '.agents/skills/project-review/references/checklist.md');
   assert.equal(resolve('template', 'dev', 'plan-template.md').out.source, 'default');
   const s0 = resolve('status').out;
-  assert.deepEqual(s0.templates_to_create.map((t) => t.skill).sort(), ['create-release-md-doc', 'create-tech-md-doc']);
+  assert.deepEqual(s0.templates_to_create, []);
+  assert.deepEqual(s0.templates_need_docnexus.map((t) => t.skill).sort(), ['create-release-md-doc', 'create-tech-md-doc']);
   put('workflow-run/templates/create-tech-md-doc/template.md', '# 团队模板');
+  put('workflow-run/templates/dev/plan-template.md', '# 项目里的开发方案模板');
   r = resolve('template', 'create-tech-md-doc', 'template.md');
-  assert.deepEqual([r.out.source, r.out.path], ['project', 'workflow-run/templates/create-tech-md-doc/template.md']);
+  assert.equal(r.status, 2, '项目模板不再生效');
+  assert.equal(r.out.stale_project_file, 'workflow-run/templates/create-tech-md-doc/template.md');
+  assert.match(r.out.hint, /不再生效/);
+  r = resolve('template', 'dev', 'plan-template.md');
+  assert.deepEqual([r.out.source, r.out.path, r.out.stale_project_file], ['default', '.agents/skills/dev/references/plan-template.md', 'workflow-run/templates/dev/plan-template.md']);
+  assert.deepEqual(resolve('status').out.docnexus.stale_project_templates.sort(), ['workflow-run/templates/create-tech-md-doc/template.md', 'workflow-run/templates/dev/plan-template.md']);
   assert.equal(resolve('template', 'dev', 'nope.md').status, 1);
   fs.rmSync(root, { recursive: true, force: true });
 });

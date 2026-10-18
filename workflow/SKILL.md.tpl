@@ -33,7 +33,7 @@ description: "Entry point for this project's dev workflow skills: routes a reque
 | 写 PR / MR 描述、提 PR | `workflow/scripts/pr-desc.mjs` | 汇总本分支交付说明、审查报告、技术 / 上线方案；创建 PR 需用户同意 |
 | 这套工作流效果怎么样、用得怎么样 | `/workflow report` | 只读统计 `workflow-run/docs/requirements/` 下的产物 |
 | 看看项目文档、某个需求留下了哪些文档、审查记录 | `/workflow view` | 生成本地静态页面，按需求浏览 |
-| 改技术方案 / 上线方案 / 交付说明 / 审查报告的模板，按样例建模板 | `/workflow template` | 草稿 → 校验与影响 → 用户确认后保存 |
+| 改技术方案 / 上线方案 / 交付说明 / 审查报告的模板，按样例建模板 | `/workflow template` | 草稿 → 校验与影响 → 用户确认后写入 DocNexus（默认模板只读，未接入 DocNexus 时不能改） |
 | 记住 / 查找项目决策与约定 | DocNexus（入口 skill `docnexus`） | 需已接入；写入必须用户授权 |
 
 意图明确时直接按对应 skill 执行，不必先输出这张表。目标 skill 没有安装（`resolve.mjs status` 输出的 `skills` 里没有它，安装时用了 `--skills` 子集）→ 告诉用户可以运行 `workflow-run --skills <名称>` 补装，不要假装执行。意图横跨多个阶段时按下面的「完整链路」逐段推进，每段结束告诉用户下一段是什么，由用户决定是否继续。走到哪一步不靠记忆：运行 `node <skills>/workflow/scripts/artifacts.mjs [--branch <分支>]`，它扫描 `workflow-run/docs/requirements/` 下的产物，按元信息行里的分支归组，输出每类最新的一份、wiki 发布记录和 `next`（下一步建议）。

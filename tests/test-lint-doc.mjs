@@ -51,7 +51,7 @@ test('缺必填章节、残留占位符、缺元信息为错误；缺普通章�
   assert.ok(!r.warnings.some((w) => w.includes('不是标题')));
 });
 
-test('CLI：按项目模板检查，原样的骨架报错；技术方案没有模板时退出 2；已接入 DocNexus 时改用知识库模板', () => {
+test('CLI：技术方案没有模板时退出 2，项目模板不生效；已接入 DocNexus 时按知识库模板检查，原样的骨架报错', () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'lintdoc-'));
   assert.equal(spawnSync(process.execPath, [path.join(REPO, 'bin/workflow-run.mjs'), '--project-root', root, '--envs', 'codex', '--skip-db', '--yes'], { encoding: 'utf8' }).status, 0);
   const cli = (...a) => spawnSync(process.execPath, [path.join(root, '.agents/skills/workflow/scripts/lint-doc.mjs'), ...a], { cwd: root, encoding: 'utf8' });
@@ -62,10 +62,7 @@ test('CLI：按项目模板检查，原样的骨架报错；技术方案没有�
   fs.mkdirSync(path.join(root, 'workflow-run/templates/create-tech-md-doc'), { recursive: true });
   fs.writeFileSync(path.join(root, 'workflow-run/templates/create-tech-md-doc/template.md'), TEAM);
   r = cli('raw.md', '--skill', 'create-tech-md-doc', '--json');
-  assert.equal(r.status, 1);
-  const out = JSON.parse(r.stdout);
-  assert.equal(out.source, 'project');
-  assert.ok(out.errors.some((e) => e.includes('模板来源')));
+  assert.equal(r.status, 2, 'workflow-run/templates/ 下的项目模板不再生效');
   assert.equal(cli('raw.md', '--skill', 'database-query').status, 3, '没有带 lint 的模板');
   // 审查报告：原样的模板报占位符；按模板写完的报告通过，缺元信息行与必填章节报错
   fs.copyFileSync(path.join(REPO, 'project-review/references/report.md.tpl'), path.join(root, 'review-raw.md'));
@@ -93,6 +90,12 @@ test('CLI：按项目模板检查，原样的骨架报错；技术方案没有�
   r = cli('doc.md', '--skill', 'create-tech-md-doc');
   assert.equal(r.status, 0, r.stdout);
   assert.match(r.stdout, /docnexus/);
+  fs.writeFileSync(path.join(root, 'workflow-run/docnexus/library/templates/create-tech-md-doc/template.md'), TEAM);
+  r = cli('raw.md', '--skill', 'create-tech-md-doc', '--json');
+  assert.equal(r.status, 1, '原样的骨架报错');
+  const out = JSON.parse(r.stdout);
+  assert.equal(out.source, 'docnexus');
+  assert.ok(out.errors.some((e) => e.includes('模板来源')));
   fs.rmSync(root, { recursive: true, force: true });
 });
 
