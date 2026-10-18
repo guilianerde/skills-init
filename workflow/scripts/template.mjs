@@ -51,7 +51,7 @@ export function target(name) {
 }
 
 // 未接入 DocNexus：默认模板只读，不能改也不能新建
-const NEED_DOCNEXUS = '默认模板随 skills 提供、只读不能改；自定义模板只保存在 DocNexus 知识库里，便于团队共享。告诉用户先重跑 workflow-run 并加 --with-docnexus 接入，再修改或创建模板。';
+const NEED_DOCNEXUS = '默认模板随 skills 提供、只读不能改；自定义模板只保存在 DocNexus 知识库里，便于团队共享。告诉用户先重跑 npx @rowansenne/workflow-run 并加 --with-docnexus 接入，再修改或创建模板。';
 const needDocNexus = (t, r) => ({ code: 2, out: { ok: false, skill: t.skill, id: t.id, docnexus: false, need_docnexus: true, current: r.ok ? r.path : null, hint: NEED_DOCNEXUS } });
 
 const draftPath = (root, { skill, id }) => path.join(root, 'workflow-run', 'tmp', 'template-draft', skill, id);

@@ -140,9 +140,9 @@ export function updateTemplates(root, tplDir, records = {}, { ok = console.log, 
 
 export const STATUS_TEXT = {
   current: '与默认模板一致',
-  outdated: '默认模板有新版，库中模板未改动：运行 workflow-run seed-templates --update 更新',
-  customized: '团队改过，默认模板也有新版：运行 workflow-run seed-templates --diff 查看差异后手动合并',
+  outdated: '默认模板有新版，库中模板未改动：运行 npx @rowansenne/workflow-run seed-templates --update 更新',
+  customized: '团队改过，默认模板也有新版：运行 npx @rowansenne/workflow-run seed-templates --diff 查看差异后手动合并',
   edited: '团队改过（默认模板无变化）',
-  untracked: '没有导入记录，内容与默认模板不同：如需采用新默认模板，运行 workflow-run seed-templates --diff 对比',
-  missing: '知识库中缺失：运行 workflow-run seed-templates 导入（upgrade 时会自动导入）',
+  untracked: '没有导入记录，内容与默认模板不同：如需采用新默认模板，运行 npx @rowansenne/workflow-run seed-templates --diff 对比',
+  missing: '知识库中缺失：运行 npx @rowansenne/workflow-run seed-templates 导入（upgrade 时会自动导入）',
 };

@@ -39,7 +39,7 @@ export function run(root, args, opts = {}) {
   const entry = cliEntry(root);
   if (entry) return spawnSync(process.execPath, [entry, ...args], o);
   const bin = docnexusBin(root);
-  if (!bin) return { status: 1, error: 'DocNexus 没装：重跑 workflow-run 并加 --with-docnexus' };
+  if (!bin) return { status: 1, error: 'DocNexus 没装：重跑 npx @rowansenne/workflow-run 并加 --with-docnexus' };
   return spawnSync(path.resolve(root, bin), args, { ...o, shell: process.platform === 'win32' });
 }
 

@@ -13,18 +13,18 @@ node <skills>/workflow/scripts/resolve.mjs template <skill> <文件名>
 判定规则（实现在脚本里，这里只是说明）：
 
 - **已接入 DocNexus**：只用 `workflow-run/docnexus/library/templates/<skill>/<文件名>`（分类 `doc-template`，普通 Markdown，手工改动立即生效）。不使用 skill 默认模板，也不使用 `workflow-run/templates/`——知识库是唯一来源，避免几份模板各自演化。
-  - 缺模板时退出码 2，输出 `expected`（应在的位置）、`import_from`（可导入的来源）和 `hint`。**停下这一步**，告诉用户缺哪份模板，给两个选择：在项目根运行 `workflow-run seed-templates`（或重跑安装加 `--seed-templates`）；或者由你在用户确认后按 DocNexus 的 capture 流程把 `import_from` 写入 `expected`，以显式分类封存（`draft seal ... --category doc-template`，metadata.category 也写 `doc-template`）。导入后再继续。
+  - 缺模板时退出码 2，输出 `expected`（应在的位置）、`import_from`（可导入的来源）和 `hint`。**停下这一步**，告诉用户缺哪份模板，给两个选择：在项目根运行 `npx @rowansenne/workflow-run seed-templates`（或重跑安装加 `--seed-templates`）；或者由你在用户确认后按 DocNexus 的 capture 流程把 `import_from` 写入 `expected`，以显式分类封存（`draft seal ... --category doc-template`，metadata.category 也写 `doc-template`）。导入后再继续。
 - **未接入 DocNexus**：只用 skill 默认模板，不能修改或新建模板。
 - 输出里 `stale_project_file` 非空：`workflow-run/templates/` 下的这份已不再生效，提醒用户导入 DocNexus 后删除（未接入时先接入）。
 - **技术方案、上线方案没有默认模板**（`create-tech-md-doc`、`create-release-md-doc` 的 `template.md`）：各团队发到 wiki 的格式不同，skills 不自带固定格式，第一次使用时按样例创建到知识库。
   - 已接入 DocNexus、还没创建：退出码 2，输出 `on_demand: true`、`expected`（知识库里的位置）和 `hint`，按下面「创建模板」处理。
-  - 未接入 DocNexus：退出码 2，输出 `need_docnexus: true` 和 `hint`。**停下这一步**，告诉用户这两类文档的模板只保存在 DocNexus 里，要先重跑 workflow-run 并加 `--with-docnexus` 接入，再创建模板。不要自己编一份模板凑数。
+  - 未接入 DocNexus：退出码 2，输出 `need_docnexus: true` 和 `hint`。**停下这一步**，告诉用户这两类文档的模板只保存在 DocNexus 里，要先重跑 npx @rowansenne/workflow-run 并加 `--with-docnexus` 接入，再创建模板。不要自己编一份模板凑数。
 
-`resolve.mjs templates` 列出所有登记模板的来源；登记表在各 skill 的 `skill.json`（`templates` 字段）。`--with-docnexus` 接入时会自动导入默认模板，之后可运行 `workflow-run seed-templates` 补导入（已存在的不覆盖）。
+`resolve.mjs templates` 列出所有登记模板的来源；登记表在各 skill 的 `skill.json`（`templates` 字段）。`--with-docnexus` 接入时会自动导入默认模板，之后可运行 `npx @rowansenne/workflow-run seed-templates` 补导入（已存在的不覆盖）。
 
 ## 修改模板（/workflow template）
 
-用户要改某份模板（「技术方案模板加一节回滚」「上线方案去掉灰度那节」「审查报告的严重问题表加一列」），或要新建、按样例重做模板时，用 `template.mjs` 一路走完，不要直接编辑生效中的模板文件。未接入 DocNexus 时 `draft` / `save` 退出码 2、输出 `need_docnexus: true`：告诉用户默认模板不能改，要先接入 DocNexus（重跑 workflow-run 并加 `--with-docnexus`），不要另找地方保存。`<模板>` 写别名 `tech` / `release` / `plan` / `delivery` / `review` / `checklist`，或 `<skill>/<文件名>`；没说哪份时先 `template.mjs list` 列出来问。
+用户要改某份模板（「技术方案模板加一节回滚」「上线方案去掉灰度那节」「审查报告的严重问题表加一列」），或要新建、按样例重做模板时，用 `template.mjs` 一路走完，不要直接编辑生效中的模板文件。未接入 DocNexus 时 `draft` / `save` 退出码 2、输出 `need_docnexus: true`：告诉用户默认模板不能改，要先接入 DocNexus（重跑 npx @rowansenne/workflow-run 并加 `--with-docnexus`），不要另找地方保存。`<模板>` 写别名 `tech` / `release` / `plan` / `delivery` / `review` / `checklist`，或 `<skill>/<文件名>`；没说哪份时先 `template.mjs list` 列出来问。
 
 1. **起草稿**：`node <skills>/workflow/scripts/template.mjs draft <模板>`，把当前生效的模板复制到 `workflow-run/tmp/template-draft/<skill>/<文件名>`（输出的 `draft`）。草稿已存在会沿用（上次没改完）；要从当前模板重来加 `--force`。
    - 退出码 2、`need_sample: true`：还没有这份模板，按下面「创建模板」第 1 步向用户要样例，再运行 `draft <模板> --from <样例文件>`（从 stdin 读用 `--from -`）。用户要「按这份文档重做模板」时同样用 `--from`。

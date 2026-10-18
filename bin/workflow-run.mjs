@@ -244,7 +244,7 @@ async function main() {
       // upgrade 顺带的导入是尽力而为：失败只提示，不让升级本身算失败
       const explicit = o.seedTemplates || o.withDocNexus;
       seedFailed = explicit && r.failed.length > 0;
-      if (!explicit && r.failed.length) warn('新增模板导入失败（skills 已升级）：修复后运行 workflow-run seed-templates 重试');
+      if (!explicit && r.failed.length) warn('新增模板导入失败（skills 已升级）：修复后运行 npx @rowansenne/workflow-run seed-templates 重试');
       if (upgradeSeed && !r.seeded.length && !r.failed.length) ok('知识库里的文档模板齐全，无需导入');
     } catch (e) { warn(e.message); seedFailed = o.seedTemplates || o.withDocNexus; }
   }

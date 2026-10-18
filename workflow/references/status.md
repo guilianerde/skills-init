@@ -9,9 +9,9 @@
 |---|---|---|
 | 项目画像 | ✅ / ⚠️ 部分字段为空 | <空字段>；运行 /workflow profile |
 | wiki | ✅ / ❌ | 填写 md-to-wiki/wiki-config.json 或接入 wiki MCP |
-| DocNexus | ✅ / ❌ | 重跑 workflow-run 并加 --with-docnexus；已接入但缺模板时列出缺的模板并提示 `workflow-run seed-templates`；未接入时说明默认模板只读、不能定制，技术方案 / 上线方案要先接入（`templates_need_docnexus`）；`stale_project_templates` 非空时提示这些项目模板已不再生效 |
+| DocNexus | ✅ / ❌ | 重跑 npx @rowansenne/workflow-run 并加 --with-docnexus；已接入但缺模板时列出缺的模板并提示 `npx @rowansenne/workflow-run seed-templates`；未接入时说明默认模板只读、不能定制，技术方案 / 上线方案要先接入（`templates_need_docnexus`）；`stale_project_templates` 非空时提示这些项目模板已不再生效 |
 | 数据库 | ✅ / ❌ | 重跑 `npx @rowansenne/workflow-run` 补配 |
-| 代码图谱 | ✅ / ⚠️ 已装未建索引 / ❌ | 重跑 workflow-run 并加 --with-codegraph；已装 codegraph 但没有 .codegraph/ 时提示用户自己运行 codegraph init |
+| 代码图谱 | ✅ / ⚠️ 已装未建索引 / ❌ | 重跑 npx @rowansenne/workflow-run 并加 --with-codegraph；已装 codegraph 但没有 .codegraph/ 时提示用户自己运行 codegraph init |
 
 ## 当前分支 <分支>
 | 环节 | 产物 | wiki |
