@@ -36,7 +36,7 @@ export function viewData(root) {
     if (a.branch) g.branches.add(a.branch);
     if (a.project) g.projects.add(a.project);
     const text = fs.readFileSync(path.join(root, a.path), 'utf8');
-    const item = { kind: a.kind, label: a.label, path: a.path, cite: a.cite ?? a.path, project: a.project ?? null, file: a.project && L.mode === 'repo' ? `${a.project}/${path.basename(a.path)}` : path.basename(a.path), date: (a.date || '').slice(0, 10) || null, branch: a.branch, wiki: a.wiki, text };
+    const item = { kind: a.kind, label: a.label, path: a.path, cite: a.cite ?? a.path, project: a.project ?? null, file: a.project && L.mode === 'repo' ? `${a.project}/${path.basename(a.path)}` : path.basename(a.path), date: (a.date || '').slice(0, 10) || null, version: a.version ?? 1, branch: a.branch, wiki: a.wiki, text };
     if (a.kind === 'review') item.review = parseReview(text);
     if (a.kind === 'delivery') item.delivery = parseDelivery(text);
     if (a.kind === 'review' || a.kind === 'delivery') item.docnexus = captureState(text);
@@ -214,8 +214,8 @@ function renderList() {
 function reviewBlock(r) {
   const rs = r.artifacts.filter((a) => a.kind === 'review');
   if (!rs.length) return '';
-  const row = (a, i) => { const v = a.review; const f = v.follow_up;
-    return '<tr><td><a href="#" data-doc="' + esc(a.path) + '">' + esc(a.file) + '</a></td><td>' + esc(a.date || '') + '</td><td>' + (i ? '复审' : '首次') + '</td>'
+  const row = (a) => { const v = a.review; const f = v.follow_up;
+    return '<tr><td><a href="#" data-doc="' + esc(a.path) + '">' + esc(a.file) + '</a></td><td>' + esc(a.date || '') + '</td><td>' + (v.is_rereview ? '复审' : '首次') + '</td>'
       + '<td><span class="lv c">' + v.levels.CRITICAL + '</span> <span class="lv h">' + v.levels.HIGH + '</span> ' + v.levels.MEDIUM + ' / ' + v.levels.LOW + '</td>'
       + '<td>✅ ' + v.verified + ' · ⚠ ' + v.pending + '</td><td>' + (v.is_rereview ? '<span class="lv f">已修复 ' + f.fixed + '</span> 仍存在 ' + f.open + ' · 不再适用 ' + f.obsolete : '—') + '</td><td>' + esc(a.docnexus === 'captured' ? '已沉淀' : a.docnexus === 'not_captured' ? '未沉淀' : a.docnexus === 'not_connected' ? '未接入' : '—') + '</td></tr>'; };
   return '<section class="block"><h3>审查记录</h3><table><thead><tr><th>报告</th><th>日期</th><th>轮次</th><th>CRITICAL · HIGH · MEDIUM / LOW</th><th>复核</th><th>与上次对比</th><th>DocNexus</th></tr></thead><tbody>' + rs.map(row).join('') + '</tbody></table></section>';
@@ -253,7 +253,7 @@ function select(id, docPath) {
   try { history.replaceState(null, '', '#' + encodeURIComponent(id)); } catch {}
   const latest = (k) => r.artifacts.filter((a) => a.kind === k).at(-1);
   const pipeline = '<div class="pipeline">' + D.kinds.map((k) => { const a = latest(k.kind); const n = r.stages[k.kind];
-    return '<div class="stage' + (n ? ' y' : '') + '"><div class="t">' + k.label + '</div><div class="c">' + (n ? (n > 1 ? n + ' 版' : '✓') + (a && a.date ? ' · ' + a.date : '') : '—') + '</div>' + (a && a.wiki ? '<div class="t">wiki ' + (a.wiki.url ? '<a href="' + esc(a.wiki.url) + '" target="_blank" rel="noopener">pageId ' + esc(a.wiki.pageId) + '</a>' : 'pageId ' + esc(a.wiki.pageId)) + '</div>' : '') + '</div>'; }).join('') + '</div>';
+    return '<div class="stage' + (n ? ' y' : '') + '"><div class="t">' + k.label + '</div><div class="c">' + (n ? (a && a.version > 1 ? 'v' + a.version : '✓') + (a && a.date ? ' · ' + a.date : '') : '—') + '</div>' + (a && a.wiki ? '<div class="t">wiki ' + (a.wiki.url ? '<a href="' + esc(a.wiki.url) + '" target="_blank" rel="noopener">pageId ' + esc(a.wiki.pageId) + '</a>' : 'pageId ' + esc(a.wiki.pageId)) + '</div>' : '') + '</div>'; }).join('') + '</div>';
   const order = D.kinds.map((k) => k.kind);
   const files = '<div class="files">' + r.artifacts.slice().sort((x, y) => order.indexOf(x.kind) - order.indexOf(y.kind)).map((a) => '<button data-doc="' + esc(a.path) + '">' + esc(a.label) + ' · ' + esc(a.file) + '</button>').join('') + '</div>';
   $('#main').innerHTML = overview() + '<h2>' + esc(r.name) + '</h2><div class="sub">' + esc(r.dir ?? '') + (r.projects.length ? ' · 项目 ' + esc(r.projects.join('、')) : '') + ' · 分支 ' + esc(r.branches.join('、') || '无') + (r.named_by === 'branch' ? ' · <span class="tag">需求名由分支名生成，可在 meta.json 改</span>' : '') + '</div>'

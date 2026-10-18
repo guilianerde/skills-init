@@ -7,7 +7,7 @@ workflow-run/docs/requirements/<需求名>/
 ├── meta.json          # 需求名、绑定的分支、各产物（种类、版本、日期、wiki 发布记录、DocNexus 沉淀）
 ├── plan.md            # 开发方案（dev，L 规模或用户要求时）
 ├── delivery.md        # 交付说明（dev）
-├── review.md          # 审查报告（project-review）；复审 review_v2.md、review_v3.md
+├── review.md          # 审查报告（project-review）；复审也写这个文件，上一版归档（见「落盘」）
 ├── tech-doc.md        # 技术方案（create-tech-md-doc）
 └── release-doc.md     # 上线方案（create-release-md-doc）
 ```
@@ -41,10 +41,11 @@ node <skills>/workflow/scripts/requirement.mjs which
 node <skills>/workflow/scripts/requirement.mjs path <plan|delivery|review|tech|release>
 ```
 
-- 输出的 `path` 就是要写的文件（相对项目根）。文档里引用产物（「参考产物」、上线方案引用技术方案等）写输出的 `cite`：默认模式下和 `path` 相同；文档仓库模式下是「文档仓库名:仓库内路径」，各服务、各人的克隆里都一样。同种产物已存在时会给出下一个版本（`_v2`、`_v3`），不覆盖旧版，复审靠它对照上次的报告。
+- 输出的 `path` 就是要写的文件（相对项目根）。文档里引用产物（「参考产物」、上线方案引用技术方案等）写输出的 `cite`：默认模式下和 `path` 相同；文档仓库模式下是「文档仓库名:仓库内路径」，各服务、各人的克隆里都一样。每种产物的文件名固定（`review.md`、`tech-doc.md` …），引用它的地方不会因为出了新版而失效。已有时，脚本先把当前版复制到 `workflow-run/tmp/old-artifacts/<需求名>/<种类>_v<N>.md`，输出的 `previous` 就是这份（复审对照上次的报告读它），`version` 是这次的版本号；然后把新版直接写到 `path`。
 - 退出码 2：当前分支还没绑定需求，按上一节问用户需求名，`bind` 之后再运行一次。
 - `wiki_record` 非空：上一版已经发布到 wiki。新版的**第一行原样写这条记录**，md-to-wiki 再发布时会更新同一个页面，不会新建页面。
 - 写完运行 `requirement.mjs sync <path>`，更新 `meta.json`。md-to-wiki 发布后改了第一行的记录，或补写了 DocNexus 元信息行，也要再 sync 一次。
+- sync 时新版内容和归档的上一版不同，才算新版本（`meta.json` 的 `versions` 加一）；没写就放弃的话版本号不变。输出里 `archived` 非空时，告诉用户归档了哪些文件、在哪里（`workflow-run/tmp/old-artifacts/<需求名>/`，文档仓库模式是 `<需求名>/<项目名>/`，不提交），请用户确认不再需要后自己删除；**不要替用户删**。随代码或文档仓库提交过的旧版也能从 git 历史找回。
 - sync 输出里 `commit` 非空：按下一节「文档仓库的提交」处理。
 
 ## 独立文档仓库（克隆到 workflow-run/）

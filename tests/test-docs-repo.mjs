@@ -96,7 +96,10 @@ test('写完提示提交：sync 输出 commit（文件、建议信息、命令�
   p.put(p.req('path', 'review').out.path, doc('复审', 'feature/order-export'));
   p.req('config', '--commit-prompt', 'off', '--local');
   assert.equal(p.req('sync').out.commit, null, '关闭后不提示');
-  assert.equal(p.req('pending').out.files.length, 2, 'pending 照样能看到');
+  // 复审后旧版移到 tmp/old-artifacts/：文档仓库里是新版 + meta.json + 旧版的删除
+  assert.deepEqual(p.req('pending').out.files.sort(), ['docs/requirements/订单导出/order-service/meta.json', 'docs/requirements/订单导出/order-service/review.md'], 'pending 照样能看到');
+  assert.ok(fs.existsSync(path.join(p.docs, 'tmp/old-artifacts/订单导出/order-service/review_v1.md')));
+  assert.equal(p.docsGit('check-ignore', '-q', 'tmp/old-artifacts/订单导出/order-service/review_v1.md').status, 0, '归档的上一版不进文档仓库');
   const local = path.join(p.root, '.agents/skills/workflow/profile.local.json');
   assert.deepEqual(JSON.parse(fs.readFileSync(local, 'utf8')).artifacts, { commit_prompt: false });
   assert.equal(spawnSync('git', ['check-ignore', '-q', local], { cwd: p.root }).status, 0, '个人设置不提交');

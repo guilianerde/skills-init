@@ -47,8 +47,9 @@ test('没绑定时 path 退出码 2 并给出建议名；bind 后给出路径，
   assert.equal(p.path, `${r.dir}/tech-doc.md`);
   put(p.path, doc('技术方案', b, '<!-- md-to-wiki: pageId=42 version=3 -->\n'));
   p = nextPath(root, 'tech', b).out;
-  assert.equal(p.path, `${r.dir}/tech-doc_v2.md`);
-  assert.equal(p.previous, `${r.dir}/tech-doc.md`);
+  assert.deepEqual([p.path, p.version], [`${r.dir}/tech-doc.md`, 2], '文件名固定，版本号加一');
+  assert.equal(p.previous, 'workflow-run/tmp/old-artifacts/订单导出支持按渠道筛选/tech-doc_v1.md');
+  assert.equal(fs.readFileSync(path.join(root, p.previous), 'utf8'), fs.readFileSync(path.join(root, p.path), 'utf8'), '上一版先复制一份');
   assert.equal(p.wiki_record, '<!-- md-to-wiki: pageId=42 version=3 -->');
   assert.equal(nextPath(root, 'nope', b).code, 1);
 
@@ -140,5 +141,42 @@ test('日期取文档头，跳过第一行 md-to-wiki 发布记录里的 at=（m
   put(`${dir}/tech-doc.md`, doc('技术', b, '<!-- md-to-wiki: pageId=42 version=3 at=2026-10-20T08:00:00Z -->\n'));
   assert.equal(sync(root, dir).artifacts[0].date, '2026-10-15');
   assert.match(collect(root)[0].date, /^2026-10-15#/);
+  fs.rmSync(root, { recursive: true, force: true });
+});
+
+test('sync <path>：文件名固定、只留最新版；上一版归档为 <种类>_v<N>.md 并提示；没写新内容不算新版本', () => {
+  const { root, put, cli } = repo();
+  assert.equal(cli('bind', '--name', '订单导出').code, 0);
+  const b = 'feature/order-export';
+  const OLD = 'workflow-run/tmp/old-artifacts/订单导出';
+  const write = (kind, title) => { const p = cli('path', kind).out; put(p.path, doc(title, b)); return p; };
+  let p = write('review', '审查 1');
+  let s = cli('sync', p.path).out;
+  assert.equal(s.archived, undefined, '第一版不归档');
+  assert.deepEqual(s.versions, {});
+  write('tech', '技术方案');
+  p = write('review', '审查 2');
+  assert.deepEqual([p.path, p.version, p.previous], [`${s.dir}/review.md`, 2, `${OLD}/review_v1.md`]);
+  assert.match(fs.readFileSync(path.join(root, p.previous), 'utf8'), /审查 1/, 'previous 是上次报告，复审对照它');
+  s = cli('sync', p.path).out;
+  assert.deepEqual(s.archived.files, [{ kind: 'review', version: 1, file: `${OLD}/review_v1.md` }]);
+  assert.equal(s.archived.dir, OLD);
+  assert.match(s.archived.hint, /不要替用户删/);
+  assert.deepEqual(s.versions, { review: 2 });
+  assert.deepEqual(fs.readdirSync(path.join(root, s.dir)).sort(), ['meta.json', 'review.md', 'tech-doc.md']);
+  assert.equal(cli('sync', p.path).out.archived, undefined, '再 sync 不重复归档');
+
+  // 拿了路径却没写：版本号不变，下次照样从 v2 归档
+  cli('path', 'review');
+  s = cli('sync', p.path).out;
+  assert.deepEqual([s.archived, s.versions.review], [undefined, 2]);
+  p = write('review', '审查 3');
+  assert.equal(p.previous, `${OLD}/review_v2.md`);
+  s = cli('sync', p.path).out;
+  assert.deepEqual([s.versions.review, s.archived.files[0].file], [3, `${OLD}/review_v2.md`]);
+  assert.deepEqual(fs.readdirSync(path.join(root, OLD)).sort(), ['review_v1.md', 'review_v2.md']);
+  // 视图与链路读到的是目录里的最新版和它的版本号
+  const v = branchView(root, b);
+  assert.deepEqual([v.latest.review.path, v.latest.review.version], [`${s.dir}/review.md`, 3]);
   fs.rmSync(root, { recursive: true, force: true });
 });

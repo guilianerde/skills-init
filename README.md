@@ -477,13 +477,13 @@ workflow-run/docs/requirements/<需求名>/
 ├── meta.json        # 需求名、绑定的分支、各产物（版本、日期、wiki 发布记录、DocNexus 沉淀），给以后的可视化用
 ├── plan.md          # 开发方案（dev，L 规模）
 ├── delivery.md      # 交付说明（dev，每次完整交付都写）
-├── review.md        # 审查报告（project-review）；复审 review_v2.md、review_v3.md
+├── review.md        # 审查报告（project-review）；复审也写这个文件，上一版归档到 workflow-run/tmp/old-artifacts/
 ├── tech-doc.md      # 技术方案
 └── release-doc.md   # 上线方案
 ```
 
 * **需求名由你定**：dev 确定是 M / L 规模（要落盘）时，或从 `/workflow` 完整链路开始时，如果当前分支还没有绑定需求，会问你这个需求叫什么（默认值按分支名生成；也可以选已有的需求，例如修 bug 的新分支挂到原需求下）。你不起名就按分支名生成。绑定后，同一分支上的各 skill 都写到这个目录，不再问。一个需求可以绑定多个分支。
-* 路径由 `workflow/scripts/requirement.mjs path <种类>` 给出，同种产物已存在时加 `_v2`、`_v3`，不覆盖旧文件；上一版发布过 wiki 时，新版沿用同一个页面。
+* 路径由 `workflow/scripts/requirement.mjs path <种类>` 给出，每种产物文件名固定，目录里只留最新版，引用不会失效；版本号记在 `meta.json` 的 `versions`。已有旧版时，上一版先复制到 `workflow-run/tmp/old-artifacts/<需求>/<种类>_v<N>.md`（不提交），新版直接覆盖写入；skill 会列出归档的文件，请你确认后自己删除。上一版发布过 wiki 时，新版沿用同一个页面。
 * 需求目录写在项目根的 `.ignore` 里，ripgrep 和 agent 的代码搜索会跳过它，产物多了不会污染搜索结果（找历史决策用 DocNexus）。git 不受影响，建议随代码提交。
 
 **独立文档仓库（可选）**：不想让产物进代码仓库、或一个需求横跨多个服务时，装好 skills 后在项目根运行一条命令：

@@ -63,9 +63,9 @@ export function collect(root, { allProjects = false } = {}) {
     const k = KINDS.find((x) => x.kind === f.kind);
     const text = fs.readFileSync(f.abs, 'utf8');
     // 排序键：文档头里的日期 + 版本号（需求目录里的文件名不带日期）
-    out.push({ kind: k.kind, label: k.label, path: f.rel, cite: f.cite, requirement: f.slug, project: f.project, branch: parseBranch(text), date: `${headerDate(text)}#${String(f.version).padStart(3, '0')}`, mtime: fs.statSync(f.abs).mtimeMs, wiki: parseWiki(text) });
+    out.push({ kind: k.kind, label: k.label, path: f.rel, cite: f.cite, requirement: f.slug, project: f.project, version: f.version, branch: parseBranch(text), date: `${headerDate(text)}#${String(f.version).padStart(3, '0')}`, mtime: fs.statSync(f.abs).mtimeMs, wiki: parseWiki(text) });
   }
-  // 同一天的多版（_v2、_v3）与无日期文件按修改时间排
+  // 同一天、无日期的文件按修改时间排
   return out.sort(byDate);
 }
 

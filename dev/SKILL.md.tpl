@@ -155,8 +155,8 @@ description: "Implement a feature or fix a bug in this project end to end: under
 产物按需求归档在 `workflow-run/docs/requirements/<需求名>/`，规则见 `<skills>/workflow/references/requirements.md`：
 
 - **需求名**：确定规模为 M / L（要落盘）时，先运行 `node <skills>/workflow/scripts/requirement.mjs which`；当前分支还没绑定需求就问用户这个需求叫什么（默认值用输出的 `suggested_name`），再 `requirement.mjs bind --name "<需求名>"`；用户不给名字时 `bind` 按分支名生成。S 规模快速通道不落盘，不问。缺陷修复同样处理（可以选择挂到原需求下）。
-- **路径**：交付说明用 `requirement.mjs path delivery`，L 规模方案（或用户要求落盘的 M 规模方案）用 `requirement.mjs path plan`，写到输出的 `path`；已有旧版时自动给出 `_v2`、`_v3`，不覆盖。
-- 写完运行 `requirement.mjs sync <path>` 更新 `meta.json`；输出里 `commit` 非空（独立文档仓库模式）时按 `<skills>/workflow/references/requirements.md`「文档仓库的提交」处理。文档里引用其他产物（「参考产物」等）写 `requirement.mjs path` 输出的 `cite`。
+- **路径**：交付说明用 `requirement.mjs path delivery`，L 规模方案（或用户要求落盘的 M 规模方案）用 `requirement.mjs path plan`，写到输出的 `path`；文件名固定，已有旧版时直接写新版，上一版由脚本归档（输出的 `previous`）。
+- 写完运行 `requirement.mjs sync <path>` 更新 `meta.json`；输出里 `archived` 非空（上一版已归档到 `workflow-run/tmp/old-artifacts/`）时告诉用户归档了哪些文件，请用户确认不再需要后自己删除；输出里 `commit` 非空（独立文档仓库模式）时按 `<skills>/workflow/references/requirements.md`「文档仓库的提交」处理。文档里引用其他产物（「参考产物」等）写 `requirement.mjs path` 输出的 `cite`。
 
 ## 终端命令
 
