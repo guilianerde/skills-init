@@ -4,6 +4,8 @@
 
 ## [Unreleased]
 
+## [0.21.0] - 2026-10-18
+
 ### 变更（破坏性）
 - **默认模板只读，定制模板只放 DocNexus**：skills 自带的模板不能改；修改或新建模板一律写进 DocNexus 知识库，便于团队共享（每次变更有 timeline）。`workflow-run/templates/` 下的项目模板不再生效，`resolve.mjs` 输出 `stale_project_file`，`doctor` 提示导入知识库后删除；接入 DocNexus 后缺模板时仍把它作为 `import_from` 提议导入。
 - 未接入 DocNexus 时：只用默认模板；`template.mjs draft` / `save` 退出码 2、输出 `need_docnexus: true`，提示先 `--with-docnexus` 接入。技术方案、上线方案没有默认模板，`resolve.mjs template` 同样返回 `need_docnexus`，要先接入 DocNexus 才能创建模板和生成文档；`resolve.mjs status` 新增 `templates_need_docnexus`。
@@ -265,7 +267,8 @@
 - 安装器改为单一 Node 实现，`init-skills.sh` / `init-skills.ps1` 只是薄封装。
 - `code-review` 改名为 `project-review`，升级时自动清理旧名。
 
-[Unreleased]: https://github.com/guilianerde/skills-init/compare/v0.20.0...HEAD
+[Unreleased]: https://github.com/guilianerde/skills-init/compare/v0.21.0...HEAD
+[0.21.0]: https://github.com/guilianerde/skills-init/compare/v0.20.0...v0.21.0
 [0.20.0]: https://github.com/guilianerde/skills-init/compare/v0.19.0...v0.20.0
 [0.19.0]: https://github.com/guilianerde/skills-init/compare/v0.18.0...v0.19.0
 [0.18.0]: https://github.com/guilianerde/skills-init/compare/v0.17.0...v0.18.0
