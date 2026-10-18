@@ -4,6 +4,8 @@
 
 ## [Unreleased]
 
+## [0.20.0] - 2026-10-18
+
 ### 变更
 - **project-review 独立复核**：能派子 agent 的环境（Claude Code、Codex、Qwen Code 等）里，CRITICAL / HIGH 每条交给一个只拿到结论、位置、触发条件的子 agent 重新读代码判定「成立 / 可能成立 / 不成立」，不成立的删掉并在「未覆盖与待确认」记复核排除的条数；派不了时自己复核，先找不成立的理由。复核方式写进报告「审查方式」。
 - **project-review 分角度并行查找**（深审大改动，用户确认后）：深审、改动超过 30 个文件或 1500 行、环境能派子 agent 时，先问用户要不要分 5 个角度（正确性与字段完整性 / 并发事务与幂等 / 安全与异常 / 数据库与配置 / 性能测试与语言专项）各派一个子 agent 同时查；同意后主 agent 合并去重、做影响面，再交独立复核。不同意照旧分批精读。
@@ -258,7 +260,8 @@
 - 安装器改为单一 Node 实现，`init-skills.sh` / `init-skills.ps1` 只是薄封装。
 - `code-review` 改名为 `project-review`，升级时自动清理旧名。
 
-[Unreleased]: https://github.com/guilianerde/skills-init/compare/v0.19.0...HEAD
+[Unreleased]: https://github.com/guilianerde/skills-init/compare/v0.20.0...HEAD
+[0.20.0]: https://github.com/guilianerde/skills-init/compare/v0.19.0...v0.20.0
 [0.19.0]: https://github.com/guilianerde/skills-init/compare/v0.18.0...v0.19.0
 [0.18.0]: https://github.com/guilianerde/skills-init/compare/v0.17.0...v0.18.0
 [0.17.0]: https://github.com/guilianerde/skills-init/compare/v0.16.0...v0.17.0
