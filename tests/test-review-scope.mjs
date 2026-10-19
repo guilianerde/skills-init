@@ -6,7 +6,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { matchGlob, parseDiff, scope, plan, rulesFor, checklistSections } from '../workflow/scripts/review-scope.mjs';
+import { matchGlob, globToRegExp, parseDiff, scope, plan, rulesFor, checklistSections, classify, stripRegexLiterals } from '../workflow/scripts/review-scope.mjs';
 import { locate, snippetLines, findAll } from '../workflow/scripts/locate.mjs';
 
 const REPO = fileURLToPath(new URL('..', import.meta.url));
@@ -49,6 +49,33 @@ test('glob：** 跨目录、* 不跨 /、{a,b}、不含 / 时匹配文件名、�
   assert.ok(matchGlob('a/b/yarn.lock', 'yarn.lock'));
   assert.ok(matchGlob('src/main/resources/mapper/OrderMapper.XML', '**/*mapper.xml'));
   assert.ok(matchGlob('.env', '**/.env'));
+  assert.ok(matchGlob('src/x/y/a.js', '{src/**,lib}/*.js'), '括号里的 ** 也跨目录');
+  assert.ok(!matchGlob('lib/x/a.js', '{src/**,lib}/*.js'));
+  // 没闭合的 { 按普通字符处理，不能卡死
+  assert.equal(String(globToRegExp('src/{a,b.java')), String(/^src\/\{a,b\.java$/i));
+  assert.ok(matchGlob('src/{a', 'src/{a'));
+});
+
+test('classify：db/ 下的代码按语言判断；迁移目录的 XML / YAML 算 SQL；构建文件先于配置；.md.tpl 是文档', () => {
+  const c = (p, t = '') => classify({ path: p, changed_text: t });
+  assert.deepEqual([c('src/main/java/com/x/db/DbUtil.java').kind, c('src/main/java/com/x/db/DbUtil.java').sections], ['code', [1, 2, 5, 6, 7, 14]]);
+  assert.equal(c('src/main/resources/db/changelog/V1.xml').kind, 'sql');
+  assert.equal(c('db/migration/V2__add_col.sql').kind, 'sql');
+  assert.deepEqual([c('pyproject.toml').kind, c('pyproject.toml').risk], ['build', 'P1']);
+  assert.equal(c('Cargo.toml').kind, 'build');
+  assert.equal(c('conf/app.toml').kind, 'config');
+});
+
+test('classify：JS / TS 里正则字面量中的关键字不算改动内容；注解和字符串照常算', () => {
+  const rules = "const KW = {\n  p0: /@Transactional|BigDecimal|@KafkaListener/i,\n};\nif (/ReentrantLock/.test(x)) return;";
+  assert.equal(stripRegexLiterals(rules).includes('BigDecimal'), false);
+  assert.equal(stripRegexLiterals('const r = a / b / c;'), 'const r = a / b / c;', '除法不动');
+  assert.equal(classify({ path: 'a.mjs', changed_text: "const LOCKS = ['yarn.lock', 'Cargo.lock'];\n// 加锁时注意 BigDecimal" }).risk, 'P2', '文件名里的 .lock 和注释不算');
+  assert.equal(classify({ path: 'A.java', changed_text: 'lock.lock();\nString u = "http://x"; // 普通注释' }).sections.includes(4), true, '.lock( 调用照常算并发');
+  const js = classify({ path: 'scripts/rules.mjs', changed_text: rules });
+  assert.deepEqual([js.risk, js.sections.includes(4), js.sections.includes(11)], ['P2', false, false]);
+  const java = classify({ path: 'src/main/java/com/x/OrderListener.java', changed_text: '@KafkaListener(topics = "order")\nvoid on(BigDecimal amount) {}' });
+  assert.deepEqual([java.risk, java.sections.includes(11)], ['P0', true]);
 });
 
 test('parseDiff：hunk 里被删的「-- 注释」算删除行，不当成文件头；记录新文件里改动的行段', () => {
@@ -161,6 +188,17 @@ test('locate：精确 / 忽略空白 / 单行部分匹配；去掉 diff 的 + �
   assert.deepEqual([d.anchored, d.match], [false, 'none']);
   assert.match(e.reason, /读不到/);
   assert.equal(r.anchored, 3);
+  // 多处匹配时按模型估的行号取最近的一处，行号写成字符串也认
+  fs.writeFileSync(path.join(root, 'Sum.java'), 'class Sum {\n  total = total.add(x);\n  log();\n  total = total.add(x);\n}\n');
+  const two = locate(root, [{ file: 'Sum.java', code: 'total = total.add(x);', line: '4' }], { base: 'main' });
+  assert.deepEqual([two.findings[0].start_line, two.findings[0].ambiguous, two.findings[0].candidates], [4, true, [2, 4]]);
+});
+
+test('scope --base：空的未跟踪文件算 0 行', () => {
+  const { root, put } = repo();
+  put('src/main/java/com/x/Empty.java', '');
+  const f = scope(root, { base: 'main', config: NO_CFG }).review.find((x) => x.path === 'src/main/java/com/x/Empty.java');
+  assert.deepEqual([f.untracked, f.added], [true, 0]);
 });
 
 test('CLI：装好的项目里 review-scope 读画像 review 配置，rules 用 resolve.mjs 取清单，locate 读发现文件', () => {

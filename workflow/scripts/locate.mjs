@@ -68,7 +68,8 @@ export function locateOne(finding, { read, hunksOf }) {
   const span = snip.length - 1;
   const inChange = hits.filter((s) => overlaps(s, s + span, hunks));
   const pool = inChange.length ? inChange : hits;
-  const near = Number.isInteger(finding.line) ? [...pool].sort((a, b) => Math.abs(a - finding.line) - Math.abs(b - finding.line)) : pool;
+  const guess = Number(finding.line); // 模型可能写成字符串 "42"
+  const near = Number.isInteger(guess) && guess > 0 ? [...pool].sort((a, b) => Math.abs(a - guess) - Math.abs(b - guess)) : pool;
   const start = near[0];
   return {
     ...out, start_line: start, end_line: start + span, anchored: true, match,

@@ -24,22 +24,25 @@ const git = (root, args) => spawnSync('git', ['-c', 'core.quotepath=false', ...a
 const toPosix = (p) => p.split(path.sep).join('/');
 
 // ---------------------------------------------------------------- glob
-// ** 跨目录、* 不跨 /、? 单个字符、{a,b} 展开；不含 / 的模式匹配文件名（同 .gitignore）。不区分大小写
-export function globToRegExp(glob) {
+// ** 跨目录、* 不跨 /、? 单个字符、{a,b} 展开（括号里同样支持这些写法）；不含 / 的模式匹配文件名（同 .gitignore）。不区分大小写。
+// 没有闭合的 { 按普通字符处理（画像里写错也不会卡住）
+function globSource(glob) {
   let re = '';
   for (let i = 0; i < glob.length; i++) {
     const c = glob[i];
+    const end = c === '{' ? glob.indexOf('}', i) : -1;
     if (c === '*' && glob[i + 1] === '*') {
       const slash = glob[i + 2] === '/';
       re += slash ? '(?:.*/)?' : '.*';
       i += slash ? 2 : 1;
     } else if (c === '*') re += '[^/]*';
     else if (c === '?') re += '[^/]';
-    else if (c === '{') { const end = glob.indexOf('}', i); re += `(?:${glob.slice(i + 1, end).split(',').map((s) => s.replace(/[.+^$()|[\]\\]/g, '\\$&').replace(/\*/g, '[^/]*')).join('|')})`; i = end; }
-    else re += c.replace(/[.+^$()|[\]\\]/g, '\\$&');
+    else if (end > i) { re += `(?:${glob.slice(i + 1, end).split(',').map(globSource).join('|')})`; i = end; }
+    else re += c.replace(/[.+^$(){}|[\]\\]/g, '\\$&');
   }
-  return new RegExp(`^${re}$`, 'i');
+  return re;
 }
+export const globToRegExp = (glob) => new RegExp(`^${globSource(glob)}$`, 'i');
 export const matchGlob = (p, glob) => globToRegExp(glob).test(glob.includes('/') ? p : p.split('/').pop());
 const matchAny = (p, globs = []) => globs.find((g) => matchGlob(p, g)) ?? null;
 
@@ -48,7 +51,7 @@ const SECRET = ['**/.env', '**/.env.*', '**/*.pem', '**/*.key', '**/*.p12', '**/
 const SECRET_OK = ['**/.env.example', '**/.env.sample', '**/.env.template'];
 const DEPENDENCY = ['**/node_modules/**', '**/vendor/**', '**/bower_components/**', '**/target/**', '**/.gradle/**', '**/__pycache__/**', '**/.venv/**', '**/site-packages/**', '**/.next/**', '**/.nuxt/**'];
 const GENERATED = ['**/package-lock.json', '**/yarn.lock', '**/pnpm-lock.yaml', '**/go.sum', '**/Cargo.lock', '**/poetry.lock', '**/composer.lock', '**/Gemfile.lock', '**/*.min.js', '**/*.min.css', '**/*.map', '**/*.pb.go', '**/*.gen.go', '**/*.generated.*', '**/generated/**', '**/__snapshots__/**', '**/*.snap'];
-const DOCS = ['**/*.md', '**/*.txt', '**/*.rst', '**/*.adoc', '**/LICENSE', '**/CHANGELOG*'];
+const DOCS = ['**/*.md', '**/*.md.tpl', '**/*.txt', '**/*.rst', '**/*.adoc', '**/LICENSE', '**/CHANGELOG*'];
 const TOOLING = ['workflow-run/**', '.agents/skills/**', '.claude/skills/**', '.qwen/skills/**', '.codebuddy/skills/**', '.codegraph/**'];
 const NOTE = {
   deleted: '文件已删除，不审内容；影响面里确认没有调用方还在用它',
@@ -83,7 +86,8 @@ const LANG = [
 const TEST = /(^|\/)(src\/test\/|tests?\/|__tests__\/)|(Test|Tests|Spec)\.(java|kt|scala|groovy|swift)$|[._-](test|spec)\.[jt]sx?$|_test\.(go|py|rs)$|(^|\/)test_[^/]*\.py$/i;
 const CONFIG = /(^|\/)(application|bootstrap)[^/]*\.(ya?ml|properties)$|\.(properties|conf|ini|toml)$|(^|\/)config\/[^/]*\.(ya?ml|json)$|(^|\/)\.env\.(example|sample|template)$/i;
 const BUILD = /(^|\/)(pom\.xml|build\.gradle(\.kts)?|settings\.gradle(\.kts)?|package\.json|go\.mod|requirements[^/]*\.txt|pyproject\.toml|Cargo\.toml|composer\.json|Gemfile)$/i;
-const SQLFILE = /\.sql$|(^|\/)(db|migration|migrations|flyway|liquibase)\//i;
+// 迁移目录只认 SQL 和 Flyway / Liquibase 的变更集格式；db/ 下的代码文件照常按语言判断
+const SQLFILE = /\.sql$|(^|\/)(db|migration|migrations|flyway|liquibase)\/(?:[^/]+\/)*[^/]+\.(xml|ya?ml|json)$/i;
 const MAPPER = /mapper[^/]*\.xml$|dao[^/]*\.xml$/i;
 const DATA_OBJ = /(^|\/)(entity|entities|dto|vo|po|bo|domain|model|models|pojo|converter|convert|assembler)(\/|$)|(Entity|DTO|Dto|VO|Vo|PO|BO|Converter|Assembler|Mapping)\.(java|kt|ts|go|py)$/;
 const ENTRY = /(^|\/)(controller|controllers|api|apis|endpoint|resource|resources|handler|handlers|router|routes)\/|Controller\.(java|kt)$/i;
@@ -91,20 +95,29 @@ const P1_PATH = /(^|\/)(service|services|impl|biz|manager|job|jobs|task|tasks|li
 
 // 只看增删的行。MyBatis 的 ${} 不放这里（JS 模板字符串也是 ${}），Mapper XML 和 .sql 按文件类型已经是 P0
 const KW = {
-  p0: /@Transactional|synchronized|\bLock\b|@Version|BigDecimal|amount|balance|@KafkaListener|KafkaTemplate|RabbitTemplate|RocketMQ|@PreAuthorize|@Secured|ALTER TABLE|CREATE TABLE|DELETE FROM|UPDATE\s+\S+\s+SET/i,
-  concurrency: /synchronized|\bLock\b|ReentrantLock|Atomic[A-Z]|ConcurrentHashMap|volatile|@Async|ThreadPool|Executor|CompletableFuture|go func|sync\.(Mutex|RWMutex|WaitGroup)|@Version|setnx|redisson/i,
+  p0: /@Transactional|synchronized|\.(?:try)?lock\(|ReentrantLock|@Version|BigDecimal|amount|balance|@KafkaListener|KafkaTemplate|RabbitTemplate|RocketMQ|@PreAuthorize|@Secured|ALTER TABLE|CREATE TABLE|DELETE FROM|UPDATE\s+\S+\s+SET/i,
+  concurrency: /synchronized|\.(?:try)?lock\(|ReentrantLock|Atomic[A-Z]|ConcurrentHashMap|volatile|@Async|ThreadPool|Executor|CompletableFuture|go func|sync\.(Mutex|RWMutex|WaitGroup)|@Version|setnx|redisson/i,
   mq: /@KafkaListener|@RabbitListener|@RocketMQMessageListener|@JmsListener|KafkaTemplate|RabbitTemplate|RocketMQTemplate|\.send\(|callback|notify|@Transactional/i,
   sql: /\b(SELECT|INSERT|UPDATE|DELETE)\b.+\b(FROM|INTO|SET|WHERE)\b|@Select|@Update|@Insert|@Delete|createQuery|nativeQuery|jdbcTemplate/i,
   config: /@Value\s*\(|@ConfigurationProperties|@NacosValue|@ApolloConfig|getProperty\(|os\.Getenv|process\.env/,
   security: /@PreAuthorize|@Secured|permission|auth|token|password|secret|role/i,
 };
 
+// 赋值、参数、对象值等位置后面的 /…/flags 换成占位，避免模式里的关键字被当成改动内容
+// 行注释（// 前要有空白或在行首，避免把 http:// 当成注释）和以 * 开头的块注释行
+export const stripComments = (text) => text.split('\n').map((l) => (/^\s*(\*|\/\*)/.test(l) ? '' : l.replace(/(^|\s)\/\/.*$/, '$1'))).join('\n');
+export const stripRegexLiterals = (text) => text.replace(/([=(:,[!&|?{};]\s*|return\s+)\/(?![*/])(?:\\.|\[(?:\\.|[^\]\\\n])*\]|[^/\\\n[])+\/[a-z]*/g, '$1/re/');
+
 export function classify(file, profileRules = []) {
   const p = file.path;
-  const changed = file.changed_text ?? '';
+  // 注释不算；JS / TS 里的正则字面量也不算（规则脚本自己写着匹配关键字的模式，不是业务代码）
+  let changed = file.changed_text ?? '';
+  if (/\.(java|kt|kts|scala|groovy|go|m?[jt]sx?|cjs|vue)$/i.test(p)) changed = stripComments(changed);
+  if (/\.(m?[jt]sx?|cjs|vue)$/i.test(p)) changed = stripRegexLiterals(changed);
   const hit = (k) => KW[k].test(changed);
   const lang = LANG.find(([re]) => re.test(p))?.[1] ?? (MAPPER.test(p) ? 'SQL / MyBatis' : null);
-  const kind = TEST.test(p) ? 'test' : MAPPER.test(p) || SQLFILE.test(p) ? 'sql' : CONFIG.test(p) ? 'config' : BUILD.test(p) ? 'build' : lang ? 'code' : 'other';
+  // 构建文件先于配置判断：pyproject.toml / Cargo.toml 也是 .toml
+  const kind = TEST.test(p) ? 'test' : MAPPER.test(p) || SQLFILE.test(p) ? 'sql' : BUILD.test(p) ? 'build' : CONFIG.test(p) ? 'config' : lang ? 'code' : 'other';
   const s = new Set();
   if (kind === 'test') { s.add(1); s.add(13); }
   else if (kind === 'sql') { [1, 6, 7, 12].forEach((n) => s.add(n)); }
@@ -189,7 +202,7 @@ export function loadDiff(root, { diff = null, base = null } = {}) {
     try { buf = fs.readFileSync(abs); } catch { continue; }
     const binary = buf.subarray(0, 8000).includes(0);
     const text = binary ? '' : buf.toString('utf8');
-    const n = binary ? 0 : text.split('\n').length - (text.endsWith('\n') ? 1 : 0);
+    const n = binary || !text ? 0 : text.split('\n').length - (text.endsWith('\n') ? 1 : 0);
     files.push({ path: toPosix(p), status: 'A', untracked: true, binary, added: n, deleted: 0, hunks: n ? [[1, n]] : [], changed_text: text });
   }
   return { ok: true, mode: 'base', range: `${b}...（含未提交与未跟踪）`, base: b, ref: 'WORKTREE', files };
