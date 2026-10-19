@@ -4,6 +4,9 @@
 
 ## [Unreleased]
 
+### 新增
+- 运行反馈：dev 和 project-review 每跑完一次，用新脚本 `workflow/scripts/feedback.mjs add` 静默追加一行过程记录到 `workflow-run/feedback/<git 用户名>.jsonl`（模型、规模 / 深度、快速通道、提问轮数、用户纠正理解的次数、验收项验证情况、跳过的步骤、不清楚或做不到的规则、用户的抱怨），不记代码和业务名词，不额外问用户。每人一个文件，随 `workflow-run/` 提交；安装器在 `.gitattributes` 加 `workflow-run/feedback/*.jsonl merge=union`（独立文档仓库模式加在文档仓库里），多个分支都有记录时合并不冲突。新命令 `npx @rowansenne/workflow-run feedback [--json]` 汇总，跳过的步骤和不清楚的规则按 SKILL.md 章节归类，作为精简 skill 的依据。`init` / `upgrade` 装了新版本时清掉本项目旧版本的记录，从新版本重新收集。字段与规则见 `workflow/references/feedback.md`。dev 内部调用 project-review 自审时只由 dev 记一行。
+
 ### 变更（破坏性）
 - 随代码提交和独立文档仓库两种用法的目录结构统一为 `workflow-run/docs/requirements/<需求名>/<项目名>/`（归档的上一版同样在 `tmp/old-artifacts/<需求名>/<项目名>/`）。随代码提交时项目名不用配置，取 git 远端仓库名（没有远端用目录名），第一次 `bind` 时写进 `workflow/profile.json` 的 `artifacts.project`。
 - 旧结构自动迁移：`init` / `upgrade` 把 `<需求名>/` 下直接放的文件挪到 `<需求名>/<项目名>/`（被 git 跟踪的用 `git mv`），结尾列出迁移的需求，改动由你提交；目标里已有同名文件的需求不动并提示。`doctor` 提示还没迁移的需求。

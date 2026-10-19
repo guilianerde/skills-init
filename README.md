@@ -46,6 +46,7 @@ npx @rowansenne/workflow-run uninstall                                     # 按
 | `doctor` | 自检：已装版本与当前包对比、手改 / 缺失的文件、软链接是否断开、项目画像、DocNexus 模板是否齐全、各数据库连接能否只读 `SELECT 1`（`--offline` 跳过）、`.gitignore` 是否忽略了凭据。有错误时退出码 1 |
 | `uninstall` | 等价于 `--uninstall` |
 | `report` | 本地效果报告：只读统计 `workflow-run/docs/requirements/` 下的产物（`--since YYYY-MM-DD`、`--all-branches`、`--json`），见「workflow：入口与项目画像」 |
+| `feedback` | 运行反馈汇总：dev / project-review 每次运行记录到 `workflow-run/feedback/<用户>.jsonl` 的过程数据（`--json`），见「运行反馈」 |
 | `view` | 项目文档视图：按需求浏览开发方案、交付说明、审查记录（含复审修复情况）、技术 / 上线方案，生成本地静态页面（`--out <文件>`、`--open`） |
 | `docs-repo <仓库地址>` | 改用团队文档仓库：`workflow-run/` 是空的就克隆，已有内容就原地接上远端（目录结构相同，文件不用挪）、代码仓库忽略它、配置本项目的项目名（`--project`，默认 git 远端仓库名）、接上仓库里的 DocNexus；不带地址显示当前状态，见「产物输出规范」 |
 | `seed-templates` | 只把默认文档模板导入 DocNexus，不重装 skills。`--update` 把导入后未改动的模板更新为新版；`--diff` 只读打印团队改过的模板与新默认模板的差异，供手动合并 |
@@ -130,6 +131,14 @@ npx @rowansenne/workflow-run docs-repo git@git.example.com:team/team-docs.git
 * 交付：功能 / 缺陷、S / M / L、开工前经需求澄清确认的决定条数、带「未验证项」的交付；
 * 知识：交付与审查的 DocNexus 沉淀率、正文引用了知识库文档的产物占比；
 * 各分支链路：开发方案、交付说明、审查报告、技术方案、上线方案齐不齐，哪些文档还没发布到 wiki。
+
+**运行反馈**（`npx @rowansenne/workflow-run feedback [--json]`）：效果报告只看落盘的产物，看不到过程。dev 和 project-review 每跑完一次，用 `workflow/scripts/feedback.mjs add` 静默追加一行到 `workflow-run/feedback/<git 用户名>.jsonl`：模型、规模 / 深度、是否走快速通道、向用户提问几轮、用户纠正过几次理解、验收项验证了几条、跳过了哪些步骤、**哪条规则读不懂或做不到**、用户主动说的抱怨。只记过程，不记代码和业务名词；不额外问用户。每人一个文件，随 `workflow-run/` 提交，多人不冲突；安装器在 `.gitattributes` 里给这些文件配 `merge=union`，同一个人在几个分支上都有记录时合并也不冲突。用来定期精简 skill：
+
+1. 团队照常用两三周；
+2. 运行 `feedback` 汇总（或直接拿 `workflow-run/feedback/` 下的文件），按「常被跳过的步骤」「读不懂的规则」「提问太多」精简 SKILL.md，发新版本；
+3. 各项目 `upgrade` 时清掉本项目旧版本的记录（git 历史里仍可找回），从新版本重新收集，回到第 1 步。
+
+字段与记录规则见 `workflow/references/feedback.md`。
 
 **PR / MR 描述**：`node <skills>/workflow/scripts/pr-desc.mjs [--branch b] [--base main] [--out 文件]` 把本分支的交付说明（做了什么、已确认的决定、改动、验证、配置 / SQL）、审查报告（结论、CRITICAL / HIGH、影响面）和相关文档路径汇总成描述；没有交付说明时退回用提交记录和改动文件列表。dev 交付后要提 PR 时会调用它；创建 PR 要你同意。
 
@@ -396,6 +405,7 @@ npx @rowansenne/workflow-run uninstall
 | `workflow/scripts/view.mjs [--out f] [--open]` | 项目文档视图（`/workflow view`、`npx @rowansenne/workflow-run view`）：读需求目录里的产物，生成单个 HTML，按需求列出各阶段、审查记录（各级别数量、复核、与上次对比）、交付记录、沉淀到的知识文档，正文直接渲染；顶部「知识文档」列出每篇知识文档来自哪个需求、哪份产物；数据内嵌，只读、不联网，默认写到 `workflow-run/tmp/view/index.html` |
 | `workflow/scripts/artifacts.mjs [--branch b \| --all]` | 按分支汇总 `workflow-run/docs/requirements/` 下的开发方案、交付说明、审查报告、技术方案、上线方案及其 wiki 发布记录，给出下一步建议；分支取自文档元信息行，不另存记录。上线方案没传 `--tech` 时据此自动引用同分支的技术方案；project-review 据此对照本分支方案、识别复审 |
 | `workflow/scripts/report.mjs [--since d] [--all-branches] [--json]` | 本地效果报告（`/workflow report`、`npx @rowansenne/workflow-run report`）：审查发现与修复率、复核率、需求澄清、沉淀率、知识引用、各分支链路 |
+| `workflow/scripts/feedback.mjs add … / summary [--json]` | 运行反馈：dev / project-review 交付后追加一行过程记录到 `workflow-run/feedback/<用户>.jsonl`；`summary` 按 skill 汇总，跳过的步骤和不清楚的规则按 SKILL.md 章节归类（`npx @rowansenne/workflow-run feedback`）；`init` / `upgrade` 装了新版本时清掉本项目旧版本的记录 |
 | `workflow/scripts/tables.mjs [--diff b...h \| --base b \| --files a,b]` | 找出改动涉及哪些表：实体注解（`@TableName` / `@Table`，没写表名时按类名推断）、Mapper XML 与代码里的 SQL、DDL 脚本；标出 DDL、是否在 `schema.md` 里，并给出拉表结构的命令。dev 调研 / 自检与 project-review 审 SQL / DDL 时使用 |
 | `workflow/scripts/template.mjs list / draft / check / save <模板>` | 修改 / 创建模板（`/workflow template`）：把当前模板复制成草稿（或 `--from <样例>` 抽骨架），`check` 校验格式、列出章节变化、拿最近几份已生成文档试跑 lint 看影响，`save` 给出写入 DocNexus 知识库的 capture 指引，不直接写知识库；未接入 DocNexus 时 `draft` / `save` 提示先接入（默认模板只读） |
 | `workflow/scripts/pr-desc.mjs [--branch b] [--base m] [--out f]` | 按本分支产物生成 PR / MR 描述；没有交付说明时退回用 git 记录 |
@@ -440,9 +450,10 @@ CI（`.github/workflows/test.yml`）在 push 到 main 和每个 PR 上运行：m
 | `.agents/skills/workflow/profile.json` | 项目画像（无凭据），产物目录用的项目名也在这里 |
 | `.agents/skills/database-query/references/schema.md` | 表结构速查，补齐后提交 |
 | `workflow-run/docs/requirements/` | 需求产物；独立文档仓库模式下提交到文档仓库 |
+| `workflow-run/feedback/` | 运行反馈，每人一个文件；独立文档仓库模式下提交到文档仓库 |
 | `workflow-run/docnexus/` | DocNexus 工作区与定制的文档模板；依赖和检索库由它自带的 `docnexus/.gitignore` 忽略。独立文档仓库模式下提交到文档仓库 |
 | `.ignore` | 让代码搜索跳过需求目录（不影响 git） |
-| `.gitignore`、`CLAUDE.md` / `AGENTS.md` | 安装器追加的忽略规则、DocNexus 说明段落 |
+| `.gitignore`、`.gitattributes`、`CLAUDE.md` / `AGENTS.md` | 安装器追加的忽略规则、运行反馈的合并规则、DocNexus 说明段落 |
 
 **忽略**（每人每机器一份，或可重新生成）：
 

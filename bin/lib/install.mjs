@@ -6,6 +6,7 @@ import { TPL_DIR, PKG, CANON_DIR, INSTALL_BASES, SKILLS, SKILL_LIST, USER_FILES,
 import { writeDbConfig } from './db.mjs';
 import { layout, ensureIgnore, homeIsRepo, migrateLayout, IGNORE_LINE, TMP_DIR } from '../../workflow/scripts/requirement.mjs';
 import { detectEnv } from '../../workflow/scripts/resolve.mjs';
+import { rotate as rotateFeedback, ensureUnionMerge } from '../../workflow/scripts/feedback.mjs';
 
 // 结尾汇总：被手改过、已用新版覆盖（原文件已备份）的 / 模板已删除、手改过而备份后删除的文件 /
 // 没有安装清单、内容与新版不同而备份后覆盖的文件（无从判断是否手改）
@@ -256,6 +257,11 @@ export function setupHome(root) {
   const L = layout(root);
   if (L.mode === 'repo' && !L.ok) warn(`${HOME}/ 是独立的文档仓库，还没配置本项目的项目名：${L.hint}`);
   reportMigration(migrateLayout(root));
+  // 运行反馈只收当前版本的：装了新版本就清掉本项目旧版本的记录（随 workflow-run/ 提交过的，git 历史里仍可找回）
+  const removed = rotateFeedback(root, PKG.version);
+  const attr = ensureUnionMerge(root);
+  if (attr) ok(`${attr.file} 已加上 ${attr.rule}（运行反馈多分支合并时保留两边的记录）`);
+  if (removed) ok(`运行反馈：已清空旧版本的 ${removed} 条记录（${HOME}/feedback/），从这一版重新收集；改动需要你提交`);
 }
 
 // 旧结构（<需求>/ 下直接放文件）迁到 <需求>/<项目名>/ 的结果

@@ -98,20 +98,21 @@ description: "Implement a feature or fix a bug in this project end to end: under
 ### F7 — 自审
 
 - 按 `project-review` skill 审本次改动：分支已有提交时用 `git diff <main_branch>...HEAD`，再加上 `git diff HEAD` 的未提交部分，以及 `git status --short` 里本次新建、还没跟踪的文件（`git diff` 看不到，逐个读）。Step 0 确认不属于本需求的文件不计入本次结论（见 Step 0「工作区状态」）。
-- 只走 project-review 的第 1～6 步（范围与深度、建立理解、对比、过清单、影响面、复核）；**跳过第 7 步落盘报告和第 8 步 DocNexus 询问**——结论由 dev 在 F8 统一交付，沉淀也只在 F8 问一次。用户要求单独的审查报告时，再按 project-review 的第 7 步和产物规范落盘。
+- 只走 project-review 的第 1～6 步（范围与深度、建立理解、对比、过清单、影响面、复核）；**跳过第 7 步落盘报告、第 8 步 DocNexus 询问和第 9 步运行反馈**——结论由 dev 在 F8 统一交付，沉淀只在 F8 问一次，反馈也只由 dev 记一行。用户要求单独的审查报告时，再按 project-review 的第 7 步和产物规范落盘。
 - 交给 F8 的是：问题表（文件:行号、严重级别、触发条件、复核结果）、影响面、未覆盖与待确认。
 - CRITICAL / HIGH 必须修掉后重新跑 F6；MEDIUM / LOW 修掉或写进交付说明。
 
 ### F8 — 交付
 
-**快速通道交付**（见 F4「S 规模快速通道」）：不落盘、不跑 lint、不问 DocNexus 沉淀。对话里给：结果一句话、改动文件、验证（验收项 → 测试 / 操作 → 结果，构建 / 测试命令与结果，开工前已有的失败，未验证项如实写）、自审结论；然后只问提交（建议的 commit message）。用户说「落盘交付说明」或之后要出上线方案时，再按下面的完整流程补落盘。
+**快速通道交付**（见 F4「S 规模快速通道」）：不落盘、不跑 lint、不问 DocNexus 沉淀。对话里给：结果一句话、改动文件、验证（验收项 → 测试 / 操作 → 结果，构建 / 测试命令与结果，开工前已有的失败，未验证项如实写）、自审结论；按完整流程第 4 步记录运行反馈；然后只问提交（建议的 commit message）。用户说「落盘交付说明」或之后要出上线方案时，再按下面的完整流程补落盘。
 
 完整流程：
 
 1. **落盘交付说明**：模板路径用 `node <skills>/workflow/scripts/resolve.mjs template dev delivery-template.md` 取（退出码 2 时停下并按 `hint` 处理），写到 `requirement.mjs path delivery` 给出的路径（见 Artifact Location）。元信息行的「对比分支」写当前分支和 `profile.main_branch`，`artifacts.mjs`、project-review、上线方案靠它找到这份交付；有开发方案时「参考产物」写方案路径。小改动每节一两行即可，不适用的节写「无」，但验证结果必须如实。
 2. **自检**：运行 `node <skills>/workflow/scripts/lint-doc.mjs <交付路径> --skill dev --template delivery-template.md`，有「错误」先修正。
 3. **对话里给摘要**：结果、验证（含未验证项）、配置 / SQL 有无、交付文件路径；不必把全文贴进对话。
-4. **询问下一步**，不要自行执行：
+4. **记录运行反馈**（不问用户）：按 `<skills>/workflow/references/feedback.md` 运行 `node <skills>/workflow/scripts/feedback.mjs add --skill dev --model <模型名> --mode <feature|bug> --size <S|M|L> --fast <yes|no> --rounds <提问轮数> --corrections <用户纠正理解的次数> --acceptance <已验证>/<总数> --baseline-failures <n>`，有跳过的步骤、不清楚或做不到的规则、用户的抱怨时再加 `--skipped` / `--unclear` / `--feedback`。只写过程，不写代码和业务名词；报错就提一句，不影响交付。
+5. **询问下一步**，不要自行执行：
    - 提交：给出建议的 commit message 和要 add 的文件（只含本需求的改动，Step 0 确认无关的不 add；建议把交付说明一起提交，随分支保留），用户同意后再 `git commit`；**不 push**，除非用户明确要求。
    - PR / MR：用户要提 PR / MR 时，运行 `node <skills>/workflow/scripts/pr-desc.mjs`（缺省当前分支、基线 `profile.main_branch`），它把本分支的交付说明、审查报告、技术方案、上线方案汇总成描述（没有交付说明时退回用提交记录和改动文件），把输出给用户；用 `gh pr create` / `glab mr create` 创建要用户明确同意。
    - 文档：运行 `node <skills>/workflow/scripts/artifacts.mjs` 看本分支已有哪些产物（开发方案、交付说明、审查报告、技术方案、上线方案及 wiki 发布记录），按输出的 `next` 建议下一步：M / L 规模缺技术方案时建议 `create-tech-md-doc`，要上线时建议 `create-release-md-doc`（会自动引用本分支的技术方案和交付说明）。

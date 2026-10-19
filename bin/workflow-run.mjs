@@ -29,7 +29,7 @@ import { docsRepo } from './lib/docsrepo.mjs';
 import { findLegacy, legacyMessage } from './lib/legacy.mjs';
 
 // ---------------------------------------------------------------- 参数
-const COMMANDS = ['init', 'upgrade', 'doctor', 'uninstall', 'seed-templates', 'report', 'view', 'docs-repo'];
+const COMMANDS = ['init', 'upgrade', 'doctor', 'uninstall', 'seed-templates', 'report', 'feedback', 'view', 'docs-repo'];
 const HELP = `用法: workflow-run [命令] [选项]
 
 命令：
@@ -40,6 +40,7 @@ const HELP = `用法: workflow-run [命令] [选项]
   uninstall            按安装清单卸载本项目装的 skills 与链接（用户配置备份到 workflow-run/tmp/uninstall-backup/）
   seed-templates       只把自带的文档模板导入 DocNexus（workflow-run/docnexus/library/templates/，已有的不覆盖）
   report               本地效果报告：只读统计 workflow-run/docs/requirements/ 下的产物（审查发现与修复率、需求澄清、DocNexus 沉淀与复用、各分支链路）
+  feedback             运行反馈汇总：dev / project-review 每次运行追加到 workflow-run/feedback/<用户>.jsonl 的过程记录（提问轮数、跳过的步骤、不清楚的规则），精简 skill 的依据；--json 输出 JSON
   view                 项目文档视图：按需求浏览方案、交付、审查（含复审修复情况）、技术 / 上线方案，生成本地静态页面
   docs-repo <仓库地址> 改用团队文档仓库：克隆到 workflow-run/、代码仓库忽略它、配置本项目的项目名、接上仓库里的 DocNexus；
                        不带地址时显示当前状态
@@ -148,6 +149,10 @@ async function main() {
   if (o.cmd === 'report') {
     const { main: report } = await import(new URL('../workflow/scripts/report.mjs', import.meta.url));
     return report(['--root', o.root, ...(o.since ? ['--since', o.since] : []), ...(o.json ? ['--json'] : []), ...(o.allBranches ? ['--all-branches'] : [])]);
+  }
+  if (o.cmd === 'feedback') {
+    const { main: feedback } = await import(new URL('../workflow/scripts/feedback.mjs', import.meta.url));
+    return feedback(['--root', o.root, 'summary', ...(o.json ? ['--json'] : [])]);
   }
   if (o.cmd === 'view') {
     const { main: view } = await import(new URL('../workflow/scripts/view.mjs', import.meta.url));
