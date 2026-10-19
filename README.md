@@ -424,6 +424,45 @@ CI（`.github/workflows/test.yml`）在 push 到 main 和每个 PR 上运行：m
 2. 推送 `vx.y.z` tag：`.github/workflows/release.yml` 校验 tag 与版本、CHANGELOG 一致，跑测试，然后用 npm Trusted Publishing 发布（不需要 npm token / OTP）。
 3. Trusted Publisher 只能给 npm 上已存在的包配置：新包名第一次要在本机登录 npm 后手动 `npm publish --access public`，之后在 npmjs.com 的包设置 → Trusted Publisher 里登记 GitHub 仓库 `guilianerde/skills-init` 与工作流 `release.yml`。
 
+## 哪些文件提交、哪些忽略
+
+安装 / 升级时安装器只往项目的 `.gitignore` 追加缺失的规则（已有内容不动），`doctor` 会检查凭据规则还在不在。团队成员照下面两张表即可。
+
+**提交**（团队共享）：
+
+| 路径 | 说明 |
+| --- | --- |
+| `.agents/skills/` | skills 单一来源，含安装清单 `.workflow-run.json` |
+| `.claude/skills/`、`.qwen/skills/`、`.codebuddy/skills/` | 指向 `.agents/skills/` 的相对软链接（Windows 上 clone 需 `git config core.symlinks true`） |
+| `.agents/skills/workflow/profile.json` | 项目画像（无凭据），独立文档仓库模式的项目名也在这里 |
+| `.agents/skills/database-query/references/schema.md` | 表结构速查，补齐后提交 |
+| `workflow-run/docs/requirements/` | 需求产物；独立文档仓库模式下提交到文档仓库 |
+| `workflow-run/docnexus/`（依赖和检索库除外） | DocNexus 工作区与定制的文档模板；独立文档仓库模式下提交到文档仓库 |
+| `.ignore` | 让代码搜索跳过需求目录（不影响 git） |
+| `.gitignore`、`CLAUDE.md` / `AGENTS.md` | 安装器追加的忽略规则、DocNexus 说明段落 |
+
+**忽略**（每人每机器一份，或可重新生成）：
+
+| `.gitignore` 规则 | 忽略的内容 | 何时追加 |
+| --- | --- | --- |
+| `**/database-query/config.json` | 数据库连接（含密码） | 总是 |
+| `**/wiki-config.json` | wiki 地址与 token | 总是 |
+| `**/workflow/profile.local.json` | 个人设置：本机系统与终端、提交提示开关 | 总是 |
+| `/workflow-run/tmp/` | 临时产物：查询导出、wiki 临时 XHTML、旧版产物归档、升级 / 卸载备份、`view` 页面 | `workflow-run/` 不是独立 git 仓库时 |
+| `/workflow-run/` | 整个文档仓库（它自己提交）；同时在文档仓库的 `.git/info/exclude` 加 `/tmp/` | 独立文档仓库模式（`docs-repo`） |
+| `node_modules/` | DocNexus 的依赖 | `--with-docnexus` |
+| `.codegraph/` | CodeGraph 本地索引（SQLite） | `--with-codegraph` |
+
+查某个文件为什么被忽略、看当前所有被忽略的文件：
+
+```bash
+git check-ignore -v .agents/skills/database-query/config.json
+```
+
+```bash
+git status --short --ignored
+```
+
 ## 凭据安全
 
 
