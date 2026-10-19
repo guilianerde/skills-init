@@ -12,7 +12,7 @@ const REPO = fileURLToPath(new URL('..', import.meta.url));
 const node = (args, opts = {}) => spawnSync(process.execPath, args, { encoding: 'utf8', ...opts });
 
 function project() {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'tpl-'));
+  const root = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'tpl-')), 'svc'); fs.mkdirSync(root); // 目录名 svc = 自动取的项目名
   assert.equal(node([path.join(REPO, 'bin/workflow-run.mjs'), '--project-root', root, '--envs', 'codex', '--skip-db', '--yes'], { cwd: root, env: { ...process.env, WORKFLOW_RUN_ADMIN: '1' } }).status, 0);
   const run = (...a) => { const r = node([path.join(root, '.agents/skills/workflow/scripts/template.mjs'), ...a], { cwd: root }); return { code: r.status, out: r.stdout ? JSON.parse(r.stdout) : null, err: r.stderr }; };
   return { root, run, draftFile: (skill, id = 'template.md') => path.join(root, 'workflow-run/tmp/template-draft', skill, id) };
@@ -90,8 +90,8 @@ test('修改知识库里的模板：草稿沿用 / --force 重来；check 列出
   const TPL = '# 【上线方案】{{文档标题}}\n\n## 一、上线服务 *\n\n{{服务}}\n\n## 二、灰度\n\n{{灰度}}\n';
   fs.mkdirSync(path.dirname(tplFile), { recursive: true });
   fs.writeFileSync(tplFile, TPL);
-  fs.mkdirSync(path.join(root, 'workflow-run/docs/requirements/x'), { recursive: true });
-  fs.writeFileSync(path.join(root, 'workflow-run/docs/requirements/x/release-doc.md'), '# 【上线方案】x\n\n> 自动生成\n> 对比分支：`a` ←→ `main`\n> diff 概览\n> 模板来源：DocNexus\n\n## 一、上线服务\n\norder\n\n## 二、灰度\n\n无\n');
+  fs.mkdirSync(path.join(root, 'workflow-run/docs/requirements/x/svc'), { recursive: true });
+  fs.writeFileSync(path.join(root, 'workflow-run/docs/requirements/x/svc/release-doc.md'), '# 【上线方案】x\n\n> 自动生成\n> 对比分支：`a` ←→ `main`\n> diff 概览\n> 模板来源：DocNexus\n\n## 一、上线服务\n\norder\n\n## 二、灰度\n\n无\n');
 
   let r = run('draft', 'release');
   assert.equal(r.out.from, 'docnexus');

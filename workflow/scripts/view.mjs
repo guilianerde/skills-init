@@ -12,16 +12,17 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { collect, KINDS } from './artifacts.mjs';
-import { requirements, repoRequirements, layout, parseDocnexus } from './requirement.mjs';
+import { repoRequirements, layout, parseDocnexus, REQ_DIR } from './requirement.mjs';
 import { parseReview, parseDelivery, captureState, buildReport } from './report.mjs';
 
 const DEFAULT_OUT = 'workflow-run/tmp/view/index.html';
 
 // 页面数据：按需求分组
 export function viewData(root) {
-  // 文档仓库模式：连同其他项目（服务）的产物一起看，一个需求下按项目区分
+  // 连同其他项目（服务）的产物一起看，一个需求下按项目区分（文档仓库里常见；两种模式目录结构相同）
   const L = layout(root);
-  const metas = new Map(L.mode === 'repo' ? repoRequirements(root, L).map((r) => [r.slug, { name: r.name, dir: null, branches: [...new Set(r.projects.flatMap((p) => p.meta.branches ?? []))], meta: r.projects.find((p) => p.project === L.project)?.meta ?? r.projects[0]?.meta ?? {} }]) : requirements(root, L).map((r) => [r.slug, r]));
+  const reqDirOf = (slug) => (L.mode === 'repo' ? `${L.repo_name}:docs/requirements/${slug}` : `${REQ_DIR}/${slug}`);
+  const metas = new Map(repoRequirements(root, L).map((r) => [r.slug, { name: r.name, dir: reqDirOf(r.slug), branches: [...new Set(r.projects.flatMap((p) => p.meta.branches ?? []))], meta: r.projects.find((p) => p.project === L.project)?.meta ?? r.projects[0]?.meta ?? {} }]));
   const groups = new Map();
   for (const a of collect(root, { allProjects: true })) {
     const id = a.requirement ? `req:${a.requirement}` : `branch:${a.branch ?? '（无分支）'}`;
@@ -29,7 +30,7 @@ export function viewData(root) {
       const m = a.requirement ? metas.get(a.requirement) : null;
       groups.set(id, {
         id, name: m?.name ?? (a.requirement ?? a.branch ?? '（无分支）'),
-        dir: m?.dir ?? (a.requirement && L.mode === 'repo' ? `${L.repo_name}:docs/requirements/${a.requirement}` : null), named_by: m?.meta?.named_by ?? null, branches: new Set(m?.branches ?? []), projects: new Set(), artifacts: [],
+        dir: m?.dir ?? (a.requirement ? reqDirOf(a.requirement) : null), named_by: m?.meta?.named_by ?? null, branches: new Set(m?.branches ?? []), projects: new Set(), artifacts: [],
       });
     }
     const g = groups.get(id);

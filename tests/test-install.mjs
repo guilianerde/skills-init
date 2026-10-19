@@ -409,7 +409,9 @@ test('旧包 skills-init 装过的项目：列出改名命令后停下，不做�
   fs.renameSync(p.at('.agents/skills/.skills-init.json'), p.at('.agents/skills/.workflow-run.json'));
   const r = p.install(['upgrade']);
   ok(r);
-  assert.ok(p.exists('workflow-run/docs/requirements/x/plan.md'));
+  assert.ok(p.exists('workflow-run/docs/requirements/x/legacy/plan.md'), '旧结构迁到 <需求>/<项目名>/（项目名取目录名）');
+  assert.match(r.log, /需求产物已迁到新结构/);
+  assert.equal(p.json('.agents/skills/workflow/profile.json').artifacts.project, 'legacy');
   assert.match(r.log, /旧版残留：CLAUDE\.md/);
   assert.match(r.log, /旧版残留：\.gitignore/);
   assert.ok(p.read('.gitignore').includes('/workflow-run/tmp/'));

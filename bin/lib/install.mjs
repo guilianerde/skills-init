@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { TPL_DIR, PKG, CANON_DIR, INSTALL_BASES, SKILLS, SKILL_LIST, USER_FILES, MANIFEST, ok, warn, readJson, walk, toPosix, sameFile, writeFile, render, sha256, fileHash, readManifest, removeEmptyDirs, lstat, timestamp, removeLink, HOME } from './core.mjs';
 import { writeDbConfig } from './db.mjs';
-import { layout, ensureIgnore, homeIsRepo, IGNORE_LINE, TMP_DIR } from '../../workflow/scripts/requirement.mjs';
+import { layout, ensureIgnore, homeIsRepo, migrateLayout, IGNORE_LINE, TMP_DIR } from '../../workflow/scripts/requirement.mjs';
 import { detectEnv } from '../../workflow/scripts/resolve.mjs';
 
 // 结尾汇总：被手改过、已用新版覆盖（原文件已备份）的 / 模板已删除、手改过而备份后删除的文件 /
@@ -255,4 +255,15 @@ export function setupHome(root) {
   excludeHomeTmp(root);
   const L = layout(root);
   if (L.mode === 'repo' && !L.ok) warn(`${HOME}/ 是独立的文档仓库，还没配置本项目的项目名：${L.hint}`);
+  reportMigration(migrateLayout(root));
+}
+
+// 旧结构（<需求>/ 下直接放文件）迁到 <需求>/<项目名>/ 的结果
+export function reportMigration(r) {
+  if (r.moved.length) {
+    const reqs = [...new Set(r.moved.map((m) => path.posix.dirname(m.from)))];
+    ok(`需求产物已迁到新结构 <需求>/${r.project}/（${reqs.length} 个需求、${r.moved.length} 个文件，被 git 跟踪的用 git mv）：${reqs.join('、')}`);
+    ok(`项目名 ${r.project} 记在 workflow/profile.json；迁移的改动（含 profile.json）需要你提交`);
+  }
+  for (const s of r.skipped) warn(`${s.dir} 没有迁移：${s.reason}。处理后重跑 npx @rowansenne/workflow-run upgrade`);
 }

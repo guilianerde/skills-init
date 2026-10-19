@@ -11,10 +11,10 @@ import { viewData, renderHtml } from '../workflow/scripts/view.mjs';
 const REPO = fileURLToPath(new URL('..', import.meta.url));
 
 function project() {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'view-'));
+  const root = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'view-')), 'svc'); fs.mkdirSync(root); // 目录名 svc = 自动取的项目名
   spawnSync('git', ['init', '-q', '-b', 'main'], { cwd: root });
   const put = (rel, text) => { fs.mkdirSync(path.dirname(path.join(root, rel)), { recursive: true }); fs.writeFileSync(path.join(root, rel), text); };
-  const dir = 'workflow-run/docs/requirements/订单导出';
+  const dir = 'workflow-run/docs/requirements/订单导出/svc';
   put(`${dir}/meta.json`, JSON.stringify({ name: '订单导出（按渠道）', named_by: 'user', branches: ['feature/export'] }));
   put(`${dir}/review.md`, '# 审查\n\n> 审查范围：分支对比 ｜ 日期：2026-10-15\n> 对比分支：`feature/export` ←→ `main`\n> DocNexus：未沉淀\n\n## 严重问题（CRITICAL / HIGH） *\n\n| # | 级别 | 位置 | 问题 | 触发条件 | 建议 | 复核 |\n|---|---|---|---|---|---|---|\n| 1 | HIGH | A.java:1 | 未分页 | 大渠道 | 分页 | ✅ |\n');
   put(`${dir}/delivery.md`, '# 交付\n\n> 类型：功能开发 ｜ 日期：2026-10-15\n> 对比分支：`feature/export` ←→ `main`\n> DocNexus：docnexus/library/dev-notes/export.md、docnexus/library/code-review/paging.md\n');
@@ -50,7 +50,7 @@ test('renderHtml：单文件、数据内嵌且转义（正文里的 </script> �
   assert.equal(html.match(/<\/script>/g).length, 2, '只有两个 script 结束标签');
   assert.ok(!html.includes('<img src=x'), '正文里的 HTML 在数据里被转义');
   assert.match(html, /prefers-color-scheme:dark/);
-  assert.match(html, /<title>项目文档视图 · view-/);
+  assert.match(html, /<title>项目文档视图 · svc/);
   const json = /<script id="data" type="application\/json">([\s\S]*?)<\/script>/.exec(html)[1];
   assert.equal(JSON.parse(json).requirements.length, 1);
   fs.rmSync(root, { recursive: true, force: true });
@@ -58,7 +58,7 @@ test('renderHtml：单文件、数据内嵌且转义（正文里的 </script> �
 
 test('CLI：workflow-run view 默认写到 workflow-run/tmp/view/index.html，--out 指定位置；不改产物', () => {
   const root = project();
-  const before = fs.readFileSync(path.join(root, 'workflow-run/docs/requirements/订单导出/meta.json'), 'utf8');
+  const before = fs.readFileSync(path.join(root, 'workflow-run/docs/requirements/订单导出/svc/meta.json'), 'utf8');
   let r = spawnSync(process.execPath, [path.join(REPO, 'bin/workflow-run.mjs'), 'view', '--project-root', root], { encoding: 'utf8' });
   assert.equal(r.status, 0, r.stderr);
   assert.match(r.stdout, /已生成 workflow-run\/tmp\/view\/index\.html（1 个需求，4 份产物）/);
@@ -66,7 +66,7 @@ test('CLI：workflow-run view 默认写到 workflow-run/tmp/view/index.html，--
   r = spawnSync(process.execPath, [path.join(REPO, 'workflow/scripts/view.mjs'), '--root', root, '--out', 'out/v.html'], { encoding: 'utf8' });
   assert.equal(r.status, 0);
   assert.ok(fs.existsSync(path.join(root, 'out/v.html')));
-  assert.equal(fs.readFileSync(path.join(root, 'workflow-run/docs/requirements/订单导出/meta.json'), 'utf8'), before, '只读');
+  assert.equal(fs.readFileSync(path.join(root, 'workflow-run/docs/requirements/订单导出/svc/meta.json'), 'utf8'), before, '只读');
   assert.equal(spawnSync(process.execPath, [path.join(REPO, 'workflow/scripts/view.mjs'), '--bogus'], { encoding: 'utf8' }).status, 1);
   fs.rmSync(root, { recursive: true, force: true });
 });

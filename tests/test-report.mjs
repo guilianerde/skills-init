@@ -58,7 +58,7 @@ const REVIEW = (rereview) => `# 代码审查报告 — feature-pay
 > 审查范围：分支对比：合并前 ｜ 日期：2026-10-16
 > 对比分支：\`feature/pay\` ←→ \`main\`
 > 审查方式：全量精读 ｜ 清单来源：skill 默认
-> 参考产物：workflow-run/docs/requirements/pay/delivery.md
+> 参考产物：workflow-run/docs/requirements/pay/svc/delivery.md
 > DocNexus：未沉淀
 
 ## 结论摘要 *
@@ -101,11 +101,11 @@ ${rereview ? `## 与上次审查对比（如有）
 `;
 
 function project() {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'report-'));
+  const root = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'report-')), 'svc'); fs.mkdirSync(root); // 目录名 svc = 自动取的项目名
   const g = (...a) => spawnSync('git', a, { cwd: root, encoding: 'utf8' });
   g('init', '-q', '-b', 'main');
   g('-c', 'user.name=t', '-c', 'user.email=t@example.com', 'commit', '-q', '--allow-empty', '-m', 'init');
-  const put = (rel, text) => { const f = path.join(root, 'workflow-run', 'docs', 'requirements', rel); fs.mkdirSync(path.dirname(f), { recursive: true }); fs.writeFileSync(f, text); };
+  const put = (rel, text) => { const [req, ...rest] = rel.split('/'); const f = path.join(root, 'workflow-run', 'docs', 'requirements', req, 'svc', ...rest); fs.mkdirSync(path.dirname(f), { recursive: true }); fs.writeFileSync(f, text); };
   return { root, put, g };
 }
 
@@ -178,7 +178,7 @@ test('pr-desc：有交付说明与审查报告时汇总；没有时退回用 git
   assert.doesNotMatch(d, /模板说明/, 'HTML 注释不输出');
   assert.match(d, /CRITICAL \/ HIGH（2 条）/);
   assert.match(d, /## 影响面\n\n影响 POST \/pay\/callback/);
-  assert.match(d, /- 交付说明：`workflow-run\/docs\/requirements\/pay\/delivery\.md`/);
+  assert.match(d, /- 交付说明：`workflow-run\/docs\/requirements\/pay\/svc\/delivery\.md`/);
 
   g('checkout', '-q', '-b', 'fix/small');
   fs.writeFileSync(path.join(root, 'a.txt'), 'x\n');
@@ -211,7 +211,7 @@ test('report --all-branches：只读扫描本地分支里提交过、还没合�
   assert.deepEqual([all.artifacts, all.review.reports, all.from_branches], [2, 1, 1]);
   assert.equal(all.delivery.scale.L, 1, '同一路径取工作区版本');
   assert.ok(all.branches.some((b) => b.branch === 'feature/coupon' && b.has.review));
-  assert.equal(fs.readFileSync(path.join(root, 'workflow-run/docs/requirements/pay/delivery.md'), 'utf8').includes('规模：L'), true, '不改工作区');
+  assert.equal(fs.readFileSync(path.join(root, 'workflow-run/docs/requirements/pay/svc/delivery.md'), 'utf8').includes('规模：L'), true, '不改工作区');
   const cli = node([path.join(REPO, 'bin/workflow-run.mjs'), 'report', '--all-branches', '--project-root', root], root);
   assert.equal(cli.status, 0, cli.stderr);
   assert.match(cli.stdout, /范围：工作区 \+ 2 个本地分支（其中 1 份只在分支里）/);

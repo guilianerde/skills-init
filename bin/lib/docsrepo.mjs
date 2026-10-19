@@ -1,5 +1,8 @@
-// docs-repo：把团队文档仓库克隆到项目根的 workflow-run/，一步切到独立文档仓库模式
-//   - 克隆（workflow-run/ 里只有 tmp/ 时先挪开再放回；有产物、DocNexus 或项目模板时停下，不合并）
+// docs-repo：让 workflow-run/ 成为团队文档仓库，一步切到独立文档仓库模式。两种模式目录结构相同，所以文件不用挪：
+//   - workflow-run/ 里没有内容（或只有 tmp/）：直接克隆
+//   - 已有产物、DocNexus 等内容：原地 git init 并接上远端。远端是空仓库时本地内容就是文档仓库的第一批内容；
+//     远端已有内容时检出远端，本地文件和远端同路径冲突就退回原状、列出冲突的文件（不合并）
+//   - 先把旧结构的产物迁到 <需求>/<项目名>/
 //   - 代码仓库 .gitignore 加 /workflow-run/；文档仓库的 .git/info/exclude 加 /tmp/（本机临时文件不进文档仓库）
 //   - 项目名写进 workflow/profile.json 的 artifacts.project（--project，或沿用已有的，默认 git 远端仓库名）
 //   - 文档仓库里有 DocNexus 时接上本项目的链接与段落；还没装依赖时提示
@@ -9,9 +12,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { HOME, step, ok, warn, toPosix, findManifests, docnexusBin, docnexusRoot } from './core.mjs';
-import { updateGitignore, excludeHomeTmp } from './install.mjs';
+import { updateGitignore, excludeHomeTmp, reportMigration } from './install.mjs';
 import { refreshDocNexusLinks } from './docnexus.mjs';
-import { layout, setConfig, artifactsConfig, suggestProject } from '../../workflow/scripts/requirement.mjs';
+import { layout, setConfig, artifactsConfig, suggestProject, migrateLayout } from '../../workflow/scripts/requirement.mjs';
 
 const git = (cwd, args, opts = {}) => spawnSync('git', args, { cwd, encoding: 'utf8', ...opts });
 
@@ -28,6 +31,36 @@ function show(root) {
   return 0;
 }
 
+// workflow-run/ 里已有内容：原地变成文档仓库。返回是否成功；失败时 workflow-run/ 保持原样（只多了迁移到新结构的产物）
+function inPlace(root, home, url, project, installed) {
+  // 先定项目名，再把旧结构迁到 <需求>/<项目名>/，这样和文档仓库里其他服务的目录对得上
+  if (project && installed) setConfig(root, { project });
+  reportMigration(migrateLayout(root));
+  const remote = git(root, ['ls-remote', '--symref', url]);
+  if (remote.status !== 0) { warn(`连不上 ${url}（地址、权限或网络），没有改动`); return false; }
+  const heads = remote.stdout.split('\n').filter((l) => /\trefs\/heads\//.test(l)).map((l) => l.split('\t')[1].replace('refs/heads/', ''));
+  const def = /^ref: refs\/heads\/(\S+)\tHEAD$/m.exec(remote.stdout)?.[1] ?? (heads.includes('main') ? 'main' : heads[0]);
+  step(`把 ${HOME}/ 原地变成文档仓库（${url}）`);
+  const undo = () => fs.rmSync(path.join(home, '.git'), { recursive: true, force: true });
+  if (git(home, ['init', '-q']).status !== 0 || git(home, ['remote', 'add', 'origin', url]).status !== 0) { undo(); warn('git init 失败，没有改动'); return false; }
+  if (!heads.length) {
+    git(home, ['symbolic-ref', 'HEAD', 'refs/heads/main']);
+    ok(`远端是空仓库：${HOME}/ 里现有的内容就是文档仓库的第一批内容（分支 main）`);
+    return true;
+  }
+  if (git(home, ['fetch', '-q', 'origin']).status !== 0) { undo(); warn('git fetch 失败，没有改动'); return false; }
+  const co = git(home, ['checkout', '-q', '-b', def, '--track', `origin/${def}`]);
+  if (co.status !== 0) {
+    undo();
+    const files = co.stderr.split('\n').filter((l) => /^\t/.test(l)).map((l) => l.trim());
+    warn(`文档仓库里已有和 ${HOME}/ 同路径的文件，没有改动${files.length ? `：${files.join('、')}` : `（${co.stderr.trim()}）`}。
+产物在各自的 <需求>/<项目名>/ 下，一般不会冲突；冲突多半来自 DocNexus：文档仓库里已有其他服务的知识库时，先按 DocNexus 的写入流程把本项目沉淀的内容写进去，再挪走本地的 docnexus/ 后重跑。`);
+    return false;
+  }
+  ok(`已接上文档仓库 ${def} 分支；${HOME}/ 里本项目的内容还没提交`);
+  return true;
+}
+
 export function docsRepo(root, { url, project }) {
   const home = path.join(root, HOME);
   if (!url && !project) return show(root);
@@ -41,20 +74,19 @@ export function docsRepo(root, { url, project }) {
     if (!url) { warn(`${HOME}/ 还不是文档仓库，需要给出仓库地址：docs-repo <仓库地址>`); return 1; }
     const entries = fs.existsSync(home) ? fs.readdirSync(home).filter((e) => e !== 'tmp' && e !== '.DS_Store') : [];
     if (entries.length) {
-      warn(`${HOME}/ 里已有 ${entries.join('、')}（随项目提交的产物 / DocNexus / 项目模板），没有改动。
-文档仓库的布局不同（需求下再分项目），不会自动合并：先把需要的内容放进文档仓库并提交，再挪走或删掉这些目录后重跑。`);
-      return 1;
+      if (!inPlace(root, home, url, project, installed)) return 1;
+    } else {
+      // tmp/ 是本机临时文件，克隆前挪开、克隆后放回
+      const tmp = path.join(home, 'tmp');
+      const park = fs.existsSync(tmp) ? path.join(root, `.${HOME}-tmp-${process.pid}`) : null;
+      if (park) fs.renameSync(tmp, park);
+      if (fs.existsSync(home)) fs.rmSync(home, { recursive: true, force: true });
+      step(`克隆文档仓库到 ${HOME}/`);
+      const r = spawnSync('git', ['clone', url, HOME], { cwd: root, stdio: 'inherit' });
+      if (park) { fs.mkdirSync(home, { recursive: true }); fs.renameSync(park, path.join(home, 'tmp')); }
+      if (r.status !== 0) { warn('git clone 失败（地址、权限或网络），没有改动'); return 1; }
+      ok(`已克隆到 ${HOME}/`);
     }
-    // tmp/ 是本机临时文件，克隆前挪开、克隆后放回
-    const tmp = path.join(home, 'tmp');
-    const park = fs.existsSync(tmp) ? path.join(root, `.${HOME}-tmp-${process.pid}`) : null;
-    if (park) fs.renameSync(tmp, park);
-    if (fs.existsSync(home)) fs.rmSync(home, { recursive: true, force: true });
-    step(`克隆文档仓库到 ${HOME}/`);
-    const r = spawnSync('git', ['clone', url, HOME], { cwd: root, stdio: 'inherit' });
-    if (park) { fs.mkdirSync(home, { recursive: true }); fs.renameSync(park, path.join(home, 'tmp')); }
-    if (r.status !== 0) { warn('git clone 失败（地址、权限或网络），没有改动'); return 1; }
-    ok(`已克隆到 ${HOME}/`);
   }
 
   updateGitignore(root);
@@ -76,7 +108,9 @@ export function docsRepo(root, { url, project }) {
     else warn(`文档仓库里有 DocNexus，本机还没装它的依赖：运行 npx @rowansenne/workflow-run upgrade --with-docnexus`);
   }
   const L = layout(root);
+  const todo = git(home, ['status', '--porcelain', '--untracked-files=normal']).stdout.split('\n').filter(Boolean).length;
   step('完成');
+  if (todo) console.log(`  ${HOME}/ 里有 ${todo} 处改动还没提交到文档仓库：git -C ${HOME} status 查看，确认后 git -C ${HOME} add -A && git -C ${HOME} commit，再 push`);
   console.log(`  产物写到 ${toPosix(path.join(HOME, 'docs', 'requirements'))}/<需求名>/${L.project}/，引用写「${L.repo_name}:docs/requirements/...」`);
   console.log(`  写完产物后 skill 会列出文档仓库里没提交的文件，你确认后才提交；推送另外问`);
   return 0;

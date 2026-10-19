@@ -6,6 +6,7 @@ import { spawnSync } from 'node:child_process';
 import { PKG, CANON_DIR, INSTALL_BASES, LINK_ENVS, HOME, DOCNEXUS_PKG, docnexusUpgradeCmd, SKILLS, step, ok, warn, fail, toPosix, fileHash, readManifest, lstat, findManifests, cmpVersion } from './core.mjs';
 import { reportTemplateStatus, docnexusSupportsCategory, docnexusSupportsRecallCategory } from './docnexus.mjs';
 import { codegraphVersion } from './codegraph.mjs';
+import { legacyRequirements } from '../../workflow/scripts/requirement.mjs';
 
 // upgrade = 用清单里记录的环境与模式非交互重装；数据库配置原样保留
 export function upgradeOptions(o) {
@@ -98,7 +99,9 @@ export function doctor(root, offline) {
     // 产出目录：都在 workflow-run/
     const mode = st.artifacts?.mode === 'repo' ? `独立文档仓库（${HOME}/ 自己是 git 仓库）` : '随项目提交';
     if (st.artifacts && !st.artifacts.ok) meh(`产出目录 ${HOME}/：${mode}，${st.artifacts.how}`);
-    else ok(`产出目录 ${HOME}/：${mode}`);
+    else ok(`产出目录 ${HOME}/：${mode}${st.artifacts?.project ? `，本项目的产物在 docs/requirements/<需求>/${st.artifacts.project}/` : ''}`);
+    const legacy = legacyRequirements(root);
+    if (legacy.length) meh(`${legacy.length} 个需求还是旧结构（文件直接放在 docs/requirements/<需求>/ 下）：运行 npx @rowansenne/workflow-run upgrade 迁到 <需求>/<项目名>/`);
     if (st.docnexus.ok) {
       if (!reportTemplateStatus(root, meh)) ok('DocNexus 已接入，文档模板齐全且与默认模板同步（或为团队定制版）');
       if (docnexusSupportsCategory(root) === false) meh(`已装的 DocNexus 不支持 draft seal --category：各 skill 的分类只能经 metadata.category 写入，不记为调用方指定。升级：${docnexusUpgradeCmd()}`);

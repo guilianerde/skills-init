@@ -49,7 +49,7 @@ dev（需求 → 方案 → 实现 → 测试 → 自审）
   → DocNexus 沉淀（可选，需授权）
 ```
 
-开始完整链路时先确定需求名：`node <skills>/workflow/scripts/requirement.mjs which`，当前分支没绑定就问用户这个需求叫什么并 `bind`（见 `references/requirements.md`），之后各段产物都落在 `workflow-run/docs/requirements/<需求名>/`。
+开始完整链路时先确定需求名：`node <skills>/workflow/scripts/requirement.mjs which`，当前分支没绑定就问用户这个需求叫什么并 `bind`（见 `references/requirements.md`），之后各段产物都落在 `workflow-run/docs/requirements/<需求名>/<项目名>/`。
 
 提交、推送、发布 wiki、写入 DocNexus 都是对外动作，每一步都要用户明确同意。
 
@@ -63,7 +63,7 @@ dev（需求 → 方案 → 实现 → 测试 → 自审）
 | `references/templates.md` | 模板来源判定（`resolve.mjs template`）、创建与修改模板（`/workflow template`）、模板随知识库更新 |
 | `references/docnexus.md` | 写入 DocNexus 的分类（`resolve.mjs category`）、按分类参考知识库（`knowledge.mjs`） |
 | `references/status.md` | `/workflow status` 的输出格式 |
-| `references/requirements.md` | 产物按需求归档（`workflow-run/docs/requirements/<需求名>/`）：什么时候问需求名、`requirement.mjs` 绑定分支与给出落盘路径、`meta.json` |
+| `references/requirements.md` | 产物按需求归档（`workflow-run/docs/requirements/<需求名>/<项目名>/`）：什么时候问需求名、`requirement.mjs` 绑定分支与给出落盘路径、`meta.json` |
 | `references/tables.md` | 确定改动涉及哪些表（`tables.mjs`）、只读拉取实际表结构 / 索引 / 行数核对（`query.mjs --schema --indexes`），没有库连接时怎么退回 |
 | `references/codegraph.md` | 用 CodeGraph 代码图谱读代码、查调用链与影响面（MCP 工具与 CLI 对照、图谱看不到的部分） |
 

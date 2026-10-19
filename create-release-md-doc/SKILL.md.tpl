@@ -70,7 +70,7 @@ description: "Generate a Markdown release/deployment plan (上线方案) from th
 
 ### Step 4 — 写文件
 
-- 路径：运行 `node <skills>/workflow/scripts/requirement.mjs path release --branch <dev分支>`，写到输出的 `path`（`workflow-run/docs/requirements/<需求名>/release-doc.md`，文件名固定；已有旧版时直接写新版，上一版由脚本归档到输出的 `previous`）。规则见 `<skills>/workflow/references/requirements.md`。
+- 路径：运行 `node <skills>/workflow/scripts/requirement.mjs path release --branch <dev分支>`，写到输出的 `path`（`workflow-run/docs/requirements/<需求名>/<项目名>/release-doc.md`，文件名固定；已有旧版时直接写新版，上一版由脚本归档到输出的 `previous`）。规则见 `<skills>/workflow/references/requirements.md`。
   - 退出码 2（这个分支还没绑定需求）：问用户这个需求叫什么，默认值用输出的 `suggested_name`，再 `requirement.mjs bind --name "<需求名>" --branch <dev分支>`；用户不给名字时 `bind` 按分支名生成。
   - `wiki_record` 非空：上一版已发布到 wiki，新版第一行原样写这条记录，重新发布时更新同一页面。
 - 写完运行 `requirement.mjs sync <path>` 更新 `meta.json`；输出里 `archived` 非空（上一版已归档到 `workflow-run/tmp/old-artifacts/`）时告诉用户归档了哪些文件，请用户确认不再需要后自己删除；输出里 `commit` 非空（独立文档仓库模式）时按 `<skills>/workflow/references/requirements.md`「文档仓库的提交」处理。文档里引用其他产物（「参考产物」等）写 `requirement.mjs path` 输出的 `cite`。

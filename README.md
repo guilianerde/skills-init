@@ -47,7 +47,7 @@ npx @rowansenne/workflow-run uninstall                                     # 按
 | `uninstall` | 等价于 `--uninstall` |
 | `report` | 本地效果报告：只读统计 `workflow-run/docs/requirements/` 下的产物（`--since YYYY-MM-DD`、`--all-branches`、`--json`），见「workflow：入口与项目画像」 |
 | `view` | 项目文档视图：按需求浏览开发方案、交付说明、审查记录（含复审修复情况）、技术 / 上线方案，生成本地静态页面（`--out <文件>`、`--open`） |
-| `docs-repo <仓库地址>` | 改用团队文档仓库：克隆到 `workflow-run/`、代码仓库忽略它、配置本项目的项目名（`--project`，默认 git 远端仓库名）、接上仓库里的 DocNexus；不带地址显示当前状态，见「产物输出规范」 |
+| `docs-repo <仓库地址>` | 改用团队文档仓库：`workflow-run/` 是空的就克隆，已有内容就原地接上远端（目录结构相同，文件不用挪）、代码仓库忽略它、配置本项目的项目名（`--project`，默认 git 远端仓库名）、接上仓库里的 DocNexus；不带地址显示当前状态，见「产物输出规范」 |
 | `seed-templates` | 只把默认文档模板导入 DocNexus，不重装 skills。`--update` 把导入后未改动的模板更新为新版；`--diff` 只读打印团队改过的模板与新默认模板的差异，供手动合并 |
 
 ```
@@ -168,7 +168,7 @@ npx @rowansenne/workflow-run docs-repo git@git.example.com:team/team-docs.git
 /dev --bug <现象 | 报错 | 日志>       # 缺陷修复
 ```
 
-* **功能开发**：理解需求（可读 PRD、查 DocNexus 历史决策）→ 调研现有代码 → 需求澄清（借鉴 grill-me：按决策树分轮提问，每题给推荐答案；事实自己查、决定交给用户；S 规模无未定决定时跳过）→ 按规模出方案（S 直接做；M 对话内方案待确认；L 落盘方案文档待确认）→ 小步实现并编译 → 补测试并运行 → 用 project-review 自审 → 交付说明落盘到 `workflow-run/docs/requirements/<需求名>/delivery.md`（带分支元信息；改动、验证结果、配置清单、未执行的 SQL），已接入 DocNexus 时每次都问要不要沉淀（同意后以 `dev-notes` 分类写入，并把库内路径记回交付说明）。审查和上线方案会按分支自动读取这份交付说明。
+* **功能开发**：理解需求（可读 PRD、查 DocNexus 历史决策）→ 调研现有代码 → 需求澄清（借鉴 grill-me：按决策树分轮提问，每题给推荐答案；事实自己查、决定交给用户；S 规模无未定决定时跳过）→ 按规模出方案（S 直接做；M 对话内方案待确认；L 落盘方案文档待确认）→ 小步实现并编译 → 补测试并运行 → 用 project-review 自审 → 交付说明落盘到 `workflow-run/docs/requirements/<需求名>/<项目名>/delivery.md`（带分支元信息；改动、验证结果、配置清单、未执行的 SQL），已接入 DocNexus 时每次都问要不要沉淀（同意后以 `dev-notes` 分类写入，并把库内路径记回交付说明）。审查和上线方案会按分支自动读取这份交付说明。
 * **S 规模快速通道**：S 规模且不涉及配置、SQL / DDL、对外接口、表结构，也没有需要澄清的决定时，编译、测试、自审照常，但只在对话里交付，不落盘交付说明、不问沉淀；实现中碰到上述任何一项或改动超过 3 个文件，就退回完整流程。缺陷修复同样适用（根因仍须在对话里写清楚）。
 * **缺陷修复**：收集现象 → 用失败测试复现 → 用证据定位根因 → 最小修复让测试转绿 → 自审 → 交付（必须写明根因）。
 * 守则：不写库、不改凭据、不擅自 commit / push、不装新依赖；测试没跑就写「未验证」。
@@ -392,7 +392,7 @@ npx @rowansenne/workflow-run uninstall
 | `workflow/scripts/resolve.mjs status` | `/workflow status` 的能力探测（不输出任何凭据） |
 | `workflow/scripts/resolve.mjs infer-profile` | 按固定规则从构建文件、Makefile、依赖与配置文件、git 推断项目画像草稿，每个字段附依据；不写文件 |
 | `workflow/scripts/lint-doc.mjs <文档> --skill <skill> [--facts]` | 对照当前生效的模板检查生成的文档：必填章节、残留 `{{...}}` 占位符、元信息行为错误；缺普通章节、顺序不一致为警告；列出待填写位置。`--facts` 再核对正文里的类名、文件、接口、表名：在对比分支的 diff 和代码里都找不到的记为警告（防编造） |
-| `workflow/scripts/requirement.mjs which / bind / path / sync / pending / list / config` | 产物按需求归档（`workflow-run/docs/requirements/<需求>/`，独立文档仓库模式再分 `<项目>/`）：查当前分支绑定的需求（没绑定时给出按分支名生成的建议名）、绑定需求名、给出本次落盘路径（不覆盖，带上一版的 wiki 记录）、重建 `meta.json`、列出所有需求；`config` 设置产物位置（文档仓库、项目名、提交提示），`pending` 看文档仓库里还没提交的产物 |
+| `workflow/scripts/requirement.mjs which / bind / path / sync / pending / list / config` | 产物按需求归档（`workflow-run/docs/requirements/<需求>/<项目>/`，两种模式结构相同）：查当前分支绑定的需求（没绑定时给出按分支名生成的建议名）、绑定需求名、给出本次落盘路径（不覆盖，带上一版的 wiki 记录）、重建 `meta.json`、列出所有需求；`config` 设置产物位置（文档仓库、项目名、提交提示），`pending` 看文档仓库里还没提交的产物 |
 | `workflow/scripts/view.mjs [--out f] [--open]` | 项目文档视图（`/workflow view`、`npx @rowansenne/workflow-run view`）：读需求目录里的产物，生成单个 HTML，按需求列出各阶段、审查记录（各级别数量、复核、与上次对比）、交付记录、沉淀到的知识文档，正文直接渲染；顶部「知识文档」列出每篇知识文档来自哪个需求、哪份产物；数据内嵌，只读、不联网，默认写到 `workflow-run/tmp/view/index.html` |
 | `workflow/scripts/artifacts.mjs [--branch b \| --all]` | 按分支汇总 `workflow-run/docs/requirements/` 下的开发方案、交付说明、审查报告、技术方案、上线方案及其 wiki 发布记录，给出下一步建议；分支取自文档元信息行，不另存记录。上线方案没传 `--tech` 时据此自动引用同分支的技术方案；project-review 据此对照本分支方案、识别复审 |
 | `workflow/scripts/report.mjs [--since d] [--all-branches] [--json]` | 本地效果报告（`/workflow report`、`npx @rowansenne/workflow-run report`）：审查发现与修复率、复核率、需求澄清、沉淀率、知识引用、各分支链路 |
@@ -437,7 +437,7 @@ CI（`.github/workflows/test.yml`）在 push 到 main 和每个 PR 上运行：m
 | --- | --- |
 | `.agents/skills/` | skills 单一来源，含安装清单 `.workflow-run.json` |
 | `.claude/skills/`、`.qwen/skills/`、`.codebuddy/skills/` | 指向 `.agents/skills/` 的相对软链接（Windows 上 clone 需 `git config core.symlinks true`） |
-| `.agents/skills/workflow/profile.json` | 项目画像（无凭据），独立文档仓库模式的项目名也在这里 |
+| `.agents/skills/workflow/profile.json` | 项目画像（无凭据），产物目录用的项目名也在这里 |
 | `.agents/skills/database-query/references/schema.md` | 表结构速查，补齐后提交 |
 | `workflow-run/docs/requirements/` | 需求产物；独立文档仓库模式下提交到文档仓库 |
 | `workflow-run/docnexus/` | DocNexus 工作区与定制的文档模板；依赖和检索库由它自带的 `docnexus/.gitignore` 忽略。独立文档仓库模式下提交到文档仓库 |
@@ -514,7 +514,7 @@ git status --short --ignored
 一个需求的文档产物放在**同一个需求目录**里，开发方案、交付说明、审查报告、技术方案、上线方案一起看：
 
 ```
-workflow-run/docs/requirements/<需求名>/
+workflow-run/docs/requirements/<需求名>/<项目名>/
 ├── meta.json        # 需求名、绑定的分支、各产物（版本、日期、wiki 发布记录、DocNexus 沉淀），给以后的可视化用
 ├── plan.md          # 开发方案（dev，L 规模）
 ├── delivery.md      # 交付说明（dev，每次完整交付都写）
@@ -523,8 +523,10 @@ workflow-run/docs/requirements/<需求名>/
 └── release-doc.md   # 上线方案
 ```
 
+* **随代码提交和独立文档仓库两种用法的结构完全一样**，切换时文件不用挪。一个需求横跨多个服务时，各服务在同一个需求目录下各占一个 `<项目名>/`。项目名写在 `workflow/profile.json` 的 `artifacts.project`：随代码提交时不用配置，取 git 远端仓库名（没有远端用目录名），第一次落盘时自动写进去；独立文档仓库时由 `docs-repo` 配置。
+* 旧版本随代码提交时没有 `<项目名>/` 这一层；`upgrade` 会把这些需求目录里的文件迁到 `<需求>/<项目名>/`（被 git 跟踪的用 `git mv`，保留历史），结尾列出迁移了哪些需求，改动由你提交。目标里已有同名文件的需求不动，并提示手动处理；`doctor` 也会提示还没迁移的需求。
 * **需求名由你定**：dev 确定是 M / L 规模（要落盘）时，或从 `/workflow` 完整链路开始时，如果当前分支还没有绑定需求，会问你这个需求叫什么（默认值按分支名生成；也可以选已有的需求，例如修 bug 的新分支挂到原需求下）。你不起名就按分支名生成。绑定后，同一分支上的各 skill 都写到这个目录，不再问。一个需求可以绑定多个分支。
-* 路径由 `workflow/scripts/requirement.mjs path <种类>` 给出，每种产物文件名固定，目录里只留最新版，引用不会失效；版本号记在 `meta.json` 的 `versions`。已有旧版时，上一版先复制到 `workflow-run/tmp/old-artifacts/<需求>/<种类>_v<N>.md`（不提交），新版直接覆盖写入；skill 会列出归档的文件，请你确认后自己删除。上一版发布过 wiki 时，新版沿用同一个页面。
+* 路径由 `workflow/scripts/requirement.mjs path <种类>` 给出，每种产物文件名固定，目录里只留最新版，引用不会失效；版本号记在 `meta.json` 的 `versions`。已有旧版时，上一版先复制到 `workflow-run/tmp/old-artifacts/<需求>/<项目>/<种类>_v<N>.md`（不提交），新版直接覆盖写入；skill 会列出归档的文件，请你确认后自己删除。上一版发布过 wiki 时，新版沿用同一个页面。
 * 需求目录写在项目根的 `.ignore` 里，ripgrep 和 agent 的代码搜索会跳过它，产物多了不会污染搜索结果（找历史决策用 DocNexus）。git 不受影响，建议随代码提交。
 
 **独立文档仓库（可选）**：不想让产物进代码仓库、或一个需求横跨多个服务时，装好 skills 后在项目根运行一条命令：
@@ -533,9 +535,12 @@ workflow-run/docs/requirements/<需求名>/
 npx @rowansenne/workflow-run docs-repo <团队文档仓库地址> [--project <项目名>]
 ```
 
-它会：把文档仓库克隆到 `workflow-run/`（里面只有 `tmp/` 时先挪开再放回；已有随项目提交的产物、DocNexus 或项目模板时停下，不自动合并）；代码仓库的 `.gitignore` 加 `/workflow-run/`，文档仓库的 `.git/info/exclude` 加 `/tmp/`；把项目名写进 `workflow/profile.json`（默认沿用已配置的，其次 git 远端仓库名；`profile.json` 随代码提交，记得提交它）；文档仓库里有 DocNexus 时接上本项目的链接和段落，本机还没装它的依赖时提示运行 `upgrade --with-docnexus`。不带地址运行显示当前状态；只改项目名：`docs-repo --project <项目名>`。
+它会：
+- `workflow-run/` 里没有内容（或只有 `tmp/`）时，把文档仓库克隆到这里（`tmp/` 先挪开再放回）；
+- 已有随项目提交的产物、DocNexus 时，原地 `git init` 并接上远端，文件不用挪（旧结构的产物先迁到 `<需求>/<项目名>/`）。远端是空仓库时，本地内容就是文档仓库的第一批内容；远端已有内容时检出远端，本地文件和远端同路径冲突（多半是两边都有 DocNexus 知识库）就退回原状并列出冲突的文件，不合并；代码仓库还跟踪着 `workflow-run/` 时提示 `git rm -r --cached workflow-run`；
+- 然后代码仓库的 `.gitignore` 加 `/workflow-run/`，文档仓库的 `.git/info/exclude` 加 `/tmp/`；把项目名写进 `workflow/profile.json`（默认沿用已配置的，其次 git 远端仓库名；`profile.json` 随代码提交，记得提交它）；文档仓库里有 DocNexus 时接上本项目的链接和段落，本机还没装它的依赖时提示运行 `upgrade --with-docnexus`。不带地址运行显示当前状态；只改项目名：`docs-repo --project <项目名>`。
 
-`workflow-run/` 自己是 git 仓库就是这个模式：产物写到 `workflow-run/docs/requirements/<需求名>/<项目名>/`，各服务在同一个需求目录下各占一个子目录，DocNexus 知识库也在这个仓库里各服务共用。项目名写在 `workflow/profile.json` 的 `artifacts.project`，只配一次（`docs-repo` 会配好；没配时 skill 会问你一次）。文档里引用产物写成「文档仓库名:路径」，各服务、各人的克隆里都一样。
+`workflow-run/` 自己是 git 仓库就是这个模式：目录结构不变，各服务在同一个需求目录下各占一个子目录，DocNexus 知识库也在这个仓库里各服务共用。项目名写在 `workflow/profile.json` 的 `artifacts.project`，只配一次（`docs-repo` 会配好；没配时 skill 会问你一次）。文档里引用产物写成「文档仓库名:路径」，各服务、各人的克隆里都一样。
 
 * 写完产物后 skill 会列出文档仓库里没提交的文件和建议的提交信息，你确认后才提交，推送另外问。不想被提示：`requirement.mjs config --commit-prompt off --local`（写在个人的 `workflow/profile.local.json`，已加入 `.gitignore`，不影响团队）。
 * 其他服务的需求要先在 `workflow-run/` 里拉下来（`git -C workflow-run pull`），绑定时才看得到。

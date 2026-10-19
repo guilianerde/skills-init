@@ -4,11 +4,16 @@
 
 ## [Unreleased]
 
+### 变更（破坏性）
+- 随代码提交和独立文档仓库两种用法的目录结构统一为 `workflow-run/docs/requirements/<需求名>/<项目名>/`（归档的上一版同样在 `tmp/old-artifacts/<需求名>/<项目名>/`）。随代码提交时项目名不用配置，取 git 远端仓库名（没有远端用目录名），第一次 `bind` 时写进 `workflow/profile.json` 的 `artifacts.project`。
+- 旧结构自动迁移：`init` / `upgrade` 把 `<需求名>/` 下直接放的文件挪到 `<需求名>/<项目名>/`（被 git 跟踪的用 `git mv`），结尾列出迁移的需求，改动由你提交；目标里已有同名文件的需求不动并提示。`doctor` 提示还没迁移的需求。
+- `docs-repo` 支持原地切换：`workflow-run/` 里已有产物、DocNexus 时不再停下，而是原地 `git init` 并接上远端。远端是空仓库时本地内容就是第一批内容；远端已有内容时检出远端，本地和远端同路径冲突就退回原状并列出冲突的文件。
+
 ### 变更
 - `--with-docnexus` 不再往项目的 `.gitignore` 追加 `node_modules/`：DocNexus 的依赖和检索库由它自带的 `docnexus/.gitignore` 忽略，随代码提交和独立文档仓库两种模式都适用。已追加过的这一行保留不动。
 
 ### 文档
-- 新增图文教程 `docs/full-install.html`：带 DocNexus 与 CodeGraph 的全量安装、团队接入、独立文档仓库（含已装过的项目按三种情况切换）、升级与卸载。
+- 新增图文教程 `docs/full-install.html`：带 DocNexus 与 CodeGraph 的全量安装、团队接入、独立文档仓库（原地切换、新服务接入、旧项目改用）、升级与卸载。
 
 ## [0.21.2] - 2026-10-19
 

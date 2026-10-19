@@ -1,9 +1,9 @@
 # 产物按需求归档（dev / project-review / 技术方案 / 上线方案共用）
 
-一个需求的全部产物放在同一个目录，整条链路一眼看全，`/workflow view` 也直接读这里。本工具的产出都在项目根的 `workflow-run/` 里（需求产物、DocNexus 工作区、项目模板、临时文件），不往项目的其他地方写。默认 `workflow-run/` 随代码提交（下图）；团队也可以把独立的文档仓库克隆到 `workflow-run/`，见最后一节。
+一个需求的全部产物放在同一个目录，整条链路一眼看全，`/workflow view` 也直接读这里。本工具的产出都在项目根的 `workflow-run/` 里（需求产物、DocNexus 工作区、项目模板、临时文件），不往项目的其他地方写。默认 `workflow-run/` 随代码提交；团队也可以让 `workflow-run/` 成为独立的文档仓库，见最后一节。两种用法的目录结构完全一样（下图），切换时文件不用挪。
 
 ```
-workflow-run/docs/requirements/<需求名>/
+workflow-run/docs/requirements/<需求名>/<项目名>/
 ├── meta.json          # 需求名、绑定的分支、各产物（种类、版本、日期、wiki 发布记录、DocNexus 沉淀）
 ├── plan.md            # 开发方案（dev，L 规模或用户要求时）
 ├── delivery.md        # 交付说明（dev）
@@ -12,7 +12,9 @@ workflow-run/docs/requirements/<需求名>/
 └── release-doc.md     # 上线方案（create-release-md-doc）
 ```
 
-这个目录写在项目根的 `.ignore` 里，不参与代码搜索（找历史决策用 DocNexus）。读写一律按下面脚本给出的路径，不要靠搜索找这些文件，也不要自己拼路径。两种放法下各 skill 的做法完全一样，区别都在脚本里。
+一个需求横跨多个服务时，各服务在同一个需求目录下各占一个 `<项目名>/`。项目名是 `workflow/profile.json` 的 `artifacts.project`：随代码提交时不用配置，脚本取 git 远端仓库名，第一次 `bind` 时写进 `profile.json` 固定下来；独立文档仓库时要先配置（见最后一节）。
+
+这个目录写在项目根的 `.ignore` 里，不参与代码搜索（找历史决策用 DocNexus）。读写一律按下面脚本给出的路径，不要靠搜索找这些文件，也不要自己拼路径。两种用法下各 skill 的做法完全一样，区别都在脚本里。
 
 ## 需求名：流程开始或第一次落盘时问用户
 
@@ -41,14 +43,14 @@ node <skills>/workflow/scripts/requirement.mjs which
 node <skills>/workflow/scripts/requirement.mjs path <plan|delivery|review|tech|release>
 ```
 
-- 输出的 `path` 就是要写的文件（相对项目根）。文档里引用产物（「参考产物」、上线方案引用技术方案等）写输出的 `cite`：默认模式下和 `path` 相同；文档仓库模式下是「文档仓库名:仓库内路径」，各服务、各人的克隆里都一样。每种产物的文件名固定（`review.md`、`tech-doc.md` …），引用它的地方不会因为出了新版而失效。已有时，脚本先把当前版复制到 `workflow-run/tmp/old-artifacts/<需求名>/<种类>_v<N>.md`，输出的 `previous` 就是这份（复审对照上次的报告读它），`version` 是这次的版本号；然后把新版直接写到 `path`。
+- 输出的 `path` 就是要写的文件（相对项目根）。文档里引用产物（「参考产物」、上线方案引用技术方案等）写输出的 `cite`：默认模式下和 `path` 相同；文档仓库模式下是「文档仓库名:仓库内路径」，各服务、各人的克隆里都一样。每种产物的文件名固定（`review.md`、`tech-doc.md` …），引用它的地方不会因为出了新版而失效。已有时，脚本先把当前版复制到 `workflow-run/tmp/old-artifacts/<需求名>/<项目名>/<种类>_v<N>.md`，输出的 `previous` 就是这份（复审对照上次的报告读它），`version` 是这次的版本号；然后把新版直接写到 `path`。
 - 退出码 2：当前分支还没绑定需求，按上一节问用户需求名，`bind` 之后再运行一次。
 - `wiki_record` 非空：上一版已经发布到 wiki。新版的**第一行原样写这条记录**，md-to-wiki 再发布时会更新同一个页面，不会新建页面。
 - 写完运行 `requirement.mjs sync <path>`，更新 `meta.json`。md-to-wiki 发布后改了第一行的记录，或补写了 DocNexus 元信息行，也要再 sync 一次。
-- sync 时新版内容和归档的上一版不同，才算新版本（`meta.json` 的 `versions` 加一）；没写就放弃的话版本号不变。输出里 `archived` 非空时，告诉用户归档了哪些文件、在哪里（`workflow-run/tmp/old-artifacts/<需求名>/`，文档仓库模式是 `<需求名>/<项目名>/`，不提交），请用户确认不再需要后自己删除；**不要替用户删**。随代码或文档仓库提交过的旧版也能从 git 历史找回。
+- sync 时新版内容和归档的上一版不同，才算新版本（`meta.json` 的 `versions` 加一）；没写就放弃的话版本号不变。输出里 `archived` 非空时，告诉用户归档了哪些文件、在哪里（`workflow-run/tmp/old-artifacts/<需求名>/<项目名>/`，不提交），请用户确认不再需要后自己删除；**不要替用户删**。随代码或文档仓库提交过的旧版也能从 git 历史找回。
 - sync 输出里 `commit` 非空：按下一节「文档仓库的提交」处理。
 
-## 独立文档仓库（克隆到 workflow-run/）
+## 独立文档仓库
 
 团队想让代码仓库保持干净、或者一个需求横跨多个服务时，用户在项目根运行（由用户执行，克隆可能要他们自己认证）：
 
@@ -56,11 +58,11 @@ node <skills>/workflow/scripts/requirement.mjs path <plan|delivery|review|tech|r
 npx @rowansenne/workflow-run docs-repo <团队文档仓库地址> [--project <项目名>]
 ```
 
-它把文档仓库克隆到 `workflow-run/`，代码仓库的 `.gitignore` 加 `/workflow-run/`，并配置好项目名。`workflow-run/` 自己是 git 仓库就是这个模式，不用别的配置。
+`workflow-run/` 里还没有内容时它直接克隆；已经有产物、DocNexus 时原地 `git init` 接上远端（目录结构相同，文件不用挪；和远端同路径冲突时退回原状并列出冲突的文件）。然后代码仓库的 `.gitignore` 加 `/workflow-run/`，并配置好项目名。`workflow-run/` 自己是 git 仓库就是这个模式，不用别的配置。
 
-- 布局：`workflow-run/docs/requirements/<需求名>/<项目名>/plan.md`、`delivery.md`……一个需求横跨多个服务时，各服务在同一个需求目录下各占一个子目录。绑定需求时 `which` 会列出 `other_projects`（其他服务已有、已拉到本地的需求），用同一个名字 `bind` 就加入了那个需求。
+- 布局和随代码提交时一样。绑定需求时 `which` 会列出 `other_projects`（其他服务已有、已拉到本地的需求），用同一个名字 `bind` 就加入了那个需求。
 - DocNexus 也在这个仓库里（`workflow-run/docnexus/`），各服务共用一个知识库。
-- `project`：这个项目在文档仓库里的名字，写在 `workflow/profile.json` 的 `artifacts.project`（随代码提交，团队共用），**只需配置一次**。没配时脚本退出码 2（`need_project`）并给出 `suggested_project`（git 远端仓库名）：问用户一次，然后运行 `requirement.mjs config --project <项目名>`，之后一直沿用。
+- `project`：这个项目在文档仓库里的名字，写在 `workflow/profile.json` 的 `artifacts.project`（随代码提交，团队共用），**只需配置一次**；随代码提交时已经自动写过的就直接沿用。没配时脚本退出码 2（`need_project`）并给出 `suggested_project`（git 远端仓库名）：问用户一次，然后运行 `requirement.mjs config --project <项目名>`，之后一直沿用。
 - 查看或修改配置：`requirement.mjs config [--project <项目名>] [--commit-prompt on|off] [--local]`。
 - `/workflow view` 在这个模式下显示文档仓库里所有项目的需求，一个需求下按项目区分产物。
 

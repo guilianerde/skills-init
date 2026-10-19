@@ -138,7 +138,7 @@ test('跨服务需求：其他项目在 which 里看到已有需求（推送后�
   fs.rmSync(ws, { recursive: true, force: true });
 });
 
-test('docs-repo 一条命令切到文档仓库：克隆、忽略、项目名、tmp/ 保留且不进文档仓库；已有产物时停下', () => {
+test('docs-repo 一条命令切到文档仓库：克隆、忽略、项目名、tmp/ 保留且不进文档仓库；已有产物时原地切换', () => {
   const { ws, remote, project } = workspace();
   const p = project('order-service', 'feature/order-export');
   fs.mkdirSync(path.join(p.root, 'workflow-run/tmp/view'), { recursive: true });
@@ -166,13 +166,49 @@ test('docs-repo 一条命令切到文档仓库：克隆、忽略、项目名、t
   assert.match(r.stdout + r.stderr, /已经是文档仓库/);
   assert.match(p.cli('docs-repo').stdout, /仓库名（引用前缀）：team-docs[\s\S]*项目名：orders/);
 
-  // 随项目提交的产物还在 workflow-run/ 里：不克隆、不改动
+  // 随项目提交的产物已在 workflow-run/ 里：两种模式结构相同，原地 git init 接上远端，产物不用挪
   const q = project('pay-service', 'feature/pay');
-  q.req('bind', '--name', '支付');
+  assert.equal(q.req('bind', '--name', '支付').out.dir, 'workflow-run/docs/requirements/支付/pay-service');
   r = q.cli('docs-repo', remote);
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  assert.match(r.stdout, /原地变成文档仓库/);
+  assert.equal(q.docsGit('rev-parse', '--abbrev-ref', 'HEAD').stdout.trim(), 'main', '检出远端的 main');
+  assert.equal(q.docsGit('log', '-1', '--format=%s').stdout.trim(), 'init');
+  assert.match(q.docsGit('-c', 'core.quotePath=false', 'status', '--porcelain', '--untracked-files=all').stdout, /docs\/requirements\/支付\/pay-service\/meta\.json/, '本项目的产物待提交');
+  assert.match(r.stdout, /还没提交到文档仓库/);
+  const w2 = q.req('which').out;
+  assert.deepEqual([w2.mode, w2.project, w2.bound, w2.dir], ['repo', 'pay-service', true, 'workflow-run/docs/requirements/支付/pay-service']);
+  fs.rmSync(ws, { recursive: true, force: true });
+});
+
+test('docs-repo 原地切换：远端是空仓库时本地内容就是第一批内容；和远端同路径冲突时退回原状', () => {
+  const { ws, remote, project } = workspace();
+  const empty = path.join(ws, 'empty.git');
+  spawnSync('git', ['init', '-q', '--bare', empty]);
+  const a = project('order-service', 'feature/order-export');
+  a.req('bind', '--name', '订单导出');
+  let r = a.cli('docs-repo', empty);
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  assert.match(r.stdout, /远端是空仓库/);
+  assert.equal(a.docsGit('symbolic-ref', '--short', 'HEAD').stdout.trim(), 'main');
+  assert.equal(a.docsGit('remote', 'get-url', 'origin').stdout.trim(), empty);
+  assert.equal(a.req('which').out.mode, 'repo');
+
+  // 远端已有 docnexus/project.json，本地也有：不合并，撤掉 .git，列出冲突的文件
+  const seed = path.join(ws, 'seed');
+  fs.mkdirSync(path.join(seed, 'docnexus'), { recursive: true });
+  fs.writeFileSync(path.join(seed, 'docnexus/project.json'), '{"team":true}\n');
+  spawnSync('git', ['add', '-A'], { cwd: seed });
+  spawnSync('git', [...G, 'commit', '-q', '-m', 'docnexus'], { cwd: seed });
+  spawnSync('git', ['push', '-q', 'origin', 'HEAD:main'], { cwd: seed });
+  const b = project('pay-service', 'feature/pay');
+  b.req('bind', '--name', '支付');
+  b.put('workflow-run/docnexus/project.json', '{"mine":true}\n');
+  r = b.cli('docs-repo', remote);
   assert.equal(r.status, 1);
-  assert.match(r.stdout + r.stderr, /已有 docs/);
-  assert.ok(!fs.existsSync(path.join(q.docs, '.git')));
-  assert.equal(q.req('which').out.mode, 'project');
+  assert.match(r.stdout + r.stderr, /同路径的文件[\s\S]*docnexus\/project\.json/);
+  assert.ok(!fs.existsSync(path.join(b.docs, '.git')), '退回原状');
+  assert.equal(fs.readFileSync(path.join(b.docs, 'docnexus/project.json'), 'utf8'), '{"mine":true}\n');
+  assert.equal(b.req('which').out.mode, 'project');
   fs.rmSync(ws, { recursive: true, force: true });
 });

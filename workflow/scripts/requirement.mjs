@@ -3,9 +3,12 @@
 // wiki 发布记录与 DocNexus 沉淀，供 /workflow view 等直接读取。
 // 本工具的产出都在项目根的 workflow-run/ 里（需求产物 docs/requirements/、DocNexus 工作区 docnexus/、项目模板 templates/、临时文件 tmp/），
 // 不往项目的其他地方写。两种用法：
-//   - 默认：workflow-run/ 随代码提交，需求产物在 workflow-run/docs/requirements/<需求名>/；这个目录写进项目根 .ignore，不参与代码搜索
-//   - 独立文档仓库：团队文档仓库克隆到 workflow-run/（它自己是 git 仓库，代码仓库忽略它），产物在 workflow-run/docs/requirements/<需求名>/<项目名>/，
-//     一个需求横跨多个服务时各项目各占一个子目录；文档仓库单独提交（写完由用户确认，可用 artifacts.commit_prompt 关闭提交提示）
+// 两种用法的目录结构完全一样：产物都在 workflow-run/docs/requirements/<需求名>/<项目名>/，一个需求横跨多个服务时各项目各占一个子目录，
+// 所以两种用法之间切换只是换一个 git 仓库来跟踪 workflow-run/，文件不用挪：
+//   - 默认：workflow-run/ 随代码提交；项目名没配置时取 git 远端仓库名（第一次 bind 时写进 profile.json，之后固定）
+//   - 独立文档仓库：团队文档仓库克隆到 workflow-run/（它自己是 git 仓库，代码仓库忽略它），项目名要先配置（各服务在同一个仓库里，名字由团队定）；
+//     文档仓库单独提交（写完由用户确认，可用 artifacts.commit_prompt 关闭提交提示）
+// 需求目录写进项目根 .ignore，不参与代码搜索。旧版本（随代码提交时没有 <项目名>/ 这一层）的产物由安装器 upgrade 时迁移（migrateLayout）
 // 需求名由用户在流程开始或第一次落盘时给出；用户不给时按分支名生成。分支 → 需求的绑定记在 meta.json 的 branches。
 // 说明见 workflow/references/requirements.md。
 //
@@ -110,13 +113,17 @@ export function artifactsConfig(root) {
   return { project: c.project ? String(c.project) : '', commit_prompt: c.commit_prompt !== false, profile_dir: dir };
 }
 
-// 产物位置：project = workflow-run/docs/requirements/<需求>/（随代码提交）；repo = 同一位置下再分 <项目>/（workflow-run/ 是独立的文档仓库）
+// 产物位置：两种模式都是 workflow-run/docs/requirements/<需求>/<项目>/。
+// mode 只决定谁来提交（project = 随代码提交，repo = workflow-run/ 是独立的文档仓库）、引用怎么写、项目名能不能自动取
 export function layout(root, cfg = artifactsConfig(root)) {
   const home = homeDir(root);
   const base = path.join(root, REQ_DIR);
-  if (!homeIsRepo(root)) return { mode: 'project', ok: true, base, home, repo: null, project: null, commit_prompt: cfg.commit_prompt, reqDir: (slug) => path.join(base, slug), ref: (abs) => relOf(root, abs) };
+  if (!homeIsRepo(root)) {
+    const project = cfg.project ? dirName(cfg.project) : suggestProject(root);
+    return { mode: 'project', ok: true, base, home, repo: null, project, project_configured: !!cfg.project, commit_prompt: cfg.commit_prompt, reqDir: (slug) => path.join(base, slug, project), ref: (abs) => relOf(root, abs) };
+  }
   const repoName = remoteName(home);
-  const L = { mode: 'repo', base, home, repo: home, repo_rel: HOME, repo_name: repoName, project: cfg.project ? dirName(cfg.project) : null, commit_prompt: cfg.commit_prompt };
+  const L = { mode: 'repo', base, home, repo: home, repo_rel: HOME, repo_name: repoName, project: cfg.project ? dirName(cfg.project) : null, project_configured: !!cfg.project, commit_prompt: cfg.commit_prompt };
   L.reqDir = (slug) => path.join(base, slug, L.project ?? '_');
   // 文档里引用产物用「文档仓库名:仓库内路径」，各服务、各人的克隆里都一样
   L.ref = (abs) => `${repoName}:${toPosix(path.relative(home, abs))}`;
@@ -157,9 +164,10 @@ export function requirements(root, L = layout(root)) {
   return out;
 }
 
-// 文档仓库里所有项目的需求（跨服务视图、bind 时找同名需求）：{ slug, name, projects:[{ project, abs, dir, meta }] }
+// 所有项目的需求（跨服务视图、bind 时找同名需求）：{ slug, name, projects:[{ project, abs, dir, meta }] }。
+// 两种模式结构相同；随代码提交时通常只有本项目一个
 export function repoRequirements(root, L = layout(root)) {
-  if (L.mode !== 'repo' || !isDir(L.base)) return [];
+  if (!isDir(L.base)) return [];
   const out = [];
   for (const d of fs.readdirSync(L.base, { withFileTypes: true })) {
     if (skipDir(d)) continue;
@@ -178,7 +186,7 @@ export function repoRequirements(root, L = layout(root)) {
 // 产物文件（view / artifacts.mjs 读）：{ abs, rel（相对项目根）, cite（文档里引用它的写法）, slug, project, kind, version }
 export function artifactFiles(root, { allProjects = false } = {}) {
   const L = layout(root);
-  const dirs = allProjects && L.mode === 'repo'
+  const dirs = allProjects
     ? repoRequirements(root, L).flatMap((r) => r.projects.map((p) => ({ abs: p.abs, slug: r.slug, project: p.project })))
     : requirements(root, L).map((r) => ({ abs: r.abs, slug: r.slug, project: L.project }));
   const out = [];
@@ -251,15 +259,15 @@ export function which(root, branch) {
   const L = layout(root);
   if (!L.ok) return notReady(L);
   const r = find(root, branch, L);
-  const where = L.mode === 'repo' ? { mode: 'repo', repo: L.repo_rel, project: L.project } : { mode: 'project' };
+  const where = L.mode === 'repo' ? { mode: 'repo', repo: L.repo_rel, project: L.project } : { mode: 'project', project: L.project };
   if (r) return { bound: true, ...where, branch, name: r.name, dir: r.dir, meta: sync(root, r.dir) };
   const recent = requirements(root, L).sort((a, b) => String(b.updated).localeCompare(String(a.updated))).slice(0, 5).map(({ name, dir, branches, updated }) => ({ name, dir, branches, updated }));
-  // 文档仓库模式：其他项目已有的需求（跨服务需求，本项目可以用同一个名字加入）
+  // 其他项目已有的需求（跨服务需求，本项目可以用同一个名字加入）；文档仓库里常见，随代码提交时一般没有
   const mine = new Set(requirements(root, L).map((x) => x.slug));
-  const others = L.mode === 'repo' ? repoRequirements(root, L).filter((x) => !mine.has(x.slug)).sort((a, b) => String(b.updated).localeCompare(String(a.updated))).slice(0, 10).map((x) => ({ name: x.name, projects: x.projects.map((p) => p.project), updated: x.updated })) : [];
+  const others = repoRequirements(root, L).filter((x) => !mine.has(x.slug)).sort((a, b) => String(b.updated).localeCompare(String(a.updated))).slice(0, 10).map((x) => ({ name: x.name, projects: x.projects.map((p) => p.project), updated: x.updated }));
   return {
-    bound: false, ...where, branch, suggested_name: branch ? dirName(branch.replace(/\//g, '-')) : null, recent, ...(L.mode === 'repo' ? { other_projects: others } : {}),
-    hint: `当前分支还没有绑定需求：问用户这个需求叫什么（给出 suggested_name 作为默认；也可以选 recent 里已有的需求继续${L.mode === 'repo' ? '，或加入 other_projects 里其他服务已有的需求' : ''}），然后运行 bind --name <需求名>；用户不给就运行 bind（按分支名生成）。`,
+    bound: false, ...where, branch, suggested_name: branch ? dirName(branch.replace(/\//g, '-')) : null, recent, ...(others.length || L.mode === 'repo' ? { other_projects: others } : {}),
+    hint: `当前分支还没有绑定需求：问用户这个需求叫什么（给出 suggested_name 作为默认；也可以选 recent 里已有的需求继续${others.length || L.mode === 'repo' ? '，或加入 other_projects 里其他服务已有的需求' : ''}），然后运行 bind --name <需求名>；用户不给就运行 bind（按分支名生成）。`,
   };
 }
 
@@ -269,25 +277,28 @@ export function bind(root, { name = null, branch, base = null }) {
   if (!branch) return { ok: false, error: '无法确定当前分支（detached HEAD？），请用 --branch 指定' };
   const named = name != null && String(name).trim() !== '';
   const display = named ? String(name).trim() : branch.replace(/\//g, '-');
-  // 同名需求沿用（文档仓库模式按整个仓库找，跨服务的需求共用一个目录）；目录名被别的需求占了就加 -2、-3
-  const pool = L.mode === 'repo' ? repoRequirements(root, L).map((r) => ({ slug: r.slug, name: r.name })) : requirements(root, L).map((r) => ({ slug: r.slug, name: r.name }));
+  // 同名需求沿用（按所有项目找，跨服务的需求共用一个目录）；目录名被别的需求占了就加 -2、-3
+  const pool = repoRequirements(root, L).map((r) => ({ slug: r.slug, name: r.name }));
   const target = pool.find((r) => r.name === display) ?? null;
   let slug = target?.slug;
   if (!slug) {
     slug = dirName(display);
-    for (let i = 2; pool.some((r) => r.slug === slug) || (L.mode === 'project' && isDir(L.reqDir(slug))); i++) slug = `${dirName(display)}-${i}`;
+    for (let i = 2; pool.some((r) => r.slug === slug) || isDir(L.reqDir(slug)); i++) slug = `${dirName(display)}-${i}`;
   }
+  // 随代码提交时项目名是自动取的：第一次落盘时写进 profile.json 固定下来，之后改了 git 远端名也不会换目录
+  // （只在项目里装过 skills、有 profile.json 时写；直接从安装包运行脚本时不写）
+  if (!L.project_configured && fs.existsSync(path.join(profileDir(root), 'profile.json'))) setConfig(root, { project: L.project });
   const dir = L.reqDir(slug);
   const existedHere = isDir(dir);
   fs.mkdirSync(dir, { recursive: true });
   const f = path.join(dir, 'meta.json');
-  const meta = readJson(f) ?? { name: target?.name ?? display, named_by: named ? 'user' : 'branch', ...(L.mode === 'repo' ? { project: L.project } : {}), branches: [], base, created: now() };
+  const meta = readJson(f) ?? { name: target?.name ?? display, named_by: named ? 'user' : 'branch', project: L.project, branches: [], base, created: now() };
   if (!meta.branches.includes(branch)) meta.branches.push(branch);
   if (base && !meta.base) meta.base = base;
   meta.updated = now();
   fs.writeFileSync(f, `${JSON.stringify(meta, null, 2)}\n`);
   const rel = relOf(root, dir);
-  return { ok: true, mode: L.mode, created: !existedHere, joined: !!target && !existedHere && L.mode === 'repo', name: meta.name, named_by: meta.named_by, dir: rel, ...(L.mode === 'repo' ? { project: L.project } : {}), branches: sync(root, rel).branches };
+  return { ok: true, mode: L.mode, created: !existedHere, joined: !!target && !existedHere, name: meta.name, named_by: meta.named_by, dir: rel, project: L.project, branches: sync(root, rel).branches };
 }
 
 // 本次落盘路径：文件名固定（review.md …），已有时先把当前版复制到 tmp/old-artifacts/<种类>_v<N>.md（previous，复审对照用），
@@ -345,6 +356,55 @@ export function pending(root, branch, dirRel = null) {
     commands: files.length ? [`git -C ${JSON.stringify(L.repo_rel)} add -- ${JSON.stringify(inRepo)}`, `git -C ${JSON.stringify(L.repo_rel)} commit -m ${JSON.stringify(message)}`] : [],
     ...(kn.length ? { knowledge_files: kn, knowledge_commands: [`git -C ${JSON.stringify(L.repo_rel)} add -- docnexus`, `git -C ${JSON.stringify(L.repo_rel)} commit -m "knowledge: <沉淀了什么>"`] } : {}),
   };
+}
+
+// ------------------------------------------------------------------ 旧结构迁移
+// 旧版本随代码提交时没有 <项目名>/ 这一层：文件直接放在 docs/requirements/<需求>/ 下。
+// 列出这样的需求目录（目录里直接有文件的；隐藏文件不算）
+export function legacyRequirements(root) {
+  const base = path.join(root, REQ_DIR);
+  if (!isDir(base)) return [];
+  return fs.readdirSync(base, { withFileTypes: true }).filter((d) => !skipDir(d)).map((d) => d.name)
+    .filter((slug) => fs.readdirSync(path.join(base, slug), { withFileTypes: true }).some((e) => e.isFile() && !e.name.startsWith('.')));
+}
+
+// 把旧结构的需求目录挪到 <需求>/<项目名>/：被 git 跟踪的用 git mv（保留历史），其余直接移动；
+// tmp/old-artifacts/<需求>/ 下归档的上一版也一起挪，复审对照还能找到。
+// 目标里已有同名文件时这个需求整个跳过，留给用户处理。项目名没配置时按 layout 自动取的写进 profile.json。
+// 返回 { project, moved: [{ from, to }], skipped: [{ dir, reason }] }
+export function migrateLayout(root) {
+  const L = layout(root);
+  const slugs = legacyRequirements(root);
+  if (!slugs.length) return { project: L.project, moved: [], skipped: [] };
+  if (!L.project) return { project: null, moved: [], skipped: slugs.map((s) => ({ dir: `${REQ_DIR}/${s}`, reason: '还没配置项目名' })) };
+  const repoOf = (abs) => (L.mode === 'repo' ? L.repo : root);
+  const tracked = (abs) => git(repoOf(abs), ['ls-files', '--error-unmatch', '--', path.relative(repoOf(abs), abs)]).status === 0;
+  const moved = []; const skipped = [];
+  const move = (from, to, useGit) => {
+    fs.mkdirSync(path.dirname(to), { recursive: true });
+    const cwd = repoOf(from);
+    if (useGit && tracked(from) && git(cwd, ['mv', '--', path.relative(cwd, from), path.relative(cwd, to)]).status === 0) return;
+    fs.renameSync(from, to);
+  };
+  for (const slug of slugs) {
+    const dir = path.join(L.base, slug);
+    const files = fs.readdirSync(dir, { withFileTypes: true }).filter((e) => e.isFile() && !e.name.startsWith('.')).map((e) => e.name);
+    const target = path.join(dir, L.project);
+    const clash = files.filter((f) => fs.existsSync(path.join(target, f)));
+    if (clash.length) { skipped.push({ dir: relOf(root, dir), reason: `${relOf(root, target)} 里已有 ${clash.join('、')}` }); continue; }
+    for (const f of files) {
+      move(path.join(dir, f), path.join(target, f), true);
+      moved.push({ from: relOf(root, path.join(dir, f)), to: relOf(root, path.join(target, f)) });
+    }
+    const m = readJson(path.join(target, 'meta.json'));
+    if (m && m.project !== L.project) fs.writeFileSync(path.join(target, 'meta.json'), `${JSON.stringify({ ...m, project: L.project }, null, 2)}\n`);
+    const old = path.join(root, OLD_DIR, slug);
+    if (isDir(old)) {
+      for (const e of fs.readdirSync(old, { withFileTypes: true })) if (e.isFile()) move(path.join(old, e.name), path.join(old, L.project, e.name), false);
+    }
+  }
+  if (moved.length && !L.project_configured && fs.existsSync(path.join(profileDir(root), 'profile.json'))) setConfig(root, { project: L.project });
+  return { project: L.project, moved, skipped };
 }
 
 // ------------------------------------------------------------------ 配置

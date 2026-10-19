@@ -74,7 +74,7 @@ description: "Review source code (any language; Java/Spring, Go, TypeScript, Pyt
 
 ## Artifact Location
 
-审查报告按需求归档在 `workflow-run/docs/requirements/<需求名>/`，规则见 `<skills>/workflow/references/requirements.md`：
+审查报告按需求归档在 `workflow-run/docs/requirements/<需求名>/<项目名>/`，规则见 `<skills>/workflow/references/requirements.md`：
 
 - 路径用 `node <skills>/workflow/scripts/requirement.mjs path review`（分支对比按 dev 分支加 `--branch <dev分支>`），写到输出的 `path`（文件名固定为 `review.md`）；已有报告时脚本先把它归档，输出的 `previous` 是上次报告，复审对照它。
 - 退出码 2（这个分支还没绑定需求）：问用户这个需求叫什么，默认值用输出的 `suggested_name`，再 `requirement.mjs bind --name "<需求名>" [--branch <dev分支>]`；用户不给名字时 `bind` 按分支名生成。
