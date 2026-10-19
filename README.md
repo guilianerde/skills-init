@@ -13,30 +13,30 @@
 > 本工具在项目里的产出（需求产物、DocNexus 工作区、项目模板、临时文件）都放在项目根的
 > `workflow-run/`
 > 一个目录里，不往项目的其他地方写；它可以随代码提交，也可以整个是团队的独立文档仓库（见「独立文档仓库」）。
-> 安装只用 `npx @rowansenne/workflow-run`，在项目根执行。
+> 安装只用 npx，在项目根执行。推荐 `npx @rowansenne/workflow-run --with-docnexus --with-codegraph`，同时接入 DocNexus 文档库和 CodeGraph 代码图谱。
 
 ## 快速开始
 
-需要 **Node.js >= 22**（接入 DocNexus 时需 >= 22.13，code-graph 的 `impact` / `entry` 需 >= 22.5）。只用 npx 安装，在项目根执行（以当前目录为项目根；Windows 要在管理员终端里运行）：
+需要 **Node.js >= 22.13**（DocNexus 的要求；不接 DocNexus 时 >= 22 即可，code-graph 的 `impact` / `entry` 需 >= 22.5）。只用 npx 安装，在项目根执行（以当前目录为项目根；Windows 要在管理员终端里运行）。推荐全量安装：
 
 ```
-npx @rowansenne/workflow-run
+npx @rowansenne/workflow-run --with-docnexus --with-codegraph
 ```
 
-按提示：选择环境（编号多选，回车 = 全部）→ 确认 / 填写数据库连接 → 自动生成。装完后在 agent 里运行 `/workflow profile` 填写项目画像。
+按提示：选择环境（编号多选，回车 = 全部）→ 确认 / 填写数据库连接 → 自动生成。`--with-docnexus` 接入 DocNexus 文档库（开发约定与审查问题的沉淀和召回、团队定制的文档模板），`--with-codegraph` 接入 CodeGraph 代码图谱（改动影响到的接口、MQ、定时任务和测试）；不需要哪一项就去掉对应参数。装完后在 agent 里运行 `/workflow profile` 填写项目画像。
 
-同时接入 DocNexus 与 CodeGraph 的全量安装，见图文教程 [docs/full-install.html](docs/full-install.html)（下载后用浏览器打开）。
+全量安装的分步说明见图文教程 [docs/full-install.html](docs/full-install.html)（下载后用浏览器打开）。
 
 整体架构（五层结构、dev 主线流程、设计约定、产物与知识闭环）见 [docs/architecture.html](docs/architecture.html)（下载后用浏览器打开）。
 
 非交互示例（bash、zsh、PowerShell 写法一样）：
 
 ```
-npx @rowansenne/workflow-run --envs all --yes                              # 用现有数据库配置，装全部环境
-npx @rowansenne/workflow-run --envs codex,qwen --skip-db                   # 跳过数据库
-npx @rowansenne/workflow-run --envs claude,qwen --skip-db --with-docnexus  # 同时接入 DocNexus 文档库
-npx @rowansenne/workflow-run --envs all --skip-db --copy                   # 不用软链接，各环境独立拷贝
-npx @rowansenne/workflow-run uninstall                                     # 按安装清单卸载
+npx @rowansenne/workflow-run --envs all --yes --with-docnexus --with-codegraph              # 用现有数据库配置，装全部环境
+npx @rowansenne/workflow-run --envs codex,qwen --skip-db --with-docnexus --with-codegraph   # 跳过数据库
+npx @rowansenne/workflow-run --envs all --skip-db --copy --with-docnexus --with-codegraph   # 不用软链接，各环境独立拷贝
+npx @rowansenne/workflow-run --envs claude --skip-db                                        # 最小安装：只装 skills，不接 DocNexus 和 CodeGraph
+npx @rowansenne/workflow-run uninstall                                                      # 按安装清单卸载
 ```
 
 ### 子命令

@@ -199,12 +199,12 @@ footer { margin-top: 40px; font-size: 13px; color: var(--muted); }
     </div>
   </div>
   <div class="term" aria-label="安装示例">
-<pre><span class="p">$ </span>npx @rowansenne/workflow-run
+<pre><span class="p">$ </span>npx @rowansenne/workflow-run --with-docnexus --with-codegraph
 <span class="dim">? 选择环境（回车 = 全部）</span>
 <span class="ok">✔</span> .agents/skills/  <span class="dim">单一来源</span>
 <span class="ok">✔</span> .claude/skills/ → 软链接
-<span class="ok">✔</span> .qwen/skills/   → 软链接
-<span class="ok">✔</span> .gitignore 已追加凭据规则
+<span class="ok">✔</span> DocNexus 文档库  <span class="dim">workflow-run/docnexus/</span>
+<span class="ok">✔</span> CodeGraph 索引   <span class="dim">.codegraph/</span>
 <span class="dim"># 然后在代理里：</span>
 <span class="p">› </span>/workflow profile
 <span class="p">› </span>/dev 给订单列表加导出接口</pre>
@@ -415,10 +415,10 @@ footer { margin-top: 40px; font-size: 13px; color: var(--muted); }
 <div class="cta">
   <div>
     <h2>在项目根试一下</h2>
-    <p>需要 Node.js 22 及以上。装完运行 <code>/workflow profile</code> 填项目画像，再用 <code>/dev</code> 提一个小需求。接入 DocNexus 和 CodeGraph 的全量安装见 <a href="full-install.html">图文教程</a>。</p>
+    <p>推荐全量安装，同时接入 DocNexus 文档库和 CodeGraph 代码图谱，需要 Node.js 22.13 及以上。装完运行 <code>/workflow profile</code> 填项目画像，再用 <code>/dev</code> 提一个小需求。分步说明见 <a href="full-install.html">图文教程</a>。</p>
   </div>
   <div class="term">
-<pre id="cmd"><span class="p">$ </span>npx @rowansenne/workflow-run</pre>
+<pre id="cmd"><span class="p">$ </span>npx @rowansenne/workflow-run --with-docnexus --with-codegraph</pre>
     <button class="copy" id="copy-btn" type="button">复制命令</button>
   </div>
 </div>
@@ -428,7 +428,7 @@ footer { margin-top: 40px; font-size: 13px; color: var(--muted); }
 <script>
 document.getElementById('copy-btn').addEventListener('click', (e) => {
   const btn = e.currentTarget;
-  const text = 'npx @rowansenne/workflow-run';
+  const text = 'npx @rowansenne/workflow-run --with-docnexus --with-codegraph';
   const done = () => { btn.textContent = '已复制'; setTimeout(() => { btn.textContent = '复制命令'; }, 1600); };
   const fallback = () => { const r = document.createRange(); r.selectNodeContents(document.getElementById('cmd')); const s = getSelection(); s.removeAllRanges(); s.addRange(r); btn.textContent = '已选中，按 ⌘C / Ctrl+C 复制'; };
   try { navigator.clipboard.writeText(text).then(done, fallback); } catch { fallback(); }

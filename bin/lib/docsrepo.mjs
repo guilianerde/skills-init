@@ -95,7 +95,7 @@ export function docsRepo(root, { url, project }) {
   if (tracked) warn(`代码仓库里还跟踪着 ${HOME}/ 下的文件，运行 git rm -r --cached ${HOME} 后提交，代码仓库就不再管它`);
 
   if (!installed) {
-    warn(`本项目还没安装 skills：先运行 npx @rowansenne/workflow-run，项目名之后用 docs-repo --project <项目名> 配置（或第一次落盘时 skill 会问）`);
+    warn(`本项目还没安装 skills：先运行 npx @rowansenne/workflow-run --with-docnexus --with-codegraph，项目名之后用 docs-repo --project <项目名> 配置（或第一次落盘时 skill 会问）`);
     return 0;
   }
   const name = project || artifactsConfig(root).project || suggestProject(root);

@@ -6,6 +6,7 @@
 
 ### 文档
 - 新增架构介绍页 `docs/architecture.html`：五层结构、dev 主线流程与规模分级、设计约定、8 个 skill 与依赖、产物与 DocNexus 知识闭环、运行反馈；README 快速开始里加了链接。
+- 推荐的安装命令默认带 `--with-docnexus --with-codegraph`：README 快速开始和非交互示例、架构介绍页、`docs-repo` 在还没安装时的提示都改成全量安装；最小安装（只装 skills）作为示例保留。
 
 ## [0.22.1] - 2026-10-19
 
