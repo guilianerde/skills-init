@@ -27,6 +27,8 @@ npx @rowansenne/workflow-run
 
 同时接入 DocNexus 与 CodeGraph 的全量安装，见图文教程 [docs/full-install.html](docs/full-install.html)（下载后用浏览器打开）。
 
+整体架构（五层结构、dev 主线流程、设计约定、产物与知识闭环）见 [docs/architecture.html](docs/architecture.html)（下载后用浏览器打开）。
+
 非交互示例（bash、zsh、PowerShell 写法一样）：
 
 ```

@@ -4,6 +4,9 @@
 
 ## [Unreleased]
 
+### 文档
+- 新增架构介绍页 `docs/architecture.html`：五层结构、dev 主线流程与规模分级、设计约定、8 个 skill 与依赖、产物与 DocNexus 知识闭环、运行反馈；README 快速开始里加了链接。
+
 ## [0.22.1] - 2026-10-19
 
 ### 变更
