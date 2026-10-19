@@ -33,6 +33,7 @@ description: "Implement a feature or fix a bug in this project end to end: under
    - 有与本需求无关的未提交改动 → 告知用户，不要混进本次改动，也不要替用户 stash / 丢弃。
    - 当前在主分支（`profile.main_branch`）上 → 建议先建特性分支，用户同意后再建。
 3. **增强能力探测**：运行 `node <skills>/workflow/scripts/resolve.mjs status`，按输出的 `wiki` / `docnexus` / `database` 判断是否可用（wiki MCP 脚本探测不到，另看当前环境有没有 wiki 工具）。都不阻塞，不可用就跳过对应增强，并在交付说明中注明。
+4. **基线**：动代码前运行一次 `profile.build`，再跑和本需求相关的测试（`profile.test_single` 或相关模块，不必全量），记下已经失败的测试和编译错误。之后只对新增的失败负责：已有失败不顺手修，写进交付说明「开工前已有的失败」。跑不了就记「未跑基线」和原因。
 
 ## 功能开发流程
 
@@ -78,7 +79,7 @@ description: "Implement a feature or fix a bug in this project end to end: under
 
 ### F5 — 实现
 
-- **小步推进**：每完成一个可编译的单元，就运行 `profile.build`（没有则用对应构建工具的编译命令）确认通过，再进入下一步。
+- **小步推进**：按逻辑分步实现，一步改完（或改了公共签名、跨了模块）运行 `profile.build`（没有则用对应构建工具的编译命令）确认通过，再进入下一步。不必每改一个文件就编译，代码没变时不重复跑。
 - **改动前看影响面**：要改公共方法、接口签名、DTO 字段时，先 `node <skills>/code-graph/scripts/cg.mjs entry <Class.method>`（code-graph skill；退出码 2 时用 grep），把会被波及的入口和调用方纳入本次改动或写进交付说明。
 - **贴合现有代码**：沿用参照实现的写法；不顺手重构、不改无关代码、不升级依赖。看到范围外的问题记进交付说明，不在本次修。
 - **配置**：新增配置项记入配置清单（key、位置、用途、建议默认值、上线前需下发的环境），按 `profile.config_center` 与审查清单的配置维度处理（清单路径用 `node <skills>/workflow/scripts/resolve.mjs template project-review checklist.md` 取，接入 DocNexus 时是团队维护的版本）。
@@ -88,7 +89,8 @@ description: "Implement a feature or fix a bug in this project end to end: under
 ### F6 — 验证
 
 - 按验收标准补充或更新单元测试 / 集成测试，测试放在项目既有测试目录、沿用既有测试框架。
-- 运行 `profile.test`（或只跑相关测试的 `profile.test_single`）。有 `profile.lint` 时一并运行。代码图谱可用时先跑 `node <skills>/code-graph/scripts/cg.mjs impact --base <main_branch>` 输出的 `tests`，再跑全量；`impact` 的 `entry_points`、`sql`、`config_keys` 写进交付说明（受影响的接口 / 消费者 / 定时任务、表、配置）。改动碰到 SQL、实体或 DDL 时运行 `node <skills>/workflow/scripts/tables.mjs --base <main_branch>`，对其中的表再核对一次实际表结构（见 `<skills>/workflow/references/tables.md`），结果写进交付说明的 SQL 节。
+- **验收项对应到证据**：F1 / F3 的每条验收标准写明靠哪个测试或手动操作验证、结果如何；没有测试也没法操作的标「未验证」并写原因。交付说明「验证」节的表格按这个填，快速通道在对话里列同样的对应。
+- 先跑相关测试（`profile.test_single`，或代码图谱的 `impact` 选出的测试），修到通过；最后跑一次 `profile.test` 全量（之后又改了代码就再跑）。有 `profile.lint` 时一并运行。全量里出现、基线没跑到的失败，先看失败的测试是否碰到本次改动的代码，确认无关的按已有失败记录并写明依据。代码图谱可用时相关测试取自 `node <skills>/code-graph/scripts/cg.mjs impact --base <main_branch>` 输出的 `tests`；`impact` 的 `entry_points`、`sql`、`config_keys` 写进交付说明（受影响的接口 / 消费者 / 定时任务、表、配置）。改动碰到 SQL、实体或 DDL 时运行 `node <skills>/workflow/scripts/tables.mjs --base <main_branch>`，对其中的表再核对一次实际表结构（见 `<skills>/workflow/references/tables.md`），结果写进交付说明的 SQL 节。
 - 如实报告结果：失败就给出失败输出并继续修；环境跑不了（缺依赖、缺中间件）就明确写「未验证」以及用户该如何验证。**不得声称未运行的测试已通过。**
 
 ### F7 — 自审
@@ -100,7 +102,7 @@ description: "Implement a feature or fix a bug in this project end to end: under
 
 ### F8 — 交付
 
-**快速通道交付**（见 F4「S 规模快速通道」）：不落盘、不跑 lint、不问 DocNexus 沉淀。对话里给：结果一句话、改动文件、验证（构建 / 测试命令与结果，未验证项如实写）、自审结论；然后只问提交（建议的 commit message）。用户说「落盘交付说明」或之后要出上线方案时，再按下面的完整流程补落盘。
+**快速通道交付**（见 F4「S 规模快速通道」）：不落盘、不跑 lint、不问 DocNexus 沉淀。对话里给：结果一句话、改动文件、验证（验收项 → 测试 / 操作 → 结果，构建 / 测试命令与结果，开工前已有的失败，未验证项如实写）、自审结论；然后只问提交（建议的 commit message）。用户说「落盘交付说明」或之后要出上线方案时，再按下面的完整流程补落盘。
 
 完整流程：
 

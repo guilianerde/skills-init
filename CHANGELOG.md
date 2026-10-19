@@ -13,6 +13,8 @@
 - `--with-docnexus` 不再往项目的 `.gitignore` 追加 `node_modules/`：DocNexus 的依赖和检索库由它自带的 `docnexus/.gitignore` 忽略，随代码提交和独立文档仓库两种模式都适用。已追加过的这一行保留不动。
 - `dev` 的 `project-review` 从 optional 改为 requires：`--skills dev` 会一起装上 `project-review`，已按子集装了 `dev` 的项目 `upgrade` 时自动补上。dev 自审必做，且要经 `resolve.mjs template project-review checklist.md` 取审查清单；之前没装 project-review 时这条命令报错，dev 写的「按清单手动自审」降级走不通。
 - dev 自审调用 project-review 时只走第 1～6 步，跳过落盘审查报告和 DocNexus 询问，问题表、影响面、未覆盖项交回 dev 在交付时统一给出（DocNexus 只在 dev 交付时问一次）；两边的 SKILL.md 都写明了这条边界。
+- dev 交付说明的「验证」节加「验收项 → 测试 / 操作 → 结果」对照表，每条验收标准写明靠什么验证，没法验证的标「未验证」和原因；新增「开工前已有的失败」一行。快速通道在对话里给同样的对应。
+- dev 开工前先跑一次基线（构建 + 相关测试，不必全量），记下已有的失败，之后只对新增失败负责；构建从「每个可编译单元」改为一步改完再编译，测试改为先相关、最后全量一次。
 
 ### 修复
 - `resolve.mjs template <skill> …` 在该 skill 没安装时提示「没有安装」并让重跑安装带上它，不再误报「没有登记模板」。
