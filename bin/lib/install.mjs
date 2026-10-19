@@ -207,11 +207,11 @@ export function linkSkills(root, envName, rel, skills = SKILLS) {
 }
 
 // ---------------------------------------------------------------- 4. .gitignore 保护
-// workflow-run/ 是独立文档仓库时整个忽略（它自己提交）；否则只忽略其中的临时文件
-export function updateGitignore(root, withDocNexus, withCodeGraph = false) {
+// workflow-run/ 是独立文档仓库时整个忽略（它自己提交）；否则只忽略其中的临时文件。
+// DocNexus 的依赖与检索库由它自带的 docnexus/.gitignore 忽略，随工作区走，两种模式都不用这里加规则
+export function updateGitignore(root, withCodeGraph = false) {
   const gi = path.join(root, '.gitignore');
   const rules = ['**/database-query/config.json', '**/wiki-config.json', '**/workflow/profile.local.json', homeIsRepo(root) ? `/${HOME}/` : `/${TMP_DIR}/`];
-  if (withDocNexus) rules.push('node_modules/');
   if (withCodeGraph) rules.push('.codegraph/'); // 本地索引（SQLite），各人各建
   const existing = fs.existsSync(gi) ? fs.readFileSync(gi, 'utf8').split(/\r?\n/).map((l) => l.trim()) : [];
   const missing = rules.filter((r) => !existing.includes(r));

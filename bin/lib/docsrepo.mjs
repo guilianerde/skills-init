@@ -57,7 +57,7 @@ export function docsRepo(root, { url, project }) {
     ok(`已克隆到 ${HOME}/`);
   }
 
-  updateGitignore(root, false);
+  updateGitignore(root);
   excludeHomeTmp(root);
   const tracked = git(root, ['ls-files', '--', HOME]).stdout.trim();
   if (tracked) warn(`代码仓库里还跟踪着 ${HOME}/ 下的文件，运行 git rm -r --cached ${HOME} 后提交，代码仓库就不再管它`);

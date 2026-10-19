@@ -225,7 +225,7 @@ async function main() {
   }
   closePrompt(); // 模板冲突时可能还要询问，装完再关
 
-  updateGitignore(o.root, o.withDocNexus, o.withCodeGraph);
+  updateGitignore(o.root, o.withCodeGraph);
   setupHome(o.root);
   recordEnv(o.root);
   const docnexus = o.withDocNexus ? setupDocNexus(o.root, sel) : 'skipped';

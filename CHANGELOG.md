@@ -4,6 +4,12 @@
 
 ## [Unreleased]
 
+### 变更
+- `--with-docnexus` 不再往项目的 `.gitignore` 追加 `node_modules/`：DocNexus 的依赖和检索库由它自带的 `docnexus/.gitignore` 忽略，随代码提交和独立文档仓库两种模式都适用。已追加过的这一行保留不动。
+
+### 文档
+- 新增图文教程 `docs/full-install.html`：带 DocNexus 与 CodeGraph 的全量安装、团队接入、独立文档仓库（含已装过的项目按三种情况切换）、升级与卸载。
+
 ## [0.21.2] - 2026-10-19
 
 ### 文档

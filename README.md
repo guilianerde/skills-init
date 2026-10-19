@@ -200,8 +200,9 @@ npx @rowansenne/workflow-run docs-repo git@git.example.com:team/team-docs.git
 
 1. 检查 Node >= 22.13 与 npm（不满足时**在安装任何文件之前**报错退出）；
 2. 在 `workflow-run/` 下执行 `npm install --prefix ./docnexus --save-exact @rowansenne/docnexus`：装在 `workflow-run/docnexus/` 下，npm 清单、锁文件和依赖不进宿主项目的 `package.json`；
-3. 在 `workflow-run/` 下执行 `./docnexus/node_modules/.bin/docnexus init --agent none`：创建 `workflow-run/docnexus/` 工作区，把 DocNexus 的 skills 同步到 `workflow-run/docnexus/skills/`；再由本工具把它们软链接到所选环境的 skills 目录、写入 `CLAUDE.md` / `AGENTS.md` 的段落（见下方「DocNexus 的位置」）；
-4. `.gitignore` 追加 `node_modules/`。
+3. 在 `workflow-run/` 下执行 `./docnexus/node_modules/.bin/docnexus init --agent none`：创建 `workflow-run/docnexus/` 工作区，把 DocNexus 的 skills 同步到 `workflow-run/docnexus/skills/`；再由本工具把它们软链接到所选环境的 skills 目录、写入 `CLAUDE.md` / `AGENTS.md` 的段落（见下方「DocNexus 的位置」）。
+
+依赖和检索库（`node_modules/`、`store/`）由 DocNexus 自带的 `docnexus/.gitignore` 忽略，它随工作区一起提交，所以随代码提交和独立文档仓库两种模式都不用另加规则。
 
 环境映射（本工具链接 DocNexus 的 skills、写段落）：
 
@@ -226,7 +227,7 @@ npx @rowansenne/workflow-run docs-repo git@git.example.com:team/team-docs.git
 * DocNexus 装在 `workflow-run/docnexus/`，以 `workflow-run/` 为项目根运行（`docnexus init --agent none`：它自己不往 `workflow-run/` 里链接 skills、写 `CLAUDE.md`）。
 * 本项目里由 workflow-run 接上：把 `workflow-run/docnexus/skills/*` 相对链接到 `.claude/skills` / `.agents/skills` / `.qwen/skills` / `.codebuddy/skills`，在 `CLAUDE.md` / `AGENTS.md` 写一段说明（概念索引 `@workflow-run/docnexus/CONCEPTS.md`；docnexus 系列 skill 的命令改用 `node <skills>/workflow/scripts/docnexus.mjs` 运行，不用先 `cd`），用自己的标记，不碰手写内容。升级时刷新，卸载时撤掉，`workflow-run/docnexus/` 本身不动。
 * 各 skill 的脚本已按位置处理：`resolve.mjs status` 给出 `docnexus.root` 与 `run`（`node <skills>/workflow/scripts/docnexus.mjs`），`knowledge.mjs` 在那里运行并给出从项目根读正文的路径。
-* `workflow-run/` 是独立文档仓库时，知识库随文档仓库提交，各服务共用；沉淀后的改动和产物一样由你确认后提交（`requirement.mjs pending` 单独列出）。DocNexus 的依赖和检索库（`node_modules/`、`store/`）不进仓库，各自 `--with-docnexus` 装一次。
+* `workflow-run/` 是独立文档仓库时，知识库随文档仓库提交，各服务共用；沉淀后的改动和产物一样由你确认后提交（`requirement.mjs pending` 单独列出）。DocNexus 的依赖和检索库（`node_modules/`、`store/`）由 `docnexus/.gitignore` 忽略、不进仓库，各自 `--with-docnexus` 装一次。
 
 ## CodeGraph 代码图谱与 code-graph skill（可选）
 
@@ -439,7 +440,7 @@ CI（`.github/workflows/test.yml`）在 push 到 main 和每个 PR 上运行：m
 | `.agents/skills/workflow/profile.json` | 项目画像（无凭据），独立文档仓库模式的项目名也在这里 |
 | `.agents/skills/database-query/references/schema.md` | 表结构速查，补齐后提交 |
 | `workflow-run/docs/requirements/` | 需求产物；独立文档仓库模式下提交到文档仓库 |
-| `workflow-run/docnexus/`（依赖和检索库除外） | DocNexus 工作区与定制的文档模板；独立文档仓库模式下提交到文档仓库 |
+| `workflow-run/docnexus/` | DocNexus 工作区与定制的文档模板；依赖和检索库由它自带的 `docnexus/.gitignore` 忽略。独立文档仓库模式下提交到文档仓库 |
 | `.ignore` | 让代码搜索跳过需求目录（不影响 git） |
 | `.gitignore`、`CLAUDE.md` / `AGENTS.md` | 安装器追加的忽略规则、DocNexus 说明段落 |
 
@@ -452,7 +453,6 @@ CI（`.github/workflows/test.yml`）在 push 到 main 和每个 PR 上运行：m
 | `**/workflow/profile.local.json` | 个人设置：本机系统与终端、提交提示开关 | 总是 |
 | `/workflow-run/tmp/` | 临时产物：查询导出、wiki 临时 XHTML、旧版产物归档、升级 / 卸载备份、`view` 页面 | `workflow-run/` 不是独立 git 仓库时 |
 | `/workflow-run/` | 整个文档仓库（它自己提交）；同时在文档仓库的 `.git/info/exclude` 加 `/tmp/` | 独立文档仓库模式（`docs-repo`） |
-| `node_modules/` | DocNexus 的依赖 | `--with-docnexus` |
 | `.codegraph/` | CodeGraph 本地索引（SQLite） | `--with-codegraph` |
 
 查某个文件为什么被忽略、看当前所有被忽略的文件：

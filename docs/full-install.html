@@ -239,7 +239,7 @@ codegraph --version<span class="c">   # 没装也没关系，安装器会装</sp
         <li><div><strong>确定环境、数据库连接</strong><p>来自 <code>--envs</code> 或交互选择；<code>--skip-db</code> 时跳过数据库。</p></div></li>
         <li><div><strong>安装 skills 到 <code>.agents/skills/</code></strong><p>这是唯一一份完整文件，并写入安装清单 <code>.workflow-run.json</code>。</p></div></li>
         <li><div><strong>为其他环境建软链接</strong><p><code>.claude/skills/&lt;skill&gt;</code>、<code>.qwen/skills/</code>、<code>.codebuddy/skills/</code> 按 skill 链接到 <code>.agents/skills/</code>。加 <code>--copy</code> 时改为各装一份。</p></div></li>
-        <li><div><strong>补齐 <code>.gitignore</code></strong><p>只追加缺失的行：凭据文件、个人设置、<code>/workflow-run/tmp/</code>，加上 <code>node_modules/</code> 和 <code>.codegraph/</code>。</p></div></li>
+        <li><div><strong>补齐 <code>.gitignore</code></strong><p>只追加缺失的行：凭据文件、个人设置、<code>/workflow-run/tmp/</code>，加上 <code>.codegraph/</code>。DocNexus 的依赖和检索库由它自带的 <code>docnexus/.gitignore</code> 忽略，这里不用加。</p></div></li>
         <li><div><strong>安装 DocNexus</strong><span class="phase">DocNexus</span><p>在 <code>workflow-run/</code> 下执行 <code>npm install --prefix ./docnexus --save-exact @rowansenne/docnexus</code>。npm 清单、锁文件和依赖都不进宿主项目的 <code>package.json</code>。</p></div></li>
         <li><div><strong>初始化 DocNexus 工作区</strong><span class="phase">DocNexus</span><p><code>docnexus init --agent none</code>：创建 <code>workflow-run/docnexus/</code>，把 DocNexus 的 skills 同步到 <code>workflow-run/docnexus/skills/</code>。</p></div></li>
         <li><div><strong>把 DocNexus 接到本项目</strong><span class="phase">DocNexus</span><p>把 <code>docnexus-recall</code> 等 skill 软链接到所选环境的 skills 目录，并在 <code>CLAUDE.md</code> / <code>AGENTS.md</code> 写一段说明（有自己的标记，不碰手写内容）。</p></div></li>
@@ -272,13 +272,14 @@ codegraph --version<span class="c">   # 没装也没关系，安装器会装</sp
 ├── workflow-run/
 │   ├── docs/requirements/     <span class="c"># 需求产物</span>
 │   ├── docnexus/              <span class="c"># DocNexus 工作区、知识库、模板</span>
+│   │   ├── .gitignore         <span class="c"># DocNexus 自带，忽略下面两项</span>
 │   │   ├── <span class="ig">node_modules/</span>
 │   │   └── <span class="ig">store/</span>             <span class="c"># 检索库</span>
 │   └── <span class="ig">tmp/</span>
 ├── CLAUDE.md  AGENTS.md       <span class="c"># DocNexus 段落</span>
 ├── .ignore                    <span class="c"># 让代码搜索跳过需求目录</span>
 └── .gitignore</div>
-      <div class="note warn"><b class="tag">注意</b><code>workflow-run/docnexus/store/</code> 目前没有对应的 <code>.gitignore</code> 规则，安装器不会替你加。提交前用 <code>git status</code> 看一眼，需要时自己在 <code>.gitignore</code> 里加一行 <code>/workflow-run/docnexus/store/</code>。</div>
+      <p><code>docnexus/.gitignore</code> 跟着工作区一起提交，所以不管 <code>workflow-run/</code> 是随代码提交还是独立文档仓库，依赖和检索库都不会被提交。</p>
     </section>
 
     <section id="verify">
@@ -339,6 +340,7 @@ npx @rowansenne/workflow-run --envs claude,codex --skip-db --with-docnexus --wit
 │       ├── order-service/     <span class="c"># 项目名 = profile.json 的 artifacts.project</span>
 │       └── report-service/
 ├── docnexus/                  <span class="c"># 共用知识库与模板</span>
+│   ├── .gitignore             <span class="c"># DocNexus 自带</span>
 │   ├── <span class="ig">node_modules/</span>  <span class="ig">store/</span>  <span class="c"># 每人本机一份</span>
 └── <span class="ig">tmp/</span>                       <span class="c"># 写在 .git/info/exclude，不进文档仓库</span></div>
 
@@ -350,9 +352,7 @@ npx @rowansenne/workflow-run --envs claude,codex --skip-db --with-docnexus --wit
         <li><div><strong>装 skills 和 CodeGraph，暂不接 DocNexus</strong><div class="cmd"><pre>npx @rowansenne/workflow-run --envs claude,codex --skip-db --with-codegraph</pre><button class="copy" type="button">复制</button></div></div></li>
         <li><div><strong>切到文档仓库</strong><p>把仓库克隆到 <code>workflow-run/</code>，代码仓库忽略它，并把项目名写进 <code>workflow/profile.json</code>。不加 <code>--project</code> 时，项目名默认用 git 远端的仓库名。</p><div class="cmd"><pre>npx @rowansenne/workflow-run docs-repo git@git.example.com:team/team-docs.git --project order-service</pre><button class="copy" type="button">复制</button></div></div></li>
         <li><div><strong>在文档仓库里接入 DocNexus</strong><p>DocNexus 装进 <code>workflow-run/docnexus/</code>，接上本项目的 skill 链接和说明段落，并导入默认文档模板。</p><div class="cmd"><pre>npx @rowansenne/workflow-run upgrade --with-docnexus</pre><button class="copy" type="button">复制</button></div></div></li>
-        <li><div><strong>检查后提交文档仓库</strong><p>代码仓库的 <code>.gitignore</code> 管不到嵌套的文档仓库。提交前看一眼：如果 <code>docnexus/node_modules/</code> 或 <code>docnexus/store/</code> 出现在列表里，就先在文档仓库根加一个 <code>.gitignore</code>，写上这两行。</p><div class="cmd"><pre>git -C workflow-run status --short
-<span class="c"># 需要时：printf 'docnexus/node_modules/\ndocnexus/store/\n' &gt;&gt; workflow-run/.gitignore</span>
-git -C workflow-run add -A
+        <li><div><strong>提交文档仓库</strong><p>依赖和检索库已由 <code>docnexus/.gitignore</code> 忽略，<code>tmp/</code> 也已写进文档仓库的 <code>.git/info/exclude</code>，直接提交即可。</p><div class="cmd"><pre>git -C workflow-run add -A
 git -C workflow-run commit -m "chore: init team docs with DocNexus"
 git -C workflow-run push</pre><button class="copy" type="button">复制</button></div></div></li>
         <li><div><strong>提交代码仓库</strong><p>提交 <code>.gitignore</code>（新增了 <code>/workflow-run/</code>）、<code>.ignore</code>、带项目名的 <code>profile.json</code>，以及 skills 目录和 MCP 配置。</p><div class="cmd"><pre>git status --short
@@ -378,13 +378,56 @@ npx @rowansenne/workflow-run upgrade --with-docnexus<span class="c">   # 本机�
         <tr><td>不想被提示提交</td><td><code>node .agents/skills/workflow/scripts/requirement.mjs config --commit-prompt off --local</code>，只写进个人的 <code>profile.local.json</code></td></tr>
       </table></div>
 
-      <h3>已经全量安装过、要改用文档仓库</h3>
-      <p><code>workflow-run/</code> 里已经有随代码提交的产物和 DocNexus 时，<code>docs-repo</code> 会停下，不做任何改动。两边的目录布局不同（文档仓库在需求下面还分项目），所以要手动迁移：</p>
-      <ol class="plain">
-        <li>把需要保留的需求产物和知识库内容按新布局放进文档仓库，提交并推送。</li>
-        <li>把本项目的 <code>workflow-run/</code> 挪走，再让代码仓库停止跟踪它：<code>git rm -r --cached workflow-run</code>，然后提交。</li>
-        <li>按上面「其他服务接入」的三条命令重新接入。</li>
+      <h3>已经装过，要改用文档仓库</h3>
+      <p>要不要迁移跟装的版本无关，只看 <code>workflow-run/</code> 里现在有什么。<code>docs-repo</code> 只在里面除了 <code>tmp/</code> 什么都没有时才接手，否则就停下，不做任何改动。</p>
+      <p>停下的原因是两种模式的目录布局不同。随代码提交时产物在 <code>docs/requirements/&lt;需求名&gt;/review.md</code>，文档仓库在需求下面多一层项目名：<code>docs/requirements/&lt;需求名&gt;/&lt;项目名&gt;/review.md</code>。所以旧产物不能原样搬过去。先用下面的命令看看属于哪种情况：</p>
+      <div class="cmd"><pre>ls -A workflow-run
+git ls-files workflow-run | head<span class="c">   # 有输出说明代码仓库在跟踪它</span></pre><button class="copy" type="button">复制</button></div>
+      <div class="tblwrap"><table>
+        <tr><th>情况</th><th><code>workflow-run/</code> 里有什么</th><th>要不要迁移</th></tr>
+        <tr><td>A</td><td>没有，或只有 <code>tmp/</code>：安装时没加 <code>--with-docnexus</code>，也还没生成过需求产物</td><td>不用</td></tr>
+        <tr><td>B</td><td>只有 <code>docnexus/</code>，知识库里只有默认模板：没沉淀过内容，也没改过模板</td><td>不用，删掉重建</td></tr>
+        <tr><td>C</td><td>有 <code>docs/requirements/</code> 下的产物，或者 DocNexus 里沉淀过内容、改过模板</td><td>要手动迁移</td></tr>
+      </table></div>
+      <p>刚装完、还没真正用起来的项目一般属于 A 或 B。</p>
+
+      <h3>情况 A：直接切换</h3>
+      <div class="cmd"><pre>npx @rowansenne/workflow-run docs-repo git@git.example.com:team/team-docs.git --project order-service
+npx @rowansenne/workflow-run upgrade --with-docnexus<span class="c">   # 需要 DocNexus 时</span></pre><button class="copy" type="button">复制</button></div>
+
+      <h3>情况 B：删掉 DocNexus 工作区再切换</h3>
+      <p>默认模板在运行 <code>upgrade --with-docnexus</code> 时会重新导入，删掉不会丢东西。拿不准时先看两处：</p>
+      <ul>
+        <li><strong>有没有沉淀过内容</strong>：<code>workflow-run/docnexus/library/</code> 下除了 <code>templates/</code> 还有没有别的文档。</li>
+        <li><strong>有没有改过模板</strong>：<code>workflow-run/</code> 提交过的话，用 <code>git log --oneline -- workflow-run/docnexus/library/templates</code> 看导入之后有没有新的提交。<code>doctor</code> 只在默认模板也出了新版时才提示团队改过，不能拿来判断。</li>
+      </ul>
+      <p>只要有一处有内容，就按情况 C 处理。</p>
+      <div class="cmd"><pre>git rm -r --cached workflow-run<span class="c">     # 代码仓库跟踪过它时才需要</span>
+rm -rf workflow-run/docnexus
+npx @rowansenne/workflow-run docs-repo git@git.example.com:team/team-docs.git --project order-service
+npx @rowansenne/workflow-run upgrade --with-docnexus
+git add -A &amp;&amp; git commit -m "chore: move workflow-run to team docs repo"</pre><button class="copy" type="button">复制</button></div>
+      <p>如果文档仓库是新建的空仓库，接着按「第一次搭建」的第 4 步检查并提交文档仓库。</p>
+
+      <h3>情况 C：手动迁移</h3>
+      <p>先把要保留的内容放进文档仓库，最后再切换。迁移时文档仓库可以临时克隆到别的目录，例如 <code>../team-docs</code>。</p>
+      <ol class="steps">
+        <li><div><strong>迁移需求产物</strong><p>每个需求目录下的文件移到 <code>docs/requirements/&lt;需求名&gt;/&lt;项目名&gt;/</code>，项目名要和之后 <code>--project</code> 给的一致。</p><div class="cmd"><pre>git clone git@git.example.com:team/team-docs.git ../team-docs
+mkdir -p ../team-docs/docs/requirements/订单导出/order-service
+cp -R workflow-run/docs/requirements/订单导出/. ../team-docs/docs/requirements/订单导出/order-service/</pre><button class="copy" type="button">复制</button></div></div></li>
+        <li><div><strong>迁移 DocNexus 知识库</strong><p>文档仓库里<strong>还没有</strong> DocNexus 时，把整个工作区复制过去。<code>node_modules/</code> 和 <code>store/</code> 不用复制，它们不会提交，切换后由 <code>upgrade --with-docnexus</code> 在本机重装：</p><div class="cmd"><pre>rsync -a --exclude node_modules --exclude store workflow-run/docnexus/ ../team-docs/docnexus/</pre><button class="copy" type="button">复制</button></div><p>文档仓库里<strong>已经有</strong>别的服务的 DocNexus 时，不要直接复制文件覆盖，那样会把对方的知识库盖掉。要把这个项目沉淀过的内容按 DocNexus 自己的写入流程逐条写进共用知识库，改过的模板也按 DocNexus 的更新流程改写。DocNexus 是外部包，合并前先看它的文档。</p></div></li>
+        <li><div><strong>提交文档仓库</strong><div class="cmd"><pre>git -C ../team-docs status --short
+git -C ../team-docs add -A
+git -C ../team-docs commit -m "docs: migrate order-service artifacts"
+git -C ../team-docs push</pre><button class="copy" type="button">复制</button></div></div></li>
+        <li><div><strong>移走旧目录，切换到文档仓库</strong><p>先确认第 3 步已经推送成功，再删除本地的 <code>workflow-run/</code>。临时克隆的 <code>../team-docs</code> 之后可以删掉。</p><div class="cmd"><pre>git rm -r --cached workflow-run<span class="c">     # 代码仓库跟踪过它时才需要</span>
+mv workflow-run ../workflow-run.bak<span class="c">   # 先留一份备份，确认无误再删</span>
+npx @rowansenne/workflow-run docs-repo git@git.example.com:team/team-docs.git --project order-service
+npx @rowansenne/workflow-run upgrade --with-docnexus
+node .agents/skills/workflow/scripts/requirement.mjs sync --all<span class="c">   # 按新位置重建各需求的 meta.json</span>
+git add -A &amp;&amp; git commit -m "chore: move workflow-run to team docs repo"</pre><button class="copy" type="button">复制</button></div><p><code>sync --all</code> 改了 <code>meta.json</code> 的话，再到文档仓库里提交一次。</p></div></li>
       </ol>
+      <p>Windows PowerShell 里 <code>rm -rf</code> 要写成 <code>Remove-Item -Recurse -Force</code>，<code>rsync</code> 可以用 <code>robocopy &lt;源&gt; &lt;目标&gt; /E /XD node_modules store</code> 代替。</p>
     </section>
 
     <section id="upgrade">
