@@ -373,7 +373,7 @@ npx @rowansenne/workflow-run uninstall
 
 `tests/test-skills-meta.mjs` 会检查：skill 的文件里出现了别的 skill 的路径（如 `md-to-wiki/scripts/…`、`workflow/scripts/…`），就必须在 `requires` 或 `optional` 里声明；`requires` 声明了就必须真的用到，而且不能成环。
 
-当前依赖关系：`workflow` 是共享核心（模板来源、画像、文档自检脚本），`dev`、`project-review`、两个文档 skill 依赖它；`database-query`、`md-to-wiki` 完全独立；wiki 凭据只由 `md-to-wiki` 的脚本读取，其他 skill 拉 PRD 统一调用 `upload.mjs get`。
+当前依赖关系：`workflow` 是共享核心（模板来源、画像、文档自检脚本），`dev`、`project-review`、两个文档 skill 依赖它；`dev` 还依赖 `project-review`（自审必做，要读它的审查清单）；`database-query`、`md-to-wiki` 完全独立；wiki 凭据只由 `md-to-wiki` 的脚本读取，其他 skill 拉 PRD 统一调用 `upload.mjs get`。
 
 新增一个 skill 就是新建目录、写 `SKILL.md.tpl` 和 `skill.json`，再加进 `package.json` 的 `files`。`tests/test-skills-meta.mjs` 会检查它们是否一致。
 

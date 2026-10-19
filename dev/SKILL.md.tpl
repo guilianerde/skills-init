@@ -13,7 +13,7 @@ description: "Implement a feature or fix a bug in this project end to end: under
 | 项目约定 / 历史决策 | DocNexus（`docnexus-recall` skill） | 读 `CLAUDE.md` / `AGENTS.md` 与代码 |
 | 读代码 / 调用链 / 影响面 | CodeGraph（见 `<skills>/workflow/references/codegraph.md`） | grep / 读文件 |
 | 涉及哪些表 / 实际表结构 / 数据核对 | `workflow/scripts/tables.mjs` 定位表 → `database-query`（`query.mjs --schema --tables … --indexes`，只读） | 读 `schema.md` 与 DDL 脚本，注明「未与实际库核对」 |
-| 自审 | `project-review` | 按审查清单手动过（`node <skills>/workflow/scripts/resolve.mjs template project-review checklist.md` 给出路径） |
+| 自审 | `project-review`（随 dev 一起安装；内部调用的边界见 F7） | — |
 | 交付文档 | `create-tech-md-doc` / `create-release-md-doc` | 只在对话中汇总 |
 
 ## Command Format
@@ -94,8 +94,9 @@ description: "Implement a feature or fix a bug in this project end to end: under
 ### F7 — 自审
 
 - 按 `project-review` skill 审本次改动：分支已有提交时用 `git diff <main_branch>...HEAD`，再加上 `git diff HEAD` 的未提交部分。
+- 只走 project-review 的第 1～6 步（范围与深度、建立理解、对比、过清单、影响面、复核）；**跳过第 7 步落盘报告和第 8 步 DocNexus 询问**——结论由 dev 在 F8 统一交付，沉淀也只在 F8 问一次。用户要求单独的审查报告时，再按 project-review 的第 7 步和产物规范落盘。
+- 交给 F8 的是：问题表（文件:行号、严重级别、触发条件、复核结果）、影响面、未覆盖与待确认。
 - CRITICAL / HIGH 必须修掉后重新跑 F6；MEDIUM / LOW 修掉或写进交付说明。
-- 自审结论放进交付说明即可，不单独落盘审查报告（用户要求时再按 project-review 的产物规范落盘）。
 
 ### F8 — 交付
 

@@ -11,6 +11,14 @@
 
 ### 变更
 - `--with-docnexus` 不再往项目的 `.gitignore` 追加 `node_modules/`：DocNexus 的依赖和检索库由它自带的 `docnexus/.gitignore` 忽略，随代码提交和独立文档仓库两种模式都适用。已追加过的这一行保留不动。
+- `dev` 的 `project-review` 从 optional 改为 requires：`--skills dev` 会一起装上 `project-review`，已按子集装了 `dev` 的项目 `upgrade` 时自动补上。dev 自审必做，且要经 `resolve.mjs template project-review checklist.md` 取审查清单；之前没装 project-review 时这条命令报错，dev 写的「按清单手动自审」降级走不通。
+- dev 自审调用 project-review 时只走第 1～6 步，跳过落盘审查报告和 DocNexus 询问，问题表、影响面、未覆盖项交回 dev 在交付时统一给出（DocNexus 只在 dev 交付时问一次）；两边的 SKILL.md 都写明了这条边界。
+
+### 修复
+- `resolve.mjs template <skill> …` 在该 skill 没安装时提示「没有安装」并让重跑安装带上它，不再误报「没有登记模板」。
+
+### 测试
+- 新增检查：SKILL.md 里经 `resolve.mjs template <其他 skill>` 取模板的，必须把那个 skill 声明为 requires。
 
 ### 文档
 - 新增图文教程 `docs/full-install.html`：带 DocNexus 与 CodeGraph 的全量安装、团队接入、独立文档仓库（原地切换、新服务接入、旧项目改用）、升级与卸载。

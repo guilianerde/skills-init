@@ -97,10 +97,22 @@ test('跨 skill 的文件引用必须在 requires 或 optional 中声明', () =>
   }
 });
 
+// resolve.mjs template <skill> 读的是已安装 skill 的 skill.json，那个 skill 没装就拿不到模板；optional 的 skill 可能不在（--skills 子集），所以必须是 requires
+test('经 resolve.mjs template 取别的 skill 的模板，必须在 requires 中声明', () => {
+  for (const s of skills) {
+    for (const f of skillFiles(s.name)) {
+      for (const [, other] of fs.readFileSync(f, 'utf8').matchAll(/resolve\.mjs template ([\w-]+) /g)) {
+        if (other === s.name || !meta.skills.includes(other)) continue;
+        assert.ok(s.requires.includes(other), `${path.relative(REPO, f)} 取 ${other} 的模板，但 ${s.name}/skill.json 的 requires 没有 ${other}`);
+      }
+    }
+  }
+});
+
 test('requires 的依赖必须被实际使用（避免声明过时）', () => {
   for (const s of skills) {
     const text = skillFiles(s.name).map((f) => fs.readFileSync(f, 'utf8')).join('\n');
-    for (const d of s.requires) assert.match(text, new RegExp(`${d}/`), `${s.name} 声明了 requires ${d}，但没有引用它的任何文件`);
+    for (const d of s.requires) assert.match(text, new RegExp(`${d}/|resolve\\.mjs template ${d} `), `${s.name} 声明了 requires ${d}，但没有引用它的任何文件或模板`);
   }
 });
 

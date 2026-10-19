@@ -68,7 +68,8 @@ export function docnexusConnected(root) {
 
 export function resolveTemplate(root, skill, id) {
   const meta = skillMeta(skill);
-  const t = meta?.templates.find((x) => x.id === id);
+  if (!meta) return { ok: false, error: 'unknown', message: `skill「${skill}」没有安装（${rel(root, SKILLS_DIR)} 下找不到 ${skill}/skill.json）；重跑安装并在 --skills 里带上它` };
+  const t = meta.templates.find((x) => x.id === id);
   if (!t) return { ok: false, error: 'unknown', message: `skill「${skill}」没有登记模板「${id}」（见 ${skill}/skill.json 的 templates）` };
   const lib = path.join(docnexusRoot(root), 'docnexus', 'library', 'templates', skill, id);
   const project = path.join(root, TEMPLATES_DIR, skill, id);

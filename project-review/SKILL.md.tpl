@@ -30,7 +30,7 @@ description: "Review source code (any language; Java/Spring, Go, TypeScript, Pyt
    3. 找有没有别处已经兜住：调用方校验、`@Validated` / 全局异常处理、数据库约束、框架默认行为、配置。涉及索引、字段、唯一约束、表大小的发现，以第 2 步拉到的实际表结构为准（复核列写「已与 <连接名> 核对」）。已兜住 → 删掉或降级，并在说明里写依据。
    4. 确认是本次改动引入的：改动前就存在的问题移到「未覆盖与待确认」，不计入合并结论。
    结果：「成立」在报告「复核」列标「✅」；「可能成立」标「⚠」；「不成立」从问题表里删掉（独立复核否掉的，在「未覆盖与待确认」里记一句「复核排除 N 条」）。复核方式（独立 / 自行）写进报告「审查方式」元信息。
-7. **输出报告**：按报告模板输出（`node <skills>/workflow/scripts/resolve.mjs template project-review report.md` 取 `path`；退出码 2 时停下并按 `hint` 处理），落盘规则见 Artifact Location。
+7. **输出报告**（由 dev 自审调用时跳过第 7、8 步，问题表、影响面、未覆盖项交回 dev 统一交付，见 dev 的 F7）：按报告模板输出（`node <skills>/workflow/scripts/resolve.mjs template project-review report.md` 取 `path`；退出码 2 时停下并按 `hint` 处理），落盘规则见 Artifact Location。
 8. **沉淀到 DocNexus（需用户授权）**：`resolve.mjs status` 的 `docnexus.ok` 为 true 时，交付报告后**每次都问**用户「要不要启动 DocNexus 流程，把本次审查沉淀到 DocNexus？」，并从本次发现里列出建议沉淀的内容：同类问题再次出现（知识库里已有类似沉淀，或本次多处出现）、新确立的编码约定、容易踩的坑；没有特别值得记的也照问，并说明这一点。未接入时不提问，报告的「DocNexus」元信息行写「未接入」。
    - 用户同意 → 按 DocNexus 入口 skill `docnexus` 的 capture 流程写入；正文只写知识，不写分支、路径；有 facts 时按 `<skills>/workflow/references/docnexus.md`「沉淀的来源」的格式写 provenance；分类用 `node <skills>/workflow/scripts/resolve.mjs category project-review` 的结果作为调用方显式分类封存（见 `<skills>/workflow/references/docnexus.md`「写入 DocNexus 的分类」）。只沉淀问题模式和约定，不沉淀某次审查的逐条清单，也不沉淀「⚠ 待确认」的发现；知识库已有同类沉淀时更新那一篇（带 `--base-version`），不要重复新建。写入成功后把报告的「DocNexus」元信息行改成 `docnexus/library/<path>`（多篇用「、」分隔），并回报给用户。
    - 用户不同意 → 元信息行保持「未沉淀」。

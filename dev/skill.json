@@ -2,10 +2,10 @@
   "name": "dev",
   "order": 2,
   "requires": [
-    "workflow"
+    "workflow",
+    "project-review"
   ],
   "optional": [
-    "project-review",
     "database-query",
     "md-to-wiki",
     "create-tech-md-doc",

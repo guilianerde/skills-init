@@ -373,6 +373,10 @@ test('--skills 子集：自动带上 requires 依赖；不装 database-query 时
   assert.deepEqual(status.templates.map((t) => t.skill), ['project-review', 'project-review']);
   r = p.install(['--envs', 'claude', '--yes', '--skip-db', '--skills', 'nope']);
   assert.equal(r.status, 1); assert.match(r.log, /未知的 skill：nope/);
+  // dev 自审要读 project-review 的审查清单，所以只装 dev 也会带上 project-review
+  const d = project('subset-dev');
+  r = d.install(['--envs', 'claude', '--yes', '--skip-db', '--skills', 'dev']); ok(r);
+  assert.match(r.log, /安装的 skill：workflow dev project-review/);
 });
 
 test('共享参考文件：仓库只有一份，装进每个声明它的 skill；改源文件后重跑全部更新', () => {

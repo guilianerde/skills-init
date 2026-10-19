@@ -32,6 +32,9 @@ test('未接入 DocNexus：只用默认模板，项目文件不生效；技术�
   assert.match(r.out.hint, /--with-docnexus/);
   assert.equal(resolve('template', 'project-review', 'checklist.md').out.path, '.agents/skills/project-review/references/checklist.md');
   assert.equal(resolve('template', 'dev', 'plan-template.md').out.source, 'default');
+  r = resolve('template', 'no-such-skill', 'checklist.md');
+  assert.deepEqual([r.status, r.out.error], [1, 'unknown']);
+  assert.match(r.out.message, /没有安装/);
   const s0 = resolve('status').out;
   assert.deepEqual(s0.templates_to_create, []);
   assert.deepEqual(s0.templates_need_docnexus.map((t) => t.skill).sort(), ['create-release-md-doc', 'create-tech-md-doc']);
