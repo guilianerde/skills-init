@@ -97,7 +97,7 @@ description: "Implement a feature or fix a bug in this project end to end: under
 
 ### F7 — 自审
 
-- 按 `project-review` skill 审本次改动：分支已有提交时用 `git diff <main_branch>...HEAD`，再加上 `git diff HEAD` 的未提交部分，以及 `git status --short` 里本次新建、还没跟踪的文件（`git diff` 看不到，逐个读）。Step 0 确认不属于本需求的文件不计入本次结论（见 Step 0「工作区状态」）。
+- 按 `project-review` skill 审本次改动，范围用 `node <skills>/workflow/scripts/review-scope.mjs --base <main_branch>`：分支已有的提交、未提交的改动和未跟踪的新文件一起列出。Step 0 确认不属于本需求的文件用 `--exclude <文件,文件>` 排除，它们不计入本次结论（见 Step 0「工作区状态」）；之后 project-review 的 `rules`、`locate.mjs` 都带同样的参数。
 - 只走 project-review 的第 1～6 步（范围与深度、建立理解、对比、过清单、影响面、复核）；**跳过第 7 步落盘报告、第 8 步 DocNexus 询问和第 9 步运行反馈**——结论由 dev 在 F8 统一交付，沉淀只在 F8 问一次，反馈也只由 dev 记一行。用户要求单独的审查报告时，再按 project-review 的第 7 步和产物规范落盘。
 - 交给 F8 的是：问题表（文件:行号、严重级别、触发条件、复核结果）、影响面、未覆盖与待确认。
 - CRITICAL / HIGH 必须修掉后重新跑 F6；MEDIUM / LOW 修掉或写进交付说明。

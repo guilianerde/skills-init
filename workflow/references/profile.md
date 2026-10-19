@@ -14,6 +14,7 @@
 | `data_review` | 上线前是否需要数据团队评审库表（`true` / `false`） | 技术方案模块 7、上线方案 2.3 |
 | `notes` | 其他项目约定，一条一句（如「启动需要本地 Redis」） | 全部 |
 | `artifacts` | 可选：`{ "project": "order-service", "commit_prompt": true }`。`project` 是这个项目的产物目录名（产物在 `workflow-run/docs/requirements/<需求名>/<项目名>/`，随代码提交和独立文档仓库两种用法都一样）：随代码提交时不配置就取 git 远端仓库名，第一次落盘时自动写进来；独立文档仓库时要先配置；`commit_prompt: false` 关闭写完后的提交提示。个人设置可写在 `workflow/profile.local.json`（不提交）覆盖 | 见 `references/requirements.md`，用 `requirement.mjs config` 修改 |
+| `review` | 可选，审查范围与项目规则，如 `{"exclude": ["**/legacy/**"], "include": ["docs/api/**/*.md"], "rules": [{"path": "**/*Mapper.xml", "rule": "分页查询必须带 ORDER BY 主键"}]}`。`exclude` 不审；`include` 把默认跳过的生成文件、文档、本工具产物加回来（删除、二进制、敏感文件加不回来）；`rules` 按 glob 匹配文件路径（不含 `/` 的模式匹配文件名，`**` 跨目录，`{a,b}` 多选），匹配到的规则和审查清单一起检查，不替换清单 | `review-scope.mjs`（project-review、dev 自审） |
 | `docnexus_categories` | 可选，覆盖各 skill 写入 DocNexus 时的分类，如 `{"create-tech-md-doc": "技术方案"}`；不填用 skill 默认 | 见 `references/docnexus.md` |
 
 其他 skill 读画像统一用 `node <skills>/workflow/scripts/resolve.mjs profile`：输出 `profile`（文件内容）、`empty`（空字段）、`complete`（`main_branch` / `build` / `test` 都已填写）、`env`（本机系统与终端，见下）。

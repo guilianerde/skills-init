@@ -7,7 +7,7 @@ description: "Review source code (any language; Java/Spring, Go, TypeScript, Pyt
 
 ## Workflow
 
-1. **确定审查范围与深度**：范围是单文件 / 单方法、分支对比（如 `branch` vs `main`），还是未提交改动（`git diff HEAD`，见 `references/diff-strategy.md`「未提交改动」）。深度按用户的说法定，没说就用「标准」，写进报告「审查方式」：
+1. **确定审查范围与深度**：范围是单文件 / 单方法、分支对比（如 `branch` vs `main`），还是未提交改动（见 `references/diff-strategy.md`「未提交改动」）。分支对比和未提交改动都先运行 `node <skills>/workflow/scripts/review-scope.mjs --diff <基线>...<dev>`（未提交改动用 `--base <基线>`，含未跟踪的新文件；dev 自审时加 dev 传来的 `--exclude`），**审哪些文件以它的 `review` 为准**：`skipped` 是按规则跳过的（删除、二进制、敏感文件、依赖目录、生成文件、文档、本工具的产物，各带原因），不要自己再增减；确实要审被跳过的，在画像 `review.include` 里加（见 `<skills>/workflow/references/profile.md`）。深度按用户的说法定，没说就用「标准」，写进报告「审查方式」：
    - **快审**（「快速看一下」「扫一眼」）：只查正确性、空值、安全、事务与幂等，不查性能、测试、风格；「优化建议（LOW）」写「无」。CRITICAL / HIGH 照样复核。
    - **标准**（默认）：检查清单全部维度，**风格类（清单「一致性 / 风格」一节）不查**；「优化建议（LOW）」只写有实际收益的（性能、可维护性上的具体问题），没有就写「无」。
    - **深审**（「仔细审」「全面审」，或资金 / 权限 / 对外接口的大改动合并前）：全部维度，包括风格；MEDIUM 也复核。
@@ -18,14 +18,14 @@ description: "Review source code (any language; Java/Spring, Go, TypeScript, Pyt
      - `latest.delivery` 存在（dev 的交付说明）→ 其中「已确认的决定」并入需求对照的依据；「配置清单」「SQL 脚本」和 diff 对照，diff 里有而交付说明漏列的配置 key / DDL 记为 MEDIUM（上线时会被漏掉）。
      - `latest.review` 存在 → 这是**复审**：读上次报告的问题表，并用 `git log --oneline --since=<上次报告日期> <dev分支>` 看之后改了什么。本次报告对上次的每条问题标「已修复 / 仍存在 / 不再适用」（「已修复」要看到对应改动），本次新发现的标「新增」。
    - **涉及数据库**：diff 里有 SQL、Mapper、实体或 DDL 时，按 `<skills>/workflow/references/tables.md` 运行 `node <skills>/workflow/scripts/tables.mjs --diff <基线>...<dev>`（未提交改动用 `--base <基线>`）找出涉及的表；数据库已配置（`resolve.mjs status` 的 `database.ok`）时用 `query.mjs --schema --tables <表> --indexes` 只读拉取实际字段、索引与估算行数，作为第 4、6 步判断索引支撑、字段存在与类型、DDL 锁表与滚动发布兼容的依据。查不了库时注明「未与实际库核对」写进「未覆盖与待确认」，这类发现不升到 HIGH 以上，除非 diff 本身就能证明。
-3. **分支对比**：基线默认取 `workflow/profile.json` 的 `main_branch`（未配置则 `main`）。按 `references/diff-strategy.md` 先量规模：小改动全量精读；改动多时按风险分级（P0 资金 / 事务 / 权限 / SQL / 对外接口 / MQ / 配置优先）分批精读，审不到的写进报告。**深审且改动属于「更大」、环境又能派子 agent 时，先问用户要不要分角度并行查找**（`references/diff-strategy.md`「分角度并行查找」），用户同意才走，第 4 步改由各子 agent 按角度过清单。只审本次改动引入的问题，同时检查改动是否破坏既有调用方。
-4. **逐项过检查清单**（在项目根运行 `node <skills>/workflow/scripts/resolve.mjs template project-review checklist.md`，读输出的 `path`；退出码 2 时停下并按 `hint` 处理）：对每个发现给出 文件+行号、问题描述、严重级别、修改建议。
+3. **分支对比**：基线默认取 `workflow/profile.json` 的 `main_branch`（未配置则 `main`）。规模和分批用第 1 步 `review-scope.mjs` 的输出：`summary.size` 是「全量精读」就一次读完；「分批精读」按 `batches` 的顺序（P0 → P1 → P2）读，P0 不能跳过；「过大」时停下请用户缩小范围。审不到的文件写进报告（读法见 `references/diff-strategy.md`）。**深审且改动属于「更大」、环境又能派子 agent 时，先问用户要不要分角度并行查找**（`references/diff-strategy.md`「分角度并行查找」），用户同意才走，第 4 步改由各子 agent 按角度过清单。只审本次改动引入的问题，同时检查改动是否破坏既有调用方。
+4. **逐项过检查清单**：每个文件只看 `review-scope.mjs` 给它的 `sections`（清单小节号，按文件类型和改动内容定），一批文件用 `node <skills>/workflow/scripts/review-scope.mjs rules <文件…>`（带上和第 1 步一样的 `--diff` / `--base`）打印这些小节的原文和画像 `review.rules` 里匹配到的项目规则，按它检查；整个改动再过一次 `overall_sections`（9 影响面、13 测试）。深审读整份清单（`node <skills>/workflow/scripts/resolve.mjs template project-review checklist.md` 取 `path`；退出码 2 时停下并按 `hint` 处理），包括风格。对每个发现给出 文件、**问题所在的原代码片段**（从文件里照原样复制，第 6 步靠它定位行号）、问题描述、严重级别、修改建议。
 5. **影响面分析**：改动是否影响其他调用方/模块。先运行 `node <skills>/code-graph/scripts/cg.mjs impact --diff <基线>...<dev>`（code-graph skill；未提交改动用 `--base <基线>`）：列出受影响的接口、MQ 消费者、定时任务、测试、表和配置 key，报告「影响面」按入口归纳并带文件:行号；退出码 2（没有索引等）时用 grep 或精读调用链确认。Spring 注入、AOP、MyBatis XML、MQ topic、配置 key 图谱看不到，照常 grep（见 `<skills>/workflow/references/codegraph.md`）。查不到调用方的符号不能当作安全，要明说"未确认"。
 6. **复核**：交付前逐条复核 CRITICAL / HIGH（深审时 MEDIUM 也复核；其余 MEDIUM 至少做下面第 1 条）。审查结论会被用来决定能不能合并，一条误报会让人白改代码，也会让后面的真问题不被当回事。找出问题的人自己复核容易顺着原来的思路认同自己，所以**能交给独立的一方就交出去**：
    - **独立复核（首选）**：当前环境能派子 agent / 子任务时（例如 Claude Code 的 Agent 工具、Codex / Qwen Code 的子 agent），每条发现派一个，互不相关的可以同时派。只给它：一句话结论、位置（文件:行号）、你写的触发条件、对比分支（或「未提交改动」）。**不给你的推理过程**，也不告诉它你认为成立。要它自己读代码，按下面 1～4 条检查，回答「成立 / 可能成立 / 不成立」并引用代码作为依据。
    - **自行复核**：环境派不了子 agent 时自己做，先找它**不成立**的理由，找不到再确认成立。
    检查项（独立复核和自行复核都按这 4 条）：
-   1. 回到被审的代码（分支对比用 `git show <dev>:<文件>`，未提交改动读工作区）确认引用的片段和行号真实存在。
+   1. **定位**：把所有发现（包括 MEDIUM / LOW）写成 `workflow-run/tmp/review/findings.json`（数组，每条 `{ "file", "code"（原代码片段）, "line"（你估的行号，可选）, "title" }`），运行 `node <skills>/workflow/scripts/locate.mjs workflow-run/tmp/review/findings.json`（带上和第 1 步一样的 `--diff` / `--base`）。报告里的行号一律用它输出的 `start_line`～`end_line`，不用自己数的。`anchored: false` 的回去重读代码、照原样改片段再跑一次，还找不到就降为 MEDIUM 并标「⚠ 待确认」；`ambiguous` 时看 `candidates` 确认是哪一处；`in_change: false` 说明问题不在本次改动的行上，按第 4 条判断是不是本次引入的。
    2. 写出**触发条件**：什么输入 / 状态下会出错、错成什么样。写不出来 → 降为 MEDIUM 并标「⚠ 待确认」。
    3. 找有没有别处已经兜住：调用方校验、`@Validated` / 全局异常处理、数据库约束、框架默认行为、配置。涉及索引、字段、唯一约束、表大小的发现，以第 2 步拉到的实际表结构为准（复核列写「已与 <连接名> 核对」）。已兜住 → 删掉或降级，并在说明里写依据。
    4. 确认是本次改动引入的：改动前就存在的问题移到「未覆盖与待确认」，不计入合并结论。
@@ -85,11 +85,11 @@ description: "Review source code (any language; Java/Spring, Go, TypeScript, Pyt
 
 ## Verification
 
-- 每个结论都要能定位到具体文件+行号，并引用真实代码片段。
+- 每个结论都要能定位到具体文件+行号，并引用真实代码片段；行号来自 `locate.mjs`。
 - 读不到的内容如实说明，不要臆测。
 - 涉及跨分支对比时，确保 diff 基于正确的 base 分支（默认 `main`）。
 - CRITICAL / HIGH 都经过第 6 步复核（能派子 agent 时独立复核），写得出触发条件；复核不了的标「⚠ 待确认」，不计入「不建议合并」的结论。
-- 分批审查时，没精读的文件列在「未覆盖与待确认」里，不能让读者以为全部审过。
+- `review-scope.mjs` 的每个文件都有交代：`review` 里的都审过，没精读的逐个列在「未覆盖与待确认」；`skipped` 按原因汇总写进同一节（例如「跳过 12 个：生成文件 8、文档 3、敏感文件 1」，敏感文件单独点名提醒）。
 
 ## 终端命令
 

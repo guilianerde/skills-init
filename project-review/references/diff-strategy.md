@@ -4,6 +4,8 @@
 
 ## 1. 先量规模
 
+`node <skills>/workflow/scripts/review-scope.mjs --diff <main>...<dev>` 已经按下面的规则算好：跳过哪些文件、`summary.size`（全量精读 / 分批精读 / 过大）、每个文件的风险级别和 `batches`。下面的命令和表是它的规则说明，脚本跑不了时手动照做：
+
 ```bash
 git diff <main>...<dev> --shortstat
 git diff <main>...<dev> --name-only            # 再按 diff-collection-common.md 的排除规则去掉测试、生成代码、文档
@@ -34,7 +36,7 @@ git diff <main>...<dev> --name-only -G '@Transactional|synchronized|Lock\b|@Vers
 
 ## 3. 分批精读
 
-- 每批不超过约 15 个文件或 800 行改动，P0 → P1 → P2。
+- 每批不超过约 15 个文件或 800 行改动，P0 → P1 → P2（`review-scope.mjs` 的 `batches` 就是这样分的，按它的顺序读）。
 - 每个文件读 `git diff <main>...<dev> -- <文件>`，并用 `git show <dev>:<文件>` 读改动所在方法的上下文（调用方、判空、事务注解），不只看 hunk。
 - 每批结束先把发现记下来（文件:行号 + 一句话）再进入下一批，防止后面的批次挤掉前面的结论；批次多时可以边审边把发现写进报告草稿。
 - 时间或上下文不够时，**P2 可以只看 `--stat`**，但要在报告「未覆盖与待确认」里列出只扫过 `--stat` 的文件；P0 不能跳过。
@@ -72,4 +74,4 @@ git diff <main>...<dev> --name-only -G '@Transactional|synchronized|Lock\b|@Vers
 
 ## 5. 未提交改动
 
-审查工作区（dev 自审或用户说「我刚改完，帮我看看」）：`git diff HEAD`（已暂存和未暂存一起）；分支已有提交时再加 `git diff <main>...HEAD`。新建但未跟踪的文件用 `git status --short` 找出来逐个读。
+审查工作区（dev 自审或用户说「我刚改完，帮我看看」）：`review-scope.mjs --base <main>` 把分支已有的提交、已暂存和未暂存的改动、未跟踪的新文件合在一起列出来。读 diff 用 `git diff $(git merge-base <main> HEAD) -- <文件>`（PowerShell 先单独运行 `git merge-base <main> HEAD` 拿到提交号再代入）；未跟踪的新文件没有 diff，直接读整个文件。
