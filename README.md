@@ -25,6 +25,8 @@ npx @rowansenne/workflow-run
 
 按提示：选择环境（编号多选，回车 = 全部）→ 确认 / 填写数据库连接 → 自动生成。装完后在 agent 里运行 `/workflow profile` 填写项目画像。
 
+同时接入 DocNexus 与 CodeGraph 的全量安装，见图文教程 [docs/full-install.html](docs/full-install.html)（下载后用浏览器打开）。
+
 非交互示例（bash、zsh、PowerShell 写法一样）：
 
 ```
