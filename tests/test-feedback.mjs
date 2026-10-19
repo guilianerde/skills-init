@@ -73,9 +73,7 @@ test('CLI：init 清掉旧版本记录；feedback 命令输出汇总', () => {
   assert.equal(inst.status, 0, inst.stderr);
   assert.match(inst.stdout, /运行反馈：已清空旧版本的 1 条记录/);
   assert.equal(fs.readFileSync(f, 'utf8'), '');
-  assert.match(fs.readFileSync(path.join(root, '.gitattributes'), 'utf8'), /^workflow-run\/feedback\/\*\.jsonl merge=union$/m);
-  const again = node([path.join(REPO, 'bin', 'workflow-run.mjs'), '--project-root', root, '--envs', 'codex', '--yes', '--skip-db'], root);
-  assert.doesNotMatch(again.stdout, /merge=union/, '重跑不重复追加');
+  assert.ok(!fs.existsSync(path.join(root, '.gitattributes')), '随代码提交时不改代码仓库的 .gitattributes');
   const add1 = node([path.join(root, '.agents', 'skills', 'workflow', 'scripts', 'feedback.mjs'), 'add', '--skill', 'dev', '--size', 'L', '--unclear', 'F8: 交付太长'], root);
   assert.equal(add1.status, 0, add1.stderr);
   assert.equal(JSON.parse(fs.readFileSync(f, 'utf8')).version, PKG.version, '安装后从清单取版本');
@@ -87,12 +85,27 @@ test('CLI：init 清掉旧版本记录；feedback 命令输出汇总', () => {
   assert.equal(bad.status, 1);
 });
 
-test('ensureUnionMerge：两个分支各追加一行，合并不冲突、两行都在', () => {
+test('ensureUnionMerge：随代码提交时去掉 0.22.0 加的那行，其他规则保留，只剩这行时删文件', () => {
   const root = repo();
-  const g = (...a) => { const r = spawnSync('git', a, { cwd: root, encoding: 'utf8' }); assert.equal(r.status, 0, r.stderr); return r.stdout; };
-  g('config', 'user.email', 'li@example.com');
-  ensureUnionMerge(root);
+  const attr = path.join(root, '.gitattributes');
+  fs.writeFileSync(attr, '*.sh text eol=lf\nworkflow-run/feedback/*.jsonl merge=union\n');
+  assert.equal(ensureUnionMerge(root).action, 'removed');
+  assert.equal(fs.readFileSync(attr, 'utf8'), '*.sh text eol=lf\n');
   assert.equal(ensureUnionMerge(root), null);
+  fs.writeFileSync(attr, 'workflow-run/feedback/*.jsonl merge=union\n');
+  ensureUnionMerge(root);
+  assert.ok(!fs.existsSync(attr));
+});
+
+test('ensureUnionMerge：独立文档仓库里加在文档仓库的 .gitattributes，两个分支各追加一行，合并不冲突、两行都在', () => {
+  const root = repo();
+  const home = path.join(root, 'workflow-run');
+  fs.mkdirSync(home);
+  const g = (...a) => { const r = spawnSync('git', a, { cwd: home, encoding: 'utf8' }); assert.equal(r.status, 0, r.stderr); return r.stdout; };
+  g('init', '-q'); g('config', 'user.name', 'Li Lei'); g('config', 'user.email', 'li@example.com');
+  assert.deepEqual(ensureUnionMerge(root), { action: 'added', file: 'workflow-run/.gitattributes', rule: 'feedback/*.jsonl merge=union' });
+  assert.equal(ensureUnionMerge(root), null);
+  assert.ok(!fs.existsSync(path.join(root, '.gitattributes')));
   add(root, { skill: 'dev', size: 'S' });
   g('add', '-A'); g('commit', '-qm', 'base'); g('branch', '-M', 'main');
   g('checkout', '-qb', 'a'); add(root, { skill: 'dev', size: 'M' }); g('commit', '-qam', 'a');

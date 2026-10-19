@@ -77,14 +77,29 @@ export function readAll(root) {
     .split('\n').filter((l) => l.trim()).map((l) => { try { return { user: f.replace(/\.jsonl$/, ''), ...JSON.parse(l) }; } catch { return null; } }).filter(Boolean));
 }
 
-// 同一个人在两个分支上各追加一行，合并时会在文件末尾冲突：用 git 内置的 union 合并保留两边的行。
-// workflow-run/ 是独立文档仓库时规则写进它自己的 .gitattributes。返回写入的文件（已有规则时 null）
+// 独立文档仓库模式下各人、各服务都往文档仓库的 feedback/ 追加，同一文件在两个分支上各追加一行时合并会在末尾冲突：
+// 在文档仓库自己的 .gitattributes 里用 git 内置的 union 合并保留两边的行。随代码提交时不加（不改代码仓库的 .gitattributes），
+// 并去掉 0.22.0 加在代码仓库里的这一行（文件里只剩这一行时删掉文件）。
+// 返回 { action: 'added' | 'removed', file, rule }，没有改动时 null
+const LEGACY_RULE = `${HOME}/${FEEDBACK_DIR}/*.jsonl merge=union`;
 export function ensureUnionMerge(root) {
-  const [file, rule] = homeIsRepo(root) ? [path.join(homeDir(root), '.gitattributes'), `${FEEDBACK_DIR}/*.jsonl merge=union`] : [path.join(root, '.gitattributes'), `${HOME}/${FEEDBACK_DIR}/*.jsonl merge=union`];
+  const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').split(/\r?\n/) : []);
+  const relOf = (f) => path.relative(root, f).split(path.sep).join('/');
+  const codeAttr = path.join(root, '.gitattributes');
+  if (!homeIsRepo(root)) {
+    const cur = lines(codeAttr);
+    if (!cur.some((l) => l.trim() === LEGACY_RULE)) return null;
+    const keep = cur.filter((l) => l.trim() !== LEGACY_RULE);
+    if (keep.every((l) => !l.trim())) fs.rmSync(codeAttr);
+    else fs.writeFileSync(codeAttr, keep.join('\n'));
+    return { action: 'removed', file: relOf(codeAttr), rule: LEGACY_RULE };
+  }
+  const file = path.join(homeDir(root), '.gitattributes');
+  const rule = `${FEEDBACK_DIR}/*.jsonl merge=union`;
   const text = fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : '';
-  if (text.split(/\r?\n/).some((l) => l.trim() === rule)) return null;
+  if (lines(file).some((l) => l.trim() === rule)) return null;
   fs.writeFileSync(file, `${text}${text && !text.endsWith('\n') ? '\n' : ''}${rule}\n`);
-  return { file: path.relative(root, file).split(path.sep).join('/'), rule };
+  return { action: 'added', file: relOf(file), rule };
 }
 
 // 新版本装好后：删掉本项目旧版本的记录，其他项目（独立文档仓库里各服务共用 feedback/）的不动。返回删掉的条数

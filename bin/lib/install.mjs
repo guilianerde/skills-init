@@ -260,7 +260,8 @@ export function setupHome(root) {
   // 运行反馈只收当前版本的：装了新版本就清掉本项目旧版本的记录（随 workflow-run/ 提交过的，git 历史里仍可找回）
   const removed = rotateFeedback(root, PKG.version);
   const attr = ensureUnionMerge(root);
-  if (attr) ok(`${attr.file} 已加上 ${attr.rule}（运行反馈多分支合并时保留两边的记录）`);
+  if (attr?.action === 'added') ok(`${attr.file} 已加上 ${attr.rule}（文档仓库里运行反馈多分支合并时保留两边的记录）`);
+  if (attr?.action === 'removed') ok(`${attr.file} 已去掉 ${attr.rule}（随代码提交时不再改代码仓库的 .gitattributes）；改动需要你提交`);
   if (removed) ok(`运行反馈：已清空旧版本的 ${removed} 条记录（${HOME}/feedback/），从这一版重新收集；改动需要你提交`);
 }
 

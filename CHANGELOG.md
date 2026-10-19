@@ -4,6 +4,9 @@
 
 ## [Unreleased]
 
+### 变更
+- 随代码提交时不再往代码仓库的 `.gitattributes` 加 `workflow-run/feedback/*.jsonl merge=union`，`init` / `upgrade` 会去掉 0.22.0 加的这一行（文件里只剩这一行时删掉文件），改动需要你提交。独立文档仓库模式照旧，加在文档仓库的 `workflow-run/.gitattributes`。
+
 ## [0.22.0] - 2026-10-19
 
 ### 新增

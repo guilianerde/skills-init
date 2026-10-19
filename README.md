@@ -132,7 +132,7 @@ npx @rowansenne/workflow-run docs-repo git@git.example.com:team/team-docs.git
 * 知识：交付与审查的 DocNexus 沉淀率、正文引用了知识库文档的产物占比；
 * 各分支链路：开发方案、交付说明、审查报告、技术方案、上线方案齐不齐，哪些文档还没发布到 wiki。
 
-**运行反馈**（`npx @rowansenne/workflow-run feedback [--json]`）：效果报告只看落盘的产物，看不到过程。dev 和 project-review 每跑完一次，用 `workflow/scripts/feedback.mjs add` 静默追加一行到 `workflow-run/feedback/<git 用户名>.jsonl`：模型、规模 / 深度、是否走快速通道、向用户提问几轮、用户纠正过几次理解、验收项验证了几条、跳过了哪些步骤、**哪条规则读不懂或做不到**、用户主动说的抱怨。只记过程，不记代码和业务名词；不额外问用户。每人一个文件，随 `workflow-run/` 提交，多人不冲突；安装器在 `.gitattributes` 里给这些文件配 `merge=union`，同一个人在几个分支上都有记录时合并也不冲突。用来定期精简 skill：
+**运行反馈**（`npx @rowansenne/workflow-run feedback [--json]`）：效果报告只看落盘的产物，看不到过程。dev 和 project-review 每跑完一次，用 `workflow/scripts/feedback.mjs add` 静默追加一行到 `workflow-run/feedback/<git 用户名>.jsonl`：模型、规模 / 深度、是否走快速通道、向用户提问几轮、用户纠正过几次理解、验收项验证了几条、跳过了哪些步骤、**哪条规则读不懂或做不到**、用户主动说的抱怨。只记过程，不记代码和业务名词；不额外问用户。每人一个文件，随 `workflow-run/` 提交，多人不冲突。独立文档仓库模式下，安装器在文档仓库的 `workflow-run/.gitattributes` 里给这些文件配 `merge=union`，同一个文件在几个分支上都有记录时合并也不冲突；随代码提交时不改代码仓库的 `.gitattributes`，合并时遇到冲突保留两边的行即可。用来定期精简 skill：
 
 1. 团队照常用两三周；
 2. 运行 `feedback` 汇总（或直接拿 `workflow-run/feedback/` 下的文件），按「常被跳过的步骤」「读不懂的规则」「提问太多」精简 SKILL.md，发新版本；
@@ -453,7 +453,7 @@ CI（`.github/workflows/test.yml`）在 push 到 main 和每个 PR 上运行：m
 | `workflow-run/feedback/` | 运行反馈，每人一个文件；独立文档仓库模式下提交到文档仓库 |
 | `workflow-run/docnexus/` | DocNexus 工作区与定制的文档模板；依赖和检索库由它自带的 `docnexus/.gitignore` 忽略。独立文档仓库模式下提交到文档仓库 |
 | `.ignore` | 让代码搜索跳过需求目录（不影响 git） |
-| `.gitignore`、`.gitattributes`、`CLAUDE.md` / `AGENTS.md` | 安装器追加的忽略规则、运行反馈的合并规则、DocNexus 说明段落 |
+| `.gitignore`、`CLAUDE.md` / `AGENTS.md` | 安装器追加的忽略规则、DocNexus 说明段落 |
 
 **忽略**（每人每机器一份，或可重新生成）：
 
