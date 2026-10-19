@@ -158,8 +158,9 @@ footer { margin-top: 56px; padding-top: 18px; border-top: 1px solid var(--line);
       <li><a href="#verify">5 验证</a></li>
       <li><a href="#first">6 第一次使用</a></li>
       <li><a href="#team">7 团队成员接入</a></li>
-      <li><a href="#upgrade">8 升级与卸载</a></li>
-      <li><a href="#faq">9 常见问题</a></li>
+      <li><a href="#docsrepo">8 独立文档仓库</a></li>
+      <li><a href="#upgrade">9 升级与卸载</a></li>
+      <li><a href="#faq">10 常见问题</a></li>
     </ol>
   </nav>
 
@@ -320,12 +321,74 @@ npx @rowansenne/workflow-run --envs claude,codex --skip-db --with-docnexus --wit
         <li>重跑不会覆盖已提交的项目画像、表结构和知识库里的模板，<code>docnexus init</code> 可以重复执行，不影响已有记忆。</li>
         <li>Windows 上 clone 含软链接的仓库前先执行 <code>git config --global core.symlinks true</code>，并用管理员终端。</li>
         <li>需要查数据库的人去掉 <code>--skip-db</code>，按提示填自己的连接；这个文件已被忽略，不会提交。</li>
-        <li>用了独立文档仓库（<code>docs-repo</code>）时，知识库随文档仓库提交，各服务共用；依赖和检索库照样每人 <code>--with-docnexus</code> 装一次。</li>
+        <li>用了独立文档仓库时，安装顺序不一样，见下一节。</li>
       </ul>
     </section>
 
+    <section id="docsrepo">
+      <h2><span class="n">08</span>独立文档仓库</h2>
+      <p>默认情况下 <code>workflow-run/</code> 随代码提交。下面两种情况适合换成团队共用的文档仓库：不想让需求产物进代码仓库，或者一个需求横跨多个服务。换了之后 <code>workflow-run/</code> 就是文档仓库的克隆：</p>
+      <ul>
+        <li>代码仓库的 <code>.gitignore</code> 加上 <code>/workflow-run/</code>，不再管理它。</li>
+        <li>产物写到 <code>workflow-run/docs/requirements/&lt;需求名&gt;/&lt;项目名&gt;/</code>，同一个需求下每个服务占一个子目录。</li>
+        <li>DocNexus 知识库也放在文档仓库里，各服务共用。</li>
+      </ul>
+<div class="tree">team-docs/                     <span class="c"># 文档仓库，克隆在每个服务的 workflow-run/</span>
+├── docs/requirements/
+│   └── 订单导出/
+│       ├── order-service/     <span class="c"># 项目名 = profile.json 的 artifacts.project</span>
+│       └── report-service/
+├── docnexus/                  <span class="c"># 共用知识库与模板</span>
+│   ├── <span class="ig">node_modules/</span>  <span class="ig">store/</span>  <span class="c"># 每人本机一份</span>
+└── <span class="ig">tmp/</span>                       <span class="c"># 写在 .git/info/exclude，不进文档仓库</span></div>
+
+      <div class="note warn"><b class="tag">顺序</b>先装 skills，再运行 <code>docs-repo</code>，最后才接 DocNexus。<code>docs-repo</code> 要求 <code>workflow-run/</code> 里除了 <code>tmp/</code> 什么都没有，否则就停下，不会自动合并。如果第一条命令就带了 <code>--with-docnexus</code>，DocNexus 会先建在 <code>workflow-run/docnexus/</code>，<code>docs-repo</code> 就会被挡住。</div>
+
+      <h3>第一次搭建（全团队只做一次）</h3>
+      <p>先在 git 服务器上建一个空仓库，例如 <code>team-docs</code>，然后在第一个服务的项目根执行：</p>
+      <ol class="steps">
+        <li><div><strong>装 skills 和 CodeGraph，暂不接 DocNexus</strong><div class="cmd"><pre>npx @rowansenne/workflow-run --envs claude,codex --skip-db --with-codegraph</pre><button class="copy" type="button">复制</button></div></div></li>
+        <li><div><strong>切到文档仓库</strong><p>把仓库克隆到 <code>workflow-run/</code>，代码仓库忽略它，并把项目名写进 <code>workflow/profile.json</code>。不加 <code>--project</code> 时，项目名默认用 git 远端的仓库名。</p><div class="cmd"><pre>npx @rowansenne/workflow-run docs-repo git@git.example.com:team/team-docs.git --project order-service</pre><button class="copy" type="button">复制</button></div></div></li>
+        <li><div><strong>在文档仓库里接入 DocNexus</strong><p>DocNexus 装进 <code>workflow-run/docnexus/</code>，接上本项目的 skill 链接和说明段落，并导入默认文档模板。</p><div class="cmd"><pre>npx @rowansenne/workflow-run upgrade --with-docnexus</pre><button class="copy" type="button">复制</button></div></div></li>
+        <li><div><strong>检查后提交文档仓库</strong><p>代码仓库的 <code>.gitignore</code> 管不到嵌套的文档仓库。提交前看一眼：如果 <code>docnexus/node_modules/</code> 或 <code>docnexus/store/</code> 出现在列表里，就先在文档仓库根加一个 <code>.gitignore</code>，写上这两行。</p><div class="cmd"><pre>git -C workflow-run status --short
+<span class="c"># 需要时：printf 'docnexus/node_modules/\ndocnexus/store/\n' &gt;&gt; workflow-run/.gitignore</span>
+git -C workflow-run add -A
+git -C workflow-run commit -m "chore: init team docs with DocNexus"
+git -C workflow-run push</pre><button class="copy" type="button">复制</button></div></div></li>
+        <li><div><strong>提交代码仓库</strong><p>提交 <code>.gitignore</code>（新增了 <code>/workflow-run/</code>）、<code>.ignore</code>、带项目名的 <code>profile.json</code>，以及 skills 目录和 MCP 配置。</p><div class="cmd"><pre>git status --short
+git add -A &amp;&amp; git commit -m "chore: install workflow-run with team docs repo"</pre><button class="copy" type="button">复制</button></div></div></li>
+      </ol>
+
+      <h3>其他服务、其他成员接入</h3>
+      <p>步骤一样，只是文档仓库里已经有 DocNexus。同一个服务的其他成员不用加 <code>--project</code>，项目名已经随代码提交在 <code>profile.json</code> 里。新服务接入时加 <code>--project</code> 给它起一个名字。</p>
+      <div class="cmd"><pre>npx @rowansenne/workflow-run --envs claude,codex --skip-db --with-codegraph
+npx @rowansenne/workflow-run docs-repo git@git.example.com:team/team-docs.git
+npx @rowansenne/workflow-run upgrade --with-docnexus<span class="c">   # 本机装 DocNexus 依赖，知识库不受影响</span></pre><button class="copy" type="button">复制</button></div>
+      <p>跑完 <code>docs-repo</code> 时，如果文档仓库里有 DocNexus 而本机还没装依赖，它会提示你运行第三条命令。<code>docnexus init</code> 可以重复执行，不影响已有记忆。</p>
+
+      <h3>日常使用</h3>
+      <div class="tblwrap"><table>
+        <tr><th>场景</th><th>做法</th></tr>
+        <tr><td>写完产物</td><td>skill 会列出文档仓库里没提交的文件，并给出建议的提交信息。你确认后它才提交，推送另外问。查看未提交的产物：<code>node .agents/skills/workflow/scripts/requirement.mjs pending</code></td></tr>
+        <tr><td>加入其他服务的需求</td><td>先 <code>git -C workflow-run pull</code>，绑定需求时就能看到别的服务建的需求，用同一个名字绑定</td></tr>
+        <tr><td>引用产物</td><td>写成「文档仓库名:路径」，例如 <code>team-docs:docs/requirements/订单导出/order-service/review.md</code>。在哪个服务、哪个人的克隆里都一样</td></tr>
+        <tr><td>浏览</td><td><code>/workflow view</code> 显示文档仓库里所有项目的需求</td></tr>
+        <tr><td>查看当前状态</td><td><code>npx @rowansenne/workflow-run docs-repo</code>（不带地址），显示仓库地址、引用前缀和本项目的项目名</td></tr>
+        <tr><td>改项目名</td><td><code>npx @rowansenne/workflow-run docs-repo --project &lt;项目名&gt;</code>，然后提交 <code>profile.json</code></td></tr>
+        <tr><td>不想被提示提交</td><td><code>node .agents/skills/workflow/scripts/requirement.mjs config --commit-prompt off --local</code>，只写进个人的 <code>profile.local.json</code></td></tr>
+      </table></div>
+
+      <h3>已经全量安装过、要改用文档仓库</h3>
+      <p><code>workflow-run/</code> 里已经有随代码提交的产物和 DocNexus 时，<code>docs-repo</code> 会停下，不做任何改动。两边的目录布局不同（文档仓库在需求下面还分项目），所以要手动迁移：</p>
+      <ol class="plain">
+        <li>把需要保留的需求产物和知识库内容按新布局放进文档仓库，提交并推送。</li>
+        <li>把本项目的 <code>workflow-run/</code> 挪走，再让代码仓库停止跟踪它：<code>git rm -r --cached workflow-run</code>，然后提交。</li>
+        <li>按上面「其他服务接入」的三条命令重新接入。</li>
+      </ol>
+    </section>
+
     <section id="upgrade">
-      <h2><span class="n">08</span>升级与卸载</h2>
+      <h2><span class="n">09</span>升级与卸载</h2>
       <h3>升级 workflow-run</h3>
       <div class="cmd"><pre>npx @rowansenne/workflow-run upgrade</pre><button class="copy" type="button">复制</button></div>
       <p>读安装清单里记录的环境，非交互升级 skills；手改过的文件先备份到 <code>workflow-run/tmp/upgrade-backup/</code>。已接入 DocNexus 时会刷新它的 skill 链接和说明段落，并导入新版本新增的模板（已有模板不动）。<strong>upgrade 不会升级 DocNexus 包，也不会动 CodeGraph</strong>，这两个各自升级：</p>
@@ -341,7 +404,7 @@ codegraph uninstall<span class="c">                      # 移除 agent 配置�
     </section>
 
     <section id="faq">
-      <h2><span class="n">09</span>常见问题</h2>
+      <h2><span class="n">10</span>常见问题</h2>
       <details><summary>安装结尾退出码是 1，但 skills 装好了</summary><div>DocNexus 的 npm 安装或 <code>docnexus init</code> 失败时只跳过 DocNexus，最后以退出码 1 结束。看输出里的警告，修好网络或 npm 权限后重跑同一条命令即可。CodeGraph 失败同样只跳过它自己。</div></details>
       <details><summary>全局安装 CodeGraph 报权限错误</summary><div>先用你平时的方式全局装好 <code>@colbymchenry/codegraph@1</code>（例如改用 nvm 管理的 Node），确认 <code>codegraph --version</code> 能运行，再重跑带 <code>--with-codegraph</code> 的命令。</div></details>
       <details><summary>codegraph init 失败或太慢</summary><div>安装器会跳过建索引并提示。之后可以在项目根手动执行 <code>codegraph init</code>。索引建好后 agent 使用期间自动增量同步，<code>cg.mjs</code> 发现索引落后于工作区时也会先 <code>codegraph sync</code>。</div></details>
