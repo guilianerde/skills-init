@@ -4,6 +4,8 @@
 
 ## [Unreleased]
 
+## [0.22.0] - 2026-10-19
+
 ### 新增
 - 运行反馈：dev 和 project-review 每跑完一次，用新脚本 `workflow/scripts/feedback.mjs add` 静默追加一行过程记录到 `workflow-run/feedback/<git 用户名>.jsonl`（模型、规模 / 深度、快速通道、提问轮数、用户纠正理解的次数、验收项验证情况、跳过的步骤、不清楚或做不到的规则、用户的抱怨），不记代码和业务名词，不额外问用户。每人一个文件，随 `workflow-run/` 提交；安装器在 `.gitattributes` 加 `workflow-run/feedback/*.jsonl merge=union`（独立文档仓库模式加在文档仓库里），多个分支都有记录时合并不冲突。新命令 `npx @rowansenne/workflow-run feedback [--json]` 汇总，跳过的步骤和不清楚的规则按 SKILL.md 章节归类，作为精简 skill 的依据。`init` / `upgrade` 装了新版本时清掉本项目旧版本的记录，从新版本重新收集。字段与规则见 `workflow/references/feedback.md`。dev 内部调用 project-review 自审时只由 dev 记一行。
 
