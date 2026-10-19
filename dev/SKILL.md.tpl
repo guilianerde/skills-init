@@ -30,7 +30,9 @@ description: "Implement a feature or fix a bug in this project end to end: under
 1. **项目画像**：运行 `node <skills>/workflow/scripts/resolve.mjs profile`，读输出的 `profile` 与 `empty`（空字段列表；字段含义见 `workflow` skill）。本 skill 用到 `main_branch`、`build`、`test`、`test_single`（`{target}` 替换为测试类或文件）、`lint`、`config_center`、`notes`。
    - 需要的字段为空 → 按 `<skills>/workflow/references/profile.md`「填写与更新」的步骤推断，经用户确认后写回；用户不确认就只在本次使用，不落盘。
 2. **工作区状态**：`git status --short` 与当前分支。
-   - 有与本需求无关的未提交改动 → 告知用户，不要混进本次改动，也不要替用户 stash / 丢弃。
+   - 有未提交改动或未跟踪文件 → 列出这些文件，**问用户哪些属于本需求**（例如用户先手写了一部分，让你接着做）；可以和后面的澄清问题一起问。不要替用户 stash / 丢弃。
+     - 属于本需求的：和你之后的改动同等对待，影响面、相关测试、自审、交付说明「改动」节都纳入。
+     - 不属于的：照常在测试里跑到（测试跑的是整个工作区），但不算本次改动——自审在这些文件里发现的问题写进「范围外发现」，交付说明单独列出，提交时不 add。同一个文件里两边都改了的，告诉用户，自审只按本需求那部分下结论。
    - 当前在主分支（`profile.main_branch`）上 → 建议先建特性分支，用户同意后再建。
 3. **增强能力探测**：运行 `node <skills>/workflow/scripts/resolve.mjs status`，按输出的 `wiki` / `docnexus` / `database` 判断是否可用（wiki MCP 脚本探测不到，另看当前环境有没有 wiki 工具）。都不阻塞，不可用就跳过对应增强，并在交付说明中注明。
 4. **基线**：动代码前运行一次 `profile.build`，再跑和本需求相关的测试（`profile.test_single` 或相关模块，不必全量），记下已经失败的测试和编译错误。之后只对新增的失败负责：已有失败不顺手修，写进交付说明「开工前已有的失败」。跑不了就记「未跑基线」和原因。
@@ -95,7 +97,7 @@ description: "Implement a feature or fix a bug in this project end to end: under
 
 ### F7 — 自审
 
-- 按 `project-review` skill 审本次改动：分支已有提交时用 `git diff <main_branch>...HEAD`，再加上 `git diff HEAD` 的未提交部分。
+- 按 `project-review` skill 审本次改动：分支已有提交时用 `git diff <main_branch>...HEAD`，再加上 `git diff HEAD` 的未提交部分，以及 `git status --short` 里本次新建、还没跟踪的文件（`git diff` 看不到，逐个读）。Step 0 确认不属于本需求的文件不计入本次结论（见 Step 0「工作区状态」）。
 - 只走 project-review 的第 1～6 步（范围与深度、建立理解、对比、过清单、影响面、复核）；**跳过第 7 步落盘报告和第 8 步 DocNexus 询问**——结论由 dev 在 F8 统一交付，沉淀也只在 F8 问一次。用户要求单独的审查报告时，再按 project-review 的第 7 步和产物规范落盘。
 - 交给 F8 的是：问题表（文件:行号、严重级别、触发条件、复核结果）、影响面、未覆盖与待确认。
 - CRITICAL / HIGH 必须修掉后重新跑 F6；MEDIUM / LOW 修掉或写进交付说明。
@@ -110,7 +112,7 @@ description: "Implement a feature or fix a bug in this project end to end: under
 2. **自检**：运行 `node <skills>/workflow/scripts/lint-doc.mjs <交付路径> --skill dev --template delivery-template.md`，有「错误」先修正。
 3. **对话里给摘要**：结果、验证（含未验证项）、配置 / SQL 有无、交付文件路径；不必把全文贴进对话。
 4. **询问下一步**，不要自行执行：
-   - 提交：给出建议的 commit message（建议把交付说明一起提交，随分支保留），用户同意后再 `git commit`；**不 push**，除非用户明确要求。
+   - 提交：给出建议的 commit message 和要 add 的文件（只含本需求的改动，Step 0 确认无关的不 add；建议把交付说明一起提交，随分支保留），用户同意后再 `git commit`；**不 push**，除非用户明确要求。
    - PR / MR：用户要提 PR / MR 时，运行 `node <skills>/workflow/scripts/pr-desc.mjs`（缺省当前分支、基线 `profile.main_branch`），它把本分支的交付说明、审查报告、技术方案、上线方案汇总成描述（没有交付说明时退回用提交记录和改动文件），把输出给用户；用 `gh pr create` / `glab mr create` 创建要用户明确同意。
    - 文档：运行 `node <skills>/workflow/scripts/artifacts.mjs` 看本分支已有哪些产物（开发方案、交付说明、审查报告、技术方案、上线方案及 wiki 发布记录），按输出的 `next` 建议下一步：M / L 规模缺技术方案时建议 `create-tech-md-doc`，要上线时建议 `create-release-md-doc`（会自动引用本分支的技术方案和交付说明）。
    - **沉淀到 DocNexus**（`resolve.mjs status` 的 `docnexus.ok` 为 true 时**每次都问**）：明确问用户「要不要启动 DocNexus 流程，把本次交付沉淀到 DocNexus？」，并从交付说明里列出建议沉淀的内容（已确认的决定、新约定、踩到的坑、缺陷根因、配置 / 表结构变化）；没有特别值得记的也照问，并说明这一点。
