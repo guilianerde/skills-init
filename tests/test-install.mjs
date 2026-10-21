@@ -440,6 +440,57 @@ test('WorkBuddy：.codebuddy/skills 按 skill 软链接到单一来源；交互�
   assertLinked(q, '.codebuddy/skills');
 });
 
+test('WorkBuddy 改用 --copy：已有软链接变成真实目录，保留配置，不改动共享来源和 Qwen', { skip: !SYMLINK_OK }, () => {
+  const p = project('workbuddy-switch-copy');
+  ok(p.install(['--envs', 'qwen,workbuddy', '--yes', '--skip-db']));
+  fillProfile(p, '.agents/skills/workflow/profile.json', 'main');
+  p.write('.agents/skills/database-query/config.json', '{"connections":{"test":{"password":"keep"}}}\n');
+  p.write('.agents/skills/dev/SKILL.md', '# 共享来源的手改内容\n');
+  const profile = p.read('.agents/skills/workflow/profile.json');
+  const config = p.read('.agents/skills/database-query/config.json');
+
+  ok(p.install(['--envs', 'workbuddy', '--copy', '--yes', '--skip-db']));
+  for (const s of SKILLS) {
+    assert.ok(p.isDir(`.codebuddy/skills/${s}`), s);
+    assert.ok(p.isFile(`.codebuddy/skills/${s}/SKILL.md`), s);
+  }
+  assert.equal(p.read('.codebuddy/skills/workflow/profile.json'), profile);
+  assert.equal(p.read('.codebuddy/skills/database-query/config.json'), config);
+  assert.equal(p.read('.codebuddy/skills/dev/SKILL.md'), repoFile('dev/SKILL.md.tpl'));
+  assert.equal(p.read('.agents/skills/dev/SKILL.md'), '# 共享来源的手改内容\n');
+  assertLinked(p, '.qwen/skills');
+  p.write('.codebuddy/skills/workflow/profile.json', '{"main_branch":"release"}\n');
+  assert.equal(p.read('.agents/skills/workflow/profile.json'), profile);
+  assert.equal(p.json('.codebuddy/skills/.workflow-run.json').mode, 'copy');
+  ok(p.install(['upgrade']));
+  for (const s of SKILLS) assert.ok(p.isDir(`.codebuddy/skills/${s}`), s);
+  assert.equal(p.read('.codebuddy/skills/workflow/profile.json'), '{"main_branch":"release"}\n');
+  assertLinked(p, '.qwen/skills');
+});
+
+test('WorkBuddy --copy 不替换用户指向其他位置的 skill 链接', { skip: !SYMLINK_OK }, () => {
+  const p = project('workbuddy-user-link');
+  p.write('my-workflow/SKILL.md', '# 用户的技能\n');
+  fs.mkdirSync(p.at('.codebuddy/skills'), { recursive: true });
+  fs.symlinkSync('../../my-workflow', p.at('.codebuddy/skills/workflow'), 'dir');
+  const r = p.install(['--envs', 'workbuddy', '--copy', '--yes', '--skip-db']);
+  assert.equal(r.status, 1);
+  assert.match(r.log, /指向其他位置/);
+  assert.ok(p.isLink('.codebuddy/skills/workflow'));
+  assert.equal(p.read('my-workflow/SKILL.md'), '# 用户的技能\n');
+});
+
+test('WorkBuddy 自动退回拷贝：升级仍以单一来源的完整 skill 清单为准', () => {
+  const p = project('workbuddy-copy-fallback');
+  const env = { WORKFLOW_RUN_NO_SYMLINK: '1' };
+  ok(p.install(['--envs', 'workbuddy', '--yes', '--skip-db'], { env }));
+  ok(p.install(['--envs', 'workbuddy', '--skills', 'workflow', '--yes', '--skip-db'], { env }));
+  ok(p.install(['upgrade'], { env }));
+  for (const s of SKILLS) assert.ok(p.isFile(`.codebuddy/skills/${s}/SKILL.md`), s);
+  assert.deepEqual(Object.keys(p.json('.codebuddy/skills/.workflow-run.json').skills).sort(), [...SKILLS].sort());
+  assert.equal(p.json('.codebuddy/skills/.workflow-run.json').mode, 'copy-fallback');
+});
+
 test('WorkBuddy --copy：.codebuddy/skills 独立拷贝，带自己的安装清单', () => {
   const p = project('workbuddy-copy');
   ok(p.install(['--envs', 'workbuddy', '--copy', '--yes', '--skip-db']));

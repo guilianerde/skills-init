@@ -107,9 +107,12 @@ export function timestamp() {
 }
 
 export const INSTALL_BASES = [CANON_DIR, ...Object.values(LINK_ENVS)];
-// 找到本项目的安装清单（单一来源优先；--copy 安装时各目录各有一份）
+// 以最近一次显式安装为准；自动退回拷贝的清单不覆盖单一来源的模式与 skill 选择。
 export function findManifests(root) {
-  return INSTALL_BASES.map((rel) => ({ rel, base: path.join(root, rel), m: readManifest(path.join(root, rel)) })).filter((x) => x.m);
+  const found = INSTALL_BASES.map((rel) => ({ rel, base: path.join(root, rel), m: readManifest(path.join(root, rel)) })).filter((x) => x.m);
+  const primary = found.filter((x) => x.rel === CANON_DIR || x.m.mode === 'copy').reduce((latest, x) =>
+    !latest || (Date.parse(x.m.installedAt) || 0) > (Date.parse(latest.m.installedAt) || 0) ? x : latest, null);
+  return primary ? [primary, ...found.filter((x) => x !== primary)] : found;
 }
 export function cmpVersion(a, b) {
   const pa = String(a).split(/[.-]/).map((x) => parseInt(x, 10) || 0);

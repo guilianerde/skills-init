@@ -2,8 +2,9 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { TPL_DIR, PKG, CANON_DIR, INSTALL_BASES, SKILLS, SKILL_LIST, USER_FILES, MANIFEST, ok, warn, readJson, walk, toPosix, sameFile, writeFile, render, sha256, fileHash, readManifest, removeEmptyDirs, lstat, timestamp, removeLink, HOME } from './core.mjs';
+import { TPL_DIR, PKG, CANON_DIR, INSTALL_BASES, SKILLS, SKILL_LIST, USER_FILES, MANIFEST, ok, warn, fail, readJson, walk, toPosix, sameFile, writeFile, render, sha256, fileHash, readManifest, removeEmptyDirs, lstat, timestamp, removeLink, HOME } from './core.mjs';
 import { writeDbConfig } from './db.mjs';
+import { linkPointsTo } from './uninstall.mjs';
 import { layout, ensureIgnore, homeIsRepo, migrateLayout, IGNORE_LINE, TMP_DIR } from '../../workflow/scripts/requirement.mjs';
 import { detectEnv } from '../../workflow/scripts/resolve.mjs';
 import { rotate as rotateFeedback, ensureUnionMerge } from '../../workflow/scripts/feedback.mjs';
@@ -66,6 +67,19 @@ export async function installSkills(base, db, ctx) {
   for (const skill of selected) {
     const srcDir = path.join(TPL_DIR, skill);
     const dstDir = path.join(base, skill);
+    // --copy 重装已有链接时先解除共享关系，避免写穿链接、仍留下无法被部分宿主发现的链接目录。
+    if (ctx.mode !== 'symlink' && lstat(dstDir)?.isSymbolicLink()) {
+      if (!linkPointsTo(dstDir, path.resolve(ctx.root, CANON_DIR, skill))) fail(`${dstDir} 指向其他位置，不能改为独立拷贝；请先手动处理该链接。`);
+      const tmp = fs.mkdtempSync(path.join(base, '.workflow-run-copy-'));
+      const copy = path.join(tmp, skill);
+      try {
+        if (fs.existsSync(dstDir)) fs.cpSync(dstDir, copy, { recursive: true, dereference: true });
+        else fs.mkdirSync(copy);
+        removeLink(dstDir);
+        fs.renameSync(copy, dstDir);
+      } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
+      ok(`${toPosix(path.relative(ctx.root, dstDir))} 已由软链接改为独立拷贝（已有配置保留）`);
+    }
     const prevSkill = prev?.skills?.[skill];
     const entry = { files: {}, userFiles: {} };
     const notes = [];
