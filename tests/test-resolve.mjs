@@ -126,3 +126,79 @@ test('category：skill.json 声明的显式分类，项目画像可覆盖，未�
   assert.ok(!('database-query' in s.docnexus.categories));
   fs.rmSync(root, { recursive: true, force: true });
 });
+
+// ------------------------------------------------------------------ 开发环境配置（toolchain）
+test('env --check：展开 $VAR / ~，核对路径存在性；变量没配与路径不存在都算不通过', () => {
+  const { root, resolve, put } = project();
+  const home = os.tmpdir();
+  put('.agents/skills/workflow/profile.json', JSON.stringify({
+    main_branch: 'main', build: 'mvn package', test: 'mvn test',
+    toolchain: { java_home: '$JAVA_HOME', maven: { settings: '~/settings.xml', repository: '/nope/missing-repo' }, node: '$NOPE/bin' },
+    env_vars: { JAVA_HOME: home },
+  }));
+  const r = resolve('env', '--check');
+  assert.equal(r.status, 0);
+  assert.equal(r.out.fields.java_home.resolved, home, '$VAR 用 env_vars 展开');
+  assert.equal(r.out.fields.java_home.exists, true);
+  assert.equal(r.out.fields.java_home.source, 'team');
+  assert.equal(r.out.fields['maven.settings'].resolved, path.join(process.env.HOME || process.env.USERPROFILE, 'settings.xml'), '~ 展开为 HOME');
+  assert.equal(r.out.fields['maven.settings'].exists, false);
+  assert.deepEqual(r.out.fields['maven.repository'].resolved, '/nope/missing-repo');
+  // 变量没配时，展开结果即使碰巧存在（$NOPE/bin → /bin）也必须算不通过
+  assert.deepEqual(r.out.fields.node.unset_vars, ['NOPE']);
+  assert.equal(r.out.fields.node.exists, false);
+  assert.equal(r.out.ok, false);
+  assert.deepEqual([...r.out.missing].sort(), ['maven.repository', 'maven.settings', 'node']);
+  assert.ok(r.out.current && 'JAVA_HOME' in r.out.current);
+  fs.rmSync(root, { recursive: true, force: true });
+});
+
+test('env --check：profile.local.json 的个人值逐个子字段覆盖团队画像；没配时给出去哪配的提示', () => {
+  const { root, resolve, put } = project();
+  const real = path.join(root, 'jdk'); fs.mkdirSync(real, { recursive: true });
+  put('.agents/skills/workflow/profile.json', JSON.stringify({ toolchain: { java_home: '/team/other-machine-jdk', maven: { repository: '/team/repo' } } }));
+  put('.agents/skills/workflow/profile.local.json', JSON.stringify({ toolchain: { java_home: real } }));
+  const r = resolve('env', '--check');
+  assert.deepEqual([r.out.fields.java_home.source, r.out.fields.java_home.exists], ['local', true], '本人机器上的 JDK 覆盖团队值');
+  assert.deepEqual([r.out.fields['maven.repository'].source, r.out.fields['maven.repository'].exists], ['team', false], '没覆盖的字段仍用团队值');
+  assert.match(r.out.how, /profile\.local\.json/);
+  // status / profile 也带 toolchain（配过才给 fields）
+  assert.equal(resolve('status').out.toolchain.configured, true);
+  assert.equal(resolve('status').out.toolchain.fields.java_home, real);
+  assert.equal(resolve('profile').out.toolchain.configured, true);
+  fs.rmSync(root, { recursive: true, force: true });
+
+  const q = project();
+  const empty = q.resolve('env', '--check');
+  assert.equal(empty.out.configured, false);
+  assert.equal(empty.out.ok, true, '没配不算失败');
+  assert.match(empty.out.how, /\/workflow profile/);
+  assert.equal(q.resolve('status').out.toolchain.configured, false);
+  fs.rmSync(q.root, { recursive: true, force: true });
+});
+
+// 回归：审查发现的 3 个问题之三——个人配置要能显式清空团队路径
+test('env --check：profile.local.json 里写空字符串表示不用团队值，不再继承、也不再报缺失', () => {
+  const { root, resolve, put } = project();
+  const real = path.join(root, 'jdk'); fs.mkdirSync(real, { recursive: true });
+  put('.agents/skills/workflow/profile.json', JSON.stringify({
+    toolchain: { java_home: '/team/other-machine-jdk', maven: { settings: '/team/settings.xml', repository: '/team/repo' } },
+  }));
+  // 本机没有 /team/*，所以覆盖前两个字段都会报缺失
+  let r = resolve('env', '--check');
+  assert.deepEqual([...r.out.missing].sort(), ['java_home', 'maven.repository', 'maven.settings']);
+  assert.equal(r.out.cleared, undefined, '没声明过就没有 cleared');
+  // 个人显式留空 maven.settings（想用 Maven 默认配置）+ 覆盖 java_home 为本机真实路径
+  put('.agents/skills/workflow/profile.local.json', JSON.stringify({ toolchain: { java_home: real, maven: { settings: '' } } }));
+  r = resolve('env', '--check');
+  assert.deepEqual(r.out.cleared, ['maven.settings'], '显式留空记为 cleared');
+  assert.ok(!('maven.settings' in r.out.fields), '被清空的字段不再出现，也不继承团队值');
+  assert.ok(!r.out.missing.includes('maven.settings'), '清空后不再报缺失');
+  assert.deepEqual([r.out.fields.java_home.source, r.out.fields.java_home.exists], ['local', true]);
+  assert.deepEqual([r.out.fields['maven.repository'].source, r.out.fields['maven.repository'].resolved], ['team', '/team/repo'], '没覆盖的字段仍继承团队值');
+  assert.deepEqual(r.out.missing, ['maven.repository']);
+  // status / profile 也带上 cleared
+  assert.deepEqual(resolve('status').out.toolchain.cleared, ['maven.settings']);
+  assert.deepEqual(resolve('profile').out.toolchain.cleared, ['maven.settings']);
+  fs.rmSync(root, { recursive: true, force: true });
+});

@@ -59,7 +59,7 @@ dev（需求 → 方案 → 实现 → 测试 → 自审）
 
 | 文件 | 内容 |
 |---|---|
-| `references/profile.md` | 项目画像 `profile.json` 各字段含义、填写与更新步骤（`resolve.mjs infer-profile`） |
+| `references/profile.md` | 项目画像 `profile.json` 各字段含义（含开发环境配置 `toolchain` / `env_vars`）、填写与更新步骤（`resolve.mjs infer-profile`、`env --check`） |
 | `references/templates.md` | 模板来源判定（`resolve.mjs template`）、创建与修改模板（`/workflow template`）、模板随知识库更新 |
 | `references/docnexus.md` | 写入 DocNexus 的分类（`resolve.mjs category`）、按分类参考知识库（`knowledge.mjs`） |
 | `references/status.md` | `/workflow status` 的输出格式 |
@@ -80,13 +80,15 @@ dev（需求 → 方案 → 实现 → 测试 → 自审）
 | 数据库 | `database-query/config.json` 存在且 `connections` 非空 | 查表结构、核对数据 |
 | 代码图谱（CodeGraph） | 项目根有 `.codegraph/` 索引，且 `codegraph` 命令可用（`resolve.mjs status` 的 `codegraph.ok`） | 读代码、查调用链与影响面、找受影响的测试；用法见 `references/codegraph.md` |
 | 项目画像 | `workflow/profile.json` 中 `main_branch` 与 `build` / `test` 非空 | dev 构建与测试 |
+| 开发环境配置 | `profile.json` 的 `toolchain`（可被 `profile.local.json` 覆盖）配了 JDK / Maven / Node 的路径；`resolve.mjs env --check` 逐个核对在本机是否存在 | dev 跑编译与测试（跑不起来时先看它） |
 
 ## Rules
 
 - 本 skill 只路由和维护 `profile.json`，不写业务代码；具体工作交给对应 skill，并遵守该 skill 的规则。
-- `profile.json` 只记录项目事实，不写密码、token、内网凭据。
+- `profile.json` 只记录项目事实（含 `toolchain` 开发环境配置：JDK / Maven / Node 的路径），**不写密码、token、内网凭据**；路径里的变量在 `env_vars` 里声明。
+- 写 `toolchain` 前先用 `resolve.mjs env --check` 核对路径在本机存在；本机对不上、又只是个人差异的，写进个人的 `profile.local.json`（覆盖 `profile.json`），不要改团队那份。
 - 用户的请求明显只属于某个 skill 时，不要先跑完整链路或状态检查，直接进入那个 skill。
 
 ## 终端命令
 
-本 skill 给出的 `node …`、`git …` 命令在 bash、zsh、PowerShell 里写法一样，原样运行即可。需要自己写其他终端命令时，先看本机的系统和终端：`node <skills>/workflow/scripts/resolve.mjs env`（安装时记录，一次对话查一次就够；`resolve.mjs profile` / `status` 的输出里也带着 `env`）。按输出的 `os`、`shell`、`note` 写命令，不要再用 `uname`、`$PSVersionTable`、`ver` 之类去探测。
+本 skill 给出的 `node …`、`git …` 命令在 bash、zsh、PowerShell 里写法一样，原样运行即可。构建 / 测试因环境跑不起来（找不到 java、依赖拉不下来）时，用 `node <skills>/workflow/scripts/resolve.mjs env --check` 核对画像里的开发环境配置（`toolchain`）在本机是否存在，把 `resolved` 与 `current` 给用户看。需要自己写其他终端命令时，先看本机的系统和终端：`node <skills>/workflow/scripts/resolve.mjs env`（安装时记录，一次对话查一次就够；`resolve.mjs profile` / `status` 的输出里也带着 `env`）。按输出的 `os`、`shell`、`note` 写命令，不要再用 `uname`、`$PSVersionTable`、`ver` 之类去探测。

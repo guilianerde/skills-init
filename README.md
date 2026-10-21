@@ -172,6 +172,13 @@ npx @rowansenne/workflow-run@latest doctor --offline
   "deploy": { "platform": "内部发布平台", "regions": ["华东-生产", "华南-生产", "海外-生产"] },
   "job_annotation": "@XxlJob",
   "data_review": true,
+  "toolchain": {
+    "java_home": "$JAVA_HOME",
+    "maven": { "settings": "$HOME/.m2/settings.xml", "repository": "/data/maven-repo" },
+    "gradle_user_home": "",
+    "node": ""
+  },
+  "env_vars": { "JAVA_HOME": "/Library/Java/JavaVirtualMachines/temurin-17.jdk/Contents/Home" },
   "notes": ["技术方案的「上线服务」与「数据链路」为必填"]
 }
 ```
@@ -184,6 +191,15 @@ npx @rowansenne/workflow-run@latest doctor --offline
 | `deploy` | 技术 / 上线方案「上线服务」的服务名与环境说明 |
 | `job_annotation` | 技术方案「定时任务变更」识别任务类 |
 | `data_review` | 是否输出技术方案模块 7 与上线方案 2.3 的库表评审块 |
+| `toolchain` / `env_vars` | 开发环境配置：JDK（`java_home`）、Maven（`maven.settings` / `maven.repository`）、Gradle（`gradle_user_home`）、Node（`node`）的位置，以及路径里用到的变量。路径写 `$JAVA_HOME` 这类变量或本机绝对路径，`~` 展开为用户目录；**不含凭据**。构建跑不起来时 dev 用它核对 |
+
+**开发环境配置**（`toolchain`）：JDK 在哪、Maven 用哪个 `settings.xml`、本地仓库在哪个盘，这些决定构建和测试能不能跑起来，统一由画像提供，模板里不写死：
+
+```bash
+node .agents/skills/workflow/scripts/resolve.mjs env --check   # 逐个字段核对在本机是否存在
+```
+
+`/workflow profile` 时会用 `infer-profile` 自动推断草稿（构建文件对应的工具、`JAVA_HOME` / `GRADLE_USER_HOME`、`~/.m2/settings.xml` 与其 `<localRepository>`、`~/.gradle`、锁定的 Node 版本），每个值带依据，经你确认后写入。Maven 的两份 `settings.xml`（全局 `$MAVEN_HOME/conf` 与用户级 `~/.m2`）**会合并、以用户级为准**，所以取用户级那份、全局的记在依据里；`<localRepository>` 也只认有效配置，注释里的示例会被忽略。路径可以写 `$JAVA_HOME`、`${VAR}`、`%VAR%`（用 `env_vars` 或本机环境展开）或 `~`。`env --check` 对每个字段给出展开后的路径、是否存在、哪个变量没配，以及本机实际的 `JAVA_HOME` / `MAVEN_HOME` / Node 目录，方便对照。**JDK、Maven 的位置每台机器不同**：团队共用一份就写 `profile.json`，个人不同就写 `profile.local.json` 的同名字段（优先），不用改团队那份；个人那份里写 `""` 表示**不用**团队那个值（用工具默认配置），不写这个键才是沿用。这一块只放路径和普通环境变量，token、密码一律不写。
 
 **本机系统与终端**：安装 / 升级时检测一次，写进 `workflow/profile.local.json` 的 `env`（个人设置，已在 `.gitignore` 里，团队里各人各机器不同），例如 `{ "os": "windows", "shell": "powershell" }`。Windows 上区分 `pwsh`（PowerShell 7）和 `powershell`（Windows PowerShell 5.1，没有 `&&`），其他系统取 `$SHELL`。skill 写终端命令时读 `resolve.mjs env`（`profile` / `status` 的输出里也有），不再每次对话自己探测；skill 里给出的命令本身都是 `node …` / `git …`，在哪个终端都一样。换了终端或机器，重跑一次安装器即可。
 
@@ -445,6 +461,7 @@ npx @rowansenne/workflow-run uninstall
 | `workflow/scripts/resolve.mjs template <skill> <文件名>` | 判定用哪份模板：已接入 DocNexus 只用知识库，缺失时退出码 2 并给出导入来源；未接入时项目文件优先，其次默认模板 |
 | `workflow/scripts/resolve.mjs profile` | 读项目画像，列出空字段 |
 | `workflow/scripts/resolve.mjs env` | 本机系统与终端（安装时记录在 `profile.local.json`），写终端命令按它来 |
+| `workflow/scripts/resolve.mjs env --check` | 核对画像里的开发环境配置（`toolchain`）在本机是否存在：每个字段给出 `resolved`（展开后）、`exists`、`unset_vars`，以及 `current`（本机实际的 `JAVA_HOME` / `MAVEN_HOME` / Node 目录）便于对照 |
 | `workflow/scripts/docnexus.mjs <参数>` / `--node <脚本> <参数>` | 在业务项目根运行 `.docnexus/` 中的 CLI 或它的 node 脚本，知识输出到 `workflow-run/docnexus/`；Windows 上直接用 node 跑 CLI 入口，不经过 `.cmd` |
 | `workflow/scripts/knowledge.mjs <skill> [--match 词] [--limit n] [--query 问题]` | 按 `readFrom` 的分类列出 DocNexus 文档（标题、摘要、路径，不含正文）；`--query` 再在每个分类内 `recall --category`，直接使用新版按分类检索能力。未接入时退出码 2 |
 | `workflow/scripts/resolve.mjs category <skill>` | 该 skill 写入 DocNexus 时的显式分类（画像 `docnexus_categories` 优先，其次 skill.json），输出 `seal_args` 与 `metadata`；未声明时退出码 1 |

@@ -4,6 +4,13 @@
 
 ## [Unreleased]
 
+## [0.25.0] - 2026-10-22
+
+### 新增
+- **项目画像新增开发环境配置 `toolchain`**：记录 JDK（`java_home`）、Maven（`maven.settings` / `maven.repository`）、Gradle（`gradle_user_home`）、Node（`node`）的位置，路径可写 `$JAVA_HOME` / `${VAR}` / `%VAR%` / `~`，变量在 `env_vars` 里声明（不含凭据）。构建和测试因环境跑不起来时（找不到 java、依赖拉不下来、版本不对），dev 用它核对而不是猜。`infer-profile` 按构建文件、`JAVA_HOME` / `GRADLE_USER_HOME`、`~/.m2/settings.xml` 及其 `<localRepository>`、`~/.gradle`、锁定的 Node 版本推断草稿并附依据；新命令 `resolve.mjs env --check` 逐个字段给出展开后的路径、`exists`、没配的变量和本机实际的 `JAVA_HOME` / `MAVEN_HOME` / Node 目录，写入前核对、对不上时改个人的 `profile.local.json`（逐个子字段覆盖团队画像）。`status` 输出里也带上配好的 toolchain。
+- `toolchain` 的值按 Maven 的实际规则取值：全局（`$MAVEN_HOME/conf/settings.xml`）与用户级（`~/.m2/settings.xml`）会合并、**以用户级为准**，所以推断用户级那份（原来优先取全局，会丢掉用户的私服与镜像配置），全局的存在时记在 `evidence` 里。`<localRepository>` 同样按有效配置推断，并且**忽略 `settings.xml` 注释里的示例节点**（原来会把注释中的 `/path/to/local/repo` 当成真实仓库）。
+- 个人的 `profile.local.json` 里把 `toolchain` 某字段写 `""` 表示**不使用**团队那个值（例如用 Maven 默认配置），原来空字符串不算覆盖、仍继承团队路径。被清空的字段不再校验、不报缺失，`env --check` / `status` / `profile` 输出里列在 `cleared`。
+
 ## [0.24.1] - 2026-10-21
 
 ### 修复

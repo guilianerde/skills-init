@@ -329,7 +329,7 @@ footer { margin-top: 40px; font-size: 13px; color: var(--muted); }
   <div class="principles">
     <div>
       <h3>项目事实只写一处</h3>
-      <p>主分支、构建和测试命令、配置中心、发布平台都在 <code>workflow/profile.json</code>。模板里不写死任何公司或项目的约定，换个项目只改画像。</p>
+      <p>主分支、构建和测试命令、配置中心、发布平台、开发环境配置（<code>toolchain</code>：JDK / Maven / Node 的位置）都在 <code>workflow/profile.json</code>。模板里不写死任何公司或项目的约定，换个项目只改画像；个人机器不同的部分写进不提交的 <code>profile.local.json</code> 覆盖。</p>
     </div>
     <div>
       <h3>能用脚本就不靠模型</h3>

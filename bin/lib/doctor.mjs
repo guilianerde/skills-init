@@ -90,6 +90,15 @@ export function doctor(root, offline) {
   } else bad('缺少 workflow/scripts/resolve.mjs：运行 npx @rowansenne/workflow-run upgrade');
   if (st) {
     if (st.profile.ok) ok('项目画像已填写'); else meh(`项目画像未完成（空字段：${st.profile.empty.join('、')}）：运行 /workflow profile`);
+    // 开发环境配置：配过才查，逐个字段核对路径在本机是否存在（画像可能抄的是别人的机器）
+    if (st.toolchain?.configured) {
+      const r = spawnSync(process.execPath, [resolveJs, '--root', root, 'env', '--check'], { encoding: 'utf8' });
+      let tc = null;
+      try { tc = JSON.parse(r.stdout); } catch { /* 单独在下面报 */ }
+      if (!tc) bad('toolchain 检查失败：resolve.mjs env --check 执行异常');
+      else if (tc.ok) ok(`开发环境配置已核对（${Object.keys(tc.fields).join('、')}）`);
+      else meh(`开发环境配置里这些路径在本机不存在或变量没配：${tc.missing.join('、')}（运行 resolve.mjs env --check 看 resolved 与 current；只是个人机器不同就写进 profile.local.json）`);
+    }
     if (st.wiki.ok) ok('wiki 已配置'); else console.log('    --  wiki 未配置（可选；也可能通过 wiki MCP 提供）');
     if (st.docnexus.ok) {
       // 运行环境在 .docnexus/，所有 Agent 都从业务项目根使用配置的知识输出。

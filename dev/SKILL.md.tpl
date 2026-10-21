@@ -27,8 +27,9 @@ description: "Implement a feature or fix a bug in this project end to end: under
 
 ## Step 0 — 前置检查（两种模式共用）
 
-1. **项目画像**：运行 `node <skills>/workflow/scripts/resolve.mjs profile`，读输出的 `profile` 与 `empty`（空字段列表；字段含义见 `workflow` skill）。本 skill 用到 `main_branch`、`build`、`test`、`test_single`（`{target}` 替换为测试类或文件）、`lint`、`config_center`、`notes`。
+1. **项目画像**：运行 `node <skills>/workflow/scripts/resolve.mjs profile`，读输出的 `profile`、`empty`（空字段列表）与 `toolchain`（开发环境配置，见 `workflow` skill）。本 skill 用到 `main_branch`、`build`、`test`、`test_single`（`{target}` 替换为测试类或文件）、`lint`、`config_center`、`notes`。
    - 需要的字段为空 → 按 `<skills>/workflow/references/profile.md`「填写与更新」的步骤推断，经用户确认后写回；用户不确认就只在本次使用，不落盘。
+   - **开发环境配置**：`toolchain.configured` 为 true 时，编译 / 测试按它跑（JDK 用 `java_home`、Maven 用 `maven.settings` / `maven.repository`，写命令时把对应的 `env_vars`（如 `JAVA_HOME`）带上，例如 `JAVA_HOME=<值> <profile.build>`）。构建或测试失败且像是环境问题（找不到 java、依赖下载不下来、版本不对）时，先运行 `node <skills>/workflow/scripts/resolve.mjs env --check`：字段 `exists: false` 或带 `unset_vars` 就是环境没配对，把 `resolved` 和 `current`（本机实际值）一起给用户看，问清楚再继续，**不要自己改画像**。配过但本机对不上时属于个人差异，按 `references/profile.md` 写进 `profile.local.json`。
 2. **工作区状态**：`git status --short` 与当前分支。
    - 有未提交改动或未跟踪文件 → 列出这些文件，**问用户哪些属于本需求**（例如用户先手写了一部分，让你接着做）；可以和后面的澄清问题一起问。不要替用户 stash / 丢弃。
      - 属于本需求的：和你之后的改动同等对待，影响面、相关测试、自审、交付说明「改动」节都纳入。

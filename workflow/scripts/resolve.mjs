@@ -10,6 +10,7 @@
 //   node .agents/skills/workflow/scripts/resolve.mjs category <skill>             # 该 skill 写入 DocNexus 时的显式分类
 //   node .agents/skills/workflow/scripts/resolve.mjs status                      # 能力探测（/workflow status）
 //   node .agents/skills/workflow/scripts/resolve.mjs env                         # 本机系统与终端（安装时记录），写终端命令按它来
+//   node .agents/skills/workflow/scripts/resolve.mjs env --check                 # 核对画像里的开发环境配置（JDK / Maven / Node 路径）在本机是否存在
 // 输出 JSON。退出码：0 正常；2 缺该模板（知识库里没有，或未接入 DocNexus 而该模板没有默认版本；按输出的 hint 处理）；1 参数错误 / 该 skill 没有声明分类
 
 import fs from 'node:fs';
@@ -145,6 +146,78 @@ export function readEnv() {
   return { ...env, ...(note ? { note } : {}) };
 }
 
+// 开发环境配置（toolchain）：画像里的路径可能写 $JAVA_HOME / ${VAR} / %VAR% / ~，用 env_vars 与进程环境展开。
+// env_vars 优先（画像里显式声明的是对的），缺失的键回退到本机进程环境（HOME、USERPROFILE 这类）。
+// 展开后为空 = 变量确实没配（不是「留空」，要报出来）；路径里有空格照常，不做 shell 求值。
+const VAR_RE = /\$\{(\w+)\}|\$(\w+)|%(\w+)%/g;
+export function expandPath(v, vars = {}, env = process.env) {
+  if (typeof v !== 'string' || !v) return { raw: v ?? '', resolved: '', missing: [] };
+  const look = (n) => (vars[n] !== undefined && vars[n] !== '' ? vars[n] : (env[n] ?? ''));
+  const home = look('HOME') || look('USERPROFILE') || '';
+  let s = v;
+  if (s === '~' || s.startsWith('~/') || s.startsWith('~\\')) s = home ? home + s.slice(1) : s;
+  const missing = [];
+  for (const m of v.matchAll(VAR_RE)) { const n = m[1] ?? m[2] ?? m[3]; if (!look(n)) missing.push(n); }
+  const resolved = s.replace(VAR_RE, (m, a, b, c) => look(a ?? b ?? c)).replace(/[\\/]+$/, '');
+  return { raw: v, resolved, missing };
+}
+
+// 画像里的 toolchain（profile.json）与个人覆盖（profile.local.json），逐个子字段合并，后者优先。
+// 「没声明」和「显式写空」是两回事：本机写 "" 表示**不使用**团队那个值（用工具自己的默认配置），
+// 所以要按 null / "" 区分来源，不能只看值真不真。
+export function readToolchain(root) {
+  const dir = path.join(SKILLS_DIR, 'workflow');
+  const team = readJson(path.join(dir, 'profile.json')) ?? {};
+  const mine = readJson(path.join(dir, 'profile.local.json')) ?? {};
+  const declared = (o) => typeof o === 'string';
+  // 个人声明过（含 ""）就以个人为准；否则用团队值。cleared 表示被个人显式留空
+  const merge = (t, m) => {
+    if (declared(m)) return m === '' ? { value: '', source: 'local', cleared: true } : { value: m, source: 'local' };
+    if (declared(t) && t !== '') return { value: t, source: 'team' };
+    return { value: '', source: null };
+  };
+  const vars = { ...(team.env_vars ?? {}), ...(mine.env_vars ?? {}) };
+  const fields = {
+    java_home: merge(team.toolchain?.java_home, mine.toolchain?.java_home),
+    'maven.settings': merge(team.toolchain?.maven?.settings, mine.toolchain?.maven?.settings),
+    'maven.repository': merge(team.toolchain?.maven?.repository, mine.toolchain?.maven?.repository),
+    gradle_user_home: merge(team.toolchain?.gradle_user_home, mine.toolchain?.gradle_user_home),
+    node: merge(team.toolchain?.node, mine.toolchain?.node),
+  };
+  const out = {};
+  const cleared = [];
+  for (const [k, { value, source, cleared: c }] of Object.entries(fields)) {
+    if (c) { cleared.push(k); continue; } // 个人明确不用这个字段：不展开、不校验、也不报缺失
+    if (value) out[k] = { ...expandPath(value, vars), source };
+  }
+  // toolchain 为空时也给出 env_vars，便于 agent 知道该用什么变量写路径
+  return { fields: out, env_vars: vars, cleared, configured: Object.keys(out).length > 0 };
+}
+
+// 每个字段的路径在本机是否存在（写入画像前、构建跑不起来时核对用）。
+// 只判断存在性，不判断版本对不对；current 是本机当前进程的值，便于和画像对照
+export function checkToolchain(root, { env = process.env } = {}) {
+  const tc = readToolchain(root);
+  const check = (f) => {
+    // 变量没配时展开结果可能是别处真存在的路径（$MISSING/bin 展开成 /bin），必须按「没配」算不通过
+    let exists = false;
+    try { exists = !f.missing.length && !!f.resolved && fs.existsSync(f.resolved); } catch { exists = false; }
+    const kind = exists ? (() => { try { return fs.statSync(f.resolved).isDirectory() ? 'dir' : 'file'; } catch { return 'other'; } })() : null;
+    return { ...f, exists, kind, ...(f.missing.length ? { unset_vars: f.missing } : {}), ...(f.raw !== f.resolved ? { expanded: true } : {}) };
+  };
+  const fields = Object.fromEntries(Object.entries(tc.fields).map(([k, f]) => [k, check(f)]));
+  const bad = Object.entries(fields).filter(([, f]) => !f.exists).map(([k]) => k);
+  return {
+    fields, configured: tc.configured, env_vars: tc.env_vars, ok: bad.length === 0,
+    missing: bad,
+    // 个人在 profile.local.json 里显式留空、表示不用团队那个值的字段（用工具默认配置）
+    ...(tc.cleared.length ? { cleared: tc.cleared } : {}),
+    // 本机当前值：和画像对不上时，多半是画像抄的是别人的机器
+    current: { JAVA_HOME: env.JAVA_HOME ?? null, MAVEN_HOME: env.MAVEN_HOME ?? null, GRADLE_USER_HOME: env.GRADLE_USER_HOME ?? null, node: path.dirname(process.execPath) },
+    how: tc.configured ? (bad.length ? `核对 toolchain 里不存在或变量没配的字段：${bad.join('、')}（本机值见 current）；改本机的那份用 profile.local.json，见 workflow/references/profile.md` : null) : '还没有配置开发环境：运行 /workflow profile 由脚本推断后确认，见 workflow/references/profile.md',
+  };
+}
+
 export function readProfile(root) {
   const f = path.join(SKILLS_DIR, 'workflow', 'profile.json');
   const profile = readJson(f);
@@ -152,7 +225,7 @@ export function readProfile(root) {
   const isEmpty = (v) => v == null || v === '' || (Array.isArray(v) && !v.length);
   const empty = profile ? PROFILE_FIELDS.filter((k) => isEmpty(get(k))) : PROFILE_FIELDS;
   return {
-    path: rel(root, f), exists: !!profile, profile: profile ?? {}, empty, env: readEnv(),
+    path: rel(root, f), exists: !!profile, profile: profile ?? {}, empty, env: readEnv(), toolchain: readToolchain(root),
     complete: !!profile && PROFILE_REQUIRED.every((k) => !empty.includes(k)),
   };
 }
@@ -169,6 +242,10 @@ export function status(root) {
     // 本机系统与终端（安装时记录），写命令按它来
     env: readEnv(),
     profile: { ok: p.complete, empty: p.empty, how: p.complete ? null : '运行 /workflow profile' },
+    // 开发环境配置：只在配过时给出（没配不算问题，构建跑不起来时才需要）
+    toolchain: p.toolchain.configured
+      ? { configured: true, fields: Object.fromEntries(Object.entries(p.toolchain.fields).map(([k, v]) => [k, v.resolved])), ...(p.toolchain.cleared.length ? { cleared: p.toolchain.cleared } : {}) }
+      : { configured: false, ...(p.toolchain.cleared.length ? { cleared: p.toolchain.cleared } : {}) },
     wiki: {
       ok: wikiCfg?.enabled === true && !!wikiCfg?.wiki?.base_url,
       how: '填写 md-to-wiki/wiki-config.json（enabled + base_url + api_token），或接入 wiki MCP（脚本无法探测 MCP，请另行检查可用工具）',
@@ -235,9 +312,12 @@ function main(argv) {
       return r.ok ? 0 : 1;
     }
     case 'status': print(status(root)); return 0;
-    case 'env': print(readEnv()); return 0;
+    case 'env':
+      // env（默认）：本机系统与终端；--check：核对画像里的开发环境配置在本机是否存在
+      if (rest.includes('--check') || rest.includes('--resolve')) { print(checkToolchain(root)); return 0; }
+      print(readEnv()); return 0;
   }
-  console.error('用法: resolve.mjs [--root <项目根>] template <skill> <文件名> | templates | profile | infer-profile | category <skill> | status | env');
+  console.error('用法: resolve.mjs [--root <项目根>] template <skill> <文件名> | templates | profile | infer-profile | category <skill> | status | env [--check]');
   return 1;
 }
 

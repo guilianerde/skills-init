@@ -38,7 +38,86 @@ function makeTargets(root) {
   return { build: has('build'), test: has('test'), lint: has('lint') };
 }
 
-export function inferProfile(root) {
+// Maven settings.xml：注释里的示例节点不是有效配置（mvn 也会忽略），解析前先去掉 <!-- ... -->
+export function stripXmlComments(xml) {
+  return xml.replace(/<!--[\s\S]*?-->/g, '');
+}
+const localRepositoryOf = (xml) => /<localRepository>\s*([^<\s]+)\s*<\/localRepository>/.exec(xml)?.[1] ?? '';
+
+// 开发环境配置（toolchain）：JDK / Maven / Gradle / Node 的位置。
+// 值来自本机当前环境（进程变量、用户目录下的配置文件），但画像会随代码提交、别的机器未必一样，
+// 所以每个值都带 evidence 说明依据；写入前由 resolve.mjs env --check 在本机核对存在性，再由用户确认。
+// 项目文件（pom.xml 要求的 JDK 版本、.nvmrc 锁定的 Node 版本）只作为对照依据写进 evidence，不当路径用。
+export function inferToolchain(root, { env = process.env } = {}) {
+  const tc = { java_home: '', maven: { settings: '', repository: '' }, gradle_user_home: '', node: '' };
+  const evidence = {};
+  const set = (k, v, why) => { const [a, b] = k.split('.'); if (v && !(b ? tc[a][b] : tc[a])) { if (b) tc[a][b] = v; else tc[a] = v; evidence[k] = why; } };
+  const exists = (f) => fs.existsSync(path.join(root, f));
+  const home = env.HOME || env.USERPROFILE || '';
+  const at = (...p) => (home ? path.join(home, ...p) : '');
+  const file = (p) => p && fs.existsSync(p);
+  const dir = (p) => { try { return !!p && fs.statSync(p).isDirectory(); } catch { return false; } };
+
+  // 项目是否用 Java / Node，决定该推断哪些工具链
+  const pom = read(path.join(root, 'pom.xml'));
+  const gradleFile = ['build.gradle.kts', 'build.gradle'].find(exists);
+  const javaProject = !!(pom || gradleFile || exists('.java-version'));
+  const nodeProject = exists('package.json') || exists('.nvmrc') || exists('.node-version');
+
+  // JDK：先记下项目要求的版本（只作依据，版本不是路径），路径取本机 JAVA_HOME；没有就问用户
+  if (javaProject) {
+    if (pom) {
+      const src = /<(?:maven\.compiler\.)?(?:source|release|target)>([\d.]+)</.exec(pom)?.[1]
+        ?? /<java\.version>([\d.]+)</.exec(pom)?.[1];
+      if (src) evidence['java_home.version'] = `pom.xml 要求 JDK ${src}（版本不是路径，需用户给出安装位置）`;
+    }
+    if (env.JAVA_HOME) set('java_home', env.JAVA_HOME, '本机 JAVA_HOME（别的机器可能不同，先确认）');
+  }
+
+  // Maven：settings.xml 与本地仓库。
+  // Maven 实际会合并全局（$MAVEN_HOME/conf/settings.xml）与用户级（~/.m2/settings.xml）两份配置，用户级优先
+  // （见 https://maven.apache.org/settings.html），所以以用户级为主、全局只作补充依据，两者都记下来。
+  if (javaProject && !gradleFile) {
+    const globalSettings = env.MAVEN_HOME ? path.join(env.MAVEN_HOME, 'conf', 'settings.xml') : '';
+    const userSettings = at('.m2', 'settings.xml');
+    const hasGlobal = file(globalSettings);
+    const hasUser = file(userSettings);
+    const settings = hasUser ? userSettings : (hasGlobal ? globalSettings : '');
+    if (settings) {
+      set('maven.settings', settings, hasUser
+        ? `用户级 settings.xml（优先于全局${hasGlobal ? ` ${globalSettings}` : ''}；Maven 会合并两份，用户配置生效）`
+        : `全局 settings.xml（没有用户级 ~/.m2/settings.xml，Maven 只用这一份）`);
+      if (hasUser && hasGlobal) evidence['maven.settings.global'] = `同时存在全局 ${globalSettings}，Maven 会合并、以用户级为准；改镜像 / 私服通常改这一份`;
+    }
+    // 本地仓库：按「有效配置」推断 —— 用户级 settings.xml 里的 <localRepository> 优先，
+    // 其次全局 settings.xml，最后才是默认目录。注释里的示例不算（mvn 自己也会忽略）。
+    const userRepo = localRepositoryOf(stripXmlComments(read(userSettings)));
+    const globalRepo = localRepositoryOf(stripXmlComments(read(globalSettings)));
+    const localRepo = userRepo || globalRepo || '';
+    if (localRepo) set('maven.repository', localRepo, `${userRepo ? path.basename(userSettings) : path.basename(globalSettings || 'settings.xml')} 里的 <localRepository>`);
+    else if (dir(at('.m2', 'repository'))) set('maven.repository', at('.m2', 'repository'), '默认本地仓库目录 ~/.m2/repository');
+  }
+
+  // Gradle：GRADLE_USER_HOME，默认 ~/.gradle
+  if (gradleFile) {
+    if (env.GRADLE_USER_HOME) set('gradle_user_home', env.GRADLE_USER_HOME, '本机 GRADLE_USER_HOME');
+    else if (dir(at('.gradle'))) set('gradle_user_home', at('.gradle'), '默认 Gradle 用户目录 ~/.gradle');
+  }
+
+  // Node：项目锁定的版本优先（.nvmrc / .node-version / package.json engines），其次本机 node 所在目录
+  if (nodeProject) {
+    const pinned = read(path.join(root, '.nvmrc')).trim() || read(path.join(root, '.node-version')).trim();
+    const engines = readJson(path.join(root, 'package.json'))?.engines?.node ?? '';
+    if (pinned || engines) evidence['node.version'] = `${pinned ? '.nvmrc / .node-version' : 'package.json engines'} 要求 Node ${pinned || engines}（不是路径；用 nvm 等版本管理器时给出对应目录）`;
+    const nodeDir = env.NODE_HOME || (process.execPath && path.dirname(process.execPath));
+    if (nodeDir) set('node', nodeDir, '当前运行本脚本的 Node 所在目录（别的机器可能不同）');
+  }
+
+  // 只推断，不写文件；展开与存在性核对交给 resolve.mjs env --check
+  return { toolchain: tc, evidence };
+}
+
+export function inferProfile(root, { env = process.env } = {}) {
   const draft = { main_branch: '', build: '', test: '', test_single: '', lint: '', config_center: '', job_annotation: '' };
   const evidence = {};
   const set = (k, v, why) => { if (v && !draft[k]) { draft[k] = v; evidence[k] = why; } };
@@ -123,10 +202,22 @@ export function inferProfile(root) {
     }
   }
 
+  // 开发环境配置（toolchain）：路径多半是本机值，写入前必须用 env --check 核对并让用户确认
+  const { toolchain, evidence: tcEvidence } = inferToolchain(root, { env });
+  for (const [k, v] of Object.entries(tcEvidence)) evidence[`toolchain.${k}`] = v;
+
+  const tcEmpty = [
+    ...(toolchain.java_home ? [] : ['toolchain.java_home']),
+    ...(toolchain.maven.settings ? [] : ['toolchain.maven.settings']),
+    ...(toolchain.maven.repository ? [] : ['toolchain.maven.repository']),
+    ...(toolchain.gradle_user_home ? [] : ['toolchain.gradle_user_home']),
+    ...(toolchain.node ? [] : ['toolchain.node']),
+  ];
+
   return {
-    draft,
+    draft: { ...draft, toolchain },
     evidence,
-    unknown: [...Object.keys(draft).filter((k) => !draft[k]), 'deploy.platform', 'deploy.regions', 'data_review'],
-    note: '草稿仅供确认：给用户看完整 JSON，确认后再写入 workflow/profile.json；已有非空字段不要被草稿覆盖，除非用户同意。',
+    unknown: [...Object.keys(draft).filter((k) => !draft[k]), ...tcEmpty, 'deploy.platform', 'deploy.regions', 'data_review'],
+    note: '草稿仅供确认：给用户看完整 JSON，确认后再写入 workflow/profile.json；已有非空字段不要被草稿覆盖，除非用户同意。toolchain 的路径多是本机值，先用 resolve.mjs env --check 核对存在性再写；团队画像里对不上的写进个人的 profile.local.json。',
   };
 }
