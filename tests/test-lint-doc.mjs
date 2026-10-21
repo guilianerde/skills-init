@@ -81,8 +81,8 @@ test('CLI：技术方案没有模板时退出 2，项目模板不生效；已接
   const errs = JSON.parse(r.stdout).errors;
   assert.ok(errs.some((e) => e.includes('审查方式')) && errs.some((e) => e.includes('未覆盖与待确认')), errs.join('\n'));
   fs.mkdirSync(path.join(root, 'workflow-run/docnexus/library/templates/create-tech-md-doc'), { recursive: true });
-  fs.mkdirSync(path.join(root, 'workflow-run/docnexus/node_modules/.bin'), { recursive: true });
-  for (const f of ['project.json', 'node_modules/.bin/docnexus', 'node_modules/.bin/docnexus.cmd']) fs.writeFileSync(path.join(root, 'workflow-run/docnexus', f), '{}');
+  fs.mkdirSync(path.join(root, '.docnexus/node_modules/.bin'), { recursive: true });
+  for (const f of ['project.json', 'node_modules/.bin/docnexus', 'node_modules/.bin/docnexus.cmd']) fs.writeFileSync(path.join(root, '.docnexus', f), f === 'project.json' ? '{"format_version":7,"output_dir":"workflow-run"}' : '');
   r = cli('raw.md', '--skill', 'create-tech-md-doc');
   assert.equal(r.status, 2, '缺知识库模板时不回退默认模板');
   fs.writeFileSync(path.join(root, 'workflow-run/docnexus/library/templates/create-tech-md-doc/template.md'), '# 团队模板\n## 背景 *\n## 方案 *\n');

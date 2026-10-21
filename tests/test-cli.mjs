@@ -70,7 +70,7 @@ test('seed-templates 子命令：未接入 DocNexus 时报错且不安装任何�
   const root = tmp();
   const r = cli(root, 'seed-templates');
   assert.equal(r.status, 1);
-  assert.match(r.stderr, /未检测到 DocNexus/);
+  assert.match(r.stderr, /未检测到新版 DocNexus/);
   assert.ok(!fs.existsSync(path.join(root, '.agents')));
   fs.rmSync(root, { recursive: true, force: true });
 });

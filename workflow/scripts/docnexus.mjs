@@ -1,12 +1,10 @@
 #!/usr/bin/env node
-// 在 workflow-run/ 下运行 DocNexus（它的项目根），不用先 cd、不用拼 &&，bash / zsh / PowerShell / cmd 里写法一样。
-// docnexus 系列 skill 里的 `./docnexus/node_modules/.bin/docnexus <参数>` 换成 `node <skills>/workflow/scripts/docnexus.mjs <参数>`，
-// `node docnexus/skills/<...>.mjs <参数>` 换成 `node <skills>/workflow/scripts/docnexus.mjs --node docnexus/skills/<...>.mjs <参数>`。
-// 参数里的路径（草稿、docnexus/library/<path>）照旧相对 workflow-run/。输出与退出码原样透传。
+// 在业务项目根运行 DocNexus。内部状态在 .docnexus/，知识输出在 workflow-run/docnexus/。
+// CLI 返回的草稿、文档路径均相对业务项目根；输出与退出码原样透传。
 //
 // 用法（在项目根执行；--root 可指定项目根，须放在最前面）：
 //   node .agents/skills/workflow/scripts/docnexus.mjs recall "订单幂等" --limit 5
-//   node .agents/skills/workflow/scripts/docnexus.mjs --node docnexus/skills/docnexus-library/scripts/query-documents.mjs --category dev-notes
+//   node .agents/skills/workflow/scripts/docnexus.mjs --node .docnexus/skills/docnexus-library/scripts/query-documents.mjs --category dev-notes
 // 退出码：DocNexus 的退出码；DocNexus 没装时为 1
 
 import fs from 'node:fs';
@@ -14,13 +12,14 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { docnexusRoot, docnexusBin } from './resolve.mjs';
+import { docnexusInternal } from './docnexus-layout.mjs';
 
 const readJson = (f) => { try { return JSON.parse(fs.readFileSync(f, 'utf8')); } catch { return null; } };
 
 // CLI 的入口 JS：直接用 node 跑，Windows 上不经过 .cmd 和 shell，参数不会被转义坏
-// 包名取 workflow-run/docnexus/package.json 的依赖（安装器用 npm install --prefix 装的）
+// 包名取 .docnexus/package.json 的依赖（安装器用 npm install --prefix 装的）
 export function cliEntry(root) {
-  const dn = path.join(docnexusRoot(root), 'docnexus');
+  const dn = docnexusInternal(root);
   const name = Object.keys(readJson(path.join(dn, 'package.json'))?.dependencies ?? {}).find((n) => /(^|\/)docnexus$/.test(n));
   if (!name) return null;
   const pkgDir = path.join(dn, 'node_modules', ...name.split('/'));
@@ -33,7 +32,7 @@ export function run(root, args, opts = {}) {
   const cwd = docnexusRoot(root);
   const o = { cwd, stdio: 'inherit', ...opts };
   if (args[0] === '--node') {
-    if (!args[1]) return { status: 1, error: '--node 后面要跟脚本路径（相对 workflow-run/）' };
+    if (!args[1]) return { status: 1, error: '--node 后面要跟脚本路径（相对业务项目根）' };
     return spawnSync(process.execPath, [path.resolve(cwd, args[1]), ...args.slice(2)], o);
   }
   const entry = cliEntry(root);

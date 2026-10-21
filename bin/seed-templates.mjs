@@ -16,7 +16,8 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { loadSkills, deriveMeta, TEMPLATE_CATEGORY, TEMPLATE_CATEGORY_REASON } from './skills.mjs';
-import { docnexusBin, docnexusRoot } from './lib/core.mjs';
+import { docnexusBin, docnexusRoot, docnexusWorkspace } from './lib/core.mjs';
+import { docnexusConnected } from '../workflow/scripts/docnexus-layout.mjs';
 
 // 模板清单来自各 skill 的 skill.json（templates 字段）。没有 src 的（技术方案、上线方案）不随 skills 提供默认版本，
 // 由用户第一次使用时按样例创建，不在导入与版本跟踪之列
@@ -25,8 +26,8 @@ export { TEMPLATE_CATEGORY };
 
 const IS_WIN = process.platform === 'win32';
 const sha256 = (s) => crypto.createHash('sha256').update(s).digest('hex');
-// DocNexus 以 workflow-run/ 为项目根：命令在那里运行，草稿与知识库路径也相对那里
-const binPath = (root) => docnexusBin(root) ?? path.join(docnexusRoot(root), 'docnexus', 'node_modules', '.bin', IS_WIN ? 'docnexus.cmd' : 'docnexus');
+// CLI 在业务项目根运行，草稿与知识路径按返回值使用。
+const binPath = (root) => docnexusBin(root);
 
 function docnexus(root, args) {
   const r = spawnSync(binPath(root), args, { cwd: docnexusRoot(root), encoding: 'utf8', shell: IS_WIN, maxBuffer: 64 * 1024 * 1024 });
@@ -36,16 +37,16 @@ function docnexus(root, args) {
 }
 
 function requireDocNexus(root) {
-  if (!fs.existsSync(path.join(docnexusRoot(root), 'docnexus', 'project.json')) || !docnexusBin(root)) {
-    throw new Error('未检测到 DocNexus（需要 workflow-run/docnexus/project.json 与 workflow-run/docnexus/node_modules/.bin/docnexus）。先加 --with-docnexus 接入。');
+  if (!docnexusConnected(root)) {
+    throw new Error('未检测到新版 DocNexus（需要 .docnexus/project.json 的 output_dir=workflow-run 与 .docnexus/node_modules/.bin/docnexus）。先加 --with-docnexus 接入。');
   }
 }
 
-const libFile = (root, t) => path.join(docnexusRoot(root), 'docnexus', 'library', t.file);
+const libFile = (root, t) => path.join(docnexusWorkspace(root), 'library', t.file);
 const defaultContent = (tplDir, t) => fs.readFileSync(path.join(tplDir, t.src), 'utf8');
 
 // 写草稿并提交；baseVersion 为 'new'（新建）或已有记录的 record_version（更新，带 --replace）。成功返回 null，失败返回错误信息
-// 分类以调用方显式分类封存（--category doc-template），不走模型分类；不支持该参数的旧版 DocNexus 会忽略它，仍按 metadata.category 入库
+// 分类以调用方显式分类封存（--category doc-template），不走模型分类。
 function writeDraft(root, t, content, metadata, baseVersion) {
   const draft = docnexus(root, ['draft', 'new', '--slug', `template-${t.skill}`]);
   if (!draft.ok || !draft.json?.artifacts) return draft.err || 'draft new 失败';

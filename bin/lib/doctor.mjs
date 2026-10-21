@@ -3,8 +3,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { PKG, CANON_DIR, INSTALL_BASES, LINK_ENVS, HOME, DOCNEXUS_PKG, docnexusUpgradeCmd, SKILLS, step, ok, warn, fail, toPosix, fileHash, readManifest, lstat, findManifests, cmpVersion } from './core.mjs';
-import { reportTemplateStatus, docnexusSupportsCategory, docnexusSupportsRecallCategory } from './docnexus.mjs';
+import { PKG, CANON_DIR, INSTALL_BASES, LINK_ENVS, HOME, SKILLS, step, ok, warn, fail, toPosix, fileHash, readManifest, lstat, findManifests, cmpVersion } from './core.mjs';
+import { reportTemplateStatus, legacyDocNexusPaths } from './docnexus.mjs';
 import { codegraphVersion } from './codegraph.mjs';
 import { legacyRequirements } from '../../workflow/scripts/requirement.mjs';
 
@@ -32,6 +32,8 @@ export function doctor(root, offline) {
 
   const [maj] = process.versions.node.split('.').map(Number);
   if (maj < 22) bad(`Node v${process.versions.node} 低于 22（workflow-run 只在 Node 22 / 24 上测试；18、20 已停止维护）`); else ok(`Node v${process.versions.node}`);
+
+  for (const dir of legacyDocNexusPaths(root)) bad(`发现旧版 DocNexus：${toPosix(path.relative(root, dir))}/；运行 npx @rowansenne/workflow-run upgrade --with-docnexus 强制清理并重新接入`);
 
   const found = findManifests(root);
   if (!found.length) { bad('未找到安装清单：本项目还没用 workflow-run 安装过'); return 1; }
@@ -90,11 +92,11 @@ export function doctor(root, offline) {
     if (st.profile.ok) ok('项目画像已填写'); else meh(`项目画像未完成（空字段：${st.profile.empty.join('、')}）：运行 /workflow profile`);
     if (st.wiki.ok) ok('wiki 已配置'); else console.log('    --  wiki 未配置（可选；也可能通过 wiki MCP 提供）');
     if (st.docnexus.ok) {
-      // DocNexus 以 workflow-run/ 为项目根：本项目要有 docnexus skill 的链接和 CLAUDE.md / AGENTS.md 段落，agent 才知道去哪里找
+      // 运行环境在 .docnexus/，所有 Agent 都从业务项目根使用配置的知识输出。
       const linked = INSTALL_BASES.some((b) => lstat(path.join(root, b, 'docnexus-recall'))?.isSymbolicLink());
-      const ctx = ['CLAUDE.md', 'AGENTS.md'].some((f) => { try { return fs.readFileSync(path.join(root, f), 'utf8').includes('workflow-run:docnexus:start'); } catch { return false; } });
-      if (linked && ctx) ok(`DocNexus 在 ${HOME}/docnexus/，本项目已链接它的 skills 并写入段落`);
-      else meh(`DocNexus 在 ${HOME}/docnexus/，但本项目${linked ? '' : '缺少 docnexus skill 链接'}${!linked && !ctx ? '、' : ''}${ctx ? '' : '缺少 CLAUDE.md / AGENTS.md 里的 DocNexus 段落'}：运行 npx @rowansenne/workflow-run upgrade`);
+      const ctx = ['CLAUDE.md', 'AGENTS.md', 'QWEN.md'].some((f) => { try { return fs.readFileSync(path.join(root, f), 'utf8').includes('workflow-run:docnexus:start'); } catch { return false; } });
+      if (linked && ctx) ok(`DocNexus 运行环境 .docnexus/，知识输出 ${HOME}/docnexus/，已接入 Agent`);
+      else meh(`DocNexus 已配置 output_dir=${HOME}，但本项目${linked ? '' : '缺少 docnexus skill 链接'}${!linked && !ctx ? '、' : ''}${ctx ? '' : '缺少 Agent 上下文段落'}：运行 npx @rowansenne/workflow-run upgrade`);
     }
     // 产出目录：都在 workflow-run/
     const mode = st.artifacts?.mode === 'repo' ? `独立文档仓库（${HOME}/ 自己是 git 仓库）` : '随项目提交';
@@ -104,11 +106,8 @@ export function doctor(root, offline) {
     if (legacy.length) meh(`${legacy.length} 个需求还是旧结构（文件直接放在 docs/requirements/<需求>/ 下）：运行 npx @rowansenne/workflow-run upgrade 迁到 <需求>/<项目名>/`);
     if (st.docnexus.ok) {
       if (!reportTemplateStatus(root, meh)) ok('DocNexus 已接入，文档模板齐全且与默认模板同步（或为团队定制版）');
-      if (docnexusSupportsCategory(root) === false) meh(`已装的 DocNexus 不支持 draft seal --category：各 skill 的分类只能经 metadata.category 写入，不记为调用方指定。升级：${docnexusUpgradeCmd()}`);
-      else ok('DocNexus 支持调用方显式分类（draft seal --category）');
-      if (docnexusSupportsRecallCategory(root) === false) meh(`已装的 DocNexus 不支持 recall --category：knowledge.mjs --query 只列文档，skill 改用不带分类的 recall。升级：${docnexusUpgradeCmd()}`);
-      else ok('DocNexus 支持按分类检索（recall --category）');
-    } else console.log('    --  DocNexus 未接入（可选；未接入时只能用 skills 自带的默认模板，不能修改）');
+    } else if (fs.existsSync(path.join(root, '.docnexus', 'project.json'))) bad('DocNexus 配置或运行环境不完整：需要 format 7、output_dir=workflow-run 和 .docnexus/ 下的 CLI，运行 upgrade --with-docnexus 修复');
+    else console.log('    --  DocNexus 未接入（可选；未接入时只能用 skills 自带的默认模板，不能修改）');
     // workflow-run/templates/ 已不再生效：模板定制只放 DocNexus
     for (const f of st.docnexus.stale_project_templates ?? []) meh(st.docnexus.ok ? `${f} 已不再生效：确认已导入 DocNexus 知识库后删除` : `${f} 已不再生效（模板定制只放 DocNexus）：重跑 npx @rowansenne/workflow-run 并加 --with-docnexus 接入后导入知识库，再删除`);
     for (const t of st.templates_need_docnexus ?? []) console.log(`    --  ${t.skill} 的模板 ${t.id} 不随 skills 提供，要先接入 DocNexus 才能创建（重跑 npx @rowansenne/workflow-run 并加 --with-docnexus）`);

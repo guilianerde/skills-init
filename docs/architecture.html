@@ -203,7 +203,7 @@ footer { margin-top: 40px; font-size: 13px; color: var(--muted); }
 <span class="dim">? 选择环境（回车 = 全部）</span>
 <span class="ok">✔</span> .agents/skills/  <span class="dim">单一来源</span>
 <span class="ok">✔</span> .claude/skills/ → 软链接
-<span class="ok">✔</span> DocNexus 文档库  <span class="dim">workflow-run/docnexus/</span>
+<span class="ok">✔</span> DocNexus 运行环境 <span class="dim">.docnexus/</span> · 知识输出 <span class="dim">workflow-run/docnexus/</span>
 <span class="ok">✔</span> CodeGraph 索引   <span class="dim">.codegraph/</span>
 <span class="dim"># 然后在代理里：</span>
 <span class="p">› </span>/workflow profile
@@ -395,7 +395,7 @@ footer { margin-top: 40px; font-size: 13px; color: var(--muted); }
     </div>
     <div class="loop">
       <div class="step"><div class="dot">1</div><div><b>开工前召回</b><p>dev 和审查先查 DocNexus 里以往的开发约定、技术方案和反复出现的审查问题。</p></div></div>
-      <div class="step"><div class="dot">2</div><div><b>过程中引用</b><p>用上的知识在产物里写明出处 <code>docnexus/library/&lt;path&gt;</code>。</p></div></div>
+      <div class="step"><div class="dot">2</div><div><b>过程中引用</b><p>用上的知识在产物里写明出处 <code>workflow-run/docnexus/library/&lt;path&gt;</code>。</p></div></div>
       <div class="step"><div class="dot">3</div><div><b>交付时沉淀</b><p>每次交付都问要不要沉淀：已确认的决定、新约定、缺陷根因。同主题的更新原文，不重复新建。</p></div></div>
       <div class="step"><div class="dot">4</div><div><b>下次被召回</b><p>审查沉淀的问题模式，会在下一次 dev 开工时被列出来。</p></div></div>
       <div class="callout">写入知识库每次都要你同意；没接入 DocNexus 时不提问，也不提示安装。</div>

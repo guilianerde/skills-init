@@ -209,7 +209,7 @@ export function linkSkills(root, envName, rel, skills = SKILLS) {
 
 // ---------------------------------------------------------------- 4. .gitignore 保护
 // workflow-run/ 是独立文档仓库时整个忽略（它自己提交）；否则只忽略其中的临时文件。
-// DocNexus 的依赖与检索库由它自带的 docnexus/.gitignore 忽略，随工作区走，两种模式都不用这里加规则
+// DocNexus 的运行依赖、检索库和草稿由项目根的 .docnexus/.gitignore 忽略。
 export function updateGitignore(root, withCodeGraph = false) {
   const gi = path.join(root, '.gitignore');
   const rules = ['**/database-query/config.json', '**/wiki-config.json', '**/workflow/profile.local.json', homeIsRepo(root) ? `/${HOME}/` : `/${TMP_DIR}/`];

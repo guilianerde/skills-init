@@ -12,7 +12,7 @@ description: "Review source code (any language; Java/Spring, Go, TypeScript, Pyt
    - **标准**（默认）：检查清单全部维度，**风格类（清单「一致性 / 风格」一节）不查**；「优化建议（LOW）」只写有实际收益的（性能、可维护性上的具体问题），没有就写「无」。
    - **深审**（「仔细审」「全面审」，或资金 / 权限 / 对外接口的大改动合并前）：全部维度，包括风格；MEDIUM 也复核。
 2. **建立理解**：先读实体、接口、DTO、调用链，理清数据流再下结论；不要凭文件名猜内容。
-   - **可选：查项目约定（DocNexus）**：DocNexus 可用时（`resolve.mjs status` 的 `docnexus.ok`），先运行 `node <skills>/workflow/scripts/knowledge.mjs project-review --match <模块名 / 业务名词> --query "<一句话：改动涉及的模块与业务>"`，看以往审查沉淀的反复问题和开发约定（`--query` 在这些分类内按正文 recall；输出 `recall_by_category: false` 时改按 `docnexus-recall` 做不带分类的 recall），找相关的编码约定、历史决策与已知坑，作为审查依据并在报告中引用 `docnexus/library/<path>`。未检测到或查询失败就跳过，并在「未覆盖与待确认」中注明；审查过程中**不写入** DocNexus（写入见第 8 步）。
+   - **可选：查项目约定（DocNexus）**：DocNexus 可用时（`resolve.mjs status` 的 `docnexus.ok`），先运行 `node <skills>/workflow/scripts/knowledge.mjs project-review --match <模块名 / 业务名词> --query "<一句话：改动涉及的模块与业务>"`，看以往审查沉淀的反复问题和开发约定（`--query` 在这些分类内按正文 recall），找相关的编码约定、历史决策与已知坑，作为审查依据并在报告中引用 `workflow-run/docnexus/library/<path>`。未检测到或查询失败就跳过，并在「未覆盖与待确认」中注明；审查过程中**不写入** DocNexus（写入见第 8 步）。
    - **同分支已有产物**：运行 `node <skills>/workflow/scripts/artifacts.mjs --branch <dev分支>`（单文件 / 未提交改动用当前分支，省略 `--branch`），看输出的 `latest`：
      - `latest.plan` 或 `latest.tech` 存在 → 读其中的验收标准、改动设计、接口 / 数据 / 配置变更，第 3 步审 diff 时做**需求对照**：方案里有、diff 里找不到的 → 漏实现（属于验收标准的按 HIGH，其余 MEDIUM）；diff 里有、方案里没提的接口 / 表结构 / 配置 / 依赖变更 → 列出请作者确认（不一定是问题）。只对照能在 diff 里核对的项，不推测业务语义。
      - `latest.delivery` 存在（dev 的交付说明）→ 其中「已确认的决定」并入需求对照的依据；「配置清单」「SQL 脚本」和 diff 对照，diff 里有而交付说明漏列的配置 key / DDL 记为 MEDIUM（上线时会被漏掉）。
@@ -32,7 +32,7 @@ description: "Review source code (any language; Java/Spring, Go, TypeScript, Pyt
    结果：「成立」在报告「复核」列标「✅」；「可能成立」标「⚠」；「不成立」从问题表里删掉（独立复核否掉的，在「未覆盖与待确认」里记一句「复核排除 N 条」）。复核方式（独立 / 自行）写进报告「审查方式」元信息。
 7. **输出报告**（由 dev 自审调用时跳过第 7～9 步，问题表、影响面、未覆盖项交回 dev 统一交付，见 dev 的 F7）：按报告模板输出（`node <skills>/workflow/scripts/resolve.mjs template project-review report.md` 取 `path`；退出码 2 时停下并按 `hint` 处理），落盘规则见 Artifact Location。
 8. **沉淀到 DocNexus（需用户授权）**：`resolve.mjs status` 的 `docnexus.ok` 为 true 时，交付报告后**每次都问**用户「要不要启动 DocNexus 流程，把本次审查沉淀到 DocNexus？」，并从本次发现里列出建议沉淀的内容：同类问题再次出现（知识库里已有类似沉淀，或本次多处出现）、新确立的编码约定、容易踩的坑；没有特别值得记的也照问，并说明这一点。未接入时不提问，报告的「DocNexus」元信息行写「未接入」。
-   - 用户同意 → 按 DocNexus 入口 skill `docnexus` 的 capture 流程写入；正文只写知识，不写分支、路径；有 facts 时按 `<skills>/workflow/references/docnexus.md`「沉淀的来源」的格式写 provenance；分类用 `node <skills>/workflow/scripts/resolve.mjs category project-review` 的结果作为调用方显式分类封存（见 `<skills>/workflow/references/docnexus.md`「写入 DocNexus 的分类」）。只沉淀问题模式和约定，不沉淀某次审查的逐条清单，也不沉淀「⚠ 待确认」的发现；知识库已有同类沉淀时更新那一篇（带 `--base-version`），不要重复新建。写入成功后把报告的「DocNexus」元信息行改成 `docnexus/library/<path>`（多篇用「、」分隔），并回报给用户。
+   - 用户同意 → 按 DocNexus 入口 skill `docnexus` 的 capture 流程写入；正文只写知识，不写分支、路径；有 facts 时按 `<skills>/workflow/references/docnexus.md`「沉淀的来源」的格式写 provenance；分类用 `node <skills>/workflow/scripts/resolve.mjs category project-review` 的结果作为调用方显式分类封存（见 `<skills>/workflow/references/docnexus.md`「写入 DocNexus 的分类」）。只沉淀问题模式和约定，不沉淀某次审查的逐条清单，也不沉淀「⚠ 待确认」的发现；知识库已有同类沉淀时更新那一篇（带 `--base-version`），不要重复新建。写入成功后把报告的「DocNexus」元信息行改成 `workflow-run/docnexus/library/<path>`（多篇用「、」分隔），并回报给用户。
    - 用户不同意 → 元信息行保持「未沉淀」。
 9. **记录运行反馈**（不问用户）：按 `<skills>/workflow/references/feedback.md` 运行 `node <skills>/workflow/scripts/feedback.mjs add --skill project-review --model <模型名> --mode review --depth <快审|标准|深审> --rounds <提问轮数> --corrections <用户纠正审查范围的次数> --findings <C>/<H>/<M>/<L>`，有跳过的步骤、不清楚或做不到的规则、用户的抱怨时再加 `--skipped` / `--unclear` / `--feedback`。只写过程，不写代码和业务名词；报错就提一句，不影响交付。
 

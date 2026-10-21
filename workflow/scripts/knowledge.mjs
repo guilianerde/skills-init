@@ -2,7 +2,7 @@
 // 按分类列出与某个 skill 相关的 DocNexus 文档（标题、摘要、路径，不含正文），供 skill 开工前挑选阅读。
 // 相关分类来自 skill.json 的 docnexus.readFrom（列出要参考哪些 skill 的沉淀），分类名经 resolve.mjs category 解析，
 // 所以项目画像改了分类名也能跟上。列表用 document query --category；给了 --query 时再在每个分类内 recall
-// （DocNexus 0.16.0 起 recall 支持 --category；旧版不支持时只列文档，并提示改用不带分类的 recall）。
+// 当前 DocNexus 直接支持按分类 recall。
 // 只读，不写入任何东西。
 //
 // 用法（在项目根执行；--root 可指定项目根）：
@@ -19,8 +19,8 @@ import { skillMeta, resolveCategory, docnexusConnected, docnexusBin, docnexusRoo
 
 const IS_WIN = process.platform === 'win32';
 
-// 在 DocNexus 的项目根下运行（docnexus.root 指到团队文档仓库时就在那里），输出里的 path 相对那个目录
-const docnexus = (root, args) => spawnSync(path.resolve(root, docnexusBin(root) ?? path.join('node_modules', '.bin', 'docnexus')), args,
+// 在业务项目根运行；CLI 返回的路径已包含 output-dir 前缀。
+const docnexus = (root, args) => spawnSync(path.resolve(root, docnexusBin(root)), args,
   { cwd: docnexusRoot(root), encoding: 'utf8', shell: IS_WIN, maxBuffer: 256 * 1024 * 1024 });
 
 function runJson(root, args, what) {
@@ -34,21 +34,12 @@ function query(root, category) {
   return r.ok ? { ok: true, documents: r.data.documents ?? [] } : r;
 }
 
-// 旧版会静默忽略不认识的参数，recall 会退化成全库检索，所以先看帮助里 recall 有没有 --category
-export function recallSupportsCategory(root) {
-  const r = docnexus(root, ['--help']);
-  return /recall[^\n]*--category/.test(`${r.stdout}${r.stderr}`);
-}
-
 export function knowledge(root, skill, { match = [], limit = 20, query: question = '', recallLimit = 5 } = {}) {
   const meta = skillMeta(skill);
   if (!meta) return { ok: false, error: 'unknown', message: `未安装 skill「${skill}」` };
   if (!docnexusConnected(root)) return { ok: false, error: 'no_docnexus', message: '未接入 DocNexus，跳过知识库参考' };
   const terms = match.map((t) => t.toLowerCase()).filter(Boolean);
   const hit = (d) => !terms.length || terms.some((t) => [d.title, d.summary, d.file_path, ...(d.tags ?? [])].some((v) => String(v ?? '').toLowerCase().includes(t)));
-  const byCategory = question ? recallSupportsCategory(root) : false;
-  // DocNexus 不在本项目时，读文件要加上它的位置
-  const dnRel = path.relative(path.resolve(root), docnexusRoot(root)).split(path.sep).join('/');
   const seen = new Set();
   const categories = [];
   for (const from of meta.docnexus?.readFrom ?? []) {
@@ -60,19 +51,16 @@ export function knowledge(root, skill, { match = [], limit = 20, query: question
     const docs = q.documents.filter(hit).sort((a, b) => String(b.updated_at).localeCompare(String(a.updated_at)));
     const entry = {
       category: c.category, from, ok: true, total: docs.length,
-      documents: docs.slice(0, limit).map((d) => ({ id: d.id, title: d.title, summary: d.summary, path: d.library_path, ...(dnRel ? { file: `${dnRel}/${d.library_path}` } : {}), updated_at: d.updated_at })),
+      documents: docs.slice(0, limit).map((d) => ({ id: d.id, title: d.title, summary: d.summary, path: d.library_path, file: d.library_path, updated_at: d.updated_at })),
     };
-    if (byCategory) {
+    if (question) {
       const r = runJson(root, ['recall', question, '--limit', String(recallLimit), '--category', c.category], 'recall');
       entry.recall = r.ok ? r.data : { ok: false, error: r.error };
     }
     categories.push(entry);
   }
-  const out = { ok: true, skill, ...(dnRel ? { docnexus_root: dnRel, note: `DocNexus 在 ${dnRel}：引用写 path（docnexus/library/...），读正文用 file；recall 结果里的路径也相对 ${dnRel}` } : {}), categories };
-  if (question) {
-    out.recall_by_category = byCategory;
-    if (!byCategory) out.recall_hint = '已装的 DocNexus 不支持 recall --category（0.16.0 起支持）：改用不带分类的 recall，并按上面列出的分类 / 路径挑结果；可升级 @rowansenne/docnexus';
-  }
+  const out = { ok: true, skill, categories };
+  if (question) out.recall_by_category = true;
   return out;
 }
 

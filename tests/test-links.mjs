@@ -45,25 +45,25 @@ test('symlinkSupported：探测链接用完即删，并清掉之前异常退出�
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
-test('DocNexus CLI 位置：workflow-run/docnexus/node_modules/.bin；项目根的旧位置不再使用；安装器与 skill 脚本判断一致', async () => {
+test('DocNexus format 7：只使用 .docnexus CLI 和 output_dir=workflow-run 的配置', async () => {
   const { docnexusBin, docnexusUpgradeCmd } = await import('../bin/lib/core.mjs');
   const { docnexusBin: skillBin, docnexusConnected } = await import('../workflow/scripts/resolve.mjs');
   const name = process.platform === 'win32' ? 'docnexus.cmd' : 'docnexus';
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'dnbin-'));
   const put = (...p) => { fs.mkdirSync(path.join(root, ...p.slice(0, -1)), { recursive: true }); fs.writeFileSync(path.join(root, ...p), ''); };
-  assert.equal(docnexusBin(root), null);
-  assert.equal(skillBin(root), null);
-  put('docnexus', 'project.json');
-  put('node_modules', '.bin', name);
-  put('docnexus', 'node_modules', '.bin', name);
-  assert.equal(docnexusBin(root), null, '项目根的 docnexus/ 是旧位置，升级时搬进 workflow-run/');
-  assert.equal(docnexusConnected(root), false);
   put('workflow-run', 'docnexus', 'project.json');
-  assert.equal(docnexusConnected(root), false, '只有工作区没有 CLI');
   put('workflow-run', 'docnexus', 'node_modules', '.bin', name);
-  assert.equal(path.relative(root, docnexusBin(root)), path.join('workflow-run', 'docnexus', 'node_modules', '.bin', name));
-  assert.equal(skillBin(root), path.join('workflow-run', 'docnexus', 'node_modules', '.bin', name));
+  assert.equal(docnexusBin(root), null, '旧版 CLI 不兼容');
+  assert.equal(docnexusConnected(root), false);
+  put('.docnexus', 'node_modules', '.bin', name);
+  assert.equal(docnexusConnected(root), false, '有 CLI 也必须初始化');
+  const marker = path.join(root, '.docnexus', 'project.json');
+  fs.writeFileSync(marker, JSON.stringify({ format_version: 7, output_dir: '.' }));
+  assert.equal(docnexusConnected(root), false, '输出位置必须是 workflow-run');
+  fs.writeFileSync(marker, JSON.stringify({ format_version: 7, output_dir: 'workflow-run' }));
+  assert.equal(path.relative(root, docnexusBin(root)), path.join('.docnexus', 'node_modules', '.bin', name));
+  assert.equal(skillBin(root), path.join('.docnexus', 'node_modules', '.bin', name));
   assert.equal(docnexusConnected(root), true);
-  assert.match(docnexusUpgradeCmd(), /^npm install --prefix \.\/workflow-run\/docnexus --save-exact /);
+  assert.ok(docnexusUpgradeCmd().startsWith('npm install --prefix ./.docnexus --save-exact '));
   fs.rmSync(root, { recursive: true, force: true });
 });

@@ -3,7 +3,7 @@
 > 类型：{{功能开发 / 缺陷修复}} ｜ 规模：{{S / M / L}} ｜ 日期：{{YYYY-MM-DD}}
 > 对比分支：`{{当前分支}}` ←→ `{{主分支}}`
 > 参考产物：{{开发方案路径，没有写「无」}}
-> DocNexus：{{沉淀后写 docnexus/library/<path>；未沉淀写「未沉淀」，未接入写「未接入」}}
+> DocNexus：{{沉淀后写 workflow-run/docnexus/library/<path>；未沉淀写「未沉淀」，未接入写「未接入」}}
 
 <!-- F8 / B5 交付时按此落盘到 requirement.mjs path delivery 给出的路径（workflow-run/docs/requirements/<需求名>/<项目名>/delivery.md）。小改动每节写一两行即可，不适用的节写「无」；验证结果必须如实 -->
 

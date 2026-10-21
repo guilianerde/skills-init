@@ -11,7 +11,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { HOME, step, ok, warn, toPosix, findManifests, docnexusBin, docnexusRoot } from './core.mjs';
+import { HOME, step, ok, warn, toPosix, findManifests, docnexusBin } from './core.mjs';
 import { updateGitignore, excludeHomeTmp, reportMigration } from './install.mjs';
 import { refreshDocNexusLinks } from './docnexus.mjs';
 import { layout, setConfig, artifactsConfig, suggestProject, migrateLayout } from '../../workflow/scripts/requirement.mjs';
@@ -102,7 +102,7 @@ export function docsRepo(root, { url, project }) {
   const c = setConfig(root, { project: name });
   ok(`本项目在文档仓库里的项目名：${c.artifacts.project}（写在 ${c.file}，随代码提交，团队共用）`);
 
-  if (fs.existsSync(path.join(docnexusRoot(root), 'docnexus', 'project.json'))) {
+  if (fs.existsSync(path.join(root, HOME, 'docnexus'))) {
     const envs = findManifests(root)[0]?.m.envs ?? [];
     if (docnexusBin(root)) refreshDocNexusLinks(root, envs);
     else warn(`文档仓库里有 DocNexus，本机还没装它的依赖：运行 npx @rowansenne/workflow-run upgrade --with-docnexus`);

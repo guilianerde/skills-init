@@ -2,7 +2,7 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { IS_WIN, CANON_DIR, INSTALL_BASES, MANIFEST, step, ok, warn, toPosix, fileHash, readManifest, removeEmptyDirs, lstat, timestamp, removeLink, docnexusRoot } from './core.mjs';
+import { IS_WIN, CANON_DIR, INSTALL_BASES, MANIFEST, step, ok, warn, toPosix, fileHash, readManifest, removeEmptyDirs, lstat, timestamp, removeLink, docnexusInternal } from './core.mjs';
 import { removeDocNexusContext } from './docnexus.mjs';
 
 // 软链接是否指向 absTarget（按解析后的绝对路径比较，兼容 Windows 上 readlink 返回的 \\?\ 前缀）
@@ -37,10 +37,9 @@ export function uninstall(root) {
     if (n) ok(`已移除 ${toPosix(rel)} 下 ${n} 个指向 ${toPosix(CANON_DIR)} 的软链接`);
   }
 
-  // 1b. 本工具接进来的 DocNexus：指向 workflow-run/docnexus/skills 的链接、CLAUDE.md / AGENTS.md 里的段落。
-  //     workflow-run/ 里的东西（产物、DocNexus 工作区、项目模板）是项目数据，不删
+  // 1b. 移除指向 .docnexus/skills 的入口及上下文；运行环境和知识输出保留。
   {
-    const src = path.join(docnexusRoot(root), 'docnexus', 'skills');
+    const src = path.join(docnexusInternal(root), 'skills');
     let n = 0;
     for (const rel of bases) {
       const dir = path.join(root, rel);
@@ -50,7 +49,7 @@ export function uninstall(root) {
       }
     }
     const files = removeDocNexusContext(root);
-    if (n || files.length) ok(`已移除指向 ${toPosix(path.relative(root, src))} 的 ${n} 个 DocNexus skill 链接${files.length ? `，以及 ${files.join('、')} 里的 DocNexus 段落` : ''}（workflow-run/docnexus/ 本身不动）`);
+    if (n || files.length) ok(`已移除指向 ${toPosix(path.relative(root, src))} 的 ${n} 个 DocNexus skill 链接${files.length ? `，以及 ${files.join('、')} 里的 DocNexus 段落` : ''}（.docnexus/ 运行环境与 workflow-run/docnexus/ 知识输出保留）`);
   }
 
   // 2. 各安装目录：按清单删除模板文件；用户配置与手改过的模板文件先备份
@@ -90,6 +89,6 @@ export function uninstall(root) {
     for (const f of backedUp) console.log(`      ${f}`);
   }
   for (const d of leftovers) warn(`${d} 中有不在清单里的文件，已保留该目录`);
-  console.log('.gitignore 中追加的规则未移除，如不再需要可手动删除。workflow-run/（需求产物、DocNexus 工作区、项目模板）是项目数据，没有删除。');
+  console.log('.gitignore 中追加的规则未移除，如不再需要可手动删除。.docnexus/ 运行环境及 workflow-run/（需求产物、DocNexus 知识、项目模板）没有删除。');
   return 0;
 }

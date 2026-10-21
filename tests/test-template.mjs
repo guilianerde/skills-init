@@ -39,9 +39,9 @@ test('compare：按归一化标题比对，改编号不算变化；列出增删�
 });
 
 const connect = (root) => {
-  fs.mkdirSync(path.join(root, 'workflow-run/docnexus/node_modules/.bin'), { recursive: true });
-  fs.writeFileSync(path.join(root, 'workflow-run/docnexus/project.json'), '{}');
-  fs.writeFileSync(path.join(root, 'workflow-run/docnexus/node_modules/.bin', process.platform === 'win32' ? 'docnexus.cmd' : 'docnexus'), '');
+  fs.mkdirSync(path.join(root, '.docnexus/node_modules/.bin'), { recursive: true });
+  fs.writeFileSync(path.join(root, '.docnexus/project.json'), '{"format_version":7,"output_dir":"workflow-run"}');
+  fs.writeFileSync(path.join(root, '.docnexus/node_modules/.bin', process.platform === 'win32' ? 'docnexus.cmd' : 'docnexus'), '');
 };
 const libFile = (root, skill, id = 'template.md') => path.join(root, 'workflow-run/docnexus/library/templates', skill, id);
 

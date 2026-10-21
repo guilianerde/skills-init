@@ -25,7 +25,7 @@ description: "Generate a Markdown release/deployment plan (上线方案) from th
 1. `git rev-parse --is-inside-work-tree` 为 `true`，否则停。
 2. 两个分支都能 `git rev-parse --verify`（或 `origin/<branch>`）；不存在 → 列出候选让用户挑，停。
 3. 读 `workflow/profile.json`：发布平台、Region、配置中心、定时任务注解、是否需要数据评审都取自这里；未配置的写「待填写」，**不要沿用其他项目的取值**。
-4. DocNexus 可用时运行 `node <skills>/workflow/scripts/knowledge.mjs create-release-md-doc --match <模块名 / 业务名词> --query "<一句话：本次上线改了什么>"`（模块名取分支名或 diff 涉及的模块），看以往上线方案沉淀的风险、回滚要点与技术方案沉淀；相关的在文档对应章节引用 `docnexus/library/<path>`（见 `<skills>/workflow/references/docnexus.md`「按分类参考知识库」）。未接入就跳过。
+4. DocNexus 可用时运行 `node <skills>/workflow/scripts/knowledge.mjs create-release-md-doc --match <模块名 / 业务名词> --query "<一句话：本次上线改了什么>"`（模块名取分支名或 diff 涉及的模块），看以往上线方案沉淀的风险、回滚要点与技术方案沉淀；相关的在文档对应章节引用 `workflow-run/docnexus/library/<path>`（见 `<skills>/workflow/references/docnexus.md`「按分类参考知识库」）。未接入就跳过。
 
 ### Step 1 — PRD（仅传入 `--prd` 时）
 
@@ -81,7 +81,7 @@ description: "Generate a Markdown release/deployment plan (上线方案) from th
 
 - 发布到 wiki：`/md-to-wiki <文档路径> [pageId]`（发布过的文档有发布记录，可省略 pageId）。
 - 模板回写：用户对生成的文档做了结构性调整（新增 / 删除 / 重排章节、改表格列）时，问要不要同步回模板：未接入 DocNexus 时按「修改模板」用 `template.mjs draft / check / save release` 改（用户确认后保存）；已接入时按 `<skills>/workflow/references/templates.md`「模板随知识库更新」提议同步回模板。
-- 沉淀到 DocNexus（DocNexus 可用时，判定见 `<skills>/workflow/SKILL.md`「增强能力探测」）：列出值得长期记住的决策、配置 / 依赖变化、风险与坑，**询问用户**；同意后按 DocNexus 入口 skill `docnexus` 的 capture 流程写入，分类用 `node <skills>/workflow/scripts/resolve.mjs category create-release-md-doc` 的结果作为调用方显式分类封存（见 `<skills>/workflow/references/docnexus.md`「写入 DocNexus 的分类」），并回报 `docnexus/library/<path>`。只沉淀确认过的事实，不沉淀「待补充」「待人工确认」的推断。未检测到 DocNexus 就跳过，不提示安装。
+- 沉淀到 DocNexus（DocNexus 可用时，判定见 `<skills>/workflow/SKILL.md`「增强能力探测」）：列出值得长期记住的决策、配置 / 依赖变化、风险与坑，**询问用户**；同意后按 DocNexus 入口 skill `docnexus` 的 capture 流程写入，分类用 `node <skills>/workflow/scripts/resolve.mjs category create-release-md-doc` 的结果作为调用方显式分类封存（见 `<skills>/workflow/references/docnexus.md`「写入 DocNexus 的分类」），并回报 `workflow-run/docnexus/library/<path>`。只沉淀确认过的事实，不沉淀「待补充」「待人工确认」的推断。未检测到 DocNexus 就跳过，不提示安装。
 
 ## Red Flags — STOP
 

@@ -6,6 +6,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { loadSkills, deriveMeta, withDependencies } from '../skills.mjs';
+export { docnexusRoot, docnexusWorkspace, docnexusInternal, docnexusBinPath as docnexusBin } from '../../workflow/scripts/docnexus-layout.mjs';
 
 export const TPL_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 export const PKG = JSON.parse(fs.readFileSync(path.join(TPL_DIR, 'package.json'), 'utf8'));
@@ -25,20 +26,10 @@ export const SKILLS = META.skills;
 export const USER_FILES = META.userFiles;
 export const DOCNEXUS_PKG = process.env.DOCNEXUS_PKG || '@rowansenne/docnexus';
 export const CODEGRAPH_PKG = process.env.CODEGRAPH_PKG || '@colbymchenry/codegraph@1'; // code-graph skill 按 1.x 的库接口编写
-// 本工具在项目里的唯一目录：需求产物、DocNexus 工作区、项目模板、临时文件都在这里（与 workflow/scripts/requirement.mjs 的 HOME 一致）
+// 工作流产物与 DocNexus 知识输出的父目录；DocNexus 运行环境另在项目根 .docnexus/。
 export const HOME = 'workflow-run';
-// DocNexus 的项目根是 workflow-run/（工作区 workflow-run/docnexus/），CLI 在 workflow-run/docnexus/node_modules/.bin。
-// workflow/scripts/resolve.mjs 的 docnexusRoot / docnexusBin 与此一致
-export const DOCNEXUS_BIN_DIRS = [['docnexus', 'node_modules', '.bin']];
-export const docnexusRoot = (root) => path.resolve(root, HOME);
-export function docnexusBin(root) {
-  const name = IS_WIN ? 'docnexus.cmd' : 'docnexus';
-  const dn = docnexusRoot(root);
-  for (const dir of DOCNEXUS_BIN_DIRS) { const p = path.join(dn, ...dir, name); if (fs.existsSync(p)) return p; }
-  return null;
-}
 // 升级 DocNexus 的命令（在项目根执行；不用 cd / &&，PowerShell 5.1 也能直接运行）
-export const docnexusUpgradeCmd = () => `npm install --prefix ./${HOME}/docnexus --save-exact ${DOCNEXUS_PKG}@latest`;
+export const docnexusUpgradeCmd = () => `npm install --prefix ./.docnexus --save-exact ${DOCNEXUS_PKG}@latest`;
 export const MANIFEST = '.workflow-run.json'; // 安装清单，位于每个安装目录（单一来源时只有 .agents/skills 一份）
 
 // ---------------------------------------------------------------- 输出

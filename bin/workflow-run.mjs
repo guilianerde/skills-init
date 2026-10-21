@@ -23,7 +23,7 @@ import { findExistingDbConfig, getDb } from './lib/db.mjs';
 import { report, installSkills, linkSkills, updateGitignore, setupHome, recordEnv } from './lib/install.mjs';
 import { setupCodeGraph } from './lib/codegraph.mjs';
 import { uninstall } from './lib/uninstall.mjs';
-import { checkNodeForDocNexus, setupDocNexus, refreshDocNexusLinks, templateRecords, saveTemplateRecords, reportTemplateStatus, installedSkills, docnexusConnected, printTemplateDiffs } from './lib/docnexus.mjs';
+import { checkNodeForDocNexus, setupDocNexus, refreshDocNexusLinks, cleanupLegacyDocNexus, templateRecords, saveTemplateRecords, reportTemplateStatus, installedSkills, docnexusConnected, printTemplateDiffs } from './lib/docnexus.mjs';
 import { upgradeOptions, doctor } from './lib/doctor.mjs';
 import { docsRepo } from './lib/docsrepo.mjs';
 import { findLegacy, legacyMessage } from './lib/legacy.mjs';
@@ -206,6 +206,8 @@ async function main() {
     }
     db = await getDb(o);
   }
+
+  cleanupLegacyDocNexus(o.root);
 
   // 安装目标：单一来源模式下 .agents/skills 只装一次，其余环境建链接；--copy 时各环境各装一份
   const targets = [];

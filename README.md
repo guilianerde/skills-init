@@ -179,9 +179,9 @@ npx @rowansenne/workflow-run docs-repo git@git.example.com:team/team-docs.git
 /dev --bug <现象 | 报错 | 日志>       # 缺陷修复
 ```
 
-* **功能开发**：理解需求（可读 PRD、查 DocNexus 历史决策）→ 调研现有代码 → 需求澄清（借鉴 grill-me：按决策树分轮提问，每题给推荐答案；事实自己查、决定交给用户；S 规模无未定决定时跳过）→ 按规模出方案（S 直接做；M 对话内方案待确认；L 落盘方案文档待确认）→ 小步实现并编译 → 补测试并运行 → 用 project-review 自审 → 交付说明落盘到 `workflow-run/docs/requirements/<需求名>/<项目名>/delivery.md`（带分支元信息；改动、验证结果、配置清单、未执行的 SQL），已接入 DocNexus 时每次都问要不要沉淀（同意后以 `dev-notes` 分类写入，并把库内路径记回交付说明）。审查和上线方案会按分支自动读取这份交付说明。
-* **S 规模快速通道**：S 规模且不涉及配置、SQL / DDL、对外接口、表结构，也没有需要澄清的决定时，编译、测试、自审照常，但只在对话里交付，不落盘交付说明、不问沉淀；实现中碰到上述任何一项或改动超过 3 个文件，就退回完整流程。缺陷修复同样适用（根因仍须在对话里写清楚）。
-* **缺陷修复**：收集现象 → 用失败测试复现 → 用证据定位根因 → 最小修复让测试转绿 → 自审 → 交付（必须写明根因）。
+* **功能开发**：理解需求（可读 PRD、查 DocNexus 历史决策）→ 调研现有代码 → 需求澄清（借鉴 grill-me：按决策树分轮提问，每题给推荐答案；事实自己查、决定交给用户；S 规模无未定决定时跳过澄清提问）→ **规模确认（S / M / L 都说明判定依据、对应流程并等用户确认）** → 按规模出方案（S 列步骤开始；M 对话内方案待确认；L 落盘方案文档待确认）→ 小步实现并编译 → 补测试并运行 → 用 project-review 自审 → 交付说明落盘到 `workflow-run/docs/requirements/<需求名>/<项目名>/delivery.md`（带分支元信息；改动、验证结果、配置清单、未执行的 SQL），已接入 DocNexus 时每次都问要不要沉淀（同意后以 `dev-notes` 分类写入，并把库内路径记回交付说明）。审查和上线方案会按分支自动读取这份交付说明。
+* **S 规模快速通道**：先经用户确认 S 规模及快速通道，再按条件执行：不涉及配置、SQL / DDL、对外接口、表结构，也没有需要澄清的业务决定时，编译、测试、自审照常，但只在对话里交付，不落盘交付说明、不问沉淀；实现中碰到上述任何一项或改动超过 3 个文件，就退回完整流程，规模变化时先确认新规模。规模确认本身不影响快速通道资格。缺陷修复同样适用（根因仍须在对话里写清楚）。
+* **缺陷修复**：收集现象 → 用失败测试复现 → 用证据定位根因 → **判定规模并等用户确认** → 最小修复让测试转绿 → 自审 → 交付（必须写明根因）。
 * 守则：不写库、不改凭据、不擅自 commit / push、不装新依赖；测试没跑就写「未验证」。
 * 其他 skill 都是可选增强：wiki、DocNexus、数据库没配置时自动跳过，并在交付说明中注明。
 
@@ -207,38 +207,71 @@ npx @rowansenne/workflow-run docs-repo git@git.example.com:team/team-docs.git
 
 ## DocNexus 文档库（可选）
 
-加 `--with-docnexus` 时，脚本在装完本仓库的 skills 后额外执行：
+接入支持 `--output-dir` 的 DocNexus format 7，在**业务项目根**执行安装和初始化：
 
-1. 检查 Node >= 22.13 与 npm（不满足时**在安装任何文件之前**报错退出）；
-2. 在 `workflow-run/` 下执行 `npm install --prefix ./docnexus --save-exact @rowansenne/docnexus`：装在 `workflow-run/docnexus/` 下，npm 清单、锁文件和依赖不进宿主项目的 `package.json`；
-3. 在 `workflow-run/` 下执行 `./docnexus/node_modules/.bin/docnexus init --agent none`：创建 `workflow-run/docnexus/` 工作区，把 DocNexus 的 skills 同步到 `workflow-run/docnexus/skills/`；再由本工具把它们软链接到所选环境的 skills 目录、写入 `CLAUDE.md` / `AGENTS.md` 的段落（见下方「DocNexus 的位置」）。
+```bash
+npm install --prefix ./.docnexus --save-exact @rowansenne/docnexus
+./.docnexus/node_modules/.bin/docnexus init --output-dir workflow-run --agent none
+```
 
-依赖和检索库（`node_modules/`、`store/`）由 DocNexus 自带的 `docnexus/.gitignore` 忽略，它随工作区一起提交，所以随代码提交和独立文档仓库两种模式都不用另加规则。
+`workflow-run --with-docnexus` 自动执行这两步，并链接所选 Agent 的 skills、写入项目说明、导入文档模板。
 
-环境映射（本工具链接 DocNexus 的 skills、写段落）：
+### 运行环境与知识输出
 
-| 所选环境 | 链接到 | 写段落 |
+```text
+<业务项目>/
+├── .docnexus/                       # npm 运行环境与内部状态
+│   ├── package.json / package-lock.json
+│   ├── project.json                 # format_version=7，output_dir=workflow-run
+│   ├── node_modules/                # CLI 和依赖
+│   ├── skills/ / schemas/
+│   └── drafts/ / store/ / .runtime/
+└── workflow-run/
+    ├── docnexus/                    # 知识输出，内部不安装 npm
+    │   ├── CONCEPTS.md / concepts/
+    │   └── library/ / records/ / impacts/
+    ├── docs/requirements/           # 工作流产物
+    └── tmp/
+```
+
+所有 DocNexus 命令均从业务项目根运行，CLI 返回的路径直接用于读取和引用，不添加或删除前缀：
+
+```bash
+node .agents/skills/workflow/scripts/docnexus.mjs status
+node .agents/skills/workflow/scripts/docnexus.mjs view
+node .agents/skills/workflow/scripts/docnexus.mjs usage export > workflow-run/docnexus-usage.json
+```
+
+`status` 返回 `workspace_path`、`library_path`、`internal_directory`。知识输出固定为 `workflow-run/docnexus/`；草稿与辅助脚本位于 `.docnexus/`。模板保存在 `workflow-run/docnexus/library/templates/<skill>/`。
+
+| 环境 | DocNexus skill 入口 | 项目说明 |
 | --- | --- | --- |
-| claude | `.claude/skills/` | `CLAUDE.md` |
-| codex / doubao | `.agents/skills/`（两者共用） | `AGENTS.md` |
-| workbuddy | `.codebuddy/skills/` | `AGENTS.md`（WorkBuddy 读项目的 `AGENTS.md`，与 `CODEBUDDY.md` 并存） |
-| qwen | `.qwen/skills/` | 不写 `QWEN.md`；需要自动召回时可在 `QWEN.md` 引用 `AGENTS.md` 的 DocNexus 段落，或在 `.qwen/settings.json` 的 `context.fileName` 加入 `AGENTS.md` |
+| claude | `.claude/skills/` → `.docnexus/skills/` | `CLAUDE.md` |
+| codex / doubao | `.agents/skills/` → `.docnexus/skills/` | `AGENTS.md` |
+| workbuddy | `.codebuddy/skills/` → `.docnexus/skills/` | `AGENTS.md` |
+| qwen | `.qwen/skills/` → `.docnexus/skills/` | `QWEN.md` |
 
-说明：
+升级 / 重装刷新入口与说明，不改手写段落。知识写入仍走 DocNexus 的授权与 capture 流程。普通 `uninstall` 移除 Agent 入口和说明，保留 `.docnexus/` 运行环境与知识输出。
 
-* DocNexus 的 skills 不在本仓库中，始终以安装的 npm 包为准；重跑脚本会按包版本重新同步与链接（`docnexus init` 可重复执行，不影响已有记忆）。
-* `.qwen/skills/`、`.codebuddy/skills/` 下已存在的同名**真实目录**不会被替换，脚本会提示跳过。
-* npm 安装或 `docnexus init` 失败时只跳过 DocNexus，本仓库的 skills 照常安装，脚本最后以退出码 1 结束；修好后重跑即可。
-* 安装后 `dev`、`project-review` 会先按 `docnexus-recall` 查项目约定；`dev`、`project-review` 交付时**每次都问**要不要沉淀（写入后把库内路径记回交付说明 / 审查报告的「DocNexus」元信息行），`create-tech-md-doc`、`create-release-md-doc` 结束时有值得记的内容才**提议**沉淀；**任何写入 DocNexus 的操作都必须经你授权**。
-* 离线或测试时可用环境变量指定安装来源，例如 `DOCNEXUS_PKG=/path/to/rowansenne-docnexus-0.13.0.tgz npx @rowansenne/workflow-run --with-docnexus`（PowerShell：`$env:DOCNEXUS_PKG=...`）。
-* Windows 上的链接使用目录软链接（需管理员终端）。
+`.docnexus/.gitignore` 由 DocNexus 维护，忽略运行依赖、索引、草稿和内置资源；`.docnexus/project.json`、npm 清单和锁文件应随代码提交。知识输出随 `workflow-run/` 提交；独立文档仓库模式下只在文档仓库提交知识，本项目仍保存自己的 `.docnexus/` 配置和运行环境。
 
-### DocNexus 的位置
+### 破坏性更新：旧布局强制清理
 
-* DocNexus 装在 `workflow-run/docnexus/`，以 `workflow-run/` 为项目根运行（`docnexus init --agent none`：它自己不往 `workflow-run/` 里链接 skills、写 `CLAUDE.md`）。
-* 本项目里由 workflow-run 接上：把 `workflow-run/docnexus/skills/*` 相对链接到 `.claude/skills` / `.agents/skills` / `.qwen/skills` / `.codebuddy/skills`，在 `CLAUDE.md` / `AGENTS.md` 写一段说明（概念索引 `@workflow-run/docnexus/CONCEPTS.md`；docnexus 系列 skill 的命令改用 `node <skills>/workflow/scripts/docnexus.mjs` 运行，不用先 `cd`），用自己的标记，不碰手写内容。升级时刷新，卸载时撤掉，`workflow-run/docnexus/` 本身不动。
-* 各 skill 的脚本已按位置处理：`resolve.mjs status` 给出 `docnexus.root` 与 `run`（`node <skills>/workflow/scripts/docnexus.mjs`），`knowledge.mjs` 在那里运行并给出从项目根读正文的路径。
-* `workflow-run/` 是独立文档仓库时，知识库随文档仓库提交，各服务共用；沉淀后的改动和产物一样由你确认后提交（`requirement.mjs pending` 单独列出）。DocNexus 的依赖和检索库（`node_modules/`、`store/`）由 `docnexus/.gitignore` 忽略、不进仓库，各自 `--with-docnexus` 装一次。
+本次不兼容旧 DocNexus，不迁移、不备份旧知识。`init` / `upgrade` 在安装前强制删除：
+
+- 旧版 `workflow-run/docnexus/`（含旧 `project.json`、npm / skills / store 等内部文件的布局）；
+- 嵌套的 `workflow-run/.docnexus/` 及 `workflow-run/tmp/duplicate-docnexus/` 旧备份；
+- 能识别的根目录旧 `docnexus/` 安装、旧 Agent 链接与不兼容的内部项目状态。
+
+新版知识输出不含这些旧内部文件，后续重装 / 升级会保留新版 `library/`、`records/` 等知识。工作流的需求文档、其他临时文件和普通同名业务目录保留。清理失败会停止；npm / init 失败返回非零。
+
+已安装项目重新接入：
+
+```bash
+npx @rowansenne/workflow-run upgrade --with-docnexus
+```
+
+新项目用 `npx @rowansenne/workflow-run --with-docnexus`。离线或本地验证可设 `DOCNEXUS_PKG=/path/to/package-or-source` 指定安装来源；默认从 npm 安装，必须使用支持 format 7 和 `--output-dir` 的版本。
 
 ## CodeGraph 代码图谱与 code-graph skill（可选）
 
@@ -397,8 +430,8 @@ npx @rowansenne/workflow-run uninstall
 | `workflow/scripts/resolve.mjs template <skill> <文件名>` | 判定用哪份模板：已接入 DocNexus 只用知识库，缺失时退出码 2 并给出导入来源；未接入时项目文件优先，其次默认模板 |
 | `workflow/scripts/resolve.mjs profile` | 读项目画像，列出空字段 |
 | `workflow/scripts/resolve.mjs env` | 本机系统与终端（安装时记录在 `profile.local.json`），写终端命令按它来 |
-| `workflow/scripts/docnexus.mjs <参数>` / `--node <脚本> <参数>` | 在 `workflow-run/` 下运行 DocNexus CLI 或它的 node 脚本，不用先 `cd`，各终端写法一样；Windows 上直接用 node 跑 CLI 入口，不经过 `.cmd` |
-| `workflow/scripts/knowledge.mjs <skill> [--match 词] [--limit n] [--query 问题]` | 按 `readFrom` 的分类列出 DocNexus 文档（标题、摘要、路径，不含正文）；`--query` 再在每个分类内 `recall --category`（DocNexus 0.16.0 起），旧版自动退回只列文档并提示。未接入时退出码 2 |
+| `workflow/scripts/docnexus.mjs <参数>` / `--node <脚本> <参数>` | 在业务项目根运行 `.docnexus/` 中的 CLI 或它的 node 脚本，知识输出到 `workflow-run/docnexus/`；Windows 上直接用 node 跑 CLI 入口，不经过 `.cmd` |
+| `workflow/scripts/knowledge.mjs <skill> [--match 词] [--limit n] [--query 问题]` | 按 `readFrom` 的分类列出 DocNexus 文档（标题、摘要、路径，不含正文）；`--query` 再在每个分类内 `recall --category`，直接使用新版按分类检索能力。未接入时退出码 2 |
 | `workflow/scripts/resolve.mjs category <skill>` | 该 skill 写入 DocNexus 时的显式分类（画像 `docnexus_categories` 优先，其次 skill.json），输出 `seal_args` 与 `metadata`；未声明时退出码 1 |
 | `workflow/scripts/resolve.mjs status` | `/workflow status` 的能力探测（不输出任何凭据） |
 | `workflow/scripts/resolve.mjs infer-profile` | 按固定规则从构建文件、Makefile、依赖与配置文件、git 推断项目画像草稿，每个字段附依据；不写文件 |
@@ -455,7 +488,8 @@ CI（`.github/workflows/test.yml`）在 push 到 main 和每个 PR 上运行：m
 | `.agents/skills/database-query/references/schema.md` | 表结构速查，补齐后提交 |
 | `workflow-run/docs/requirements/` | 需求产物；独立文档仓库模式下提交到文档仓库 |
 | `workflow-run/feedback/` | 运行反馈，每人一个文件；独立文档仓库模式下提交到文档仓库 |
-| `workflow-run/docnexus/` | DocNexus 工作区与定制的文档模板；依赖和检索库由它自带的 `docnexus/.gitignore` 忽略。独立文档仓库模式下提交到文档仓库 |
+| `.docnexus/project.json`、npm 清单与锁文件 | DocNexus 项目配置与运行依赖版本，随代码提交 |
+| `workflow-run/docnexus/` | DocNexus 知识输出与定制的文档模板。独立文档仓库模式下提交到文档仓库 |
 | `.ignore` | 让代码搜索跳过需求目录（不影响 git） |
 | `.gitignore`、`CLAUDE.md` / `AGENTS.md` | 安装器追加的忽略规则、DocNexus 说明段落 |
 
@@ -688,7 +722,7 @@ npx @rowansenne/workflow-run seed-templates --diff               # 团队改过�
 ```
 
 * 只导入 DocNexus 里还没有的、有默认版本的模板（技术方案、上线方案不在内），已有的不覆盖；项目已接入但缺模板时，安装结束会列出缺哪几份。
-* 之后模板随知识库更新：直接编辑 `workflow-run/docnexus/library/templates/...` 后在 `workflow-run/` 下执行 `./docnexus/node_modules/.bin/docnexus document sync --id <id>` 采纳；或者在生成文档后，skill 发现你做了结构性调整时会提议同步回模板（你确认后才写入）。每次变更都记录在 DocNexus 的 timeline 里，可追溯。
+* 之后模板随知识库更新：直接编辑 `workflow-run/docnexus/library/templates/...` 后在业务项目根执行 `./.docnexus/node_modules/.bin/docnexus document sync --id <id>` 采纳；或者在生成文档后，skill 发现你做了结构性调整时会提议同步回模板（你确认后才写入）。每次变更都记录在 DocNexus 的 timeline 里，可追溯。
 * 模板里的 `{{...}}` 是给 agent 的填写提示，DocNexus 原样保存；不要写成单独一行的 `{{fact:...}}`（那是 DocNexus 的事实引用语法）。
 * 以前放在 `workflow-run/templates/` 下的项目模板：接入 DocNexus 后，缺模板时 skill 会把它作为 `import_from` 提议导入知识库；导入后删除这些文件。
 

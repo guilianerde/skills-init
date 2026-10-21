@@ -23,28 +23,28 @@ const REG = 'registry.json';
 const reg = fs.existsSync(REG) ? JSON.parse(fs.readFileSync(REG, 'utf8')) : {};
 const save = () => fs.writeFileSync(REG, JSON.stringify(reg));
 if (cmd === '--help') {
-  // 真 CLI 的帮助里列出 seal 参数；old-docnexus 标记文件模拟不支持 --category 的旧版
-  console.log(fs.existsSync('old-docnexus') ? 'docnexus draft seal --id <id> --file <path>\\ndocnexus recall "q" --limit 5' : 'docnexus draft seal --id <id> --file <path> [--category <name> [--category-reason <basis>]]\\ndocnexus recall "q" --limit 5 [--category <name>]');
+  // 当前 CLI 支持显式分类和按分类 recall。
+  console.log('docnexus draft seal --id <id> --file <path> [--category <name> [--category-reason <basis>]]\\ndocnexus recall "q" --limit 5 [--category <name>]');
 } else if (cmd === 'draft' && sub === 'new') {
-  const id = 'draft_' + arg('--slug') + '_' + Date.now() + Math.random().toString(36).slice(2, 6); const dir = path.join('docnexus/drafts', id);
+  const id = 'draft_' + arg('--slug') + '_' + Date.now() + Math.random().toString(36).slice(2, 6); const dir = path.join('.docnexus/drafts', id);
   fs.mkdirSync(dir, { recursive: true });
   const a = (f) => path.join(dir, f);
   console.log(JSON.stringify({ draft_id: id, artifacts: { source: a('source.md'), document: a('document.md'), metadata: a('metadata.json') } }));
 } else if (cmd === 'draft' && sub === 'seal') {
   if (rest.includes('--category')) {
-    const mf = path.join('docnexus/drafts', arg('--id'), 'metadata.json');
+    const mf = path.join('.docnexus/drafts', arg('--id'), 'metadata.json');
     const m = JSON.parse(fs.readFileSync(mf, 'utf8'));
     m.category = arg('--category'); m.category_reason = rest.includes('--category-reason') ? arg('--category-reason') : 'Explicit category supplied by caller.';
     fs.writeFileSync(mf, JSON.stringify(m));
   }
-  fs.writeFileSync(path.join('docnexus/drafts', arg('--id'), 'target'), JSON.stringify({ file: arg('--file'), base: arg('--base-version') }));
+  fs.writeFileSync(path.join('.docnexus/drafts', arg('--id'), 'target'), JSON.stringify({ file: arg('--file'), base: arg('--base-version') }));
   console.log(JSON.stringify({ result: 'draft_ready' }));
 } else if (cmd === 'document' && sub === 'add') {
-  const dir = path.join('docnexus/drafts', arg('--draft'));
+  const dir = path.join('.docnexus/drafts', arg('--draft'));
   const { file, base } = JSON.parse(fs.readFileSync(path.join(dir, 'target'), 'utf8'));
   const prev = Object.values(reg).find((r) => r.file_path === file);
   if (prev && (!rest.includes('--replace') || base !== prev.record_version)) { console.error('version_conflict'); process.exit(1); }
-  const target = path.join('docnexus/library', file);
+  const target = path.join('workflow-run/docnexus/library', file);
   fs.mkdirSync(path.dirname(target), { recursive: true });
   fs.copyFileSync(path.join(dir, 'document.md'), target);
   const id = prev ? prev.id : 'doc_' + Object.keys(reg).length;
@@ -62,11 +62,11 @@ if (cmd === '--help') {
 
 function project() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'seed-'));
-  fs.mkdirSync(path.join(root, 'workflow-run/docnexus'), { recursive: true });
-  fs.writeFileSync(path.join(root, 'workflow-run/docnexus', 'project.json'), '{}');
-  // DocNexus 0.17.0 起的装法：CLI 在 docnexus/node_modules/.bin（旧装法在项目根，见 test-links / test-resolve）
-  fs.mkdirSync(path.join(root, 'workflow-run/docnexus', 'node_modules', '.bin'), { recursive: true });
-  fs.writeFileSync(path.join(root, 'workflow-run/docnexus', 'node_modules', '.bin', 'docnexus'), FAKE, { mode: 0o755 });
+  fs.mkdirSync(path.join(root, '.docnexus'), { recursive: true });
+  fs.writeFileSync(path.join(root, '.docnexus', 'project.json'), '{"format_version":7,"output_dir":"workflow-run"}');
+  // format 7：CLI 在业务项目根的 .docnexus/ 下
+  fs.mkdirSync(path.join(root, '.docnexus', 'node_modules', '.bin'), { recursive: true });
+  fs.writeFileSync(path.join(root, '.docnexus', 'node_modules', '.bin', 'docnexus'), FAKE, { mode: 0o755 });
   return root;
 }
 const quiet = { ok() {}, warn() {} };
@@ -80,13 +80,13 @@ test('导入全部模板，内容与自带模板一致，元数据分类为 doc-
   for (const t of TEMPLATES) {
     assert.equal(fs.readFileSync(path.join(root, 'workflow-run/docnexus/library', t.file), 'utf8'), fs.readFileSync(path.join(REPO, t.src), 'utf8'));
   }
-  const reg = Object.values(JSON.parse(fs.readFileSync(path.join(root, 'workflow-run', 'registry.json'), 'utf8')));
+  const reg = Object.values(JSON.parse(fs.readFileSync(path.join(root, 'registry.json'), 'utf8')));
   assert.equal(reg.length, TEMPLATES.length);
   for (const r of reg) {
     assert.equal(r.metadata.category, 'doc-template');
     assert.ok(r.metadata.tags.includes('workflow-run-template'));
   }
-  const calls = fs.readFileSync(path.join(root, 'workflow-run', 'calls.log'), 'utf8');
+  const calls = fs.readFileSync(path.join(root, 'calls.log'), 'utf8');
   assert.match(calls, /draft seal --id draft_template-dev\S* --file templates\/dev\/plan-template.md --base-version new --category doc-template --category-reason \S/);
   assert.doesNotMatch(calls, /--replace/);
   fs.rmSync(root, { recursive: true, force: true });
@@ -106,7 +106,7 @@ test('已存在的模板不覆盖', { skip }, () => {
 
 test('未接入 DocNexus 时报错', () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'seed-none-'));
-  assert.throws(() => seedTemplates(root, REPO, quiet), /未检测到 DocNexus/);
+  assert.throws(() => seedTemplates(root, REPO, quiet), /未检测到新版 DocNexus/);
   fs.rmSync(root, { recursive: true, force: true });
 });
 
@@ -137,7 +137,7 @@ test('导入记录与状态：current / outdated / customized / edited / untrack
   assert.deepEqual(u.failed, []);
   assert.equal(fs.readFileSync(path.join(root, 'workflow-run/docnexus/library', tech.file), 'utf8'), fs.readFileSync(path.join(tpl, tech.src), 'utf8'));
   assert.match(fs.readFileSync(path.join(root, 'workflow-run/docnexus/library', release.file), 'utf8'), /团队加的章节/, 'customized 不自动覆盖');
-  assert.match(fs.readFileSync(path.join(root, 'workflow-run', 'calls.log'), 'utf8'), /document add --draft \S+ --replace/);
+  assert.match(fs.readFileSync(path.join(root, 'calls.log'), 'utf8'), /document add --draft \S+ --replace/);
   s = Object.fromEntries(templateStatus(root, tpl, { ...records, ...u.records }).map((x) => [x.file, x.status]));
   assert.equal(s[tech.file], 'current');
   fs.rmSync(root, { recursive: true, force: true });
@@ -160,13 +160,6 @@ test('CLI：安装时导入并记录到清单；doctor 提示 outdated；seed-te
   fs.writeFileSync(mf, JSON.stringify(m));
   r = cli('doctor', '--offline');
   assert.match(r.stderr, new RegExp(`${t.file}：默认模板有新版`));
-  assert.match(r.stdout, /支持调用方显式分类/);
-  assert.match(r.stdout, /支持按分类检索/);
-  fs.writeFileSync(path.join(root, 'workflow-run', 'old-docnexus'), '');
-  const oldDoctor = cli('doctor', '--offline').stderr;
-  assert.match(oldDoctor, /不支持 draft seal --category/);
-  assert.match(oldDoctor, /不支持 recall --category/);
-  fs.rmSync(path.join(root, 'workflow-run', 'old-docnexus'));
   r = cli('upgrade');
   assert.equal(r.status, 0, r.stderr);
   assert.match(r.stderr, /seed-templates --update/, 'upgrade 后提示，不自动写 DocNexus');
@@ -189,33 +182,33 @@ test('CLI：upgrade 自动导入新增的模板（只新增）；seed-templates 
   const custom = TEMPLATES.find((t) => t.skill === 'project-review' && t.id === 'checklist.md');
   // 模拟「旧版本装的项目」：知识库里还没有新模板；清单是团队在旧默认基础上改过的
   fs.rmSync(path.join(root, 'workflow-run/docnexus/library', added.file));
-  const reg = JSON.parse(fs.readFileSync(path.join(root, 'workflow-run', 'registry.json'), 'utf8'));
-  fs.writeFileSync(path.join(root, 'workflow-run', 'registry.json'), JSON.stringify(Object.fromEntries(Object.entries(reg).filter(([, d]) => d.file_path !== added.file))));
+  const reg = JSON.parse(fs.readFileSync(path.join(root, 'registry.json'), 'utf8'));
+  fs.writeFileSync(path.join(root, 'registry.json'), JSON.stringify(Object.fromEntries(Object.entries(reg).filter(([, d]) => d.file_path !== added.file))));
   delete m.templates[added.file];
   const oldDefault = '# 旧版清单\n## 1. 正确性\n';
   fs.writeFileSync(path.join(root, 'workflow-run/docnexus/library', custom.file), `${oldDefault}## 团队加的章节\n`);
   m.templates[custom.file] = { version: '0.5.0', sha256: crypto.createHash('sha256').update(oldDefault).digest('hex') };
   fs.writeFileSync(mf, JSON.stringify(m));
-  fs.writeFileSync(path.join(root, 'workflow-run', 'calls.log'), '');
+  fs.writeFileSync(path.join(root, 'calls.log'), '');
 
   r = cli('upgrade');
   assert.equal(r.status, 0, r.stderr);
   assert.equal(fs.readFileSync(path.join(root, 'workflow-run/docnexus/library', added.file), 'utf8'), fs.readFileSync(path.join(REPO, added.src), 'utf8'));
   assert.match(fs.readFileSync(path.join(root, 'workflow-run/docnexus/library', custom.file), 'utf8'), /团队加的章节/, '已有模板不动');
-  const seals = fs.readFileSync(path.join(root, 'workflow-run', 'calls.log'), 'utf8').split('\n').filter((l) => l.startsWith('draft seal'));
+  const seals = fs.readFileSync(path.join(root, 'calls.log'), 'utf8').split('\n').filter((l) => l.startsWith('draft seal'));
   assert.equal(seals.length, 1);
   assert.match(seals[0], new RegExp(`--file ${added.file} --base-version new`));
   assert.ok(JSON.parse(fs.readFileSync(mf, 'utf8')).templates[added.file], '导入记录写回清单');
   assert.doesNotMatch(r.stdout, /DocNexus 中已有/, 'upgrade 时不逐个列出已有模板');
   assert.match(r.stderr, /seed-templates --diff/, 'customized 提示用 --diff 对比');
 
-  fs.writeFileSync(path.join(root, 'workflow-run', 'calls.log'), '');
+  fs.writeFileSync(path.join(root, 'calls.log'), '');
   r = cli('seed-templates', '--diff');
   assert.equal(r.status, 0, r.stderr);
   assert.match(r.stdout, new RegExp(custom.file.replace(/[.]/g, '\\.')));
   assert.match(r.stdout, /^-## 团队加的章节$/m);
   assert.match(r.stdout, /^\+## 11\. 幂等与消息一致性$/m);
-  assert.equal(fs.readFileSync(path.join(root, 'workflow-run', 'calls.log'), 'utf8'), '', '--diff 不调用 DocNexus');
+  assert.equal(fs.readFileSync(path.join(root, 'calls.log'), 'utf8'), '', '--diff 不调用 DocNexus');
   r = cli('upgrade');
   assert.match(r.stdout, /文档模板齐全/);
   fs.rmSync(root, { recursive: true, force: true });

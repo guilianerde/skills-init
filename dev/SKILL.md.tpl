@@ -42,7 +42,7 @@ description: "Implement a feature or fix a bug in this project end to end: under
 ### F1 — 理解需求
 
 - 需求来源是 PRD pageId/URL → 按 `references/prd-fetch.md` 拉取并提炼；wiki 不可用 → 请用户贴出关键内容。
-- DocNexus 可用 → 先运行 `node <skills>/workflow/scripts/knowledge.mjs dev --match <模块名 / 业务名词> --query "<一句话需求>"`，看以往开发沉淀、技术方案和反复出现的审查问题里有没有相关的（`--query` 在这些分类内按正文 recall；输出 `recall_by_category: false` 时改按 `docnexus-recall` 做不带分类的 recall）。引用 `docnexus/library/<path>`（见 `<skills>/workflow/references/docnexus.md`「按分类参考知识库」）。
+- DocNexus 可用 → 先运行 `node <skills>/workflow/scripts/knowledge.mjs dev --match <模块名 / 业务名词> --query "<一句话需求>"`，看以往开发沉淀、技术方案和反复出现的审查问题里有没有相关的（`--query` 在这些分类内按正文 recall）。引用 `workflow-run/docnexus/library/<path>`（见 `<skills>/workflow/references/docnexus.md`「按分类参考知识库」）。
 - 先在心里列出初版 **需求要点 + 验收标准**（可验证的行为，而不是实现手段）和还没定的决定，带进 F2 查事实、F3 澄清。
 
 ### F2 — 现状调研
@@ -57,7 +57,7 @@ description: "Implement a feature or fix a bug in this project end to end: under
 
 | 情况 | 做法 |
 |---|---|
-| S 规模且 F2 后没有未定的决定 | 跳过提问，在开工前用一两句话写明本次的理解和假设 |
+| S 规模且 F2 后没有未定的决定 | 跳过需求澄清提问，写明本次的理解和假设；仍须按 F4 确认规模 |
 | 只有一两个小决定 | 问一轮即可 |
 | M / L 规模，或用户说「拷问一下 / grill me / 先把需求问清楚」 | 按轮问到前沿为空，输出需求要点、验收标准、不在本次范围、已确认的决定，**等用户确认理解一致**再进 F4 |
 
@@ -67,15 +67,17 @@ description: "Implement a feature or fix a bug in this project end to end: under
 
 | 规模 | 判定 | 做法 |
 |---|---|---|
-| **S** | ≤3 个文件，无接口签名 / 表结构 / 配置项变更，不涉及权限 / 资金 | 在对话中列改动步骤，直接开始 |
+| **S** | ≤3 个文件，无接口签名 / 表结构 / 配置项变更，不涉及权限 / 资金 | 用户确认规模后，在对话中列改动步骤并开始 |
 | **M** | 新增或修改接口、配置项、少量表字段 | 在对话中给出简要方案（方案模板的精简版），**等用户确认后再写代码** |
 | **L** | 新模块、跨服务、表结构较大变更、数据迁移 | 按方案模板写方案文档落盘（见 Artifact Location），用户确认后再写代码；完成后建议用 `create-tech-md-doc` 生成正式技术方案 |
 
 规模拿不准时按大一级处理。涉及权限（鉴权、角色、数据可见范围）或资金（金额计算、扣款、退款、对账）的改动，文件再少也至少按 M：需求理解（F3）和方案都要用户确认。
 
-**M / L 规模先定需求名**：规模定下来、确定要落盘时，按 Artifact Location 运行 `requirement.mjs which`，当前分支没绑定需求就在这一轮问用户这个需求叫什么（可以和澄清问题一起问），之后的方案、交付、审查、技术方案、上线方案都归到这个需求下。
+**规模确认（S / M / L 都必做，含快速通道）**：判定后向用户说明推荐规模、依据（预计改动文件 / 模块、接口 / 数据 / 配置变化及风险），以及对应流程（是否走快速通道、方案与交付说明是否落盘），明确询问是否按该规模处理。**等用户明确确认后，再按该规模推进后续流程、绑定需求或写代码**；只告知判定结果或默认选中推荐项不算确认。可以与 F3 的理解确认或简要方案确认在同一轮提出，但必须明确列出规模并收到确认；本轮对话中已明确确认的同一规模不重复询问。用户调整范围或实现中发现规模变化时，说明变化依据，确认新规模后再继续。规模确认属于流程选择，不算 F3 的业务决定，不影响 S 规模快速通道资格。
 
-**S 规模快速通道**：S 规模，且改动**不涉及**配置项、SQL / DDL、对外接口（HTTP 接口签名、MQ 消息体、对外 DTO）、表结构、权限、资金，也没有 F3 中确认过的决定 → 走快速通道：F5～F7 照常（编译、测试、自审都不省），F8 只在对话里交付，不落盘交付说明、不问 DocNexus 沉淀（见 F8「快速通道交付」）。开工时用一句话告诉用户「按快速通道处理，不落盘交付说明」。实现中一旦碰到上面任何一项、改动超过 3 个文件，或用户要求落盘 → 退出快速通道，按完整 F8 交付。小改动也要走完整流程是用户绕开 dev 的主要原因，所以只在上面这些会影响上线和团队的情况下才落盘。
+**M / L 规模先定需求名**：用户确认规模、确定要落盘时，按 Artifact Location 运行 `requirement.mjs which`，当前分支没绑定需求就在这一轮问用户这个需求叫什么（可以和规模确认、澄清问题一起问），之后的方案、交付、审查、技术方案、上线方案都归到这个需求下。
+
+**S 规模快速通道**：用户已确认 S 规模，且改动**不涉及**配置项、SQL / DDL、对外接口（HTTP 接口签名、MQ 消息体、对外 DTO）、表结构、权限、资金，也没有 F3 中确认过的业务决定 → 走快速通道：F5～F7 照常（编译、测试、自审都不省），F8 只在对话里交付，不落盘交付说明、不问 DocNexus 沉淀（见 F8「快速通道交付」）。规模确认时说明「按快速通道处理，不落盘交付说明」。实现中一旦碰到上面任何一项、改动超过 3 个文件，或用户要求落盘 → 退出快速通道，按完整 F8 交付；重新评估后规模变化的，先确认新规模再继续。小改动也要走完整流程是用户绕开 dev 的主要原因，所以只在上面这些会影响上线和团队的情况下才落盘。
 
 方案模板：在项目根运行 `node <skills>/workflow/scripts/resolve.mjs template dev plan-template.md`，读输出的 `path`；退出码 2（已接入 DocNexus 但缺模板）时停下并按 `hint` 处理。L 规模的方案文档落盘后运行 `node <skills>/workflow/scripts/lint-doc.mjs <方案路径> --skill dev` 自检，再请用户确认。
 
@@ -117,7 +119,7 @@ description: "Implement a feature or fix a bug in this project end to end: under
    - PR / MR：用户要提 PR / MR 时，运行 `node <skills>/workflow/scripts/pr-desc.mjs`（缺省当前分支、基线 `profile.main_branch`），它把本分支的交付说明、审查报告、技术方案、上线方案汇总成描述（没有交付说明时退回用提交记录和改动文件），把输出给用户；用 `gh pr create` / `glab mr create` 创建要用户明确同意。
    - 文档：运行 `node <skills>/workflow/scripts/artifacts.mjs` 看本分支已有哪些产物（开发方案、交付说明、审查报告、技术方案、上线方案及 wiki 发布记录），按输出的 `next` 建议下一步：M / L 规模缺技术方案时建议 `create-tech-md-doc`，要上线时建议 `create-release-md-doc`（会自动引用本分支的技术方案和交付说明）。
    - **沉淀到 DocNexus**（`resolve.mjs status` 的 `docnexus.ok` 为 true 时**每次都问**）：明确问用户「要不要启动 DocNexus 流程，把本次交付沉淀到 DocNexus？」，并从交付说明里列出建议沉淀的内容（已确认的决定、新约定、踩到的坑、缺陷根因、配置 / 表结构变化）；没有特别值得记的也照问，并说明这一点。
-     - 用户同意 → 以交付说明为来源，按 DocNexus 入口 skill `docnexus` 的 capture 流程写入；正文只写知识，不写分支、路径；有 facts 时按 `<skills>/workflow/references/docnexus.md`「沉淀的来源」的格式写 provenance；分类用 `node <skills>/workflow/scripts/resolve.mjs category dev` 的结果作为调用方显式分类封存（见 `<skills>/workflow/references/docnexus.md`「写入 DocNexus 的分类」）。只沉淀确认过的事实，不沉淀「未验证」「待确认」的内容；知识库已有同主题的沉淀时更新那一篇（带 `--base-version`），不重复新建。写入成功后把交付说明的「DocNexus」元信息行改成 `docnexus/library/<path>`，并回报给用户。
+     - 用户同意 → 以交付说明为来源，按 DocNexus 入口 skill `docnexus` 的 capture 流程写入；正文只写知识，不写分支、路径；有 facts 时按 `<skills>/workflow/references/docnexus.md`「沉淀的来源」的格式写 provenance；分类用 `node <skills>/workflow/scripts/resolve.mjs category dev` 的结果作为调用方显式分类封存（见 `<skills>/workflow/references/docnexus.md`「写入 DocNexus 的分类」）。只沉淀确认过的事实，不沉淀「未验证」「待确认」的内容；知识库已有同主题的沉淀时更新那一篇（带 `--base-version`），不重复新建。写入成功后把交付说明的「DocNexus」元信息行改成 `workflow-run/docnexus/library/<path>`，并回报给用户。
      - 用户不同意 → 元信息行保持「未沉淀」，不再追问。
      - 未接入 DocNexus → 元信息行写「未接入」，不提问、不提示安装。
 
@@ -141,6 +143,7 @@ description: "Implement a feature or fix a bug in this project end to end: under
 
 ### B4 — 修复与验证
 
+- 修复前按 F4 的标准判定规模，并完成同样的规模确认（S / M / L 都适用，说明是否走快速通道及落盘要求）；用户明确确认后再改代码。修复中规模变化时先确认新规模再继续。
 - 做能消除根因的**最小改动**；B2 的测试由红变绿，相关已有测试保持通过（运行方式同 F6）。
 - 如果历史脏数据需要修正，写成 SQL 脚本交给用户，不直接执行。
 

@@ -22,7 +22,7 @@ function project() {
   const put = (rel, text) => { fs.mkdirSync(path.dirname(path.join(root, rel)), { recursive: true }); fs.writeFileSync(path.join(root, rel), text); };
   return { root, resolve, put };
 }
-const connect = (put) => { put('workflow-run/docnexus/project.json', '{}'); put('workflow-run/docnexus/node_modules/.bin/docnexus', ''); put('workflow-run/docnexus/node_modules/.bin/docnexus.cmd', ''); };
+const connect = (put) => { put('.docnexus/project.json', '{"format_version":7,"output_dir":"workflow-run"}'); put('.docnexus/node_modules/.bin/docnexus', ''); put('.docnexus/node_modules/.bin/docnexus.cmd', ''); };
 
 test('未接入 DocNexus：只用默认模板，项目文件不生效；技术方案没有默认模板，退出 2 提示先接入 DocNexus', () => {
   const { root, resolve, put } = project();

@@ -15,17 +15,15 @@ const FAKE = `#!/usr/bin/env node
 const fs = require('fs');
 const [cmd, sub, ...rest] = process.argv.slice(2);
 const cat = rest[rest.indexOf('--category') + 1];
-// 有 old-docnexus 标记文件时模拟 0.16.0 之前的版本：帮助里 recall 没有 --category
-if (cmd === '--help') { console.log(fs.existsSync('old-docnexus') ? '  docnexus recall "q" --limit 5' : '  docnexus recall "q" --limit 5 [--category <name>]'); process.exit(0); }
 if (cmd === 'recall') {
   const all = JSON.parse(fs.readFileSync('docs.json', 'utf8')).filter((d) => d.category === cat && d.body.includes(sub));
-  console.log(JSON.stringify({ query: sub, context_groups: all.map((d) => ({ id: d.id, path: 'docnexus/library/' + d.file_path })) }));
+  console.log(JSON.stringify({ query: sub, context_groups: all.map((d) => ({ id: d.id, path: 'workflow-run/docnexus/library/' + d.file_path })) }));
   process.exit(0);
 }
 if (cmd !== 'document' || sub !== 'query') process.exit(1);
 if (cat === 'broken') { console.error('engine_unavailable'); process.exit(1); }
 const docs = JSON.parse(fs.readFileSync('docs.json', 'utf8')).filter((d) => d.category === cat);
-console.log(JSON.stringify({ documents: docs.map((d) => ({ ...d, library_path: 'docnexus/library/' + d.file_path, document: '正文不应输出' })) }));
+console.log(JSON.stringify({ documents: docs.map((d) => ({ ...d, library_path: 'workflow-run/docnexus/library/' + d.file_path, document: '正文不应输出' })) }));
 `;
 
 function project({ connect = true } = {}) {
@@ -33,15 +31,15 @@ function project({ connect = true } = {}) {
   const r = spawnSync(process.execPath, [path.join(REPO, 'bin', 'workflow-run.mjs'), '--project-root', root, '--envs', 'codex', '--skip-db', '--yes'], { encoding: 'utf8' });
   assert.equal(r.status, 0, r.stderr);
   if (connect) {
-    fs.mkdirSync(path.join(root, 'workflow-run/docnexus'), { recursive: true });
-    fs.writeFileSync(path.join(root, 'workflow-run/docnexus', 'project.json'), '{}');
-    // DocNexus 0.17.0 起的装法：CLI 在 docnexus/node_modules/.bin
-    fs.mkdirSync(path.join(root, 'workflow-run/docnexus', 'node_modules', '.bin'), { recursive: true });
-    fs.writeFileSync(path.join(root, 'workflow-run/docnexus', 'node_modules', '.bin', 'docnexus'), FAKE, { mode: 0o755 });
+    fs.mkdirSync(path.join(root, '.docnexus'), { recursive: true });
+    fs.writeFileSync(path.join(root, '.docnexus', 'project.json'), '{"format_version":7,"output_dir":"workflow-run"}');
+    // format 7：内部状态与 CLI 在 .docnexus/
+    fs.mkdirSync(path.join(root, '.docnexus', 'node_modules', '.bin'), { recursive: true });
+    fs.writeFileSync(path.join(root, '.docnexus', 'node_modules', '.bin', 'docnexus'), FAKE, { mode: 0o755 });
   }
   const doc = (id, category, title, updated_at, extra = {}) => ({ id, category, title, summary: `${title} 摘要`, file_path: `notes/${id}.md`, updated_at, tags: [], body: `${title} 正文`, ...extra });
   fs.mkdirSync(path.join(root, 'workflow-run'), { recursive: true });
-  fs.writeFileSync(path.join(root, 'workflow-run', 'docs.json'), JSON.stringify([
+  fs.writeFileSync(path.join(root, 'docs.json'), JSON.stringify([
     doc('a', 'dev-notes', '订单幂等约定', '2026-10-01'),
     doc('b', 'dev-notes', '缓存击穿处理', '2026-10-03', { body: '缓存失效时订单查询走互斥锁' }),
     doc('c', 'code-review', '金额精度', '2026-10-02', { tags: ['订单'] }),
@@ -61,7 +59,7 @@ test('按 readFrom 顺序列出各分类，按更新时间倒序，不含正文'
   assert.equal(r.status, 0);
   assert.deepEqual(r.out.categories.map((c) => [c.category, c.from]), [['dev-notes', 'dev'], ['tech-design', 'create-tech-md-doc'], ['code-review', 'project-review']]);
   assert.deepEqual(r.out.categories[0].documents.map((d) => d.id), ['b', 'a']);
-  assert.equal(r.out.categories[0].documents[0].path, 'docnexus/library/notes/b.md');
+  assert.equal(r.out.categories[0].documents[0].path, 'workflow-run/docnexus/library/notes/b.md');
   assert.doesNotMatch(r.raw, /正文不应输出/);
   assert.ok(!r.out.categories.some((c) => c.category === 'release-plan'));
   fs.rmSync(root, { recursive: true, force: true });
@@ -96,7 +94,7 @@ test('未接入 DocNexus 退出 2；未知 skill 退出 1', () => {
   fs.rmSync(root, { recursive: true, force: true });
 });
 
-test('--query：每个分类内 recall 按正文检索；旧版 DocNexus 不支持时只列文档并提示', { skip }, () => {
+test('--query：每个分类内 recall 按正文检索', { skip }, () => {
   const { root, run } = project();
   let r = run('dev', '--query', '订单');
   assert.equal(r.status, 0);
@@ -105,10 +103,5 @@ test('--query：每个分类内 recall 按正文检索；旧版 DocNexus 不支�
   assert.deepEqual(r.out.categories.map((c) => [c.category, c.recall.context_groups.map((g) => g.id)]), [['dev-notes', ['a', 'b']], ['tech-design', []], ['code-review', []]]);
   assert.equal(run('dev').out.recall_by_category, undefined, '不给 --query 不 recall');
   assert.equal(run('dev', '--query', 'x', '--recall-limit', '0').status, 1);
-  fs.writeFileSync(path.join(root, 'workflow-run', 'old-docnexus'), '');
-  r = run('dev', '--query', '订单');
-  assert.equal(r.out.recall_by_category, false);
-  assert.match(r.out.recall_hint, /0\.16\.0/);
-  assert.ok(r.out.categories.every((c) => c.recall === undefined));
   fs.rmSync(root, { recursive: true, force: true });
 });

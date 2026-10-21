@@ -18,6 +18,8 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { inferProfile } from './infer-profile.mjs';
 import { layout, HOME, TEMPLATES_DIR } from './requirement.mjs';
+import { docnexusWorkspace, docnexusConnected, docnexusBinPath } from './docnexus-layout.mjs';
+export { docnexusRoot, docnexusWorkspace, docnexusConnected } from './docnexus-layout.mjs';
 
 const SKILLS_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const PROFILE_FIELDS = ['main_branch', 'build', 'test', 'test_single', 'lint', 'config_center', 'deploy.platform', 'deploy.regions', 'job_annotation'];
@@ -37,19 +39,13 @@ function skillMetas() {
 
 export const skillMeta = (name) => skillMetas().find((m) => m.name === name);
 
-// DocNexus 的项目根：workflow-run/（工作区在 workflow-run/docnexus/），DocNexus 的命令都在这个目录下运行。bin/lib/core.mjs 的 docnexusRoot 与此一致
-export const docnexusRoot = (root) => path.resolve(root, HOME);
-
-// DocNexus CLI 的位置（相对项目根）：workflow-run/docnexus/node_modules/.bin；没有返回 null。bin/lib/core.mjs 的 docnexusBin 与此一致
-export const DOCNEXUS_BIN_DIRS = [['docnexus', 'node_modules', '.bin']];
+// CLI 位于项目根的 .docnexus/，对 Agent 返回项目相对路径。
 export function docnexusBin(root) {
-  const name = process.platform === 'win32' ? 'docnexus.cmd' : 'docnexus';
-  const dn = docnexusRoot(root);
-  for (const dir of DOCNEXUS_BIN_DIRS) if (fs.existsSync(path.join(dn, ...dir, name))) return path.relative(path.resolve(root), path.join(dn, ...dir, name));
-  return null;
+  const bin = docnexusBinPath(root);
+  return bin ? path.relative(path.resolve(root), bin) : null;
 }
-// 给 agent 的命令写法（相对项目根）：./workflow-run/docnexus/...
-const cmdPath = (p) => { const s = p.split(path.sep).join('/'); return s.startsWith('.') ? s : `./${s}`; };
+// 给 agent 的命令写法（相对项目根）：./.docnexus/...
+const cmdPath = (p) => { const s = p.split(path.sep).join('/'); return s.startsWith('./') || s.startsWith('../') ? s : `./${s}`; };
 
 // CodeGraph 代码图谱：本项目建过索引（.codegraph/）且 codegraph 命令可用。索引是否建立由用户决定，skill 不自行 codegraph init
 export function codegraphStatus(root) {
@@ -62,16 +58,12 @@ export function codegraphStatus(root) {
   };
 }
 
-export function docnexusConnected(root) {
-  return fs.existsSync(path.join(docnexusRoot(root), 'docnexus', 'project.json')) && docnexusBin(root) !== null;
-}
-
 export function resolveTemplate(root, skill, id) {
   const meta = skillMeta(skill);
   if (!meta) return { ok: false, error: 'unknown', message: `skill「${skill}」没有安装（${rel(root, SKILLS_DIR)} 下找不到 ${skill}/skill.json）；重跑安装并在 --skills 里带上它` };
   const t = meta.templates.find((x) => x.id === id);
   if (!t) return { ok: false, error: 'unknown', message: `skill「${skill}」没有登记模板「${id}」（见 ${skill}/skill.json 的 templates）` };
-  const lib = path.join(docnexusRoot(root), 'docnexus', 'library', 'templates', skill, id);
+  const lib = path.join(docnexusWorkspace(root), 'library', 'templates', skill, id);
   const project = path.join(root, TEMPLATES_DIR, skill, id);
   // 没有 src 的模板（技术方案、上线方案）不随 skills 提供，缺失时按「创建模板」由用户给样例生成
   const builtin = t.src ? path.join(SKILLS_DIR, skill, t.src.replace(/\.tpl$/, '')) : null;
@@ -185,8 +177,11 @@ export function status(root) {
       ok: dn,
       // 调用 DocNexus CLI 时用这个路径（在项目根执行）
       bin: dn ? cmdPath(docnexusBin(root)) : null,
-      // DocNexus 的项目根（相对本项目）：docnexus 系列 skill 里的路径（docnexus/library/<path>、草稿）都相对这个目录
-      root: HOME,
+      // CLI、草稿及返回的文档路径均相对业务项目根。
+      root: '.',
+      internal: '.docnexus',
+      workspace: `${HOME}/docnexus`,
+      output_dir: HOME,
       // 运行 DocNexus 命令的写法（在项目根执行，任何终端都一样）：后面接原命令的参数；node 脚本前加 --node
       run: `node ${(rel(root, path.join(SKILLS_DIR, 'workflow', 'scripts', 'docnexus.mjs')))}`,
       missing_templates: dn ? templates.filter((t) => !t.ok && !t.on_demand).map((t) => t.expected) : [],
