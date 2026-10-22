@@ -308,7 +308,7 @@ footer { margin-top: 40px; font-size: 13px; color: var(--muted); }
       <li><span class="code">F1</span><div class="name">理解需求</div><div class="what">拉 PRD，召回以往的约定和坑，列初版验收标准</div></li>
       <li><span class="code">F2</span><div class="name">现状调研</div><div class="what">沿调用链读代码，只读查实际表结构</div></li>
       <li class="gate"><span class="code">F3</span><div class="name">需求澄清</div><div class="what">分轮提问，每题带推荐答案；M / L 确认理解一致</div></li>
-      <li class="gate"><span class="code">F4</span><div class="name">方案</div><div class="what">按规模分级；M / L 确认方案后才写代码</div></li>
+      <li class="gate"><span class="code">F4</span><div class="name">方案</div><div class="what">按规模分级并告知；S 问是否走快速通道，M / L 确认方案后才写代码</div></li>
       <li><span class="code">F5</span><div class="name">实现</div><div class="what">贴合现有写法，不顺手重构；SQL 只写脚本不执行</div></li>
       <li><span class="code">F6</span><div class="name">验证</div><div class="what">先相关测试再全量；验收项逐条对应到证据</div></li>
       <li><span class="code">F7</span><div class="name">自审</div><div class="what">用 project-review 审本次改动，CRITICAL / HIGH 必须修</div></li>
@@ -317,7 +317,7 @@ footer { margin-top: 40px; font-size: 13px; color: var(--muted); }
   </div>
   <div class="legend"><span><i></i>需要人确认的节点</span><span>缺陷修复走 B1 收集现象 → B2 复现 → B3 定位根因 → B4 最小修复 → B5 自审交付</span></div>
   <div class="sizes">
-    <div class="size"><div class="s">S · 快速通道</div><p>≤3 个文件，不碰接口、表、配置、权限、资金。编译、测试、自审照做，在对话里交付，不落盘。</p></div>
+    <div class="size"><div class="s">S · 快速通道</div><p>≤3 个文件，不碰接口、表、配置、权限、资金。走不走由用户选：同意则编译、测试、自审照做，在对话里交付，不落盘。</p></div>
     <div class="size"><div class="s">M</div><p>改接口、配置项、少量字段，或涉及权限、资金。先确认需求理解，再确认简要方案。</p></div>
     <div class="size"><div class="s">L</div><p>新模块、跨服务、数据迁移。方案写成文档落盘，确认后再写代码，之后可生成正式技术方案。</p></div>
   </div>
@@ -372,6 +372,107 @@ footer { margin-top: 40px; font-size: 13px; color: var(--muted); }
         <tr><td>md-to-wiki</td><td>把 md 转成 Confluence 格式并发布；未配置时不启动</td><td><span class="pill">独立</span></td></tr>
       </tbody>
     </table>
+  </div>
+</section>
+
+<section>
+  <div class="kicker">常用命令</div>
+  <h2>日常就两类输入：代理里说需求，终端里管安装</h2>
+  <div class="prose">
+    <p>开发、审查、出文档在装好 skills 的代理会话里完成；安装、升级、自检在项目根的终端执行，前缀统一是 <code>npx @rowansenne/workflow-run</code>，下表省略。</p>
+  </div>
+  <div class="tbl">
+    <table>
+      <thead><tr><th>代理里输入</th><th>做什么</th></tr></thead>
+      <tbody>
+        <tr><td>/dev &lt;需求描述&gt;</td><td>功能开发全流程：澄清 → 方案 → 实现 → 测试 → 自审 → 交付说明</td></tr>
+        <tr><td>/dev --bug &lt;现象&gt;</td><td>缺陷修复全流程：复现 → 定位根因 → 最小修复 → 验证</td></tr>
+        <tr><td>/workflow</td><td>入口路由：直接说需求也行；不带请求时输出能力地图和状态</td></tr>
+        <tr><td>/workflow profile</td><td>填写或更新项目画像（主分支、构建测试命令、toolchain）</td></tr>
+        <tr><td>/workflow status</td><td>能力探测：CodeGraph、数据库、DocNexus、wiki 是否可用</td></tr>
+        <tr><td>/workflow template &lt;模板&gt; [怎么改]</td><td>修改或创建文档模板：tech、release、plan、delivery、review、checklist</td></tr>
+        <tr><td>/create-tech-md-doc &lt;dev分支&gt; &lt;主分支&gt;</td><td>从分支 diff 按团队模板生成技术方案</td></tr>
+        <tr><td>/create-release-md-doc &lt;dev分支&gt; &lt;主分支&gt;</td><td>生成上线方案，自动引用同分支的技术方案和交付说明</td></tr>
+        <tr><td>/workflow report</td><td>效果报告：审查发现与修复率、需求澄清、DocNexus 沉淀与复用</td></tr>
+        <tr><td>/workflow view</td><td>按需求浏览全部产物的本地页面（加 --open 直接打开）</td></tr>
+        <tr><td>/md-to-wiki &lt;md&gt; [pageId]</td><td>发布到 Confluence；发布过的文档省略 pageId 直接更新</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="sub" style="margin-top:10px">project-review 和 database-query 没有斜杠命令：直接说「审一下这次改动」「查一下 order 表有哪些索引」就会触发。</p>
+  <div class="tbl">
+    <table>
+      <thead><tr><th>终端里执行（项目根）</th><th>做什么</th></tr></thead>
+      <tbody>
+        <tr><td>init --with-docnexus --with-codegraph</td><td>首次安装 / 重装；<code>--skills dev</code> 只装子集，<code>--copy</code> 不建软链接</td></tr>
+        <tr><td>upgrade</td><td>升级到当前版本：用户配置保留，手改过的文件先备份</td></tr>
+        <tr><td>doctor</td><td>自检：版本、软链接、项目画像、DocNexus 模板、数据库连通、.gitignore</td></tr>
+        <tr><td>seed-templates</td><td>把自带的文档模板导入 DocNexus（已有的不覆盖）</td></tr>
+        <tr><td>view --open</td><td>生成并打开项目文档视图（同 /workflow view）</td></tr>
+        <tr><td>report --since 2026-10-01</td><td>效果报告（同 /workflow report），只读统计产物</td></tr>
+        <tr><td>feedback --json</td><td>运行反馈汇总：提问轮数、跳过的步骤、读不懂的规则，精简 skill 的依据</td></tr>
+        <tr><td>docs-repo &lt;仓库地址&gt;</td><td>改用团队独立文档仓库；不带地址显示当前状态</td></tr>
+        <tr><td>uninstall</td><td>按安装清单卸载，用户配置备份到 workflow-run/tmp/</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="sub" style="margin-top:10px">skill 内部还有一批脚本命令（<code>resolve.mjs</code>、<code>requirement.mjs</code>、<code>review-scope.mjs</code>、<code>template.mjs</code>、<code>locate.mjs</code>、<code>tables.mjs</code>、<code>knowledge.mjs</code> 等），由各流程自动调用，不用记。</p>
+</section>
+
+<section>
+  <div class="kicker">连接配置</div>
+  <h2>数据库与 wiki：各填一份 JSON，填完即生效</h2>
+  <div class="prose">
+    <p>两份配置都在 <code>.agents/skills/</code> 单一来源目录下，其他环境是软链接，改一处全环境生效（<code>--copy</code> 装的多份在重装时自动并入）；安装器已把这两个文件加进 <code>.gitignore</code>（含凭据，勿提交），重跑和升级都不会覆盖你填的内容。</p>
+  </div>
+  <div class="two">
+    <div>
+      <h3>数据库连接 · <code>database-query/config.json</code></h3>
+      <p>安装时交互生成第一个连接，之后直接编辑文件增加连接（安装时用 <code>--skip-db</code> 跳过的，重跑补配即可；已有的 <code>.codex/database-query/config.json</code> 会自动迁移）。驱动支持 MySQL / MariaDB / PostgreSQL（走本机 <code>mysql</code> / <code>psql</code> 客户端）：</p>
+      <div class="tree" aria-label="数据库配置示例">
+<pre>{
+  "default_connection": "dev",
+  "connections": {
+    "dev": {
+      "driver": "mysql",
+      "host": "127.0.0.1", "port": 3306,
+      "database": "app",
+      "user": "app_ro",
+      "password_env": "APP_DEV_DB_PASSWORD",
+      "readonly": true
+    }
+  },
+  "mask_columns": ["id_card", "phone"]
+}</pre>
+      </div>
+      <ul>
+        <li><strong>只读是默认</strong>：<code>readonly</code> 为 true 或缺省都按只读处理，写语句在会话层直接拦截；只有显式 <code>"readonly": false</code> 的连接才允许写，而且要你点名用那个连接。</li>
+        <li><strong>密码不进对话</strong>：按 <code>password_env</code> 指向的环境变量 → <code>DB_PASSWORD</code> → <code>password</code> 字段的顺序取，推荐用环境变量。</li>
+        <li><code>mask_columns</code>（顶层或单连接，正则数组）追加脱敏列；手机号、证件号、银行卡等默认已打码。</li>
+        <li><code>doctor</code> 会试连一次验证配置（<code>--offline</code> 跳过连通性测试）。</li>
+      </ul>
+    </div>
+    <div>
+      <h3>wiki 连接 · <code>md-to-wiki/wiki-config.json</code></h3>
+      <p>安装后默认 <code>enabled: false</code>，不配置就不启动。按环境分两种情况：</p>
+      <p><strong>没装 wiki MCP</strong> —— 填 <code>enabled: true</code> + <code>base_url</code> + <code>api_token</code>（Confluence 的个人访问令牌）和 <code>username</code>，发布与 PRD 拉取走 REST 通道：</p>
+      <div class="tree" aria-label="wiki 配置示例">
+<pre>{
+  "enabled": true,
+  "wiki": {
+    "base_url": "https://wiki.example.com",
+    "username": "me@example.com",
+    "api_token": "‹Confluence PAT›",
+    "remote_url": ""
+  }
+}</pre>
+      </div>
+      <ul>
+        <li><strong>已装 wiki MCP</strong>（如 Claude Code 里配了 <code>wiki-mcp</code>，工具名形如 <code>mcp__wiki-mcp__get_page</code>）：skill 自动优先走 MCP 通道，REST 字段可以不填；<code>mcp_server</code> 默认 <code>wiki-mcp</code>，<code>remote_url</code> 可选记录远程 MCP 地址。</li>
+        <li>两种都配了：有 MCP 工具就用 MCP，没有再走 REST。</li>
+      </ul>
+      <div class="callout">wiki 未配置时 md-to-wiki 直接不启动；技术 / 上线方案的 <code>--prd</code> 增强自动回退纯 diff 流程，文档生成主流程不受影响。dev 拉 PRD 用同一套判定。</div>
+    </div>
   </div>
 </section>
 
