@@ -4,8 +4,10 @@
 
 ## [Unreleased]
 
+## [0.26.0] - 2026-10-22
+
 ### 变更
-- dev 不再向用户确认规模：S / M / L 由 agent 按标准判定并说明依据，直接按该规模推进，用户主动提出异议或范围变化时按新规模继续。S 规模符合快速通道条件时改为明确询问用户是否走快速通道，同意才走，不同意或未明确答复按完整流程落盘交付；缺陷修复同样处理，M / L 规模先把根因与修复方式给用户确认再改代码。
+- dev 不再向用户确认规模：S / M / L 由 agent 按标准判定并说明依据，直接按该规模推进，用户主动提出异议或范围变化时按新规模继续。S 规模符合快速通道条件时改为明确询问用户是否走快速通道，问完等本轮答复再继续：明确同意才走，拒绝或答复未明确同意按完整流程落盘交付；缺陷修复同样处理，M / L 规模先把根因与修复方式给用户确认再改代码。
 
 ## [0.25.0] - 2026-10-22
 
@@ -350,7 +352,8 @@
 - 安装器改为单一 Node 实现，`init-skills.sh` / `init-skills.ps1` 只是薄封装。
 - `code-review` 改名为 `project-review`，升级时自动清理旧名。
 
-[Unreleased]: https://github.com/guilianerde/skills-init/compare/v0.21.0...HEAD
+[Unreleased]: https://github.com/guilianerde/skills-init/compare/v0.26.0...HEAD
+[0.26.0]: https://github.com/guilianerde/skills-init/compare/v0.25.0...v0.26.0
 [0.21.0]: https://github.com/guilianerde/skills-init/compare/v0.20.0...v0.21.0
 [0.20.0]: https://github.com/guilianerde/skills-init/compare/v0.19.0...v0.20.0
 [0.19.0]: https://github.com/guilianerde/skills-init/compare/v0.18.0...v0.19.0
