@@ -88,6 +88,7 @@ dev（确定工作分支 → 定需求名 → 理解需求 → 方案 → 实现
 
 ## Rules
 
+- 普通聊天生成的报告、分析、方案、草稿或导出等辅助文件默认放在项目根的 `workflow-run/other/`，不因分支已绑定需求而写入需求目录，也不调用需求归档或运行状态命令。工作流正式产物仍按 `references/requirements.md` 归档；源码、测试、配置和已有文件的维护、工作流指定的临时文件与知识库沿用各自目录，用户明确指定路径时以用户为准。
 - 本 skill 只路由和维护 `profile.json`，不写业务代码；具体工作交给对应 skill，并遵守该 skill 的规则。
 - `profile.json` 只记录项目事实（含 `toolchain` 开发环境配置：JDK / Maven / Node 的路径），**不写密码、token、内网凭据**；路径里的变量在 `env_vars` 里声明。
 - 写 `toolchain` 前先用 `resolve.mjs env --check` 核对路径在本机存在；本机对不上、又只是个人差异的，写进个人的 `profile.local.json`（覆盖 `profile.json`），不要改团队那份。

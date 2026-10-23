@@ -103,7 +103,7 @@ export function startRun(root, { branch, kind = 'feature', size = null, input = 
       created_at: at, updated_at: at, completed_at: null, steps: Object.fromEntries(FLOWS[kind].map((s) => [s, { status: 'pending' }])),
       context: {}, waiting_for: null, reason: null, decision: null, history: [] }, input, at);
     return { ...meta, runs: { ...runs, [id]: selected }, updated: at };
-  });
+  }, { root });
   return { ok: true, resumed, dir: req.dir, run: selected };
 }
 
@@ -143,7 +143,7 @@ export function changeRun(root, { branch, id, revision, input = {}, action = 'sa
     run.updated_at = at; run.revision++;
     result = run;
     return { ...meta, runs: { ...meta.runs, [id]: run }, updated: at };
-  });
+  }, { root });
   return { ok: true, dir: req.dir, run: result };
 }
 

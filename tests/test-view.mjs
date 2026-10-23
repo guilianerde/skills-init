@@ -40,6 +40,13 @@ test('viewData：按需求分组（用 meta.json 的名字）；审查带解析�
   assert.deepEqual(d.knowledge.map((k) => k.path), ['docnexus/library/code-review/paging.md', 'docnexus/library/dev-notes/export.md']);
   assert.deepEqual(d.knowledge[0].sources.map((s) => [s.name, s.label]), [['订单导出（按渠道）', '交付说明'], ['订单导出（按渠道）', '审查报告']]);
   assert.equal(d.report.review.reports, 2);
+  // 普通聊天文件即便同名、含分支元信息与 meta.json，也不混入需求视图或效果统计。
+  const other = path.join(root, 'workflow-run/other/聊天/svc');
+  fs.mkdirSync(other, { recursive: true });
+  for (const file of ['review.md', 'delivery.md', 'meta.json']) {
+    fs.copyFileSync(path.join(root, 'workflow-run/docs/requirements/订单导出/svc', file), path.join(other, file));
+  }
+  assert.deepEqual({ ...viewData(root), generated: d.generated }, d);
   fs.rmSync(root, { recursive: true, force: true });
 });
 

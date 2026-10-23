@@ -283,6 +283,45 @@ test('卸载 --copy 安装：环境目录清空后一并移除', () => {
   for (const d of ['.claude', '.qwen', '.agents']) assert.ok(!p.exists(d), d);
 });
 
+test('普通聊天落盘约定：无需 DocNexus，重装与升级更新原段，卸载保留手写说明和产物', () => {
+  const p = project('artifact-context');
+  const files = ['CLAUDE.md', 'AGENTS.md', 'QWEN.md'];
+  const before = '# 团队约定\n\n<!-- custom:start -->\n手写规则\n<!-- custom:end -->\n';
+  for (const f of files) p.write(f, before);
+  p.write('workflow-run/other/讨论/报告.md', '# 普通对话报告\n');
+  const meta = '{"name":"existing","runs":{}}\n';
+  p.write('workflow-run/docs/requirements/existing/service/meta.json', meta);
+  ok(p.install(['--envs', 'codex,claude,doubao,qwen,workbuddy', '--copy', '--yes', '--skip-db', '--skills', 'workflow']));
+  const installed = Object.fromEntries(files.map((f) => [f, p.read(f)]));
+  for (const f of files) {
+    assert.ok(installed[f].startsWith(before), f);
+    assert.match(installed[f], /workflow-run\/other\//);
+    assert.match(installed[f], /普通聊天不得.*requirement\.mjs.*run\.mjs/);
+    assert.doesNotMatch(installed[f], /workflow-run:docnexus:start/, '不依赖 DocNexus');
+  }
+  ok(p.install(['--envs', 'codex,claude,doubao,qwen,workbuddy', '--copy', '--yes', '--skip-db', '--skills', 'workflow']));
+  for (const f of files) assert.equal(p.read(f), installed[f], '重装幂等');
+  for (const f of files) p.write(f, installed[f].replace('## 工作流文件落盘边界', '## 旧版文件规则'));
+  ok(p.install(['upgrade']));
+  for (const f of files) assert.equal(p.read(f), installed[f], '升级替换旧段，不重复追加');
+  assert.equal(p.read('workflow-run/docs/requirements/existing/service/meta.json'), meta);
+  ok(p.install(['uninstall']));
+  for (const f of files) assert.equal(p.read(f), before, '只移除自己的段落');
+  assert.equal(p.read('workflow-run/other/讨论/报告.md'), '# 普通对话报告\n');
+  assert.equal(p.read('workflow-run/docs/requirements/existing/service/meta.json'), meta);
+});
+
+test('文件落盘约定只写所选环境：包括 WorkBuddy 与豆包；卸载清理仅含生成段落的文件', () => {
+  for (const [env, file] of Object.entries({ claude: 'CLAUDE.md', codex: 'AGENTS.md', doubao: 'AGENTS.md', workbuddy: 'AGENTS.md', qwen: 'QWEN.md' })) {
+    const p = project(`artifact-context-${env}`);
+    ok(p.install(['--envs', env, '--copy', '--yes', '--skip-db', '--skills', 'workflow']));
+    for (const f of ['CLAUDE.md', 'AGENTS.md', 'QWEN.md']) assert.equal(p.exists(f), f === file, `${env}: ${f}`);
+    assert.ok(!p.exists('workflow-run/other'), '没有辅助文件时不创建空目录');
+    ok(p.install(['uninstall']));
+    assert.ok(!p.exists(file), '只剩生成段落的文件随卸载移除');
+  }
+});
+
 test('--copy 装的独立拷贝换成链接：填过的用户配置并入单一来源，原目录备份', { skip: !SYMLINK_OK && '需要软链接' }, () => {
   const p = project('copy-to-link');
   ok(p.install(['--envs', 'claude,qwen', '--copy', '--yes', '--skip-db']));

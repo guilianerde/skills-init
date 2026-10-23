@@ -265,6 +265,7 @@ npm install --prefix ./.docnexus --save-exact @rowansenne/docnexus
     │   ├── CONCEPTS.md / concepts/
     │   └── library/ / records/ / impacts/
     ├── docs/requirements/           # 工作流产物
+    ├── other/                       # 普通聊天生成的辅助文件，按需创建
     └── tmp/
 ```
 
@@ -523,11 +524,12 @@ CI（`.github/workflows/test.yml`）在 push 到 main 和每个 PR 上运行：m
 | `.agents/skills/workflow/profile.json` | 项目画像（无凭据），产物目录用的项目名也在这里 |
 | `.agents/skills/database-query/references/schema.md` | 表结构速查，补齐后提交 |
 | `workflow-run/docs/requirements/` | 需求产物；独立文档仓库模式下提交到文档仓库 |
+| `workflow-run/other/` | 普通聊天生成的报告、方案、草稿、导出等辅助文件（按需创建，可按主题分目录）；不进入需求索引、运行状态、需求统计与文档视图，按需提交 |
 | `workflow-run/feedback/` | 运行反馈，每人一个文件；独立文档仓库模式下提交到文档仓库 |
 | `.docnexus/project.json`、npm 清单与锁文件 | DocNexus 项目配置与运行依赖版本，随代码提交 |
 | `workflow-run/docnexus/` | DocNexus 知识输出与定制的文档模板。独立文档仓库模式下提交到文档仓库 |
 | `.ignore` | 让代码搜索跳过需求目录（不影响 git） |
-| `.gitignore`、`CLAUDE.md` / `AGENTS.md` | 安装器追加的忽略规则、DocNexus 说明段落 |
+| `.gitignore`、`CLAUDE.md` / `AGENTS.md` / `QWEN.md` | 安装器追加的忽略规则、文件落盘约定、DocNexus 说明段落 |
 
 **忽略**（每人每机器一份，或可重新生成）：
 
@@ -595,6 +597,8 @@ git status --short --ignored
   调 Confluence REST API。
 
 ## 产物输出规范（统一落位）
+
+普通聊天生成的报告、分析、方案、草稿、导出等辅助文件默认写到 `workflow-run/other/`（按需创建，可按主题建子目录），不绑定需求、不登记运行状态，也不进入需求统计与文档视图。安装与 `upgrade` 会向所选环境的 `CLAUDE.md` / `AGENTS.md` / `QWEN.md` 写入这条项目级指令，无需接入 DocNexus；卸载只清理自己的指令段，保留手写内容与产物。源码、测试、配置和已有文件的维护、工作流指定的临时目录与知识库沿用原路径；用户明确指定输出路径时以用户为准。不会自动搬移已有文件。
 
 一个需求的文档产物放在**同一个需求目录**里，方案（开发 / 缺陷修复）、交付说明、审查报告、技术方案、上线方案一起看：
 

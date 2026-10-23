@@ -86,7 +86,7 @@ node <skills>/workflow/scripts/run.mjs cancel --id <运行id> --expect-revision 
 
 交付产物、自检、摘要和反馈已处理后，把最后步骤标 completed，再运行 complete。complete 要求所有步骤 completed 或有原因的 skipped；完整 dev 的方案、实现、验证、审查、交付核心步骤不能跳过，用户必须已选择交付，并有当前分支的 plan.md、review.md、delivery.md。其他文档／审查运行也检查当前分支的对应文件。验证步骤完成可以包含如实记录的“未验证”，不等于所有测试都通过。
 
-complete 不接受待用户确认或 blocked 的运行。还在处理本次已承诺的交付事项时不能提前完成；可选下一步不属于本次运行范围。状态写入具有 revision 检查和短时元信息写锁；版本冲突时重新 show，核对并合并进度，不盲目重试覆盖。进程异常遗留 meta.json.lock 时，先确认没有写入进程再清理锁。
+complete 不接受待用户确认或 blocked 的运行。还在处理本次已承诺的交付事项时不能提前完成；可选下一步不属于本次运行范围。状态写入具有 revision 检查和短时元信息写锁；版本冲突时重新 show，核对并合并进度，不盲目重试覆盖。写入用 workflow-run/tmp/locks/ 下的短时锁（不落在需求目录、不会随产物提交）；写入进程崩溃后，超过 30 秒且进程已退出的锁会被自动清理，无需手工删除。
 
 ## 新会话恢复
 

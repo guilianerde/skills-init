@@ -67,7 +67,8 @@ test('DocNexus 在 workflow-run/docnexus/：本项目链接它的 skills（相�
     assert.equal(fs.realpathSync(link), fs.realpathSync(path.join(p.root, '.docnexus/skills/docnexus-recall')));
   }
   const claude = p.read('CLAUDE.md');
-  assert.match(claude, /^# 项目说明\n\n手写的内容\n\n<!-- workflow-run:docnexus:start -->/);
+  assert.match(claude, /^# 项目说明\n\n手写的内容\n\n/);
+  assert.match(claude, /<!-- workflow-run:docnexus:start -->/);
   assert.match(claude, /@workflow-run\/docnexus\/CONCEPTS\.md/);
   assert.match(claude, /`node \.claude\/skills\/workflow\/scripts\/docnexus\.mjs <参数>`/);
   assert.doesNotMatch(claude, /cd workflow-run/);

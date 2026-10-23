@@ -82,6 +82,8 @@ description: "Review source code (any language; Java/Spring, Go, TypeScript, Pyt
 
 ## Artifact Location
 
+本节只适用于工作流生成的审查报告。用户只是让看一眼、问个问题，或让写一份不进入需求归档的分析、草稿时，产物默认放项目根的 `workflow-run/other/`（需要时创建，可按主题建子目录），不 `bind`、不调 `run.mjs`，也不写需求 `meta.json`；用户明确指定路径时以用户为准。走本 skill 正式流程产出的审查报告仍按下面的规则归档。
+
 审查报告按需求归档在 `workflow-run/docs/requirements/<需求名>/<项目名>/`，规则见 `<skills>/workflow/references/requirements.md`：
 
 - 路径用 `node <skills>/workflow/scripts/requirement.mjs path review`（分支对比按 dev 分支加 `--branch <dev分支>`），写到输出的 `path`（文件名固定为 `review.md`）；已有报告时脚本先把它归档，输出的 `previous` 是上次报告，复审对照它。

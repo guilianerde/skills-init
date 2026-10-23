@@ -44,7 +44,8 @@ test('安装强制清除旧版工作区、嵌套运行环境和旧备份；其�
   assert.equal(p.read('workflow-run/docs/requirements/task/svc/delivery.md'), '# 交付');
   assert.equal(p.read('workflow-run/tmp/template-draft/dev/plan-template.md'), '# 草稿');
   assert.equal(fs.existsSync(p.at('workflow-run/.agents/skills/docnexus-recall')), false);
-  assert.equal(p.read('AGENTS.md'), '# 手写说明\n');
+  assert.match(p.read('AGENTS.md'), /^# 手写说明\n\n<!-- workflow-run:artifacts:start -->/);
+  assert.doesNotMatch(p.read('AGENTS.md'), /<!-- docnexus:start -->/);
   assert.equal(p.read('workflow-run/AGENTS.md'), '# 嵌套手写说明\n');
   assert.match(r.stderr, /破坏性更新/);
 });

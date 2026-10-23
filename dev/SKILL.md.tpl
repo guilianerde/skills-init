@@ -184,6 +184,7 @@ description: "Implement a feature or fix a bug in this project end to end: under
 ## Rules
 
 - 不执行任何写库操作；不修改 `config.json` / `wiki-config.json` 等凭据文件。
+- 普通聊天里顺手生成的报告、分析、方案、草稿或导出（不属于本次 dev 流程的产物）默认放项目根的 `workflow-run/other/`，即使当前分支已绑定需求也不要写进需求目录，不调 `requirement.mjs bind / path / sync` 或 `run.mjs`。本流程正式产出的方案、审查报告、交付说明仍按 Artifact Location 归档。
 - 不 `git commit` / `git push` / 改写历史 / 删除分支，除非用户在本次对话中明确要求。
 - 不安装新依赖；确实需要时说明理由，等用户同意。
 - 每个关于现有代码的结论都指向真实文件和行号；读不到的内容如实说明。

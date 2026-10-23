@@ -23,6 +23,7 @@ import { findExistingDbConfig, getDb } from './lib/db.mjs';
 import { report, installSkills, linkSkills, updateGitignore, setupHome, recordEnv } from './lib/install.mjs';
 import { setupCodeGraph } from './lib/codegraph.mjs';
 import { uninstall } from './lib/uninstall.mjs';
+import { writeArtifactContext } from './lib/artifact-context.mjs';
 import { checkNodeForDocNexus, setupDocNexus, refreshDocNexusLinks, cleanupLegacyDocNexus, templateRecords, saveTemplateRecords, reportTemplateStatus, installedSkills, docnexusConnected, printTemplateDiffs } from './lib/docnexus.mjs';
 import { upgradeOptions, doctor } from './lib/doctor.mjs';
 import { docsRepo } from './lib/docsrepo.mjs';
@@ -235,6 +236,7 @@ async function main() {
   updateGitignore(o.root, o.withCodeGraph);
   setupHome(o.root);
   recordEnv(o.root);
+  writeArtifactContext(o.root, sel);
   const docnexus = o.withDocNexus ? setupDocNexus(o.root, sel) : 'skipped';
   // 升级 / 重装都刷新本项目里的 DocNexus skills 链接与 CLAUDE.md / AGENTS.md 段落
   if (!o.withDocNexus) refreshDocNexusLinks(o.root, sel);

@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { IS_WIN, CANON_DIR, INSTALL_BASES, MANIFEST, step, ok, warn, toPosix, fileHash, readManifest, removeEmptyDirs, lstat, timestamp, removeLink, docnexusInternal } from './core.mjs';
 import { removeDocNexusContext } from './docnexus.mjs';
+import { removeArtifactContext } from './artifact-context.mjs';
 
 // 软链接是否指向 absTarget（按解析后的绝对路径比较，兼容 Windows 上 readlink 返回的 \\?\ 前缀）
 export function linkPointsTo(link, absTarget) {
@@ -51,6 +52,8 @@ export function uninstall(root) {
     const files = removeDocNexusContext(root);
     if (n || files.length) ok(`已移除指向 ${toPosix(path.relative(root, src))} 的 ${n} 个 DocNexus skill 链接${files.length ? `，以及 ${files.join('、')} 里的 DocNexus 段落` : ''}（.docnexus/ 运行环境与 workflow-run/docnexus/ 知识输出保留）`);
   }
+
+  removeArtifactContext(root);
 
   // 2. 各安装目录：按清单删除模板文件；用户配置与手改过的模板文件先备份
   for (const [rel, m] of found) {

@@ -251,7 +251,7 @@ export function sync(root, dirRel, { bump = false } = {}) {
       created: old.created ?? now(), updated: changed || !old.updated ? now() : old.updated, latest, ...(Object.keys(versions).length ? { versions } : {}), artifacts,
     };
     return meta;
-  });
+  }, { root });
   return bump ? { ...result, archived } : result;
 }
 
@@ -300,7 +300,7 @@ export function bind(root, { name = null, branch, base = null }) {
     if (base && !value.base) value.base = base;
     value.updated = now();
     return value;
-  });
+  }, { root });
   const rel = relOf(root, dir);
   return { ok: true, mode: L.mode, created: !existedHere, joined: !!target && !existedHere, name: meta.name, named_by: meta.named_by, dir: rel, project: L.project, branches: sync(root, rel).branches };
 }

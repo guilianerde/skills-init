@@ -25,12 +25,14 @@ function fixture(t) {
   return { root, req, file, put, start, save };
 }
 const completed = (names) => Object.fromEntries(names.map((name) => [name, { status: 'completed' }]));
+// 和 meta-store.mjs 的锁路径规则一致：workflow-run/tmp/locks/<需求目录相对路径>.lock
+const lockOf = (root, file) => path.join(root, 'workflow-run/tmp/locks', `${path.relative(root, file).replace(/[\\/]/g, '__')}.lock`);
 
 test('运行保存在同一 meta.json；sync / which / 重新 bind 均保留上下文、已完成步骤与其他扩展字段', (t) => {
   const f = fixture(t);
   let run = f.start();
   run = f.save(run, { stage: 'F5', steps: { F4: { status: 'completed', evidence: ['plan.md 自检通过'] } }, context: { remaining: ['实现分页'] } });
-  updateMeta(f.file, (meta) => ({ ...meta, extension: { keep: true } }));
+  updateMeta(f.file, (meta) => ({ ...meta, extension: { keep: true } }), { root: f.root });
   f.put('plan.md');
   sync(f.root, f.req.dir);
   which(f.root, BRANCH);
@@ -165,14 +167,40 @@ test('独立审查、技术／上线方案、wiki 和 bug 的步骤与完成标�
 test('元信息锁阻止并发覆盖，异常释放锁；损坏 JSON 不会被重建为空索引', (t) => {
   const f = fixture(t);
   const original = fs.readFileSync(f.file, 'utf8');
-  fs.writeFileSync(`${f.file}.lock`, '');
+  const lock = lockOf(f.root, f.file);
+  fs.mkdirSync(path.dirname(lock), { recursive: true });
+  fs.writeFileSync(lock, JSON.stringify({ pid: process.pid }));
   assert.throws(() => sync(f.root, f.req.dir), /正在写入/);
   assert.equal(fs.readFileSync(f.file, 'utf8'), original);
-  fs.rmSync(`${f.file}.lock`);
+  fs.rmSync(lock);
   fs.writeFileSync(f.file, '{invalid');
-  assert.throws(() => sync(f.root, f.req.dir));
+  assert.throws(() => sync(f.root, f.req.dir), /不是合法 JSON/);
   assert.equal(fs.readFileSync(f.file, 'utf8'), '{invalid');
-  assert.equal(fs.existsSync(`${f.file}.lock`), false);
+  assert.equal(fs.existsSync(lock), false);
+});
+
+test('写锁不落在需求目录：崩溃残留不会随产物提交；陈旧锁自动清理，活锁仍拒绝', (t) => {
+  const f = fixture(t);
+  const lock = lockOf(f.root, f.file);
+  // 正常写入后需求目录只剩 meta.json，锁和临时文件都在 workflow-run/tmp/ 下
+  sync(f.root, f.req.dir);
+  assert.deepEqual(fs.readdirSync(path.dirname(f.file)), ['meta.json']);
+  assert.ok(lock.startsWith(path.join(f.root, 'workflow-run/tmp/')), lock);
+  // 写入进程已死且锁过期 → 清理后继续，不再永久卡死
+  fs.mkdirSync(path.dirname(lock), { recursive: true });
+  fs.writeFileSync(lock, JSON.stringify({ pid: 999999, at: '2020-01-01T00:00:00.000Z' }));
+  const old = Date.now() / 1000 - 3600;
+  fs.utimesSync(lock, old, old);
+  const meta = updateMeta(f.file, (cur) => ({ ...cur, healed: true }), { root: f.root });
+  assert.equal(meta.healed, true);
+  assert.equal(JSON.parse(fs.readFileSync(f.file, 'utf8')).healed, true);
+  assert.equal(fs.existsSync(lock), false, '陈旧锁已清理');
+  // 锁很旧但写入进程仍活着 → 不能抢，避免覆盖正在写的进度
+  fs.mkdirSync(path.dirname(lock), { recursive: true });
+  fs.writeFileSync(lock, JSON.stringify({ pid: process.pid }));
+  fs.utimesSync(lock, old, old);
+  assert.throws(() => updateMeta(f.file, (cur) => cur, { root: f.root }), /正在写入/);
+  fs.rmSync(lock);
 });
 
 test('发布已有产物按来源需求与分支记录，不跟随当前 checkout 或同分支最新绑定串到其他需求', (t) => {
