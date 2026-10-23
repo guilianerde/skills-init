@@ -35,7 +35,7 @@ const HELP = `用法: workflow-run [命令] [选项]
 命令：
   init（默认）         安装或重装 skills
   upgrade              按安装清单里的环境与模式非交互升级到当前版本（保留数据库配置等用户配置；skills 文件一律更新为新版，手改过的先备份到 workflow-run/tmp/upgrade-backup/）；
-                       已接入 DocNexus 时顺带导入新增的文档模板（只新增，不覆盖已有模板）
+                       加 --with-docnexus 时把 DocNexus 包也升到最新版（@latest），刷新 skill 链接与 CLAUDE.md / AGENTS.md 段落，并导入新增的文档模板（只新增，不覆盖已有模板）；不加则 DocNexus 包原地不动，只顺带导入新增模板
   doctor               自检：版本、手改 / 缺失文件、软链接、项目画像、DocNexus 模板、数据库连通性、.gitignore
   uninstall            按安装清单卸载本项目装的 skills 与链接（用户配置备份到 workflow-run/tmp/uninstall-backup/）
   seed-templates       只把自带的文档模板导入 DocNexus（workflow-run/docnexus/library/templates/，已有的不覆盖）

@@ -103,6 +103,8 @@ h3 { font-size: 16px; margin: 0 0 6px; }
 .layer.agent .cell { background: transparent; border: 1px solid var(--line); }
 .layer.core .cells { border-color: var(--accent); background: var(--accent-soft); }
 .layer.core .cell { background: var(--surface); }
+.layer.view .cells { border-color: var(--line); background: var(--surface); }
+.layer.view .cell { background: var(--warn-soft); }
 .layer.out .cells { background: var(--term-bg); border-color: var(--term-bg); }
 .layer.out .cell { background: transparent; color: var(--term-fg); font-family: var(--f-mono); font-size: 12.5px; padding: 4px 6px; }
 .layer.out .cell span { color: var(--term-dim); font-family: var(--f-body); }
@@ -235,40 +237,34 @@ footer { margin-top: 40px; font-size: 13px; color: var(--muted); }
 
 <section>
   <div class="kicker">整体架构</div>
-  <h2>五层：代理只碰最上面两层，规则和脚本在下面托底</h2>
+  <h2>四层：底层文档库托底，工具与编排分层，代理和用户只看最上面一层</h2>
   <div class="prose">
     <p>skill 只写流程和判断，所有能确定的事（找模板、定产物路径、识别涉及的表、文档自检）都交给脚本。脚本结果是固定的，模型强弱只影响判断，不影响格式。</p>
   </div>
   <div class="arch">
     <div class="stack">
       <div class="layer agent">
-        <div class="tag">代理<small>你在用的工具</small></div>
+        <div class="tag">代理 · 用户<small>你在用的工具</small></div>
         <div class="cells">
           <div class="cell">Claude Code</div><div class="cell">Codex CLI</div><div class="cell">Qwen Code</div><div class="cell">豆包办公</div><div class="cell">WorkBuddy</div>
         </div>
       </div>
-      <div class="layer">
-        <div class="tag">编排<small>完整的工作流</small></div>
+      <div class="layer view">
+        <div class="tag">用户 view<small>只读页面，回看下面两层</small></div>
+        <div class="cells">
+          <div class="cell"><b>view.mjs</b><span>按需求浏览产物，生成静态页面（/workflow view）</span></div>
+          <div class="cell"><b>docnexus view</b><span>本地只读浏览知识库，Ctrl+C 停止</span></div>
+          <div class="cell"><b>report.mjs</b><span>效果报告，只读统计产物</span></div>
+        </div>
+      </div>
+      <div class="layer core">
+        <div class="tag">工作流编排<small>共享核心 workflow/scripts</small></div>
         <div class="cells">
           <div class="cell"><b>workflow</b><span>入口路由、能力探测</span></div>
           <div class="cell"><b>dev</b><span>需求 → 交付</span></div>
           <div class="cell"><b>project-review</b><span>代码审查</span></div>
           <div class="cell"><b>create-tech-md-doc</b><span>技术方案</span></div>
           <div class="cell"><b>create-release-md-doc</b><span>上线方案</span></div>
-        </div>
-      </div>
-      <div class="layer">
-        <div class="tag">能力<small>可选，缺了就降级</small></div>
-        <div class="cells">
-          <div class="cell"><b>code-graph</b><span>影响面、调用入口、MQ、定时任务</span></div>
-          <div class="cell"><b>database-query</b><span>只读查库、脱敏</span></div>
-          <div class="cell"><b>md-to-wiki</b><span>发布到 Confluence</span></div>
-          <div class="cell"><b>DocNexus</b><span>团队知识库</span></div>
-        </div>
-      </div>
-      <div class="layer core">
-        <div class="tag">共用核心<small>workflow/scripts</small></div>
-        <div class="cells">
           <div class="cell"><b>profile.json</b><span>项目画像</span></div>
           <div class="cell"><b>resolve.mjs</b><span>模板来源、能力状态</span></div>
           <div class="cell"><b>requirement.mjs</b><span>需求绑定、产物路径</span></div>
@@ -277,11 +273,19 @@ footer { margin-top: 40px; font-size: 13px; color: var(--muted); }
           <div class="cell"><b>feedback.mjs</b><span>运行反馈</span></div>
         </div>
       </div>
+      <div class="layer">
+        <div class="tag">工具<small>query 与 md-wiki</small></div>
+        <div class="cells">
+          <div class="cell"><b>code-graph</b><span>影响面、调用入口、MQ、定时任务</span></div>
+          <div class="cell"><b>database-query</b><span>只读查库、脱敏</span></div>
+          <div class="cell"><b>md-to-wiki</b><span>发布到 Confluence</span></div>
+        </div>
+      </div>
       <div class="layer out">
-        <div class="tag">产物<small>只写这一个目录</small></div>
+        <div class="tag">底层文档库<small>只写这一个目录</small></div>
         <div class="cells">
           <div class="cell">workflow-run/docs/requirements/ <span>需求产物</span></div>
-          <div class="cell">workflow-run/docnexus/ <span>知识库</span></div>
+          <div class="cell">workflow-run/docnexus/ <span>团队知识库</span></div>
           <div class="cell">workflow-run/feedback/ <span>运行反馈</span></div>
         </div>
       </div>
@@ -291,7 +295,7 @@ footer { margin-top: 40px; font-size: 13px; color: var(--muted); }
       <p>和运行流程分开：负责安装、升级、卸载、自检，不参与开发。</p>
       <p>每个 skill 的依赖、模板、知识库分类都写在自己的 <code>skill.json</code> 里，安装器、脚本、测试都从这一份读。</p>
       <p>升级只换 skills 文件；项目画像、数据库和 wiki 配置保留不动，手改过的文件先备份。</p>
-      <p><code>doctor</code> 检查链接、画像、凭据是否被忽略、数据库能否只读连上。</p>
+      <p><code>npx @rowansenne/workflow-run doctor</code> 检查链接、画像、凭据是否被忽略、数据库能否只读连上。</p>
     </aside>
   </div>
 </section>
@@ -379,7 +383,7 @@ footer { margin-top: 40px; font-size: 13px; color: var(--muted); }
   <div class="kicker">常用命令</div>
   <h2>日常就两类输入：代理里说需求，终端里管安装</h2>
   <div class="prose">
-    <p>开发、审查、出文档在装好 skills 的代理会话里完成；安装、升级、自检在项目根的终端执行，前缀统一是 <code>npx @rowansenne/workflow-run</code>，下表省略。</p>
+    <p>开发、审查、出文档在装好 skills 的代理会话里完成；安装、升级、自检在项目根的终端执行，命令前缀统一是 <code>npx @rowansenne/workflow-run</code>，下表写全。</p>
   </div>
   <div class="tbl">
     <table>
@@ -404,15 +408,16 @@ footer { margin-top: 40px; font-size: 13px; color: var(--muted); }
     <table>
       <thead><tr><th>终端里执行（项目根）</th><th>做什么</th></tr></thead>
       <tbody>
-        <tr><td>init --with-docnexus --with-codegraph</td><td>首次安装 / 重装；<code>--skills dev</code> 只装子集，<code>--copy</code> 不建软链接</td></tr>
-        <tr><td>upgrade</td><td>升级到当前版本：用户配置保留，手改过的文件先备份</td></tr>
-        <tr><td>doctor</td><td>自检：版本、软链接、项目画像、DocNexus 模板、数据库连通、.gitignore</td></tr>
-        <tr><td>seed-templates</td><td>把自带的文档模板导入 DocNexus（已有的不覆盖）</td></tr>
-        <tr><td>view --open</td><td>生成并打开项目文档视图（同 /workflow view）</td></tr>
-        <tr><td>report --since 2026-10-01</td><td>效果报告（同 /workflow report），只读统计产物</td></tr>
-        <tr><td>feedback --json</td><td>运行反馈汇总：提问轮数、跳过的步骤、读不懂的规则，精简 skill 的依据</td></tr>
-        <tr><td>docs-repo &lt;仓库地址&gt;</td><td>改用团队独立文档仓库；不带地址显示当前状态</td></tr>
-        <tr><td>uninstall</td><td>按安装清单卸载，用户配置备份到 workflow-run/tmp/</td></tr>
+        <tr><td>npx @rowansenne/workflow-run init --with-docnexus --with-codegraph</td><td>首次安装 / 重装；<code>--skills dev</code> 只装子集，<code>--copy</code> 不建软链接</td></tr>
+        <tr><td>npx @rowansenne/workflow-run upgrade</td><td>升级到当前版本：用户配置保留，手改过的文件先备份</td></tr>
+        <tr><td>npx @rowansenne/workflow-run doctor</td><td>自检：版本、软链接、项目画像、DocNexus 模板、数据库连通、.gitignore</td></tr>
+        <tr><td>npx @rowansenne/workflow-run seed-templates</td><td>把自带的文档模板导入 DocNexus（已有的不覆盖）</td></tr>
+        <tr><td>npx @rowansenne/workflow-run view --open</td><td>生成并打开项目文档视图（同 /workflow view）</td></tr>
+        <tr><td>npx @rowansenne/workflow-run docnexus view</td><td>打开 DocNexus 知识库的本地只读浏览页面（前台常驻，Ctrl+C 停止）</td></tr>
+        <tr><td>npx @rowansenne/workflow-run report --since 2026-10-01</td><td>效果报告（同 /workflow report），只读统计产物</td></tr>
+        <tr><td>npx @rowansenne/workflow-run feedback --json</td><td>运行反馈汇总：提问轮数、跳过的步骤、读不懂的规则，精简 skill 的依据</td></tr>
+        <tr><td>npx @rowansenne/workflow-run docs-repo &lt;仓库地址&gt;</td><td>改用团队独立文档仓库；不带地址显示当前状态</td></tr>
+        <tr><td>npx @rowansenne/workflow-run uninstall</td><td>按安装清单卸载，用户配置备份到 workflow-run/tmp/</td></tr>
       </tbody>
     </table>
   </div>
@@ -449,7 +454,7 @@ footer { margin-top: 40px; font-size: 13px; color: var(--muted); }
         <li><strong>只读是默认</strong>：<code>readonly</code> 为 true 或缺省都按只读处理，写语句在会话层直接拦截；只有显式 <code>"readonly": false</code> 的连接才允许写，而且要你点名用那个连接。</li>
         <li><strong>密码不进对话</strong>：按 <code>password_env</code> 指向的环境变量 → <code>DB_PASSWORD</code> → <code>password</code> 字段的顺序取，推荐用环境变量。</li>
         <li><code>mask_columns</code>（顶层或单连接，正则数组）追加脱敏列；手机号、证件号、银行卡等默认已打码。</li>
-        <li><code>doctor</code> 会试连一次验证配置（<code>--offline</code> 跳过连通性测试）。</li>
+        <li><code>npx @rowansenne/workflow-run doctor</code> 会试连一次验证配置（<code>--offline</code> 跳过连通性测试）。</li>
       </ul>
     </div>
     <div>
@@ -500,6 +505,7 @@ footer { margin-top: 40px; font-size: 13px; color: var(--muted); }
       <div class="step"><div class="dot">3</div><div><b>交付时沉淀</b><p>每次交付都问要不要沉淀：已确认的决定、新约定、缺陷根因。同主题的更新原文，不重复新建。</p></div></div>
       <div class="step"><div class="dot">4</div><div><b>下次被召回</b><p>审查沉淀的问题模式，会在下一次 dev 开工时被列出来。</p></div></div>
       <div class="callout">写入知识库每次都要你同意；没接入 DocNexus 时不提问，也不提示安装。</div>
+      <p class="sub" style="margin-top:12px;font-size:14px">想直接翻知识库：在项目根运行 <code>npx @rowansenne/workflow-run docnexus view</code>，会起一个本地只读的文档浏览服务并打印访问地址，<code>Ctrl+C</code> 停止。加 <code>--port 8080</code> 可指定端口，不加则随机。</p>
     </div>
   </div>
 </section>
@@ -509,7 +515,7 @@ footer { margin-top: 40px; font-size: 13px; color: var(--muted); }
   <h2>skill 自己也按数据迭代</h2>
   <div class="prose">
     <p>dev 和 project-review 每跑完一次，静默记一行过程数据到 <code>workflow-run/feedback/&lt;用户&gt;.jsonl</code>：提问了几轮、用户纠正过几次理解、跳过了哪些步骤、哪条规则读不懂或做不到。只记过程，不记代码和业务名词，也不额外打扰用户。</p>
-    <p>团队用两三周后，<code>npx @rowansenne/workflow-run feedback</code> 按 skill 和章节汇总，据此精简或修正规则、发新版本；各项目升级时清掉旧版本的记录，从新版本重新收集。结果类数据（审查发现、修复率、沉淀率）则由 <code>report</code> 命令从产物里统计。</p>
+    <p>团队用两三周后，<code>npx @rowansenne/workflow-run feedback</code> 按 skill 和章节汇总，据此精简或修正规则、发新版本；各项目升级时清掉旧版本的记录，从新版本重新收集。结果类数据（审查发现、修复率、沉淀率）则由 <code>npx @rowansenne/workflow-run report</code> 命令从产物里统计。</p>
   </div>
 </section>
 

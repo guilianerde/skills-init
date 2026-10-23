@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { templateStatus, STATUS_TEXT, TEMPLATES } from '../seed-templates.mjs';
-import { TPL_DIR, IS_WIN, DOCNEXUS_PKG, MANIFEST, PKG, CANON_DIR, step, ok, warn, fail, writeFile, readJson, toPosix, lstat, findManifests, removeLink, docnexusBin, docnexusWorkspace, docnexusInternal, HOME, INSTALL_BASES } from './core.mjs';
+import { TPL_DIR, IS_WIN, DOCNEXUS_SPEC, MANIFEST, PKG, CANON_DIR, step, ok, warn, fail, writeFile, readJson, toPosix, lstat, findManifests, removeLink, docnexusBin, docnexusWorkspace, docnexusInternal, HOME, INSTALL_BASES } from './core.mjs';
 
 import { docnexusConfigured, docnexusConnected } from '../../workflow/scripts/docnexus-layout.mjs';
 export { docnexusConnected } from '../../workflow/scripts/docnexus-layout.mjs';
@@ -177,7 +177,7 @@ export function refreshDocNexusLinks(root, sel) {
 }
 
 export function setupDocNexus(root, sel) {
-  const npmArgs = ['install', '--prefix', './.docnexus', '--save-exact', DOCNEXUS_PKG];
+  const npmArgs = ['install', '--prefix', './.docnexus', '--save-exact', DOCNEXUS_SPEC];
   step(`接入 DocNexus（运行环境 .docnexus/；知识输出 ${HOME}/docnexus/）`);
   if (!run(IS_WIN ? 'npm.cmd' : 'npm', npmArgs, root)) { warn('npm 安装 DocNexus 失败，已跳过 DocNexus 接入（skills 已正常安装）'); return 'failed'; }
   const bin = docnexusBin(root);

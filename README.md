@@ -27,7 +27,7 @@ npx @rowansenne/workflow-run --with-docnexus --with-codegraph
 
 全量安装的分步说明见图文教程 [docs/full-install.html](docs/full-install.html)（下载后用浏览器打开）。
 
-整体架构（五层结构、dev 主线流程、设计约定、产物与知识闭环）见 [docs/architecture.html](docs/architecture.html)（下载后用浏览器打开）。
+整体架构（代理 / 用户 view / 工作流编排 / 工具 / 底层文档库四层、dev 主线流程、设计约定、产物与知识闭环）见 [docs/architecture.html](docs/architecture.html)（下载后用浏览器打开）。
 
 非交互示例（bash、zsh、PowerShell 写法一样）：
 
@@ -44,7 +44,7 @@ npx @rowansenne/workflow-run uninstall                                          
 | 命令 | 作用 |
 | --- | --- |
 | `init`（默认，可省略） | 安装或重装 |
-| `upgrade` | 读安装清单里记录的环境与模式，非交互升级到当前版本：保留数据库配置等用户配置，skills 文件一律更新为新版（手改过的先备份到 `workflow-run/tmp/upgrade-backup/`）；已接入 DocNexus 时顺带导入新版本新增的文档模板（只新增，不改动已有模板） |
+| `upgrade` | 读安装清单里记录的环境与模式，非交互升级到当前版本：保留数据库配置等用户配置，skills 文件一律更新为新版（手改过的先备份到 `workflow-run/tmp/upgrade-backup/`）。加 `--with-docnexus` 时把 DocNexus 包也升到最新版（`@latest`），刷新 skill 链接与 `CLAUDE.md` / `AGENTS.md` 段落，并导入新增的文档模板（只新增，不改动已有模板）；不加则 DocNexus 包原地不动，只顺带导入新增模板 |
 | `doctor` | 自检：已装版本与当前包对比、手改 / 缺失的文件、软链接是否断开、项目画像、DocNexus 模板是否齐全、各数据库连接能否只读 `SELECT 1`（`--offline` 跳过）、`.gitignore` 是否忽略了凭据。有错误时退出码 1 |
 | `uninstall` | 等价于 `--uninstall` |
 | `report` | 本地效果报告：只读统计 `workflow-run/docs/requirements/` 下的产物（`--since YYYY-MM-DD`、`--all-branches`、`--json`），见「workflow：入口与项目画像」 |
@@ -302,7 +302,7 @@ node .agents/skills/workflow/scripts/docnexus.mjs usage export > workflow-run/do
 npx @rowansenne/workflow-run upgrade --with-docnexus
 ```
 
-新项目用 `npx @rowansenne/workflow-run --with-docnexus`。离线或本地验证可设 `DOCNEXUS_PKG=/path/to/package-or-source` 指定安装来源；默认从 npm 安装，必须使用支持 format 7 和 `--output-dir` 的版本。
+新项目用 `npx @rowansenne/workflow-run --with-docnexus`。默认从 npm 安装最新版（`@rowansenne/docnexus@latest`），接入和升级都取最新版；离线或本地验证可设 `DOCNEXUS_PKG=/path/to/package-or-source` 指定安装来源（此时不再追加 `@latest`），必须使用支持 format 7 和 `--output-dir` 的版本。
 
 ## CodeGraph 代码图谱与 code-graph skill（可选）
 

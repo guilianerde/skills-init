@@ -24,12 +24,16 @@ export const resolveSkillSelection = (names) => withDependencies(SKILL_LIST, nam
 export const SKILLS = META.skills;
 // 用户配置：重跑不覆盖；值为对应空模板（用于判断单一来源中的文件是否还没被填写过）
 export const USER_FILES = META.userFiles;
+// 接入 / 重装都用最新版：@latest 让 npm 显式解析最新 tag，不受 .docnexus/package.json 里
+// 已锁版本的牵制（否则重跑会把旧版本原地装回来）。离线或本地验证时 DOCNEXUS_PKG 可指向
+// 本地目录 / tgz，此时不再追加 @latest（本地来源没有 tag）。
 export const DOCNEXUS_PKG = process.env.DOCNEXUS_PKG || '@rowansenne/docnexus';
+export const DOCNEXUS_SPEC = process.env.DOCNEXUS_PKG ? DOCNEXUS_PKG : `${DOCNEXUS_PKG}@latest`;
 export const CODEGRAPH_PKG = process.env.CODEGRAPH_PKG || '@colbymchenry/codegraph@1'; // code-graph skill 按 1.x 的库接口编写
 // 工作流产物与 DocNexus 知识输出的父目录；DocNexus 运行环境另在项目根 .docnexus/。
 export const HOME = 'workflow-run';
 // 升级 DocNexus 的命令（在项目根执行；不用 cd / &&，PowerShell 5.1 也能直接运行）
-export const docnexusUpgradeCmd = () => `npm install --prefix ./.docnexus --save-exact ${DOCNEXUS_PKG}@latest`;
+export const docnexusUpgradeCmd = () => `npm install --prefix ./.docnexus --save-exact ${DOCNEXUS_SPEC}`;
 export const MANIFEST = '.workflow-run.json'; // 安装清单，位于每个安装目录（单一来源时只有 .agents/skills 一份）
 
 // ---------------------------------------------------------------- 输出

@@ -4,6 +4,16 @@
 
 ## [Unreleased]
 
+## [0.26.1] - 2026-10-23
+
+### 修复
+- **`upgrade --with-docnexus` 现在真的会把 DocNexus 升到最新版**：接入与升级统一改用 `@rowansenne/docnexus@latest`。此前传的是不带 tag 的包名，npm 会参考 `.docnexus/package.json` 里 `--save-exact` 锁定的版本，把旧版本原地装回来，命令看起来成功、DocNexus 却没升级。离线 / 本地验证用 `DOCNEXUS_PKG` 指向目录或 tgz 时不追加 `@latest`（本地来源没有 tag）。
+- 修正文档里「upgrade 不会升级 DocNexus 包」的说法：`upgrade` 不带 `--with-docnexus` 时确实只升级 skills、DocNexus 包原地不动；带上该参数则会在重装技能的同时升级 DocNexus 包、刷新 skill 链接与 `CLAUDE.md` / `AGENTS.md` 段落，并导入新增模板。`--help` 与 README 命令表同步重写该参数说明。
+
+### 变更
+- 架构页的分层图改为「代理 · 用户 / 用户 view / 工作流编排 / 工具 / 底层文档库」：原来的五层里，「编排」与「共用核心」合并为「工作流编排」（脚本由流程调用，不构成独立能力层），DocNexus 从「能力」移到「底层文档库」（它的产物与需求产物同在 `workflow-run/` 下），新增「用户 view」一条，容纳 `view.mjs`、`docnexus view`、`report.mjs` 这类只读回看入口。README 的架构描述同步更新。
+- 架构页的 DocNexus 命令表补上 `docnexus view`（本地只读浏览知识库），并说明它是前台常驻、`Ctrl+C` 停止、`--port` 可指定端口。
+
 ## [0.26.0] - 2026-10-22
 
 ### 变更

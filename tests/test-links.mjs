@@ -65,5 +65,10 @@ test('DocNexus format 7：只使用 .docnexus CLI 和 output_dir=workflow-run �
   assert.equal(skillBin(root), path.join('.docnexus', 'node_modules', '.bin', name));
   assert.equal(docnexusConnected(root), true);
   assert.ok(docnexusUpgradeCmd().startsWith('npm install --prefix ./.docnexus --save-exact '));
+  // 接入与升级都用最新版：不带 DOCNEXUS_PKG 时必须显式 @latest，否则会把 .docnexus 里已锁的旧版本装回来
+  const { DOCNEXUS_SPEC } = await import('../bin/lib/core.mjs');
+  assert.equal(process.env.DOCNEXUS_PKG, undefined, '本测试要求未设置 DOCNEXUS_PKG');
+  assert.equal(DOCNEXUS_SPEC, '@rowansenne/docnexus@latest');
+  assert.ok(docnexusUpgradeCmd().endsWith('@rowansenne/docnexus@latest'));
   fs.rmSync(root, { recursive: true, force: true });
 });

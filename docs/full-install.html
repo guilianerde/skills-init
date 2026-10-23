@@ -387,9 +387,13 @@ npx @rowansenne/workflow-run docs-repo git@git.example.com:team/team-docs.git --
       <h2><span class="n">09</span>升级与卸载</h2>
       <h3>升级 workflow-run</h3>
       <div class="cmd"><pre>npx @rowansenne/workflow-run upgrade</pre><button class="copy" type="button">复制</button></div>
-      <p>读安装清单里记录的环境，非交互升级 skills；手改过的文件先备份到 <code>workflow-run/tmp/upgrade-backup/</code>。已接入 DocNexus 时会刷新它的 skill 链接和说明段落，并导入新版本新增的模板（已有模板不动）。<strong>upgrade 不会升级 DocNexus 包，也不会动 CodeGraph</strong>，这两个各自升级：</p>
-      <div class="cmd"><pre>npm install --prefix ./.docnexus --save-exact @rowansenne/docnexus@latest
-npm i -g @colbymchenry/codegraph@1</pre><button class="copy" type="button">复制</button></div>
+      <p>读安装清单里记录的环境，非交互升级 skills；手改过的文件先备份到 <code>workflow-run/tmp/upgrade-backup/</code>。</p>
+      <p><strong>DocNexus 要升级，必须带上 <code>--with-docnexus</code></strong>：它会用 <code>@latest</code> 重装 DocNexus 包（升到最新版）、刷新 skill 链接和说明段落，并导入新版本新增的模板（已有模板不动）。不带这个参数时只升级 skills，DocNexus 包原地不动：</p>
+      <div class="cmd"><pre>npx @rowansenne/workflow-run upgrade --with-docnexus</pre><button class="copy" type="button">复制</button></div>
+      <p>只用 npm 单独升级 DocNexus 包（不刷新链接和段落）也可以，效果一样：</p>
+      <div class="cmd"><pre>npm install --prefix ./.docnexus --save-exact @rowansenne/docnexus@latest</pre><button class="copy" type="button">复制</button></div>
+      <p>CodeGraph 不在 <code>upgrade</code> 范围内，单独升级：</p>
+      <div class="cmd"><pre>npm i -g @colbymchenry/codegraph@1</pre><button class="copy" type="button">复制</button></div>
       <p>团队改过的模板和新默认模板有差异时，用 <code>seed-templates --diff</code> 只读查看，再按 DocNexus 的流程手动合并。</p>
 
       <h3>卸载</h3>
