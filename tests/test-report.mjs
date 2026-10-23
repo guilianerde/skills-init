@@ -119,6 +119,8 @@ test('parseReview / parseDelivery / captureState：按模板结构计数，跳�
   assert.equal(captureState(DELIVERY), 'captured');
   assert.equal(captureState(REVIEW(false)), 'not_captured');
   assert.equal(captureState('> DocNexus：未接入'), 'not_connected');
+  assert.equal(captureState('> DocNexus：无需沉淀'), 'not_needed');
+  assert.equal(captureState('> DocNexus：未询问（由 dev 交付统一处理）'), 'not_asked');
   assert.equal(captureState('# 旧报告'), 'missing');
   // 模板原样（占位符、空表）不计数
   const tpl = fs.readFileSync(path.join(REPO, 'project-review/references/report.md.tpl'), 'utf8');
@@ -155,6 +157,49 @@ test('report：汇总修复率、复核率、澄清、沉淀率、知识引用�
   const json = node([path.join(REPO, 'workflow/scripts/report.mjs'), '--json', '--since', '2026-10-16'], root);
   assert.equal(JSON.parse(json.stdout).review.reports, 1);
   assert.equal(node([path.join(REPO, 'workflow/scripts/report.mjs'), '--since', '10/16'], root).status, 1);
+  fs.rmSync(root, { recursive: true, force: true });
+});
+
+test('report：「无需沉淀」单列，不计入沉淀率的分母', () => {
+  const { root, put } = project();
+  put('pay/delivery.md', DELIVERY);
+  put('copy/delivery.md', DELIVERY.replace('支付回调幂等', '改文案').replace('> DocNexus：docnexus/library/dev-notes/pay-idempotent.md', '> DocNexus：无需沉淀'));
+  const r = buildReport(root);
+  assert.deepEqual([r.capture.captured, r.capture.not_captured, r.capture.not_needed, r.capture.capture_rate], [1, 0, 1, 100]);
+  const out = node([path.join(REPO, 'workflow/scripts/report.mjs')], root);
+  assert.match(out.stdout, /没有值得沉淀的内容 1/);
+  fs.rmSync(root, { recursive: true, force: true });
+});
+
+test('report：dev 内部审查与快速通道未询问沉淀，不稀释交付沉淀率或重复计数', () => {
+  const { root, put } = project();
+  const internalReview = REVIEW(false).replace('> DocNexus：未沉淀', '> DocNexus：未询问（由 dev 交付统一处理）');
+  put('pay/review.md', internalReview);
+  put('fast/review.md', internalReview.replaceAll('feature/pay', 'fix/fast'));
+  let r = buildReport(root);
+  assert.equal(r.artifacts, 2);
+  assert.equal(r.review.reports, 2, '快速通道的报告计入审查统计');
+  assert.equal(r.delivery.total, 0, '交付前与快速通道都没有交付说明');
+  assert.deepEqual([r.capture.not_asked, r.capture.not_captured, r.capture.capture_rate], [2, 0, null]);
+
+  put('pay/delivery.md', DELIVERY);
+  r = buildReport(root);
+  assert.deepEqual([r.capture.captured, r.capture.not_asked, r.capture.capture_rate], [1, 2, 100]);
+  put('pay/delivery.md', DELIVERY.replace('> DocNexus：docnexus/library/dev-notes/pay-idempotent.md', '> DocNexus：无需沉淀'));
+  r = buildReport(root);
+  assert.deepEqual([r.capture.not_needed, r.capture.not_asked, r.capture.capture_rate], [1, 2, null]);
+  put('pay/delivery.md', DELIVERY.replace('> DocNexus：docnexus/library/dev-notes/pay-idempotent.md', '> DocNexus：未沉淀'));
+  r = buildReport(root);
+  assert.deepEqual([r.capture.not_captured, r.capture.not_asked, r.capture.capture_rate], [1, 2, 0]);
+  put('pay/delivery.md', DELIVERY);
+  put('standalone/review.md', REVIEW(false).replaceAll('feature/pay', 'feature/standalone'));
+  r = buildReport(root);
+  assert.deepEqual([r.capture.captured, r.capture.not_captured, r.capture.not_asked, r.capture.capture_rate], [1, 1, 2, 50]);
+  const out = node([path.join(REPO, 'workflow/scripts/report.mjs')], root);
+  assert.equal(out.status, 0, out.stderr);
+  assert.match(out.stdout, /问过沉淀的 2 次中，沉淀 1 次（50%）/);
+  assert.match(out.stdout, /未询问 2/);
+  assert.match(out.stdout, /独立审查报告计入产物与审查统计/);
   fs.rmSync(root, { recursive: true, force: true });
 });
 

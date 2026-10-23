@@ -41,7 +41,8 @@ description: "Entry point for this project's dev workflow skills: routes a reque
 ### 完整链路（从需求到上线）
 
 ```
-dev（需求 → 方案 → 实现 → 测试 → 自审）
+dev（需求 → 方案 → 实现 → 测试 → 独立子 agent 审查并落盘报告 → 用户选择修复或交付）
+  ↳ 修复：实现 → 验证 → 独立复审 → 再次选择；交付：完整流程生成 delivery.md，S 快速通道只在对话交付
   → create-tech-md-doc（M / L 规模）
   → md-to-wiki（发布技术方案，可选）
   → create-release-md-doc（要上线时）

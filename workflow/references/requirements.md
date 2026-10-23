@@ -6,8 +6,8 @@
 workflow-run/docs/requirements/<需求名>/<项目名>/
 ├── meta.json          # 需求名、绑定的分支、各产物（种类、版本、日期、wiki 发布记录、DocNexus 沉淀）
 ├── plan.md            # 开发方案（dev，L 规模或用户要求时）
-├── delivery.md        # 交付说明（dev）
-├── review.md          # 审查报告（project-review）；复审也写这个文件，上一版归档（见「落盘」）
+├── delivery.md        # 交付说明（dev，独立审查后用户选择交付才生成；S 快速通道仅对话交付）
+├── review.md          # 审查报告（独立 project-review 或 dev 子 agent 自审，含 S 快速通道）；复审也写这个文件，上一版归档（见「落盘」）
 ├── tech-doc.md        # 技术方案（create-tech-md-doc）
 └── release-doc.md     # 上线方案（create-release-md-doc）
 ```
@@ -29,7 +29,7 @@ node <skills>/workflow/scripts/requirement.mjs which
   - 用户说不用起名、随便：`requirement.mjs bind`，按分支名生成。
 
   什么时候问：
-  - dev：确定规模为 M / L、要落盘时（S 规模快速通道不落盘，不问）；
+  - dev：确定规模为 M / L、要落盘时；S 规模（含快速通道）最迟在 F7 写独立审查报告前绑定；
   - 从 `/workflow` 完整链路开始时；
   - 其他 skill：第一次落盘时。
 
@@ -69,6 +69,8 @@ npx @rowansenne/workflow-run docs-repo <团队文档仓库地址> [--project <�
 ## 文档仓库的提交
 
 文档仓库模式下，产物写在另一个 git 仓库里，不会随代码提交。sync 输出里 `commit` 非空时：
+
+**dev F7 独立审查例外**：子 agent 将 `commit` 信息交回主 agent，此时不询问、不执行文档提交；主 agent 先交审查报告、等待用户选择修复或交付。选择交付进入 F8 后（含 S 快速通道），再运行 `requirement.mjs pending` 获取当前待提交内容，按下面步骤询问；修复与复审期间继续延后，不改动 `commit_prompt` 配置。
 
 1. 把 `commit.files`（未提交的产物）和 `commit.suggested_message` 给用户看，问要不要提交。
 2. 用户确认后，按 `commit.commands` 在文档仓库里提交；推送另外问用户，用户同意后再 `git -C workflow-run push`。

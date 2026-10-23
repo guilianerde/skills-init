@@ -3,10 +3,10 @@
 // 数据全部来自已经落盘的产物，不上报、不另存记录：
 //   - 审查：每份报告的 CRITICAL / HIGH / MEDIUM / LOW 条数、复核通过率；复审报告里上次问题的「已修复 / 仍存在 / 不再适用」→ 修复率
 //   - 交付：功能 / 缺陷、S / M / L、需求澄清中确认的决定条数、带「未验证项」的交付
-//   - 沉淀：交付说明与审查报告的「DocNexus」元信息行 → 已沉淀 / 未沉淀 / 未接入
+//   - 沉淀：交付说明与审查报告的「DocNexus」元信息行 → 已沉淀 / 未沉淀 / 未询问 / 无需沉淀 / 未接入
 //   - 知识复用：正文里引用 docnexus/library/ 的产物（开工前召回到并用上了）
 //   - 链路完整度：每个分支有哪些产物、文档有没有发布到 wiki
-// S 规模走快速通道的交付不落盘，不在统计内。
+// S 快速通道没有交付说明，不计交付统计；其独立审查报告计入产物与审查统计。
 // 默认只看工作区；产物随特性分支提交、还没合并时，加 --all-branches 用 git 只读扫描所有本地分支（同一路径以工作区为准）。
 //
 // 用法（在项目根执行；--root 可指定项目根）：
@@ -22,12 +22,14 @@ import { sections, section, tableRows, listItems, meta, isEmpty } from './doc-se
 const LEVELS = ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'];
 const pct = (a, b) => (b ? Math.round((a / b) * 100) : null);
 
-// DocNexus 元信息行 → captured / not_captured / not_connected / missing
+// DocNexus 元信息行 → captured / not_captured / not_asked / not_needed / not_connected / missing
 export function captureState(text) {
   const v = meta(text, 'DocNexus');
   if (!v) return 'missing';
   if (/docnexus\/library\//.test(v)) return 'captured';
   if (/未接入/.test(v)) return 'not_connected';
+  if (/未询问/.test(v)) return 'not_asked';
+  if (/无需沉淀/.test(v)) return 'not_needed';
   if (/未沉淀/.test(v)) return 'not_captured';
   return 'missing';
 }
@@ -86,7 +88,7 @@ export function buildReport(root, { since = null, allBranches = false } = {}) {
 
   const review = { reports: 0, rereviews: 0, levels: Object.fromEntries(LEVELS.map((l) => [l, 0])), verified: 0, pending: 0, follow_up: { fixed: 0, open: 0, obsolete: 0 } };
   const delivery = { total: 0, feature: 0, bug: 0, scale: { S: 0, M: 0, L: 0 }, with_decisions: 0, decisions: 0, with_unverified: 0 };
-  const capture = { captured: 0, not_captured: 0, not_connected: 0, missing: 0 };
+  const capture = { captured: 0, not_captured: 0, not_asked: 0, not_needed: 0, not_connected: 0, missing: 0 };
   let cites = 0;
   for (const a of all) {
     const text = read(a);
@@ -142,7 +144,7 @@ export function toMarkdown(r) {
     L.push('`workflow-run/docs/requirements/` 下还没有产物。dev 交付（M / L 规模）、审查报告、技术方案、上线方案落盘后，这里才有数据。');
     return L.join('\n');
   }
-  L.push(`产物 ${r.artifacts} 份：${KINDS.map((k) => `${k.label} ${r.counts[k.kind]}`).join('、')}。S 规模走快速通道的交付不落盘，不在统计内。`, '');
+  L.push(`产物 ${r.artifacts} 份：${KINDS.map((k) => `${k.label} ${r.counts[k.kind]}`).join('、')}。S 快速通道的交付说明不落盘，不计交付统计；其独立审查报告计入产物与审查统计。`, '');
   const v = r.review;
   L.push('## 审查', '');
   L.push(`- 报告 ${v.reports} 份（其中复审 ${v.rereviews} 份）；发现 CRITICAL ${v.levels.CRITICAL} / HIGH ${v.levels.HIGH} / MEDIUM ${v.levels.MEDIUM} / LOW ${v.levels.LOW}`);
@@ -155,7 +157,7 @@ export function toMarkdown(r) {
   L.push(`- 带「未验证项」的交付：${d.with_unverified} 份`, '');
   const c = r.capture;
   L.push('## 知识沉淀与复用', '');
-  L.push(`- 交付与审查问过沉淀的 ${c.captured + c.not_captured} 次中，沉淀 ${c.captured} 次（${show(c.capture_rate)}）；未接入 DocNexus ${c.not_connected}，元信息缺失 ${c.missing}`);
+  L.push(`- 交付与审查问过沉淀的 ${c.captured + c.not_captured} 次中，沉淀 ${c.captured} 次（${show(c.capture_rate)}）；未询问 ${c.not_asked}，没有值得沉淀的内容 ${c.not_needed}，未接入 DocNexus ${c.not_connected}，元信息缺失 ${c.missing}`);
   L.push(`- 正文引用知识库文档的产物：${r.knowledge.citing} 份（${show(r.knowledge.rate)}）`, '');
   L.push('## 各分支链路', '');
   L.push(`| 分支（需求） | ${KINDS.map((k) => k.label).join(' | ')} | 未发布到 wiki |`);

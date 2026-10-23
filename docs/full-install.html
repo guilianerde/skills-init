@@ -306,8 +306,8 @@ node .agents/skills/code-graph/scripts/cg.mjs impact --base main</pre><button cl
       <p>接入后 skills 会自动用上这两样：</p>
       <div class="tblwrap"><table>
         <tr><th>skill</th><th>DocNexus</th><th>CodeGraph</th></tr>
-        <tr><td><code>dev</code></td><td>开始前用 <code>docnexus-recall</code> 查项目约定；交付时问要不要沉淀</td><td>改公共方法前看入口，先跑受影响的测试，交付说明写受影响的接口、表、配置</td></tr>
-        <tr><td><code>project-review</code></td><td>同上，审查报告记下库内路径</td><td>「影响面」按入口归纳</td></tr>
+        <tr><td><code>dev</code></td><td>开始前用 <code>docnexus-recall</code> 查项目约定；完整交付有值得记的内容才问沉淀，快速通道不问；内部审查报告记「未询问」，由 dev 交付统一处理</td><td>改公共方法前看入口，先跑受影响的测试，交付说明写受影响的接口、表、配置</td></tr>
+        <tr><td><code>project-review</code></td><td>独立运行时有值得记的才问，沉淀后报告记库内路径；dev 子 agent 审查不单独问</td><td>「影响面」按入口归纳</td></tr>
         <tr><td>技术 / 上线方案</td><td>从知识库取模板；有值得记的内容时提议沉淀</td><td>影响范围、中间件上线、回归验证参考 <code>impact</code></td></tr>
       </table></div>
       <div class="note"><b class="tag">授权</b>任何写入 DocNexus 的操作都要你同意。没有 <code>.codegraph/</code> 时 skills 不会自己建索引，只在交付或报告里注明「未使用代码图谱」。</div>

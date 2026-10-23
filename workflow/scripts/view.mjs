@@ -191,6 +191,7 @@ function md(src) {
 }
 
 const pct = (v) => (v == null ? '—' : v + '%');
+const dnLabel = { captured: '已沉淀', not_captured: '未沉淀', not_asked: '未询问', not_needed: '无需沉淀', not_connected: '未接入' };
 function overview() {
   const r = D.report; const v = r.review;
   const cards = [
@@ -218,7 +219,7 @@ function reviewBlock(r) {
   const row = (a) => { const v = a.review; const f = v.follow_up;
     return '<tr><td><a href="#" data-doc="' + esc(a.path) + '">' + esc(a.file) + '</a></td><td>' + esc(a.date || '') + '</td><td>' + (v.is_rereview ? '复审' : '首次') + '</td>'
       + '<td><span class="lv c">' + v.levels.CRITICAL + '</span> <span class="lv h">' + v.levels.HIGH + '</span> ' + v.levels.MEDIUM + ' / ' + v.levels.LOW + '</td>'
-      + '<td>✅ ' + v.verified + ' · ⚠ ' + v.pending + '</td><td>' + (v.is_rereview ? '<span class="lv f">已修复 ' + f.fixed + '</span> 仍存在 ' + f.open + ' · 不再适用 ' + f.obsolete : '—') + '</td><td>' + esc(a.docnexus === 'captured' ? '已沉淀' : a.docnexus === 'not_captured' ? '未沉淀' : a.docnexus === 'not_connected' ? '未接入' : '—') + '</td></tr>'; };
+      + '<td>✅ ' + v.verified + ' · ⚠ ' + v.pending + '</td><td>' + (v.is_rereview ? '<span class="lv f">已修复 ' + f.fixed + '</span> 仍存在 ' + f.open + ' · 不再适用 ' + f.obsolete : '—') + '</td><td>' + esc(dnLabel[a.docnexus] ?? '—') + '</td></tr>'; };
   return '<section class="block"><h3>审查记录</h3><table><thead><tr><th>报告</th><th>日期</th><th>轮次</th><th>CRITICAL · HIGH · MEDIUM / LOW</th><th>复核</th><th>与上次对比</th><th>DocNexus</th></tr></thead><tbody>' + rs.map(row).join('') + '</tbody></table></section>';
 }
 
@@ -245,7 +246,7 @@ function deliveryBlock(r) {
   const ds = r.artifacts.filter((a) => a.kind === 'delivery');
   if (!ds.length) return '';
   return '<section class="block"><h3>交付记录</h3><table><thead><tr><th>交付说明</th><th>日期</th><th>类型</th><th>规模</th><th>确认的决定</th><th>未验证项</th><th>DocNexus</th></tr></thead><tbody>' + ds.map((a) => { const d = a.delivery;
-    return '<tr><td><a href="#" data-doc="' + esc(a.path) + '">' + esc(a.file) + '</a></td><td>' + esc(a.date || '') + '</td><td>' + (d.type === 'bug' ? '缺陷修复' : d.type === 'feature' ? '功能开发' : '—') + '</td><td>' + (d.scale || '—') + '</td><td>' + d.decisions + '</td><td>' + (d.has_unverified ? '<span class="lv h">有</span>' : '无') + '</td><td>' + esc(a.docnexus === 'captured' ? '已沉淀' : a.docnexus === 'not_captured' ? '未沉淀' : a.docnexus === 'not_connected' ? '未接入' : '—') + '</td></tr>'; }).join('') + '</tbody></table></section>';
+    return '<tr><td><a href="#" data-doc="' + esc(a.path) + '">' + esc(a.file) + '</a></td><td>' + esc(a.date || '') + '</td><td>' + (d.type === 'bug' ? '缺陷修复' : d.type === 'feature' ? '功能开发' : '—') + '</td><td>' + (d.scale || '—') + '</td><td>' + d.decisions + '</td><td>' + (d.has_unverified ? '<span class="lv h">有</span>' : '无') + '</td><td>' + esc(dnLabel[a.docnexus] ?? '—') + '</td></tr>'; }).join('') + '</tbody></table></section>';
 }
 
 function select(id, docPath) {

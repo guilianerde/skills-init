@@ -56,6 +56,21 @@ test('renderHtml：单文件、数据内嵌且转义（正文里的 </script> �
   fs.rmSync(root, { recursive: true, force: true });
 });
 
+test('view：dev 内部审查的未询问状态进入页面，沉淀率只算实际询问', () => {
+  const root = project();
+  const dir = path.join(root, 'workflow-run/docs/requirements/订单导出/svc');
+  fs.rmSync(path.join(dir, 'review_v2.md'));
+  const review = path.join(dir, 'review.md');
+  fs.writeFileSync(review, fs.readFileSync(review, 'utf8').replace('DocNexus：未沉淀', 'DocNexus：未询问（由 dev 交付统一处理）'));
+  const data = viewData(root);
+  assert.equal(data.requirements[0].artifacts.find((a) => a.kind === 'review').docnexus, 'not_asked');
+  assert.deepEqual([data.report.capture.not_asked, data.report.capture.not_captured, data.report.capture.capture_rate], [1, 0, 100]);
+  const html = renderHtml(data);
+  const json = /<script id="data" type="application\/json">([\s\S]*?)<\/script>/.exec(html)[1];
+  assert.equal(JSON.parse(json).report.capture.not_asked, 1);
+  fs.rmSync(root, { recursive: true, force: true });
+});
+
 test('CLI：workflow-run view 默认写到 workflow-run/tmp/view/index.html，--out 指定位置；不改产物', () => {
   const root = project();
   const before = fs.readFileSync(path.join(root, 'workflow-run/docs/requirements/订单导出/svc/meta.json'), 'utf8');
