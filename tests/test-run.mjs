@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import vm from 'node:vm';
 import { bind, sync, which } from '../workflow/scripts/requirement.mjs';
 import { startRun, changeRun, runState, FLOWS } from '../workflow/scripts/run.mjs';
 import { branchView } from '../workflow/scripts/artifacts.mjs';
@@ -72,10 +73,12 @@ test('完成必须有明确交付选择和当前分支产物，记录 completed 
   f.put('review.md', 'feature/other');
   assert.throws(() => f.save(run, {}, 'complete'), /review.md/);
   f.put('review.md');
-  run = f.save(run, {}, 'complete');
+  run = f.save(run, { stage: 'F8', steps: completed(['F8']) }, 'complete');
   assert.equal(run.status, 'completed');
   assert.ok(run.completed_at);
   assert.equal(branchView(f.root, BRANCH).execution.current.status, 'completed');
+  assert.equal(viewData(f.root).requirements[0].runs[0].status, 'completed');
+  assert.equal(viewData(f.root).requirements[0].runs[0].completed_at, run.completed_at);
   assert.throws(() => f.save(run, { context: { summary: '覆盖' } }), /运行已结束/);
   const second = f.start();
   assert.notEqual(second.id, run.id);
@@ -107,13 +110,14 @@ test('步骤 / 等待 / 阻塞校验拒绝不完整状态；不根据 Markdown �
   assert.throws(() => f.save(run, { status: 'blocked' }), /reason/);
   assert.throws(() => f.save(run, { stage: 'invalid' }), /无效阶段/);
   assert.throws(() => f.save(run, { status: 'completed' }), /complete/);
+  for (const status of ['', null, 0]) assert.throws(() => f.save(run, { status }), /状态只支持/);
   for (const name of ['plan.md', 'review.md', 'delivery.md']) f.put(name);
   sync(f.root, f.req.dir);
   assert.equal(runState(f.root, BRANCH).current.status, 'running');
   assert.equal(runState(f.root, BRANCH).current.steps.F8.status, 'pending');
 });
 
-test('无运行的读取不创建目录；只有 meta 状态也能在 view 中显示，完成状态进入页面数据', (t) => {
+test('无运行的读取不创建目录；只有 meta 状态也能在 view 中显示步骤进度', (t) => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'workflow-empty-state-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   assert.equal(runState(root, 'feature/fast').current, null);
@@ -125,9 +129,37 @@ test('无运行的读取不创建目录；只有 meta 状态也能在 view 中�
   assert.equal(data.requirements.length, 1);
   assert.equal(data.requirements[0].artifacts.length, 0);
   assert.equal(data.requirements[0].runs[0].stage, 'F4');
+  const all = spawnSync(process.execPath, [path.join(REPO, 'workflow/scripts/artifacts.mjs'), '--root', f.root, '--all'], { encoding: 'utf8' });
+  assert.equal(all.status, 0, all.stderr);
+  assert.equal(JSON.parse(all.stdout).branches[0].execution.current.branch, BRANCH);
   const html = renderHtml(data);
   const embedded = JSON.parse(/<script id="data" type="application\/json">([\s\S]*?)<\/script>/.exec(html)[1]);
   assert.equal(embedded.requirements[0].runs[0].steps.F3.status, 'completed');
+  const nodes = new Map();
+  const document = {
+    documentElement: { dataset: {} },
+    getElementById: () => ({ textContent: JSON.stringify(embedded) }),
+    querySelector: (id) => { if (!nodes.has(id)) nodes.set(id, { value: '', innerHTML: '' }); return nodes.get(id); },
+    querySelectorAll: () => [],
+  };
+  vm.runInNewContext(/<script>([\s\S]*?)<\/script>/.exec(html)[1], { document, localStorage: { getItem: () => null }, history: { replaceState() {} }, location: { hash: '' } });
+  assert.match(nodes.get('#main').innerHTML, /流程运行状态/);
+  assert.match(nodes.get('#main').innerHTML, /F3：已完成/);
+  assert.match(nodes.get('#doc').innerHTML, /尚未生成文档/);
+});
+
+test('独立审查、技术／上线方案、wiki 和 bug 的步骤与完成标识一致', (t) => {
+  const f = fixture(t);
+  for (const name of ['plan.md', 'review.md', 'delivery.md', 'tech-doc.md', 'release-doc.md']) f.put(name);
+  for (const kind of ['review', 'tech', 'release', 'wiki', 'bug']) {
+    const steps = FLOWS[kind];
+    const input = { stage: steps.at(-1), steps: completed(steps), ...(kind === 'bug' ? { decision: { action: 'deliver', confirmed: true } } : {}) };
+    let run = startRun(f.root, { branch: BRANCH, kind, size: 'M', input }).run;
+    run = f.save(run, {}, 'complete');
+    assert.equal(run.status, 'completed', kind);
+    assert.ok(run.completed_at, kind);
+  }
+  assert.equal(runState(f.root, BRANCH).runs.length, 5);
 });
 
 test('元信息锁阻止并发覆盖，异常释放锁；损坏 JSON 不会被重建为空索引', (t) => {
@@ -141,6 +173,18 @@ test('元信息锁阻止并发覆盖，异常释放锁；损坏 JSON 不会被�
   assert.throws(() => sync(f.root, f.req.dir));
   assert.equal(fs.readFileSync(f.file, 'utf8'), '{invalid');
   assert.equal(fs.existsSync(`${f.file}.lock`), false);
+});
+
+test('发布已有产物按来源需求与分支记录，不跟随当前 checkout 或同分支最新绑定串到其他需求', (t) => {
+  const f = fixture(t);
+  bind(f.root, { name: '另一个需求', branch: BRANCH });
+  bind(f.root, { name: '主分支任务', branch: 'main' });
+  const run = startRun(f.root, { branch: BRANCH, kind: 'wiki', dir: f.req.dir, input: { context: { document: `${f.req.dir}/tech-doc.md`, pageId: '42' } } });
+  assert.equal(run.dir, f.req.dir);
+  assert.equal(run.run.branch, BRANCH);
+  assert.equal(runState(f.root, 'main').current, null);
+  assert.equal(JSON.parse(fs.readFileSync(f.file)).runs[run.run.id].context.pageId, '42');
+  assert.throws(() => startRun(f.root, { branch: 'main', kind: 'wiki', dir: f.req.dir }), /尚未绑定指定需求/);
 });
 
 test('CLI 在安装后的 skills 中支持 start / show / save / cancel，并以 JSON 文件提交 checkpoint', (t) => {

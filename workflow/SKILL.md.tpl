@@ -11,7 +11,8 @@ description: "Entry point for this project's dev workflow skills: routes a reque
 
 ```
 /workflow                 # 根据用户请求路由；无具体请求时输出能力地图 + 状态
-/workflow status          # 能力探测报告
+/workflow status          # 能力探测 + 当前分支运行进度（含已完成）
+/workflow resume [<运行id>] # 读取 meta.json 中的状态，核对后续接
 /workflow profile         # 填写或更新项目画像
 /workflow report          # 本地效果报告（审查发现与修复率、需求澄清、沉淀与复用、各分支链路）
 /workflow view            # 项目文档视图：按需求浏览方案、交付、审查、技术 / 上线方案（本地静态页面）
@@ -31,6 +32,7 @@ description: "Entry point for this project's dev workflow skills: routes a reque
 | 根据分支 diff 出上线方案 | `create-release-md-doc` | 可带 `--tech` 复用技术方案 |
 | 把 md 发布到 wiki | `md-to-wiki` | 需 wiki 已配置 |
 | 写 PR / MR 描述、提 PR | `workflow/scripts/pr-desc.mjs` | 汇总本分支交付说明、审查报告、技术 / 上线方案；创建 PR 需用户同意 |
+| 继续上次任务、恢复中断的流程 | `/workflow resume` | 先读运行状态和上下文，等待中的决定不能自动跳过 |
 | 这套工作流效果怎么样、用得怎么样 | `/workflow report` | 只读统计 `workflow-run/docs/requirements/` 下的产物 |
 | 看看项目文档、某个需求留下了哪些文档、审查记录 | `/workflow view` | 生成本地静态页面，按需求浏览 |
 | 改技术方案 / 上线方案 / 交付说明 / 审查报告的模板，按样例建模板 | `/workflow template` | 草稿 → 校验与影响 → 用户确认后写入 DocNexus（默认模板只读，未接入 DocNexus 时不能改） |
@@ -64,11 +66,12 @@ dev（确定工作分支 → 定需求名 → 理解需求 → 方案 → 实现
 | `references/templates.md` | 模板来源判定（`resolve.mjs template`）、创建与修改模板（`/workflow template`）、模板随知识库更新 |
 | `references/docnexus.md` | 写入 DocNexus 的分类（`resolve.mjs category`）、按分类参考知识库（`knowledge.mjs`） |
 | `references/status.md` | `/workflow status` 的输出格式 |
+| `references/runs.md` | 完整流程在 meta.json 中的运行状态、步骤完成标记、保存与恢复、运行完成时间 |
 | `references/requirements.md` | 产物按需求归档（`workflow-run/docs/requirements/<需求名>/<项目名>/`）：什么时候问需求名、`requirement.mjs` 绑定分支与给出落盘路径、`meta.json` |
 | `references/tables.md` | 确定改动涉及哪些表（`tables.mjs`）、只读拉取实际表结构 / 索引 / 行数核对（`query.mjs --schema --indexes`），没有库连接时怎么退回 |
 | `references/codegraph.md` | 用 CodeGraph 代码图谱读代码、查调用链与影响面（MCP 工具与 CLI 对照、图谱看不到的部分） |
 
-`/workflow profile` → 按 `references/profile.md` 执行；`/workflow status` → 按 `references/status.md` 输出；`/workflow report` → 运行 `node <skills>/workflow/scripts/report.mjs [--since YYYY-MM-DD]`，原样给出输出的 Markdown，再用两三句话指出最值得关注的数字（例如修复率低、带未验证项的交付多、从不沉淀），不要编造报告里没有的数据。`/workflow view` → 运行 `node <skills>/workflow/scripts/view.mjs`（用户要直接打开时加 `--open`），把生成的页面路径告诉用户；页面只读、不联网，数据是生成那一刻的快照，产物有更新时重新生成。`/workflow template` → 按 `references/templates.md`「修改模板」一路走完：起草稿、按用户的要求改、校验并说明影响、用户确认后保存并确认生效；没说改哪份模板时先运行 `template.mjs list` 问用户。
+`/workflow resume` → 按 `references/runs.md`「新会话恢复」读取 `run.mjs show [--id <运行id>]`，先核对项目根、分支、代码和证据，再进入对应 skill 的保存阶段；已完成运行只展示完成标记与时间，不能自动重启。`/workflow profile` → 按 `references/profile.md` 执行；`/workflow status` → 按 `references/status.md` 输出；`/workflow report` → 运行 `node <skills>/workflow/scripts/report.mjs [--since YYYY-MM-DD]`，原样给出输出的 Markdown，再用两三句话指出最值得关注的数字（例如修复率低、带未验证项的交付多、从不沉淀），不要编造报告里没有的数据。`/workflow view` → 运行 `node <skills>/workflow/scripts/view.mjs`（用户要直接打开时加 `--open`），把生成的页面路径告诉用户；页面只读、不联网，数据是生成那一刻的快照，产物有更新时重新生成。`/workflow template` → 按 `references/templates.md`「修改模板」一路走完：起草稿、按用户的要求改、校验并说明影响、用户确认后保存并确认生效；没说改哪份模板时先运行 `template.mjs list` 问用户。
 
 ## 增强能力探测
 

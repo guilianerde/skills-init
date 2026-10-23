@@ -25,6 +25,16 @@ description: "Implement a feature or fix a bug in this project end to end: under
 
 没有斜杠命令时按用户意图判断模式：描述的是「要新增/改变的行为」→ 功能开发；描述的是「现在的行为不对」→ 缺陷修复。
 
+## 完整流程的运行状态
+
+按 `<skills>/workflow/references/runs.md` 保存和恢复进度，状态统一在需求的 `meta.json`，不另建状态文件。确定工作分支后先 `run.mjs show`；用户要求继续时读取对应运行的 context、已完成步骤与等待事项，核对代码和证据后从保存的阶段恢复，不重走有效的已完成步骤。不能把“继续”当成用户选择交付。
+
+新任务确定不走快速通道后，先绑定需求，再 `run.mjs start --kind feature|bug --size <规模> --input <checkpoint.json>`，把前置步骤、验收标准、已确认决定、范围、基线与待办补入第一份 checkpoint。功能开发在 F4 创建（Step0、F1～F3 按真实进度补记），缺陷修复在 B4 创建（Step0、B1～B3 补记）；快速通道不 start、不 save。
+
+每个步骤完成、等待用户、遇到阻塞和结束本轮会话前 save，明确标记步骤 completed 并记录证据。方案待确认时运行为 waiting_user；F7 报告交给用户后也保存 waiting_user 和“修复或交付”，不能仅因报告存在就继续。用户选修复时记录确认的 fix 并回 F5（bug 回 B4），自动重置后续完成标记；选交付时记录确认的 deliver 并进 F8（bug 留 B5）。规模变化同时更新 size。
+
+完整交付说明、自检、摘要和反馈完成后，将 F8（bug 为 B5）标 completed，再执行 `run.mjs complete`，保存运行的 **completed（已完成）与 completed_at**；可选后续动作不阻塞本次已完成的交付，也不自动获得执行授权。已完成运行不再覆盖，新工作使用新的运行记录。dev 内部的审查子 agent 只返回报告和证据，由主 agent 更新同一运行，不能另起 review 运行或并发覆盖状态。
+
 ## Step 0 — 前置检查（两种模式共用）
 
 1. **项目画像**：运行 `node <skills>/workflow/scripts/resolve.mjs profile`，读输出的 `profile`、`empty`（空字段列表）与 `toolchain`（开发环境配置，见 `workflow` skill）。本 skill 用到 `main_branch`、`build`、`test`、`test_single`（`{target}` 替换为测试类或文件）、`lint`、`config_center`、`notes`。

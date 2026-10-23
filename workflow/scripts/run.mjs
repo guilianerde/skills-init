@@ -23,12 +23,13 @@ const object = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
 const timestamp = () => new Date().toISOString();
 const branchOf = (root) => spawnSync('git', ['symbolic-ref', '--short', 'HEAD'], { cwd: root, encoding: 'utf8' }).stdout?.trim() || null;
 
-export function branchRuns(root, branch) {
+export function allRuns(root) {
   return requirements(root).flatMap((r) => Object.values(readMeta(path.join(r.abs, 'meta.json')).runs ?? {})
-    .filter((run) => run.branch === branch)
     .map((run) => ({ ...run, requirement: r.name, dir: r.dir })))
     .sort((a, b) => a.updated_at.localeCompare(b.updated_at));
 }
+
+export const branchRuns = (root, branch) => allRuns(root).filter((run) => run.branch === branch);
 
 export function runState(root, branch) {
   const runs = branchRuns(root, branch);
@@ -40,17 +41,21 @@ export function runState(root, branch) {
   return { branch, current, runs, next };
 }
 
-function applyCheckpoint(run, patch, at) {
+function applyCheckpoint(run, patch, at, reopen = true) {
   if (!object(patch)) throw new Error('checkpoint 必须是 JSON 对象');
-  const allowed = ['stage', 'status', 'waiting_for', 'reason', 'steps', 'context', 'decision'];
+  const allowed = ['stage', 'status', 'size', 'waiting_for', 'reason', 'steps', 'context', 'decision'];
   for (const key of Object.keys(patch)) if (!allowed.includes(key)) throw new Error(`不支持修改字段：${key}`);
-  if (patch.status && !['running', 'waiting_user', 'blocked'].includes(patch.status)) throw new Error('save 的状态只支持 running / waiting_user / blocked；完成用 complete，取消用 cancel');
+  if (patch.status !== undefined && !['running', 'waiting_user', 'blocked'].includes(patch.status)) throw new Error('save 的状态只支持 running / waiting_user / blocked；完成用 complete，取消用 cancel');
+  if (patch.size !== undefined) {
+    if (!['S', 'M', 'L'].includes(patch.size)) throw new Error('size 必须是 S / M / L');
+    run.size = patch.size;
+  }
   const stages = FLOWS[run.kind];
   const stage = patch.stage ?? run.stage;
   if (!stages.includes(stage)) throw new Error(`无效阶段：${stage}`);
   const status = patch.status ?? run.status;
   // 回到已完成的阶段时，后续完成标记失效；历史 checkpoint 仍保留。
-  if (patch.stage && (stages.indexOf(stage) < stages.indexOf(run.stage) || (status === 'running' && done(run.steps[stage].status)))) {
+  if (reopen && patch.stage && (stages.indexOf(stage) < stages.indexOf(run.stage) || (status === 'running' && done(run.steps[stage].status)))) {
     for (const name of stages.slice(stages.indexOf(stage))) run.steps[name] = { status: 'pending' };
     run.decision = null;
   }
@@ -83,11 +88,11 @@ function applyCheckpoint(run, patch, at) {
   return run;
 }
 
-export function startRun(root, { branch, kind = 'feature', size = null, input = {} }) {
+export function startRun(root, { branch, kind = 'feature', size = null, input = {}, dir = null }) {
   if (!branch || !FLOWS[kind]) throw new Error('start 需要有效分支及 kind：feature / bug / review / tech / release / wiki');
   if (['feature', 'bug'].includes(kind) && !['S', 'M', 'L'].includes(size)) throw new Error('完整 dev 流程需要 size：S / M / L；快速通道不创建运行记录');
-  const req = find(root, branch);
-  if (!req) throw new Error('当前分支尚未绑定需求，先确认需求名并运行 requirement.mjs bind；快速通道不要调用 start');
+  const req = dir ? requirements(root).find((r) => r.abs === path.resolve(root, dir)) : find(root, branch);
+  if (!req || !req.branches.includes(branch)) throw new Error('当前分支尚未绑定指定需求，先确认需求名并运行 requirement.mjs bind；快速通道不要调用 start');
   let selected; let resumed = false;
   updateMeta(path.join(req.abs, 'meta.json'), (meta) => {
     const runs = meta.runs ?? {};
@@ -118,10 +123,10 @@ export function changeRun(root, { branch, id, revision, input = {}, action = 'sa
       run.status = 'cancelled'; run.reason = input.reason; run.waiting_for = null; run.ended_at = at;
       run.history.push({ at, stage: run.stage, status: 'cancelled', reason: input.reason });
     } else {
-      applyCheckpoint(run, input, at);
+      applyCheckpoint(run, input, at, action !== 'complete');
       if (action === 'complete') {
         const steps = FLOWS[run.kind];
-        if (run.status !== 'running' || !steps.every((s) => done(run.steps[s].status)) || run.steps[steps.at(-1)].status !== 'completed') throw new Error('还有未完成步骤、待用户决定或阻塞，不能标记已完成');
+        if (run.status !== 'running' || run.stage !== steps.at(-1) || !steps.every((s) => done(run.steps[s].status)) || run.steps[steps.at(-1)].status !== 'completed') throw new Error('还有未完成步骤、待用户决定或阻塞，不能标记已完成');
         if (['feature', 'bug'].includes(run.kind)) {
           const required = run.kind === 'feature' ? ['F4', 'F5', 'F6', 'F7', 'F8'] : ['B4', 'B5'];
           if (required.some((s) => run.steps[s].status !== 'completed') || run.decision?.action !== 'deliver' || !run.decision.confirmed) throw new Error('完整 dev 流程必须完成方案、实现、验证、审查和交付，且用户已选择交付');
@@ -147,7 +152,7 @@ function main(argv) {
   try {
     while (args.length) {
       const key = args.shift();
-      if (!['--root', '--branch', '--id', '--kind', '--size', '--input', '--expect-revision'].includes(key) || !args.length) throw new Error(`未知或缺少值的参数：${key}`);
+      if (!['--root', '--branch', '--dir', '--id', '--kind', '--size', '--input', '--expect-revision'].includes(key) || !args.length) throw new Error(`未知或缺少值的参数：${key}`);
       opts[key.slice(2)] = args.shift();
     }
     const root = path.resolve(opts.root ?? '.'); const branch = opts.branch ?? branchOf(root);
@@ -156,8 +161,12 @@ function main(argv) {
     let out;
     if (action === 'show') {
       out = runState(root, branch);
-      if (opts.id) { out.current = out.runs.find((r) => r.id === opts.id) ?? null; if (!out.current) throw new Error('当前分支没有这个运行'); }
-    } else if (action === 'start') out = startRun(root, { branch, kind: opts.kind, size: opts.size, input });
+      if (opts.id) {
+        out.current = out.runs.find((r) => r.id === opts.id) ?? null;
+        if (!out.current) throw new Error('当前分支没有这个运行');
+        out.next = `${STATUS_LABELS[out.current.status]}：${out.current.stage}（${out.current.id}）`;
+      }
+    } else if (action === 'start') out = startRun(root, { branch, kind: opts.kind, size: opts.size, input, dir: opts.dir });
     else out = changeRun(root, { branch, id: opts.id, revision: opts['expect-revision'] === undefined ? null : Number(opts['expect-revision']), input, action });
     console.log(JSON.stringify(out, null, 2)); return 0;
   } catch (e) { console.error(e.message); return 1; }

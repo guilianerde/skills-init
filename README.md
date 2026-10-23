@@ -149,6 +149,8 @@ npx @rowansenne/workflow-run@latest doctor --offline
 * 知识：交付与审查的 DocNexus 沉淀率（只算真正问过沉淀的，「未询问」「无需沉淀」不计入分母；dev 内部审查不单独询问或重复计入交付沉淀）、正文引用了知识库文档的产物占比；
 * 各分支链路：方案、交付说明、审查报告、技术方案、上线方案齐不齐，哪些文档还没发布到 wiki。
 
+**完整流程状态与续接**：需求目录的 `meta.json` 同时保存绑定、产物索引和按运行 id 区分的 `runs`。每次运行关联分支，记录阶段、逐步完成标记、上下文、待用户决定、阻塞原因、历史与 revision；完成后保存 `status: completed` 和 `completed_at`。`/workflow status` 查看状态，`/workflow resume [运行id]` 核对后继续；`/workflow view` 展示运行与“已完成”，尚未生成 Markdown 的运行也可见。快速通道保持不绑定、不创建运行状态。完整 dev 在 F4／B4 确定流程后开始记录，补入此前已确认的进度；后续文档／发布用独立运行保留开发的完成记录。脚本用法见 `workflow/references/runs.md`，`sync` 不会清掉状态。
+
 **运行反馈**（`npx @rowansenne/workflow-run feedback [--json]`）：效果报告只看落盘的产物，看不到过程。dev 和 project-review 每跑完一次，用 `workflow/scripts/feedback.mjs add` 静默追加一行到 `workflow-run/feedback/<git 用户名>.jsonl`：模型、规模 / 深度、是否走快速通道、向用户提问几轮、用户纠正过几次理解、验收项验证了几条、跳过了哪些步骤、**哪条规则读不懂或做不到**、用户主动说的抱怨。只记过程，不记代码和业务名词；不额外问用户。每人一个文件，随 `workflow-run/` 提交，多人不冲突。独立文档仓库模式下，安装器在文档仓库的 `workflow-run/.gitattributes` 里给这些文件配 `merge=union`，同一个文件在几个分支上都有记录时合并也不冲突；随代码提交时不改代码仓库的 `.gitattributes`，合并时遇到冲突保留两边的行即可。用来定期精简 skill：
 
 1. 团队照常用两三周；
@@ -471,6 +473,7 @@ npx @rowansenne/workflow-run uninstall
 | `workflow/scripts/lint-doc.mjs <文档> --skill <skill> [--facts]` | 对照当前生效的模板检查生成的文档：必填章节、残留 `{{...}}` 占位符、元信息行为错误；缺普通章节、顺序不一致为警告；列出待填写位置。`--facts` 再核对正文里的类名、文件、接口、表名：在对比分支的 diff 和代码里都找不到的记为警告（防编造） |
 | `workflow/scripts/requirement.mjs which / bind / path / sync / pending / list / config` | 产物按需求归档（`workflow-run/docs/requirements/<需求>/<项目>/`，两种模式结构相同）：查当前分支绑定的需求（没绑定时给出按分支名生成的建议名）、绑定需求名、给出本次落盘路径（不覆盖，带上一版的 wiki 记录）、重建 `meta.json`、列出所有需求；`config` 设置产物位置（文档仓库、项目名、提交提示），`pending` 看文档仓库里还没提交的产物 |
 | `workflow/scripts/view.mjs [--out f] [--open]` | 项目文档视图（`/workflow view`、`npx @rowansenne/workflow-run view`）：读需求目录里的产物，生成单个 HTML，按需求列出各阶段、审查记录（各级别数量、复核、与上次对比）、交付记录、沉淀到的知识文档，正文直接渲染；顶部「知识文档」列出每篇知识文档来自哪个需求、哪份产物；数据内嵌，只读、不联网，默认写到 `workflow-run/tmp/view/index.html` |
+| `workflow/scripts/run.mjs show / start / save / complete / cancel` | 需求 meta.json 中的分支运行记录：恢复、checkpoint、已完成状态与时间、等待用户、修复回退、revision 冲突检查 |
 | `workflow/scripts/artifacts.mjs [--branch b \| --all]` | 按分支汇总 `workflow-run/docs/requirements/` 下的方案、交付说明、审查报告、技术方案、上线方案及其 wiki 发布记录，给出下一步建议；分支取自文档元信息行，不另存记录。上线方案没传 `--tech` 时据此自动引用同分支的技术方案；project-review 据此对照本分支方案、识别复审 |
 | `workflow/scripts/report.mjs [--since d] [--all-branches] [--json]` | 本地效果报告（`/workflow report`、`npx @rowansenne/workflow-run report`）：审查发现与修复率、复核率、需求澄清、沉淀率、知识引用、各分支链路 |
 | `workflow/scripts/feedback.mjs add … / summary [--json]` | 运行反馈：dev / project-review 交付后追加一行过程记录到 `workflow-run/feedback/<用户>.jsonl`；`summary` 按 skill 汇总，跳过的步骤和不清楚的规则按 SKILL.md 章节归类（`npx @rowansenne/workflow-run feedback`）；`init` / `upgrade` 装了新版本时清掉本项目旧版本的记录 |
@@ -597,7 +600,7 @@ git status --short --ignored
 
 ```
 workflow-run/docs/requirements/<需求名>/<项目名>/
-├── meta.json        # 需求名、绑定的分支、各产物（版本、日期、wiki 发布记录、DocNexus 沉淀），给以后的可视化用
+├── meta.json        # runs 保存分支运行状态、逐步完成标记与完成时间；另含 需求名、绑定的分支、各产物（版本、日期、wiki 发布记录、DocNexus 沉淀），给以后的可视化用
 ├── plan.md          # 方案（dev，非快速通道都写；S / M 简版；缺陷修复追加修复方案节）
 ├── delivery.md      # 交付说明（dev，完整流程审查后用户选择交付才写；S 快速通道不落盘）
 ├── review.md        # 审查报告（独立审查或 dev 完整流程自查；S 快速通道不落盘）；复审也写这个文件，上一版归档到 workflow-run/tmp/old-artifacts/

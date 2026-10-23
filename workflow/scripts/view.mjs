@@ -274,7 +274,9 @@ function select(id, docPath) {
   $('#main').innerHTML = overview() + '<h2>' + esc(r.name) + '</h2><div class="sub">' + esc(r.dir ?? '') + (r.projects.length ? ' · 项目 ' + esc(r.projects.join('、')) : '') + ' · 分支 ' + esc(r.branches.join('、') || '无') + (r.named_by === 'branch' ? ' · <span class="tag">需求名由分支名生成，可在 meta.json 改</span>' : '') + '</div>'
     + pipeline + runBlock(r) + reviewBlock(r) + deliveryBlock(r) + knowledgeBlock(r) + files + '<div class="doc" id="doc"></div>';
   document.querySelectorAll('[data-doc]').forEach((el) => (el.onclick = (e) => { e.preventDefault(); showDoc(r, el.dataset.doc); }));
-  showDoc(r, docPath || (latest('review') || r.artifacts.at(-1)).path);
+  const selected = docPath || (latest('review') || r.artifacts.at(-1))?.path;
+  if (selected) showDoc(r, selected);
+  else $('#doc').innerHTML = '<div class="empty">运行进度已保存，尚未生成文档。</div>';
   renderList();
 }
 

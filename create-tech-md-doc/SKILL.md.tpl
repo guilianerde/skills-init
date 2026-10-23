@@ -26,6 +26,8 @@ description: "Generate a Markdown technical design doc (技术方案) from the d
 3. 读 `workflow/profile.json`：发布平台、Region、配置中心、定时任务注解、是否需要数据评审都取自这里；未配置的写「待填写」，**不要沿用其他项目的取值**。
 4. DocNexus 可用时运行 `node <skills>/workflow/scripts/knowledge.mjs create-tech-md-doc --match <模块名 / 业务名词> --query "<一句话：本次改动做了什么>"`（模块名取分支名或 diff 涉及的模块），看以往技术方案沉淀的决策与约定、相关开发沉淀；相关的在文档对应章节引用 `workflow-run/docnexus/library/<path>`（见 `<skills>/workflow/references/docnexus.md`「按分类参考知识库」）。未接入就跳过。
 
+**完整流程状态**：Step 0 通过后确定需求名、绑定目标 dev 分支，按 `<skills>/workflow/references/runs.md` 用 kind `tech` 创建／恢复运行；带上 `--branch <dev分支>`，T0～T4 对应 Step 0～4。已完成步骤、PRD 跳过原因、模板等待／阻塞和证据都写 checkpoint；缺模板停下时不能丢失进度。Step 4 文档写完、自检和交付摘要完成后，将 T4 标 completed，再 complete 保存“已完成”与完成时间；Step 5 的可选下一步另行处理，不把 dev 的已完成记录覆盖成文档运行。
+
 ### Step 1 — PRD（仅传入 `--prd` 时）
 
 按 `references/prd-fetch.md` 判断 wiki 是否可用并拉取 PRD（不可用 → 告知「wiki 连接未配置，PRD 增强已跳过」，继续纯 diff 流程），再按 `references/prd.md` 抽取本文档需要的字段并做对齐校验。PRD 任何环节失败都只回退，不中止。

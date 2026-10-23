@@ -4,7 +4,7 @@
 
 ```
 workflow-run/docs/requirements/<需求名>/<项目名>/
-├── meta.json          # 需求名、绑定的分支、各产物（种类、版本、日期、wiki 发布记录、DocNexus 沉淀）
+├── meta.json          # 运行记录 runs（阶段、步骤完成标记、等待决定、上下文、完成时间）及 需求名、绑定的分支、各产物（种类、版本、日期、wiki 发布记录、DocNexus 沉淀）
 ├── plan.md            # 方案（dev，非快速通道都写；S / M 简版；缺陷修复追加修复方案节）
 ├── delivery.md        # 交付说明（dev，完整流程审查后用户选择交付才生成；S 快速通道不落盘）
 ├── review.md          # 审查报告（独立 project-review 或 dev 完整流程的自查；S 快速通道不落盘）；复审也写这个文件，上一版归档（见「落盘」）
@@ -39,6 +39,10 @@ node <skills>/workflow/scripts/requirement.mjs which
   已经问过、绑定过的分支，后面的 skill 直接沿用；只问过、还没 bind 的，沿用对话里给出的名字。
 
 一个需求可以绑定多个分支（`bind` 在其他分支上用同一个名字即可）。
+
+## 运行状态
+
+完整流程在本文件的 `runs` 中按运行 id 保存进度，关联分支；同一需求可有多次运行。`status: completed` 和 `completed_at` 是本次运行已完成的明确标记，步骤也单独记录 completed。保存／恢复和各 skill 的记录时机见 `runs.md`；快速通道不创建记录。`sync` 只重建产物索引，保留 runs 和其他扩展字段；重新 bind 也不会清空历史。元信息采用原子写入与短时写锁，状态更新另有 revision 检查。
 
 ## 落盘
 

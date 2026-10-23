@@ -43,6 +43,8 @@ description: "Publish a local Markdown document to an existing Confluence wiki p
 5. 读取目标页面当前的标题、版本号：通道 A 用 MCP 的 `get_page`，通道 B 用 `node <skillDir>/scripts/upload.mjs info <pageId|url>`（细节见 `references/upload.md`）。页面不存在或无权限 → 停。
 6. 本机有 Node.js（≥ 18）；转换脚本不依赖任何第三方库。
 
+**需求文档的运行状态**：workflow 已安装且发布的是已绑定需求的产物时，先从 Markdown 所在需求目录的 meta.json 及文档头确定其归属需求与分支，按 `<skills>/workflow/references/runs.md` 创建／恢复 kind `wiki` 运行，start 显式传 `--dir <来源需求目录> --branch <文档归属分支>`，后续 show / save / complete 都传同一分支和运行 id，不按当前 checkout 猜归属；分支缺失或有歧义时先确认，不能把发布记录写进当前 checkout 的其他需求。W0～W2 对应 Step 0～2；记录文档路径、目标页面和版本，上传确认前保存 waiting_user。成功验证版本递增、回写发布记录后，将 W2 标 completed 并 complete；不能在转换通过或只取得上传授权时就标记完成。`--validate-only` 只校验、不创建发布运行。workflow 未安装或单独发布其他 Markdown 时，不为记录状态强制绑定需求。
+
 ### Step 1 — 转换并校验
 
 ```bash

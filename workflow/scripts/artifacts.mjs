@@ -14,7 +14,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { REQ_DIR, parseFile, artifactFiles } from './requirement.mjs';
-import { runState } from './run.mjs';
+import { runState, allRuns } from './run.mjs';
 
 // 产物种类；顺序即链路顺序
 export const KINDS = [
@@ -139,7 +139,7 @@ function main(argv) {
     else { console.error('用法: artifacts.mjs [--root <项目根>] [--branch <分支> | --all]'); return 1; }
   }
   if (all) {
-    const branches = [...new Set(collect(root).map((a) => a.branch).filter(Boolean))].sort();
+    const branches = [...new Set([...collect(root).map((a) => a.branch), ...allRuns(root).map((r) => r.branch)].filter(Boolean))].sort();
     const unknown = collect(root).filter((a) => !a.branch).map((a) => a.path);
     console.log(JSON.stringify({ branches: branches.map((b) => branchView(root, b)), without_branch: unknown }, null, 2));
     return 0;

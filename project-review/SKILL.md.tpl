@@ -5,6 +5,10 @@ description: "Review source code (any language; Java/Spring, Go, TypeScript, Pyt
 
 # Code Review
 
+## 运行状态
+
+独立运行且确定要落盘完整报告时，先确定目标分支与需求名、绑定需求，按 `<skills>/workflow/references/runs.md` 用 kind `review` 创建／恢复运行，R1～R7 对应下文第 1～7 步；每步完成、等待用户或受阻时保存。报告落盘、自检并交给用户后，将 R7 标 completed 并 complete，记录“已完成”和完成时间。可选沉淀、反馈与后续动作按原规则处理。灵活模式只在对话里审查时不创建运行；dev 内部调用也不另起运行，由 dev 主 agent 把报告结果记录到 F7／B5。
+
 ## Workflow
 
 **dev 自审调用**：优先由未参与本轮实现的子 agent 执行第 1～7 步；没有子 agent 时由当前会话的 dev 执行同样的步骤，报告「审查者」写当前 agent，不写成独立审查。完整流程必须落盘报告（零发现也写），不使用下文「灵活模式」免落盘；S 快速通道不落盘，不适用本节。跳过第 8～9 步，沉淀与反馈由 dev 交付时统一处理。只审代码、写报告，不修改业务代码、不生成 `delivery.md`、不提交。DocNexus 可用时元信息写「未询问（由 dev 交付统一处理）」，不可用写「未接入」，不将 F8 的交付沉淀结果复制到内部审查报告；缺少本轮交付说明是正常时序，需求、已确认决定和验证结果以 dev 交接为准，旧交付说明只作历史参考。报告完成后交回主 agent，由主 agent 询问用户修复或交付。
