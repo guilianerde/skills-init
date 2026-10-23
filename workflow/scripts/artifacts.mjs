@@ -14,6 +14,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { REQ_DIR, parseFile, artifactFiles } from './requirement.mjs';
+import { runState } from './run.mjs';
 
 // 产物种类；顺序即链路顺序
 export const KINDS = [
@@ -111,11 +112,13 @@ export function branchView(root, branch) {
   const latest = {};
   for (const a of items) latest[a.kind] = a; // 已按时间升序，最后一个即最新
   const strip = ({ mtime, ...a }) => a;
+  const execution = runState(root, branch);
   return {
     branch,
     artifacts: items.map(strip),
     latest: Object.fromEntries(KINDS.map((k) => [k.kind, latest[k.kind] ? strip(latest[k.kind]) : null])),
-    next: nextSteps(latest),
+    execution,
+    next: execution.current && execution.current.status !== 'completed' ? [execution.next] : nextSteps(latest),
   };
 }
 

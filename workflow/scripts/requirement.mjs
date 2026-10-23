@@ -28,6 +28,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { updateMeta } from './meta-store.mjs';
 
 const SKILLS_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 // 本工具在项目里的唯一目录
@@ -78,7 +79,7 @@ function currentBranch(root) {
 }
 
 const head = (text, n = 20) => text.split(/\r?\n/).slice(0, n).join('\n');
-function parseBranch(text) {
+export function parseBranch(text) {
   const m = head(text).match(/(?:对比)?分支[：:]\s*`?([^`\s｜|←，,）)]+)`?/);
   return m && !/^[{<]/.test(m[1]) ? m[1] : null;
 }
@@ -221,36 +222,37 @@ const versionsOf = (dirAbs) => readJson(path.join(dirAbs, 'meta.json'))?.version
 export function sync(root, dirRel, { bump = false } = {}) {
   const dir = path.resolve(root, dirRel);
   const f = path.join(dir, 'meta.json');
-  const old = readJson(f) ?? {};
-  const versions = { ...(old.versions ?? {}) };
   const archived = [];
-  if (bump) {
-    for (const kind of Object.keys(FILES)) {
-      const cur = path.join(dir, `${FILES[kind]}.md`);
-      const v = versions[kind] ?? 1;
-      const arc = archivePath(root, dir, kind, v);
-      if (!fs.existsSync(cur) || !fs.existsSync(arc) || fs.readFileSync(arc).equals(fs.readFileSync(cur))) continue;
-      versions[kind] = v + 1;
-      archived.push({ kind, version: v, file: relOf(root, arc) });
+  const result = updateMeta(f, (old) => {
+    const versions = { ...(old.versions ?? {}) };
+    if (bump) {
+      for (const kind of Object.keys(FILES)) {
+        const cur = path.join(dir, `${FILES[kind]}.md`);
+        const v = versions[kind] ?? 1;
+        const arc = archivePath(root, dir, kind, v);
+        if (!fs.existsSync(cur) || !fs.existsSync(arc) || fs.readFileSync(arc).equals(fs.readFileSync(cur))) continue;
+        versions[kind] = v + 1;
+        archived.push({ kind, version: v, file: relOf(root, arc) });
+      }
     }
-  }
-  const artifacts = fs.readdirSync(dir).map((name) => {
-    const p = parseFile(name);
-    if (!p) return null;
-    const text = fs.readFileSync(path.join(dir, name), 'utf8');
-    return { kind: p.kind, version: name === `${FILES[p.kind]}.md` ? versions[p.kind] ?? 1 : p.version, file: name, branch: parseBranch(text), date: headerDate(text), wiki: parseWiki(text), docnexus: parseDocnexus(text) };
-  }).filter(Boolean).sort((a, b) => Object.keys(FILES).indexOf(a.kind) - Object.keys(FILES).indexOf(b.kind) || a.version - b.version);
-  const branches = [...new Set([...(old.branches ?? []), ...artifacts.map((a) => a.branch).filter(Boolean)])];
-  const latest = Object.fromEntries(Object.keys(FILES).map((k) => [k, artifacts.filter((a) => a.kind === k).at(-1)?.file ?? null]));
-  // 内容没变就不写（meta.json 随需求目录提交，避免无谓的改动）；产物有变化才更新 updated
-  const changed = JSON.stringify(old.artifacts ?? null) !== JSON.stringify(artifacts) || JSON.stringify(old.branches ?? null) !== JSON.stringify(branches);
-  const meta = {
-    name: old.name ?? path.basename(dir), named_by: old.named_by ?? 'user', ...(old.project ? { project: old.project } : {}), branches, base: old.base ?? null,
-    created: old.created ?? now(), updated: changed || !old.updated ? now() : old.updated, latest, ...(Object.keys(versions).length ? { versions } : {}), artifacts,
-  };
-  const out = `${JSON.stringify(meta, null, 2)}\n`;
-  if (!fs.existsSync(f) || fs.readFileSync(f, 'utf8') !== out) fs.writeFileSync(f, out);
-  return bump ? { ...meta, archived } : meta;
+    const artifacts = fs.readdirSync(dir).map((name) => {
+      const p = parseFile(name);
+      if (!p) return null;
+      const text = fs.readFileSync(path.join(dir, name), 'utf8');
+      return { kind: p.kind, version: name === `${FILES[p.kind]}.md` ? versions[p.kind] ?? 1 : p.version, file: name, branch: parseBranch(text), date: headerDate(text), wiki: parseWiki(text), docnexus: parseDocnexus(text) };
+    }).filter(Boolean).sort((a, b) => Object.keys(FILES).indexOf(a.kind) - Object.keys(FILES).indexOf(b.kind) || a.version - b.version);
+    const branches = [...new Set([...(old.branches ?? []), ...artifacts.map((a) => a.branch).filter(Boolean)])];
+    const latest = Object.fromEntries(Object.keys(FILES).map((k) => [k, artifacts.filter((a) => a.kind === k).at(-1)?.file ?? null]));
+    // 内容没变就不写（meta.json 随需求目录提交，避免无谓的改动）；产物有变化才更新 updated
+    const changed = JSON.stringify(old.artifacts ?? null) !== JSON.stringify(artifacts) || JSON.stringify(old.branches ?? null) !== JSON.stringify(branches);
+    const meta = {
+      ...old,
+      name: old.name ?? path.basename(dir), named_by: old.named_by ?? 'user', ...(old.project ? { project: old.project } : {}), branches, base: old.base ?? null,
+      created: old.created ?? now(), updated: changed || !old.updated ? now() : old.updated, latest, ...(Object.keys(versions).length ? { versions } : {}), artifacts,
+    };
+    return meta;
+  });
+  return bump ? { ...result, archived } : result;
 }
 
 const notReady = (L) => ({ ok: false, mode: L.mode, ...(L.need_project ? { need_project: true, suggested_project: L.suggested_project } : {}), hint: L.hint });
@@ -292,11 +294,13 @@ export function bind(root, { name = null, branch, base = null }) {
   const existedHere = isDir(dir);
   fs.mkdirSync(dir, { recursive: true });
   const f = path.join(dir, 'meta.json');
-  const meta = readJson(f) ?? { name: target?.name ?? display, named_by: named ? 'user' : 'branch', project: L.project, branches: [], base, created: now() };
-  if (!meta.branches.includes(branch)) meta.branches.push(branch);
-  if (base && !meta.base) meta.base = base;
-  meta.updated = now();
-  fs.writeFileSync(f, `${JSON.stringify(meta, null, 2)}\n`);
+  const meta = updateMeta(f, (old) => {
+    const value = Object.keys(old).length ? old : { name: target?.name ?? display, named_by: named ? 'user' : 'branch', project: L.project, branches: [], base, created: now() };
+    if (!value.branches.includes(branch)) value.branches.push(branch);
+    if (base && !value.base) value.base = base;
+    value.updated = now();
+    return value;
+  });
   const rel = relOf(root, dir);
   return { ok: true, mode: L.mode, created: !existedHere, joined: !!target && !existedHere, name: meta.name, named_by: meta.named_by, dir: rel, project: L.project, branches: sync(root, rel).branches };
 }

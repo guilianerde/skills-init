@@ -22,7 +22,7 @@ export function viewData(root) {
   // 连同其他项目（服务）的产物一起看，一个需求下按项目区分（文档仓库里常见；两种模式目录结构相同）
   const L = layout(root);
   const reqDirOf = (slug) => (L.mode === 'repo' ? `${L.repo_name}:docs/requirements/${slug}` : `${REQ_DIR}/${slug}`);
-  const metas = new Map(repoRequirements(root, L).map((r) => [r.slug, { name: r.name, dir: reqDirOf(r.slug), branches: [...new Set(r.projects.flatMap((p) => p.meta.branches ?? []))], meta: r.projects.find((p) => p.project === L.project)?.meta ?? r.projects[0]?.meta ?? {} }]));
+  const metas = new Map(repoRequirements(root, L).map((r) => [r.slug, { name: r.name, dir: reqDirOf(r.slug), branches: [...new Set(r.projects.flatMap((p) => p.meta.branches ?? []))], meta: r.projects.find((p) => p.project === L.project)?.meta ?? r.projects[0]?.meta ?? {}, runs: r.projects.flatMap((p) => Object.values(p.meta.runs ?? {}).map((run) => ({ ...run, project: p.project }))) }]));
   const groups = new Map();
   for (const a of collect(root, { allProjects: true })) {
     const id = a.requirement ? `req:${a.requirement}` : `branch:${a.branch ?? '（无分支）'}`;
@@ -44,9 +44,15 @@ export function viewData(root) {
     item.knowledge = parseDocnexus(text) ?? []; // 产物里「DocNexus：docnexus/library/<path>」行：沉淀到的知识文档
     g.artifacts.push(item);
   }
+  // 完整流程在首次产物前也可能已保存状态，不能因为没有 Markdown 就隐藏需求。
+  for (const [slug, m] of metas) {
+    const id = `req:${slug}`;
+    if (m.runs.length && !groups.has(id)) groups.set(id, { id, name: m.name, dir: m.dir, named_by: m.meta.named_by ?? null, branches: new Set(m.branches), projects: new Set(m.runs.map((r) => r.project)), artifacts: [] });
+    if (groups.has(id)) groups.get(id).runs = m.runs;
+  }
   const list = [...groups.values()].map((g) => {
     const latest = (k) => g.artifacts.filter((a) => a.kind === k).at(-1)?.date ?? null;
-    const dates = g.artifacts.map((a) => a.date).filter(Boolean).sort();
+    const dates = [...g.artifacts.map((a) => a.date), ...(g.runs ?? []).map((r) => r.updated_at?.slice(0, 10))].filter(Boolean).sort();
     // 沉淀到的知识文档：汇总各产物的「DocNexus：」行，去重，注明来自哪些产物
     const docnexus = new Map();
     for (const a of g.artifacts) for (const k of a.knowledge) {
@@ -223,6 +229,13 @@ function reviewBlock(r) {
   return '<section class="block"><h3>审查记录</h3><table><thead><tr><th>报告</th><th>日期</th><th>轮次</th><th>CRITICAL · HIGH · MEDIUM / LOW</th><th>复核</th><th>与上次对比</th><th>DocNexus</th></tr></thead><tbody>' + rs.map(row).join('') + '</tbody></table></section>';
 }
 
+function runBlock(r) {
+  if (!r.runs?.length) return '';
+  const labels = { running: '进行中', waiting_user: '等待用户', blocked: '受阻', completed: '已完成', cancelled: '已取消' };
+  const stepLabels = { pending: '未开始', in_progress: '进行中', completed: '已完成', skipped: '已跳过' };
+  return '<section class="block"><h3>流程运行状态</h3><table><thead><tr><th>运行 / 分支</th><th>阶段</th><th>状态</th><th>步骤进度</th><th>等待 / 阻塞 / 完成时间</th></tr></thead><tbody>' + r.runs.map((run) => '<tr><td>' + esc(run.project + ' · ' + run.kind + ' · ' + run.id) + '<br>' + esc(run.branch) + '</td><td>' + esc(run.stage) + '</td><td>' + esc(labels[run.status] ?? run.status) + '</td><td>' + Object.entries(run.steps).map(([name, s]) => esc(name + '：' + (stepLabels[s.status] ?? s.status))).join('<br>') + '</td><td>' + esc(run.waiting_for ?? run.reason ?? run.completed_at ?? '') + '</td></tr>').join('') + '</tbody></table></section>';
+}
+
 function knowledgeBlock(r) {
   if (!r.docnexus.length) return '';
   return '<section class="block"><h3>沉淀到的知识文档</h3><table><thead><tr><th>知识文档</th><th>来自产物</th></tr></thead><tbody>' + r.docnexus.map((d) => '<tr><td><code>' + esc(d.path) + '</code></td><td>' + d.from.map((f) => '<a href="#" data-doc="' + esc(f.path) + '">' + esc(f.label + ' · ' + f.file) + '</a>').join('<br>') + '</td></tr>').join('') + '</tbody></table></section>';
@@ -259,7 +272,7 @@ function select(id, docPath) {
   const order = D.kinds.map((k) => k.kind);
   const files = '<div class="files">' + r.artifacts.slice().sort((x, y) => order.indexOf(x.kind) - order.indexOf(y.kind)).map((a) => '<button data-doc="' + esc(a.path) + '">' + esc(a.label) + ' · ' + esc(a.file) + '</button>').join('') + '</div>';
   $('#main').innerHTML = overview() + '<h2>' + esc(r.name) + '</h2><div class="sub">' + esc(r.dir ?? '') + (r.projects.length ? ' · 项目 ' + esc(r.projects.join('、')) : '') + ' · 分支 ' + esc(r.branches.join('、') || '无') + (r.named_by === 'branch' ? ' · <span class="tag">需求名由分支名生成，可在 meta.json 改</span>' : '') + '</div>'
-    + pipeline + reviewBlock(r) + deliveryBlock(r) + knowledgeBlock(r) + files + '<div class="doc" id="doc"></div>';
+    + pipeline + runBlock(r) + reviewBlock(r) + deliveryBlock(r) + knowledgeBlock(r) + files + '<div class="doc" id="doc"></div>';
   document.querySelectorAll('[data-doc]').forEach((el) => (el.onclick = (e) => { e.preventDefault(); showDoc(r, el.dataset.doc); }));
   showDoc(r, docPath || (latest('review') || r.artifacts.at(-1)).path);
   renderList();
