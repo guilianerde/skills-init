@@ -55,7 +55,7 @@ export function buildDescription(root, branch, base) {
     add('影响面', keep(section(s, '影响面')));
   }
 
-  const docs = [['开发方案', plan], ['交付说明', delivery], ['审查报告', review], ['技术方案', tech], ['上线方案', release]]
+  const docs = [['方案', plan], ['交付说明', delivery], ['审查报告', review], ['技术方案', tech], ['上线方案', release]]
     
     .filter(([, a]) => a).map(([label, a]) => `- ${label}：\`${a.cite ?? a.path}\`${a.wiki?.url ? `（wiki：${a.wiki.url}）` : a.wiki ? `（wiki pageId ${a.wiki.pageId}）` : ''}`);
   add('相关文档', docs.length ? docs.join('\n') : null);

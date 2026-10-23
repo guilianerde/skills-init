@@ -49,7 +49,7 @@ npx @rowansenne/workflow-run uninstall                                          
 | `uninstall` | 等价于 `--uninstall` |
 | `report` | 本地效果报告：只读统计 `workflow-run/docs/requirements/` 下的产物（`--since YYYY-MM-DD`、`--all-branches`、`--json`），见「workflow：入口与项目画像」 |
 | `feedback` | 运行反馈汇总：dev / project-review 每次运行记录到 `workflow-run/feedback/<用户>.jsonl` 的过程数据（`--json`），见「运行反馈」 |
-| `view` | 项目文档视图：按需求浏览开发方案、交付说明、审查记录（含复审修复情况）、技术 / 上线方案，生成本地静态页面（`--out <文件>`、`--open`） |
+| `view` | 项目文档视图：按需求浏览方案、交付说明、审查记录（含复审修复情况）、技术 / 上线方案，生成本地静态页面（`--out <文件>`、`--open`） |
 | `docs-repo <仓库地址>` | 改用团队文档仓库：`workflow-run/` 是空的就克隆，已有内容就原地接上远端（目录结构相同，文件不用挪）、代码仓库忽略它、配置本项目的项目名（`--project`，默认 git 远端仓库名）、接上仓库里的 DocNexus；不带地址显示当前状态，见「产物输出规范」 |
 | `seed-templates` | 只把默认文档模板导入 DocNexus，不重装 skills。`--update` 把导入后未改动的模板更新为新版；`--diff` 只读打印团队改过的模板与新默认模板的差异，供手动合并 |
 
@@ -147,7 +147,7 @@ npx @rowansenne/workflow-run@latest doctor --offline
 * 审查：各级别发现条数、严重问题复核通过率、复审时上次问题的修复率；
 * 交付：功能 / 缺陷、S / M / L、开工前经需求澄清确认的决定条数、带「未验证项」的交付；
 * 知识：交付与审查的 DocNexus 沉淀率（只算真正问过沉淀的，「未询问」「无需沉淀」不计入分母；dev 内部审查不单独询问或重复计入交付沉淀）、正文引用了知识库文档的产物占比；
-* 各分支链路：开发方案、交付说明、审查报告、技术方案、上线方案齐不齐，哪些文档还没发布到 wiki。
+* 各分支链路：方案、交付说明、审查报告、技术方案、上线方案齐不齐，哪些文档还没发布到 wiki。
 
 **运行反馈**（`npx @rowansenne/workflow-run feedback [--json]`）：效果报告只看落盘的产物，看不到过程。dev 和 project-review 每跑完一次，用 `workflow/scripts/feedback.mjs add` 静默追加一行到 `workflow-run/feedback/<git 用户名>.jsonl`：模型、规模 / 深度、是否走快速通道、向用户提问几轮、用户纠正过几次理解、验收项验证了几条、跳过了哪些步骤、**哪条规则读不懂或做不到**、用户主动说的抱怨。只记过程，不记代码和业务名词；不额外问用户。每人一个文件，随 `workflow-run/` 提交，多人不冲突。独立文档仓库模式下，安装器在文档仓库的 `workflow-run/.gitattributes` 里给这些文件配 `merge=union`，同一个文件在几个分支上都有记录时合并也不冲突；随代码提交时不改代码仓库的 `.gitattributes`，合并时遇到冲突保留两边的行即可。用来定期精简 skill：
 
@@ -211,8 +211,8 @@ node .agents/skills/workflow/scripts/resolve.mjs env --check   # 逐个字段核
 ```
 
 * **功能开发**：开始前先确定工作分支，再确认需求名（给不出名字或说不清要做什么就不开始）→ 理解需求（可读 PRD、查 DocNexus 历史决策）→ 调研现有代码 → 需求澄清（借鉴 grill-me：按决策树分轮提问，每题给推荐答案；事实自己查、决定交给用户；S 规模无未定决定时跳过澄清提问）→ **规模判定（S / M / L 说明判定依据，不再询问确认）** → 按规模出方案（非快速通道一律落方案文档：S 简版、M 精简版、L 完整版；S 符合条件时先问是否走快速通道，走则不落盘）→ 小步实现并编译 → 补测试并运行 → 优先由独立子 agent 按 project-review 审查并落盘 `review.md`（没有子 agent 时在当前会话自查，报告注明审查者）→ 报告交给用户，等待选择「修复问题 / 交付」；修复则验证后重新审查、再次等待选择，选择交付后才将交付说明落盘到 `workflow-run/docs/requirements/<需求名>/<项目名>/delivery.md`（带分支元信息；改动、验证结果、配置清单、未执行的 SQL），已接入 DocNexus 时交付里有值得记录的知识才问要不要沉淀（同意后以 `dev-notes` 分类写入，并把库内路径记回交付说明），没有就跳过并在元信息行写「无需沉淀」。审查和上线方案会按分支自动读取这份交付说明。
-* **S 规模快速通道**：规模判定不询问用户；S 规模且不涉及配置、SQL / DDL、对外接口、表结构，也没有需要澄清的业务决定时，**问用户是否走快速通道**，问完等本轮答复——明确同意才走：编译、测试照常，审查在当前会话按标准清单做，**不绑定需求、不落任何产物文件**（方案 / `review.md` / 交付说明都不写；运行反馈照常记一行），对话里一次交付并注明「DocNexus：未询问（快速通道不问沉淀）」；拒绝或未明确同意就按完整流程落盘交付。实现中碰到上述任何一项或改动超过 3 个文件，就退回完整流程（先绑定需求、补审查报告），规模变化时按新规模继续。缺陷修复同样适用（根因仍须在对话里写清楚）。
-* **缺陷修复**：收集现象 → 用失败测试复现 → 用证据定位根因 → **判定规模并告知（S 规模问是否走快速通道；M / L 确认根因与修复方式后再改）** → 完整流程先把根因与修复方式追加到 `plan.md`（不另建文件）→ 最小修复让测试转绿 → 审查并落盘报告（无子 agent 时当前会话自查）→ 用户选择修复或交付（修复后验证与复审；交付必须写明根因）。
+* **S 规模快速通道**：规模判定不询问用户；S 规模且不涉及配置、SQL / DDL、对外接口、表结构，也没有需要澄清的业务决定时，**问用户是否走快速通道**，问完等本轮答复——明确同意才走：编译、测试照常，审查在当前会话按标准清单做，**不绑定需求、不落任何产物文件**（方案 / `review.md` / 交付说明都不写；运行反馈照常记一行），对话里一次交付并注明「DocNexus：未询问（快速通道不问沉淀）」；拒绝或未明确同意就按完整流程落盘交付。实现中碰到上述任何一项或改动超过 3 个文件，先停下后续实现、重新评估规模，绑定需求并回 F4 补方案、自检；M / L 确认方案后再继续实现、验证、审查与交付选择。缺陷修复同样适用（根因仍须在对话里写清楚）。
+* **缺陷修复**：收集现象 → 用失败测试复现 → 用证据定位根因 → **判定规模并告知（S 规模问是否走快速通道；M / L 确认根因与修复方式后再改）** → 完整流程先把根因与修复方式追加到 `plan.md`，同步更新文档头的修复分支与日期（不另建文件）→ 最小修复让测试转绿 → 审查并落盘报告（无子 agent 时当前会话自查）→ 用户选择修复或交付（修复后验证与复审；交付必须写明根因）。
 * 审查优先用独立子 agent（期间不继续改被审代码，子 agent 只审查、写报告，不直接修复）；没有子 agent 时降级为当前会话自查并把「审查者」写成当前 agent，不阻塞、也不跳过审查。遗留严重问题须说明风险并由用户明确接受，不能把选择交付写成审查通过。
 * 守则：不写库、不改凭据、不擅自 commit / push、不装新依赖；测试没跑就写「未验证」。
 * 其他 skill 都是可选增强：wiki、DocNexus、数据库没配置时自动跳过，并在交付说明中注明。
@@ -471,7 +471,7 @@ npx @rowansenne/workflow-run uninstall
 | `workflow/scripts/lint-doc.mjs <文档> --skill <skill> [--facts]` | 对照当前生效的模板检查生成的文档：必填章节、残留 `{{...}}` 占位符、元信息行为错误；缺普通章节、顺序不一致为警告；列出待填写位置。`--facts` 再核对正文里的类名、文件、接口、表名：在对比分支的 diff 和代码里都找不到的记为警告（防编造） |
 | `workflow/scripts/requirement.mjs which / bind / path / sync / pending / list / config` | 产物按需求归档（`workflow-run/docs/requirements/<需求>/<项目>/`，两种模式结构相同）：查当前分支绑定的需求（没绑定时给出按分支名生成的建议名）、绑定需求名、给出本次落盘路径（不覆盖，带上一版的 wiki 记录）、重建 `meta.json`、列出所有需求；`config` 设置产物位置（文档仓库、项目名、提交提示），`pending` 看文档仓库里还没提交的产物 |
 | `workflow/scripts/view.mjs [--out f] [--open]` | 项目文档视图（`/workflow view`、`npx @rowansenne/workflow-run view`）：读需求目录里的产物，生成单个 HTML，按需求列出各阶段、审查记录（各级别数量、复核、与上次对比）、交付记录、沉淀到的知识文档，正文直接渲染；顶部「知识文档」列出每篇知识文档来自哪个需求、哪份产物；数据内嵌，只读、不联网，默认写到 `workflow-run/tmp/view/index.html` |
-| `workflow/scripts/artifacts.mjs [--branch b \| --all]` | 按分支汇总 `workflow-run/docs/requirements/` 下的开发方案、交付说明、审查报告、技术方案、上线方案及其 wiki 发布记录，给出下一步建议；分支取自文档元信息行，不另存记录。上线方案没传 `--tech` 时据此自动引用同分支的技术方案；project-review 据此对照本分支方案、识别复审 |
+| `workflow/scripts/artifacts.mjs [--branch b \| --all]` | 按分支汇总 `workflow-run/docs/requirements/` 下的方案、交付说明、审查报告、技术方案、上线方案及其 wiki 发布记录，给出下一步建议；分支取自文档元信息行，不另存记录。上线方案没传 `--tech` 时据此自动引用同分支的技术方案；project-review 据此对照本分支方案、识别复审 |
 | `workflow/scripts/report.mjs [--since d] [--all-branches] [--json]` | 本地效果报告（`/workflow report`、`npx @rowansenne/workflow-run report`）：审查发现与修复率、复核率、需求澄清、沉淀率、知识引用、各分支链路 |
 | `workflow/scripts/feedback.mjs add … / summary [--json]` | 运行反馈：dev / project-review 交付后追加一行过程记录到 `workflow-run/feedback/<用户>.jsonl`；`summary` 按 skill 汇总，跳过的步骤和不清楚的规则按 SKILL.md 章节归类（`npx @rowansenne/workflow-run feedback`）；`init` / `upgrade` 装了新版本时清掉本项目旧版本的记录 |
 | `workflow/scripts/review-scope.mjs [--diff b...h \| --base b] [--exclude a,b]` / `rules <文件…>` | 审查范围：由脚本决定审哪些文件、跳过哪些（删除、二进制、敏感文件、依赖目录、生成文件、文档、本工具产物，各带原因）、每个文件的风险级别和分批，以及按文件类型和改动内容该看审查清单的哪几节；`--base` 含未提交和未跟踪的新文件。`rules` 打印这些小节的原文和画像 `review.rules` 里匹配的项目规则。project-review 第 1、3、4 步与 dev 自审使用 |
@@ -593,12 +593,12 @@ git status --short --ignored
 
 ## 产物输出规范（统一落位）
 
-一个需求的文档产物放在**同一个需求目录**里，开发方案、交付说明、审查报告、技术方案、上线方案一起看：
+一个需求的文档产物放在**同一个需求目录**里，方案（开发 / 缺陷修复）、交付说明、审查报告、技术方案、上线方案一起看：
 
 ```
 workflow-run/docs/requirements/<需求名>/<项目名>/
 ├── meta.json        # 需求名、绑定的分支、各产物（版本、日期、wiki 发布记录、DocNexus 沉淀），给以后的可视化用
-├── plan.md          # 开发方案（dev，非快速通道都写；S / M 简版）
+├── plan.md          # 方案（dev，非快速通道都写；S / M 简版；缺陷修复追加修复方案节）
 ├── delivery.md      # 交付说明（dev，完整流程审查后用户选择交付才写；S 快速通道不落盘）
 ├── review.md        # 审查报告（独立审查或 dev 完整流程自查；S 快速通道不落盘）；复审也写这个文件，上一版归档到 workflow-run/tmp/old-artifacts/
 ├── tech-doc.md      # 技术方案
@@ -728,7 +728,7 @@ workflow-run（安装器仓库）/
 | --- | --- | --- | --- |
 | create-tech-md-doc | `template.md` | 技术方案模板 | **不提供**，第一次用时按样例创建 |
 | create-release-md-doc | `template.md` | 上线方案模板 | **不提供**，第一次用时按样例创建 |
-| dev | `plan-template.md` | 开发方案模板 | 有 |
+| dev | `plan-template.md` | 方案模板（开发 / 修复） | 有 |
 | dev | `delivery-template.md` | 交付说明模板 | 有 |
 | project-review | `checklist.md` | 审查清单 | 有 |
 | project-review | `report.md` | 审查报告模板 | 有 |
@@ -741,7 +741,7 @@ workflow-run（安装器仓库）/
 2. `template.mjs check` 校验格式（必填 ` *`、可选「（如有）」、占位符），列出新增 / 删除的章节、必填变化，并拿最近几份已生成的文档试跑，告诉你新模板下它们会多出哪些错误；
 3. 你确认后经你授权按 capture 流程写入 DocNexus 知识库，再确认生效；要撤销按 DocNexus 的 timeline 恢复旧版本。
 
-模板别名：`tech`、`release`、`plan`、`delivery`、`review`、`checklist`。改带默认版本的模板（开发方案、交付说明、审查报告、审查清单）也走这条路，知识库里的版本取代默认版本，升级不会覆盖。未接入 DocNexus 时不能修改模板，agent 会提示你先接入。
+模板别名：`tech`、`release`、`plan`、`delivery`、`review`、`checklist`。改带默认版本的模板（方案、交付说明、审查报告、审查清单）也走这条路，知识库里的版本取代默认版本，升级不会覆盖。未接入 DocNexus 时不能修改模板，agent 会提示你先接入。
 
 * `doctor` 和 `/workflow status` 会列出还没创建的模板，以及要先接入 DocNexus 才能创建的模板。
 

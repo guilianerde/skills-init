@@ -5,7 +5,7 @@
 ```
 workflow-run/docs/requirements/<需求名>/<项目名>/
 ├── meta.json          # 需求名、绑定的分支、各产物（种类、版本、日期、wiki 发布记录、DocNexus 沉淀）
-├── plan.md            # 开发方案（dev，非快速通道都写；S / M 简版）
+├── plan.md            # 方案（dev，非快速通道都写；S / M 简版；缺陷修复追加修复方案节）
 ├── delivery.md        # 交付说明（dev，完整流程审查后用户选择交付才生成；S 快速通道不落盘）
 ├── review.md          # 审查报告（独立 project-review 或 dev 完整流程的自查；S 快速通道不落盘）；复审也写这个文件，上一版归档（见「落盘」）
 ├── tech-doc.md        # 技术方案（create-tech-md-doc）

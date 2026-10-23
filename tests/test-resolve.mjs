@@ -39,7 +39,7 @@ test('未接入 DocNexus：只用默认模板，项目文件不生效；技术�
   assert.deepEqual(s0.templates_to_create, []);
   assert.deepEqual(s0.templates_need_docnexus.map((t) => t.skill).sort(), ['create-release-md-doc', 'create-tech-md-doc']);
   put('workflow-run/templates/create-tech-md-doc/template.md', '# 团队模板');
-  put('workflow-run/templates/dev/plan-template.md', '# 项目里的开发方案模板');
+  put('workflow-run/templates/dev/plan-template.md', '# 项目里的方案模板');
   r = resolve('template', 'create-tech-md-doc', 'template.md');
   assert.equal(r.status, 2, '项目模板不再生效');
   assert.equal(r.out.stale_project_file, 'workflow-run/templates/create-tech-md-doc/template.md');

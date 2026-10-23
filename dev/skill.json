@@ -16,8 +16,8 @@
     {
       "id": "plan-template.md",
       "src": "references/plan-template.md",
-      "title": "开发方案模板",
-      "summary": "dev skill 在 M / L 规模需求中使用的开发方案模板。",
+      "title": "方案模板（开发 / 修复）",
+      "summary": "dev skill 在非快速通道（S / M / L）落盘方案时使用；缺陷修复在 B4 追加「修复方案」节。",
       "lint": {}
     },
     {

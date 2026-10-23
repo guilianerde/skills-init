@@ -1,6 +1,6 @@
 # 模板来源（文档类 skill 共用）
 
-技术方案、上线方案、开发方案、审查清单的模板由脚本判定，各 skill 不自行查找：
+技术方案、上线方案、方案、审查清单的模板由脚本判定，各 skill 不自行查找：
 
 ```
 node <skills>/workflow/scripts/resolve.mjs template <skill> <文件名>

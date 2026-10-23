@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// 按分支汇总各 skill 的产物：开发方案、交付说明、审查报告、技术方案、上线方案，以及它们的 wiki 发布记录。
+// 按分支汇总各 skill 的产物：方案、交付说明、审查报告、技术方案、上线方案，以及它们的 wiki 发布记录。
 // 产物按需求归档在 workflow-run/docs/requirements/<需求>/<项目>/（两种模式结构相同，见 requirement.mjs）。
 // 直接扫描 Markdown，从元信息行读分支（「分支：」「对比分支：」），
 // 从第一行的 <!-- md-to-wiki: ... --> 读发布记录（md-to-wiki 上传后写入）。只读。
@@ -17,7 +17,7 @@ import { REQ_DIR, parseFile, artifactFiles } from './requirement.mjs';
 
 // 产物种类；顺序即链路顺序
 export const KINDS = [
-  { kind: 'plan', label: '开发方案' },
+  { kind: 'plan', label: '方案' },
   { kind: 'delivery', label: '交付说明' },
   { kind: 'review', label: '审查报告' },
   { kind: 'tech', label: '技术方案' },

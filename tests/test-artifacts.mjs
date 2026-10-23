@@ -67,7 +67,7 @@ test('审查报告模板的元信息：取对比分支里的开发分支，不�
   assert.equal(parseBranch(tpl), null, '未填写的模板不算任何分支');
 });
 
-test('交付说明按对比分支归到 latest.delivery，与开发方案分开', () => {
+test('交付说明按对比分支归到 latest.delivery，与方案分开', () => {
   const { root, put, run } = project();
   put('pay/plan.md', '# 方案\n> 规模：L ｜ 分支：feature/pay ｜ 日期：2026-10-14\n');
   put('pay/delivery.md', '# 开发交付 — 支付回调幂等\n\n> 类型：功能开发 ｜ 规模：L ｜ 日期：2026-10-15\n> 对比分支：`feature/pay` ←→ `main`\n> 参考产物：workflow-run/docs/requirements/pay/svc/plan.md\n> DocNexus：未沉淀\n');

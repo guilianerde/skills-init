@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// 产物按需求归档：开发方案、交付说明、审查报告、技术方案、上线方案按需求放在一起，meta.json 汇总需求名、绑定的分支、各产物、
+// 产物按需求归档：方案、交付说明、审查报告、技术方案、上线方案按需求放在一起，meta.json 汇总需求名、绑定的分支、各产物、
 // wiki 发布记录与 DocNexus 沉淀，供 /workflow view 等直接读取。
 // 本工具的产出都在项目根的 workflow-run/ 里（需求产物 docs/requirements/、DocNexus 工作区 docnexus/、项目模板 templates/、临时文件 tmp/），
 // 不往项目的其他地方写。两种用法：
@@ -41,7 +41,7 @@ export const homeDir = (root) => path.join(root, HOME);
 export const homeIsRepo = (root) => fs.existsSync(path.join(root, HOME, '.git'));
 // 产物种类 → 需求目录里的文件名（只放最新版 <base>.md；版本号在 meta.json 的 versions，旧版归档为 <base>_v<N>.md）
 export const FILES = { plan: 'plan', delivery: 'delivery', review: 'review', tech: 'tech-doc', release: 'release-doc' };
-const LABELS = { plan: '开发方案', delivery: '交付说明', review: '审查报告', tech: '技术方案', release: '上线方案' };
+const LABELS = { plan: '方案', delivery: '交付说明', review: '审查报告', tech: '技术方案', release: '上线方案' };
 // 安装后的 skills 目录（安装器从安装包调用本脚本时，到项目里找画像）
 const INSTALL_BASES = ['.agents/skills', '.claude/skills', '.qwen/skills', '.codebuddy/skills'];
 
@@ -428,7 +428,7 @@ export function ensureIgnore(root) {
   const text = fs.existsSync(f) ? fs.readFileSync(f, 'utf8') : '';
   const norm = (l) => l.trim().replace(/^\//, '').replace(/\/$/, '');
   if (text.split(/\r?\n/).some((l) => norm(l) === norm(IGNORE_LINE))) return false;
-  const add = `# workflow-run：需求产物（开发方案、交付说明、审查报告、技术 / 上线方案）不参与代码搜索，检索交给 DocNexus\n${IGNORE_LINE}\n`;
+  const add = `# workflow-run：需求产物（方案、交付说明、审查报告、技术 / 上线方案）不参与代码搜索，检索交给 DocNexus\n${IGNORE_LINE}\n`;
   fs.writeFileSync(f, text ? `${text.replace(/\s*$/, '')}\n\n${add}` : add);
   return true;
 }
