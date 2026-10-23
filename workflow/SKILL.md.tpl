@@ -41,8 +41,8 @@ description: "Entry point for this project's dev workflow skills: routes a reque
 ### 完整链路（从需求到上线）
 
 ```
-dev（需求 → 方案 → 实现 → 测试 → 独立子 agent 审查并落盘报告 → 用户选择修复或交付）
-  ↳ 修复：实现 → 验证 → 独立复审 → 再次选择；交付：完整流程生成 delivery.md，S 快速通道只在对话交付
+dev（确定工作分支 → 定需求名 → 理解需求 → 方案 → 实现 → 测试 → 优先独立子 agent 审查并落盘报告，无则在当前会话自查 → 用户选择修复或交付）
+  ↳ 修复：实现 → 验证 → 复审（无子 agent 时当前会话）→ 再次选择；交付：完整流程生成 delivery.md，S 快速通道只在对话交付、不落盘
   → create-tech-md-doc（M / L 规模）
   → md-to-wiki（发布技术方案，可选）
   → create-release-md-doc（要上线时）
@@ -50,7 +50,7 @@ dev（需求 → 方案 → 实现 → 测试 → 独立子 agent 审查并落�
   → DocNexus 沉淀（可选，需授权）
 ```
 
-开始完整链路时先确定需求名：`node <skills>/workflow/scripts/requirement.mjs which`，当前分支没绑定就问用户这个需求叫什么并 `bind`（见 `references/requirements.md`），之后各段产物都落在 `workflow-run/docs/requirements/<需求名>/<项目名>/`。
+开始完整链路时，先进入 dev 的 Step 0 确定本次工作分支，再运行 `node <skills>/workflow/scripts/requirement.mjs which` 确认需求名（见 `references/requirements.md`）。入口只转交用户明确给出或确认的名字，不把切换前从旧分支自动读到的名字当成用户已确认的需求名。**这里只问、不 bind**，等第一次真的要落盘产物时再由对应 skill `bind`。这样从入口进来也可以走 S 快速通道，不会提前创建需求目录和 `meta.json`。
 
 提交、推送、发布 wiki、写入 DocNexus 都是对外动作，每一步都要用户明确同意。
 

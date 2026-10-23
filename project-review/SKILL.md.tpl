@@ -7,7 +7,7 @@ description: "Review source code (any language; Java/Spring, Go, TypeScript, Pyt
 
 ## Workflow
 
-**dev 独立自审调用**：由未参与本轮实现的子 agent 执行第 1～7 步，必须落盘报告（包括 S 快速通道与零发现），不使用下文「灵活模式」免落盘；跳过第 8～9 步，沉淀与反馈由 dev 交付时统一处理。只审代码、写报告，不修改业务代码、不生成 `delivery.md`、不提交。报告写明独立子 agent 审查；DocNexus 可用时元信息写「未询问（由 dev 交付统一处理）」，不可用写「未接入」，不将 F8 的交付沉淀结果复制到内部审查报告；缺少本轮交付说明是正常时序，需求、已确认决定和验证结果以 dev 交接为准，旧交付说明只作历史参考。报告完成后交回主 agent，由主 agent 询问用户修复或交付。
+**dev 自审调用**：优先由未参与本轮实现的子 agent 执行第 1～7 步；没有子 agent 时由当前会话的 dev 执行同样的步骤，报告「审查者」写当前 agent，不写成独立审查。完整流程必须落盘报告（零发现也写），不使用下文「灵活模式」免落盘；S 快速通道不落盘，不适用本节。跳过第 8～9 步，沉淀与反馈由 dev 交付时统一处理。只审代码、写报告，不修改业务代码、不生成 `delivery.md`、不提交。DocNexus 可用时元信息写「未询问（由 dev 交付统一处理）」，不可用写「未接入」，不将 F8 的交付沉淀结果复制到内部审查报告；缺少本轮交付说明是正常时序，需求、已确认决定和验证结果以 dev 交接为准，旧交付说明只作历史参考。报告完成后交回主 agent，由主 agent 询问用户修复或交付。
 
 1. **确定审查范围与深度**：范围是单文件 / 单方法、分支对比（如 `branch` vs `main`），还是未提交改动（见 `references/diff-strategy.md`「未提交改动」）。分支对比和未提交改动都先运行 `node <skills>/workflow/scripts/review-scope.mjs --diff <基线>...<dev>`（未提交改动用 `--base <基线>`，含未跟踪的新文件；dev 自审时加 dev 传来的 `--exclude`），**审哪些文件以它的 `review` 为准**：`skipped` 是按规则跳过的（删除、二进制、敏感文件、依赖目录、生成文件、文档、本工具的产物，各带原因），不要自己再增减；确实要审被跳过的，在画像 `review.include` 里加（见 `<skills>/workflow/references/profile.md`）。深度按用户的说法定，没说就用「标准」，写进报告「审查方式」：
    - **快审**（「快速看一下」「扫一眼」）：只查正确性、空值、安全、事务与幂等，不查性能、测试、风格；「优化建议（LOW）」写「无」。CRITICAL / HIGH 照样复核。
@@ -32,7 +32,7 @@ description: "Review source code (any language; Java/Spring, Go, TypeScript, Pyt
    3. 找有没有别处已经兜住：调用方校验、`@Validated` / 全局异常处理、数据库约束、框架默认行为、配置。涉及索引、字段、唯一约束、表大小的发现，以第 2 步拉到的实际表结构为准（复核列写「已与 <连接名> 核对」）。已兜住 → 删掉或降级，并在说明里写依据。
    4. 确认是本次改动引入的：改动前就存在的问题移到「未覆盖与待确认」，不计入合并结论。
    结果：「成立」在报告「复核」列标「✅」；「可能成立」标「⚠」；「不成立」从问题表里删掉（独立复核否掉的，在「未覆盖与待确认」里记一句「复核排除 N 条」）。复核方式（独立 / 自行）写进报告「审查方式」元信息。
-7. **输出报告**（dev 独立自审同样执行本步，只跳过第 8～9 步）：尚未发起沉淀询问且 DocNexus 可用时，报告元信息先写「未询问」；不可用写「未接入」。按报告模板输出（`node <skills>/workflow/scripts/resolve.mjs template project-review report.md` 取 `path`；退出码 2 时停下并按 `hint` 处理），落盘规则见 Artifact Location。
+7. **输出报告**（dev 完整流程的自审同样执行本步，只跳过第 8～9 步）：尚未发起沉淀询问且 DocNexus 可用时，报告元信息先写「未询问」；不可用写「未接入」。按报告模板输出（`node <skills>/workflow/scripts/resolve.mjs template project-review report.md` 取 `path`；退出码 2 时停下并按 `hint` 处理），落盘规则见 Artifact Location。
 8. **沉淀到 DocNexus（需用户授权）**：`resolve.mjs status` 的 `docnexus.ok` 为 true 时，交付报告后先判断本次发现里有没有**特别值得记录**的内容：同类问题再次出现（知识库里已有类似沉淀，或本次多处出现）、新确立的编码约定、容易踩的坑。没有 → 不提沉淀，报告的「DocNexus」元信息行写「无需沉淀」；有 → 明确问用户「要不要启动 DocNexus 流程，把本次审查沉淀到 DocNexus？」，并列出建议沉淀的内容；发起询问时将报告元信息改成「未沉淀」，入库成功后再写知识路径。未接入时不提问，报告的「DocNexus」元信息行写「未接入」。
    - 用户同意 → 按 DocNexus 入口 skill `docnexus` 的 capture 流程写入；正文只写知识，不写分支、路径；有 facts 时按 `<skills>/workflow/references/docnexus.md`「沉淀的来源」的格式写 provenance；分类用 `node <skills>/workflow/scripts/resolve.mjs category project-review` 的结果作为调用方显式分类封存（见 `<skills>/workflow/references/docnexus.md`「写入 DocNexus 的分类」）。只沉淀问题模式和约定，不沉淀某次审查的逐条清单，也不沉淀「⚠ 待确认」的发现；知识库已有同类沉淀时更新那一篇（带 `--base-version`），不要重复新建。写入成功后把报告的「DocNexus」元信息行改成 `workflow-run/docnexus/library/<path>`（多篇用「、」分隔），并回报给用户。
    - 用户不同意 → 元信息行保持「未沉淀」。

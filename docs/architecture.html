@@ -123,6 +123,7 @@ h3 { font-size: 16px; margin: 0 0 6px; }
 .flow li.gate .code { background: var(--accent); border-color: var(--accent); color: var(--bg); }
 .flow .name { font-weight: 700; font-size: 14px; margin-top: 10px; }
 .flow .what { color: var(--muted); font-size: 12.5px; line-height: 1.55; margin-top: 4px; }
+.flow .art { display: inline-block; margin-top: 5px; font-family: var(--f-mono); font-size: 10.5px; padding: 1px 5px; border-radius: 5px; background: var(--accent-soft); color: var(--accent); }
 .legend { display: flex; flex-wrap: wrap; gap: 16px; font-size: 13px; color: var(--muted); margin-top: 14px; }
 .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; background: var(--accent); margin-right: 6px; vertical-align: -1px; }
 .sizes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 22px; }
@@ -308,22 +309,22 @@ footer { margin-top: 40px; font-size: 13px; color: var(--muted); }
   </div>
   <div class="flow">
     <ol>
-      <li><span class="code">Step 0</span><div class="name">前置检查</div><div class="what">读画像，问清工作区里已有的改动归谁，跑一次基线</div></li>
+      <li><span class="code">Step 0</span><div class="name">前置检查</div><div class="what">读画像，先确定工作分支，再问清需求名（给不出就不开始）与工作区里已有的改动归谁，跑一次基线</div></li>
       <li><span class="code">F1</span><div class="name">理解需求</div><div class="what">拉 PRD，召回以往的约定和坑，列初版验收标准</div></li>
       <li><span class="code">F2</span><div class="name">现状调研</div><div class="what">沿调用链读代码，只读查实际表结构</div></li>
       <li class="gate"><span class="code">F3</span><div class="name">需求澄清</div><div class="what">分轮提问，每题带推荐答案；M / L 确认理解一致</div></li>
-      <li class="gate"><span class="code">F4</span><div class="name">方案</div><div class="what">按规模分级并告知；S 问是否走快速通道，M / L 确认方案后才写代码</div></li>
+      <li class="gate"><span class="code">F4</span><div class="name">方案</div><div class="what">按规模分级并告知；S 问是否走快速通道，非快速通道方案一律落盘（S / M 简版）<br><span class="art">plan.md</span></div></li>
       <li><span class="code">F5</span><div class="name">实现</div><div class="what">贴合现有写法，不顺手重构；SQL 只写脚本不执行</div></li>
       <li><span class="code">F6</span><div class="name">验证</div><div class="what">先相关测试再全量；验收项逐条对应到证据</div></li>
-      <li class="gate"><span class="code">F7</span><div class="name">独立自审</div><div class="what">独立子 agent 审查并落盘 review.md，交报告后等待用户选择修复或交付；修复后验证、复审</div></li>
-      <li class="gate"><span class="code">F8</span><div class="name">交付</div><div class="what">用户选择交付后才生成交付说明；提交、PR 先问，沉淀有值得记的内容才问</div></li>
+      <li class="gate"><span class="code">F7</span><div class="name">审查</div><div class="what">完整流程：优先独立子 agent 审查（没有时当前会话自查）并落盘 review.md，交报告后等待用户选择修复或交付；修复后验证、复审<br><span class="art">review.md</span></div></li>
+      <li class="gate"><span class="code">F8</span><div class="name">交付</div><div class="what">用户选择交付后才生成交付说明；提交、PR 先问，沉淀有值得记的内容才问<br><span class="art">delivery.md</span></div></li>
     </ol>
   </div>
-  <div class="legend"><span><i></i>需要人确认的节点</span><span>缺陷修复走 B1 收集现象 → B2 复现 → B3 定位根因 → B4 最小修复 → B5 自审交付</span></div>
+  <div class="legend"><span><i></i>需要人确认的节点</span><span><b>产物落盘</b>：F4 <code>plan.md</code> → F7 <code>review.md</code> → F8 <code>delivery.md</code>（选择交付后）；S 快速通道不落任何产物</span><span>缺陷修复走 B1 收集现象 → B2 复现 → B3 定位根因 → B4 追加 <code>plan.md</code> → B5 审查与交付（<code>review.md</code> / <code>delivery.md</code>）</span></div>
   <div class="sizes">
-    <div class="size"><div class="s">S · 快速通道</div><p>≤3 个文件，不碰接口、表、配置、权限、资金。走不走由用户选：同意则编译、测试、独立子 agent 审查照做，review.md 仍落盘；报告后等待选择，选择交付后只在对话里交付。</p></div>
-    <div class="size"><div class="s">M</div><p>改接口、配置项、少量字段，或涉及权限、资金。先确认需求理解，再确认简要方案。</p></div>
-    <div class="size"><div class="s">L</div><p>新模块、跨服务、数据迁移。方案写成文档落盘，确认后再写代码，之后可生成正式技术方案。</p></div>
+    <div class="size"><div class="s">S · 快速通道</div><p>≤3 个文件，不碰接口、表、配置、权限、资金。走不走由用户选：同意则编译、测试照常，审查在当前会话做；不绑定需求、不落产物文件（连方案也不写），一次对话交付并注明「未询问」。</p></div>
+    <div class="size"><div class="s">M</div><p>改接口、配置项、少量字段，或涉及权限、资金。先确认需求理解，再确认落盘的简要方案。</p></div>
+    <div class="size"><div class="s">L</div><p>新模块、跨服务、数据迁移。写完整方案文档落盘，确认后再写代码，之后可生成正式技术方案。</p></div>
   </div>
 </section>
 
@@ -389,8 +390,8 @@ footer { margin-top: 40px; font-size: 13px; color: var(--muted); }
     <table>
       <thead><tr><th>代理里输入</th><th>做什么</th></tr></thead>
       <tbody>
-        <tr><td>/dev &lt;需求描述&gt;</td><td>功能开发全流程：澄清 → 方案 → 实现 → 测试 → 独立子 agent 审查与报告 → 用户选择修复或交付（完整交付才生成交付说明）</td></tr>
-        <tr><td>/dev --bug &lt;现象&gt;</td><td>缺陷修复全流程：复现 → 定位根因 → 最小修复 → 验证 → 独立审查报告 → 用户选择修复或交付</td></tr>
+        <tr><td>/dev &lt;需求描述&gt;</td><td>功能开发全流程：确定工作分支 → 定需求名 → 澄清 → 方案 → 实现 → 测试 → 独立子 agent 审查与报告（无则当前会话自查）→ 用户选择修复或交付（完整交付才生成交付说明）</td></tr>
+        <tr><td>/dev --bug &lt;现象&gt;</td><td>缺陷修复全流程：复现 → 定位根因 → 最小修复 → 验证 → 审查报告 → 用户选择修复或交付</td></tr>
         <tr><td>/workflow</td><td>入口路由：直接说需求也行；不带请求时输出能力地图和状态</td></tr>
         <tr><td>/workflow profile</td><td>填写或更新项目画像（主分支、构建测试命令、toolchain）</td></tr>
         <tr><td>/workflow status</td><td>能力探测：CodeGraph、数据库、DocNexus、wiki 是否可用</td></tr>
@@ -491,11 +492,11 @@ footer { margin-top: 40px; font-size: 13px; color: var(--muted); }
 └── 订单导出/                <span class="c"># 需求名由你定</span>
     └── order-service/       <span class="c"># 项目名，跨服务各占一层</span>
         ├── meta.json        <span class="c"># 分支、版本、wiki、沉淀记录</span>
-        ├── plan.md          <span class="c"># 开发方案（L）</span>
-        ├── delivery.md      <span class="c"># 交付说明</span>
-        ├── review.md        <span class="c"># 审查报告</span>
-        ├── tech-doc.md      <span class="c"># 技术方案</span>
-        └── release-doc.md   <span class="c"># 上线方案</span></pre>
+        ├── plan.md          <span class="c"># 开发方案（F4；非快速通道都写。缺陷修复在 B4 追加「修复方案」节）</span>
+        ├── delivery.md      <span class="c"># 交付说明（F8 / B5，选择交付后）</span>
+        ├── review.md        <span class="c"># 审查报告（F7 / B5，每轮）</span>
+        ├── tech-doc.md      <span class="c"># 技术方案（create-tech-md-doc）</span>
+        └── release-doc.md   <span class="c"># 上线方案（create-release-md-doc）</span></pre>
       </div>
       <p class="sub" style="margin-top:12px;font-size:14px">可以随代码提交，也可以把 <code>workflow-run/</code> 整个换成团队的独立文档仓库，多个服务共用，目录结构不变。<code>npx @rowansenne/workflow-run view</code> 生成本地页面按需求浏览。</p>
     </div>

@@ -6,7 +6,7 @@
 //   - 沉淀：交付说明与审查报告的「DocNexus」元信息行 → 已沉淀 / 未沉淀 / 未询问 / 无需沉淀 / 未接入
 //   - 知识复用：正文里引用 docnexus/library/ 的产物（开工前召回到并用上了）
 //   - 链路完整度：每个分支有哪些产物、文档有没有发布到 wiki
-// S 快速通道没有交付说明，不计交付统计；其独立审查报告计入产物与审查统计。
+// S 快速通道不落盘（不绑定需求，也不写审查报告 / 交付说明），不在统计内。
 // 默认只看工作区；产物随特性分支提交、还没合并时，加 --all-branches 用 git 只读扫描所有本地分支（同一路径以工作区为准）。
 //
 // 用法（在项目根执行；--root 可指定项目根）：
@@ -144,7 +144,7 @@ export function toMarkdown(r) {
     L.push('`workflow-run/docs/requirements/` 下还没有产物。dev 交付（M / L 规模）、审查报告、技术方案、上线方案落盘后，这里才有数据。');
     return L.join('\n');
   }
-  L.push(`产物 ${r.artifacts} 份：${KINDS.map((k) => `${k.label} ${r.counts[k.kind]}`).join('、')}。S 快速通道的交付说明不落盘，不计交付统计；其独立审查报告计入产物与审查统计。`, '');
+  L.push(`产物 ${r.artifacts} 份：${KINDS.map((k) => `${k.label} ${r.counts[k.kind]}`).join('、')}。S 快速通道不落盘，不在统计内。`, '');
   const v = r.review;
   L.push('## 审查', '');
   L.push(`- 报告 ${v.reports} 份（其中复审 ${v.rereviews} 份）；发现 CRITICAL ${v.levels.CRITICAL} / HIGH ${v.levels.HIGH} / MEDIUM ${v.levels.MEDIUM} / LOW ${v.levels.LOW}`);

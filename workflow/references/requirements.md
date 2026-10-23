@@ -5,9 +5,9 @@
 ```
 workflow-run/docs/requirements/<需求名>/<项目名>/
 ├── meta.json          # 需求名、绑定的分支、各产物（种类、版本、日期、wiki 发布记录、DocNexus 沉淀）
-├── plan.md            # 开发方案（dev，L 规模或用户要求时）
-├── delivery.md        # 交付说明（dev，独立审查后用户选择交付才生成；S 快速通道仅对话交付）
-├── review.md          # 审查报告（独立 project-review 或 dev 子 agent 自审，含 S 快速通道）；复审也写这个文件，上一版归档（见「落盘」）
+├── plan.md            # 开发方案（dev，非快速通道都写；S / M 简版）
+├── delivery.md        # 交付说明（dev，完整流程审查后用户选择交付才生成；S 快速通道不落盘）
+├── review.md          # 审查报告（独立 project-review 或 dev 完整流程的自查；S 快速通道不落盘）；复审也写这个文件，上一版归档（见「落盘」）
 ├── tech-doc.md        # 技术方案（create-tech-md-doc）
 └── release-doc.md     # 上线方案（create-release-md-doc）
 ```
@@ -16,7 +16,9 @@ workflow-run/docs/requirements/<需求名>/<项目名>/
 
 这个目录写在项目根的 `.ignore` 里，不参与代码搜索（找历史决策用 DocNexus）。读写一律按下面脚本给出的路径，不要靠搜索找这些文件，也不要自己拼路径。两种用法下各 skill 的做法完全一样，区别都在脚本里。
 
-## 需求名：流程开始或第一次落盘时问用户
+## 需求名：流程开始时问用户
+
+dev 先按 Step 0 确定本次工作分支，再查询绑定和确认需求名。之后如果新建或切换分支，重新运行 `which`，不沿用旧分支的绑定结果或自动读到的名字；只有用户明确确认继续同一需求时，才把该名字用于新分支。
 
 ```
 node <skills>/workflow/scripts/requirement.mjs which
@@ -24,16 +26,17 @@ node <skills>/workflow/scripts/requirement.mjs which
 
 - `bound: true`：当前分支已绑定需求，直接用，不再问。
 - 退出码 2 且 `need_project`：独立文档仓库模式还没配项目名，按最后一节处理。
-- `bound: false`：**问用户这个需求叫什么**，一句话即可，例如「订单导出支持按渠道筛选」。把 `suggested_name`（由分支名生成）作为默认值给出；`recent` 里有相关的需求时，也让用户可以选择继续那一个（例如修 bug 的新分支属于原来的需求）。然后：
-  - 用户给了名字或选了已有的需求：`requirement.mjs bind --name "<需求名>"`；
-  - 用户说不用起名、随便：`requirement.mjs bind`，按分支名生成。
+- `bound: false`：**问用户这个需求叫什么**，一句话即可，例如「订单导出支持按渠道筛选」。把 `suggested_name`（由分支名生成）作为默认值给出；`recent` 里有相关的需求时，也让用户可以选择继续那一个（例如修 bug 的新分支属于原来的需求）。先只确认名字，第一次需要落盘时再 `bind`：
+  - 落盘时用户给了名字或选了已有的需求：`requirement.mjs bind --name "<需求名>"`；
+  - 用户说不用起名、随便：`requirement.mjs bind`，按分支名生成；
+  - 用户给不出名字、也说不清这次要做什么：**不开始流程**（dev 停在 F1 之前）。
 
-  什么时候问：
-  - dev：确定规模为 M / L、要落盘时；S 规模（含快速通道）最迟在 F7 写独立审查报告前绑定；
-  - 从 `/workflow` 完整链路开始时；
-  - 其他 skill：第一次落盘时。
+  什么时候问 / 绑定：
+  - dev：Step 0 就问（从 `/workflow` 进来时沿用已确认的名字，不再问）；完整流程第一次落盘前 `bind`（S 快速通道只问不 bind）；
+  - 从 `/workflow` 完整链路开始时：只问名字、不 bind，把名字交给接下来的 skill；
+  - 其他 skill：第一次落盘时问并 bind；对话里已经给过名字就直接用，不再问。
 
-  已经问过、绑定过的分支，后面的 skill 直接沿用。
+  已经问过、绑定过的分支，后面的 skill 直接沿用；只问过、还没 bind 的，沿用对话里给出的名字。
 
 一个需求可以绑定多个分支（`bind` 在其他分支上用同一个名字即可）。
 
@@ -70,7 +73,7 @@ npx @rowansenne/workflow-run docs-repo <团队文档仓库地址> [--project <�
 
 文档仓库模式下，产物写在另一个 git 仓库里，不会随代码提交。sync 输出里 `commit` 非空时：
 
-**dev F7 独立审查例外**：子 agent 将 `commit` 信息交回主 agent，此时不询问、不执行文档提交；主 agent 先交审查报告、等待用户选择修复或交付。选择交付进入 F8 后（含 S 快速通道），再运行 `requirement.mjs pending` 获取当前待提交内容，按下面步骤询问；修复与复审期间继续延后，不改动 `commit_prompt` 配置。
+**dev F7 审查例外**：审查环节（独立子 agent 或当前会话自查）拿到 `commit` 信息后不询问、不执行文档提交，先交审查报告、等待用户选择修复或交付。选择交付进入 F8 后（完整流程；S 快速通道不落盘，没有待提交产物），再运行 `requirement.mjs pending` 获取当前待提交内容，按下面步骤询问；修复与复审期间继续延后，不改动 `commit_prompt` 配置。
 
 1. 把 `commit.files`（未提交的产物）和 `commit.suggested_message` 给用户看，问要不要提交。
 2. 用户确认后，按 `commit.commands` 在文档仓库里提交；推送另外问用户，用户同意后再 `git -C workflow-run push`。
