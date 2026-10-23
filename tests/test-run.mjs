@@ -3,7 +3,9 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { spawnSync } from 'node:child_process';
+import { fork, spawnSync } from 'node:child_process';
+import { createHash, randomUUID } from 'node:crypto';
+import { once } from 'node:events';
 import { fileURLToPath } from 'node:url';
 import vm from 'node:vm';
 import { bind, sync, which } from '../workflow/scripts/requirement.mjs';
@@ -25,8 +27,22 @@ function fixture(t) {
   return { root, req, file, put, start, save };
 }
 const completed = (names) => Object.fromEntries(names.map((name) => [name, { status: 'completed' }]));
-// 和 meta-store.mjs 的锁路径规则一致：workflow-run/tmp/locks/<需求目录相对路径>.lock
-const lockOf = (root, file) => path.join(root, 'workflow-run/tmp/locks', `${path.relative(root, file).replace(/[\\/]/g, '__')}.lock`);
+const lockOf = (root, file) => {
+  const target = path.join(fs.realpathSync.native(path.dirname(file)), path.basename(file));
+  const rel = path.relative(fs.realpathSync.native(root), target).split(path.sep).join('/');
+  return path.join(root, 'workflow-run/tmp/locks', `${createHash('sha256').update(rel).digest('hex')}.lock`);
+};
+function seedLock(lock, pid, old = false) {
+  fs.mkdirSync(lock, { recursive: true });
+  const owner = path.join(lock, `${pid}-${randomUUID()}.json`);
+  fs.writeFileSync(owner, JSON.stringify({ pid }));
+  if (old) {
+    const time = Date.now() / 1000 - 3600;
+    fs.utimesSync(owner, time, time);
+    fs.utimesSync(lock, time, time);
+  }
+  return owner;
+}
 
 test('运行保存在同一 meta.json；sync / which / 重新 bind 均保留上下文、已完成步骤与其他扩展字段', (t) => {
   const f = fixture(t);
@@ -168,11 +184,10 @@ test('元信息锁阻止并发覆盖，异常释放锁；损坏 JSON 不会被�
   const f = fixture(t);
   const original = fs.readFileSync(f.file, 'utf8');
   const lock = lockOf(f.root, f.file);
-  fs.mkdirSync(path.dirname(lock), { recursive: true });
-  fs.writeFileSync(lock, JSON.stringify({ pid: process.pid }));
+  seedLock(lock, process.pid);
   assert.throws(() => sync(f.root, f.req.dir), /正在写入/);
   assert.equal(fs.readFileSync(f.file, 'utf8'), original);
-  fs.rmSync(lock);
+  fs.rmSync(lock, { recursive: true });
   fs.writeFileSync(f.file, '{invalid');
   assert.throws(() => sync(f.root, f.req.dir), /不是合法 JSON/);
   assert.equal(fs.readFileSync(f.file, 'utf8'), '{invalid');
@@ -187,20 +202,130 @@ test('写锁不落在需求目录：崩溃残留不会随产物提交；陈旧�
   assert.deepEqual(fs.readdirSync(path.dirname(f.file)), ['meta.json']);
   assert.ok(lock.startsWith(path.join(f.root, 'workflow-run/tmp/')), lock);
   // 写入进程已死且锁过期 → 清理后继续，不再永久卡死
-  fs.mkdirSync(path.dirname(lock), { recursive: true });
-  fs.writeFileSync(lock, JSON.stringify({ pid: 999999, at: '2020-01-01T00:00:00.000Z' }));
-  const old = Date.now() / 1000 - 3600;
-  fs.utimesSync(lock, old, old);
+  seedLock(lock, 999999, true);
   const meta = updateMeta(f.file, (cur) => ({ ...cur, healed: true }), { root: f.root });
   assert.equal(meta.healed, true);
   assert.equal(JSON.parse(fs.readFileSync(f.file, 'utf8')).healed, true);
   assert.equal(fs.existsSync(lock), false, '陈旧锁已清理');
   // 锁很旧但写入进程仍活着 → 不能抢，避免覆盖正在写的进度
-  fs.mkdirSync(path.dirname(lock), { recursive: true });
-  fs.writeFileSync(lock, JSON.stringify({ pid: process.pid }));
-  fs.utimesSync(lock, old, old);
+  seedLock(lock, process.pid, true);
   assert.throws(() => updateMeta(f.file, (cur) => cur, { root: f.root }), /正在写入/);
-  fs.rmSync(lock);
+  fs.rmSync(lock, { recursive: true });
+  // mkdir 后还没写入标记就崩溃的空锁也能在过期后恢复。
+  fs.mkdirSync(lock);
+  const old = Date.now() / 1000 - 3600;
+  fs.utimesSync(lock, old, old);
+  updateMeta(f.file, (cur) => cur, { root: f.root });
+  assert.equal(fs.existsSync(lock), false);
+});
+
+test('长中文需求名的锁名固定长度，路径分隔符与双下划线不会碰撞', (t) => {
+  const f = fixture(t);
+  const files = [path.join('需'.repeat(60), 'p'.repeat(60)), 'a__b/c', 'a/b__c'];
+  const locks = [];
+  for (const dir of files) {
+    const file = path.join(f.root, 'workflow-run/docs/requirements', dir, 'meta.json');
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    updateMeta(file, () => {
+      const entries = fs.readdirSync(path.join(f.root, 'workflow-run/tmp/locks'));
+      assert.equal(entries.length, 1);
+      assert.match(entries[0], /^[a-f0-9]{64}\.lock$/);
+      assert.equal(Buffer.byteLength(entries[0]), 69);
+      locks.push(entries[0]);
+      return { saved: true };
+    }, { root: f.root });
+    assert.equal(JSON.parse(fs.readFileSync(file)).saved, true);
+  }
+  assert.equal(new Set(locks).size, files.length);
+});
+
+test('两个进程同时回收陈旧锁：不能删除新持有者的活锁，重试后保留双方更新', { timeout: 15000 }, async (t) => {
+  const f = fixture(t);
+  const lock = lockOf(f.root, f.file);
+  const stale = seedLock(lock, 999999, true);
+  const worker = path.join(f.root, 'lock-worker.mjs');
+  fs.writeFileSync(worker, `
+import fs from 'node:fs';
+import path from 'node:path';
+import { updateMeta } from ${JSON.stringify(new URL('../workflow/scripts/meta-store.mjs', import.meta.url).href)};
+const [role, root, file, stale] = process.argv.slice(2);
+const wait = (gate) => {
+  const end = Date.now() + 10000;
+  while (!fs.existsSync(path.join(root, gate))) {
+    if (Date.now() > end) throw new Error('gate timeout: ' + gate);
+    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 5);
+  }
+};
+if (role === 'B') {
+  const unlink = fs.unlinkSync;
+  let paused = false;
+  fs.unlinkSync = function (file, ...args) {
+    if (file === stale && !paused) { paused = true; process.send('stale-decided'); wait('allow-B'); }
+    return unlink.call(this, file, ...args);
+  };
+  try { updateMeta(file, (meta) => ({ ...meta, B: true }), { root }); process.send('unexpected-write'); }
+  catch (e) { process.send(e.message.includes('正在写入') ? 'blocked' : e.message); }
+  process.once('message', () => {
+    updateMeta(file, (meta) => ({ ...meta, B: true }), { root });
+    process.send('saved-B'); process.disconnect();
+  });
+} else {
+  updateMeta(file, (meta) => { process.send('A-holding-lock'); wait('allow-A'); return { ...meta, A: true }; }, { root });
+  process.send('saved-A'); process.disconnect();
+}
+`);
+  const start = (role) => {
+    const child = fork(worker, [role, f.root, f.file, stale], { execArgv: [], stdio: ['ignore', 'ignore', 'inherit', 'ipc'] });
+    t.after(() => child.kill());
+    return child;
+  };
+  const b = start('B');
+  assert.equal((await once(b, 'message'))[0], 'stale-decided');
+  const a = start('A');
+  assert.equal((await once(a, 'message'))[0], 'A-holding-lock');
+  fs.writeFileSync(path.join(f.root, 'allow-B'), '');
+  assert.equal((await once(b, 'message'))[0], 'blocked');
+  assert.ok(fs.existsSync(lock), '另一个进程仍持有活锁');
+  fs.writeFileSync(path.join(f.root, 'allow-A'), '');
+  assert.equal((await once(a, 'message'))[0], 'saved-A');
+  const savedB = once(b, 'message');
+  b.send('retry');
+  assert.equal((await savedB)[0], 'saved-B');
+  const meta = JSON.parse(fs.readFileSync(f.file));
+  assert.equal(meta.A, true);
+  assert.equal(meta.B, true);
+  assert.equal(fs.existsSync(lock), false);
+});
+
+test('同一需求目录的路径别名共用写锁；空目录恢复期间也不能删除新持有者标记', (t) => {
+  const f = fixture(t);
+  const lock = lockOf(f.root, f.file);
+  updateMeta(f.file, (meta) => {
+    // Windows / 默认 macOS 文件系统：同一目录的大小写别名不能产生另一把锁。
+    const alias = path.join(path.dirname(f.file).toUpperCase(), 'meta.json');
+    if (fs.existsSync(alias)) assert.throws(() => updateMeta(alias, (cur) => cur, { root: f.root }), /正在写入/);
+    assert.throws(() => updateMeta(path.join(path.dirname(f.file), '..', path.basename(path.dirname(f.file)), 'meta.json'), (cur) => cur, { root: f.root }), /正在写入/);
+    return meta;
+  }, { root: f.root });
+  // 模拟 mkdir 后停顿，空目录已被回收且另一个写入者取得了同名目录。
+  const write = fs.writeFileSync;
+  let replacement;
+  let replaced = false;
+  fs.writeFileSync = function (file, ...args) {
+    if (!replaced && path.dirname(file) === lock) {
+      replaced = true;
+      fs.rmdirSync(lock);
+      replacement = seedLock(lock, process.pid);
+    }
+    return write.call(this, file, ...args);
+  };
+  try {
+    assert.throws(() => updateMeta(f.file, (cur) => cur, { root: f.root }), /正在写入/);
+    assert.deepEqual(fs.readdirSync(lock), [path.basename(replacement)], '失败的写入只清理自身标记');
+  } finally {
+    fs.writeFileSync = write;
+    fs.rmSync(lock, { recursive: true, force: true });
+  }
 });
 
 test('发布已有产物按来源需求与分支记录，不跟随当前 checkout 或同分支最新绑定串到其他需求', (t) => {
