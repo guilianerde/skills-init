@@ -6,6 +6,9 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { useLocalDocNexus } from './helpers/docnexus-pkg.mjs';
+
+useLocalDocNexus();
 
 const CLI = fileURLToPath(new URL('../bin/workflow-run.mjs', import.meta.url));
 const PKG = JSON.parse(fs.readFileSync(new URL('../package.json', import.meta.url), 'utf8'));

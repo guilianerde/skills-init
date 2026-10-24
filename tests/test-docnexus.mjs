@@ -6,7 +6,10 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { useLocalDocNexus } from './helpers/docnexus-pkg.mjs';
 import { cleanupLegacyDocNexus } from '../bin/lib/docnexus.mjs';
+
+useLocalDocNexus();
 
 const CLI = fileURLToPath(new URL('../bin/workflow-run.mjs', import.meta.url));
 function project(t) {

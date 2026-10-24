@@ -6,7 +6,10 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { useLocalDocNexus } from './helpers/docnexus-pkg.mjs';
 import { lint, headingKey, extractRefs, checkRefs, diffRange } from '../workflow/scripts/lint-doc.mjs';
+
+useLocalDocNexus();
 
 const REPO = fileURLToPath(new URL('..', import.meta.url));
 const TPL = `# 【技术方案】<在此填写需求标题>
@@ -68,7 +71,7 @@ test('CLI：技术方案没有模板时退出 2，项目模板不生效；已接
   fs.copyFileSync(path.join(REPO, 'project-review/references/report.md.tpl'), path.join(root, 'review-raw.md'));
   r = cli('review-raw.md', '--skill', 'project-review', '--json');
   assert.equal(r.status, 1);
-  assert.equal(JSON.parse(r.stdout).template, '.agents/skills/project-review/references/report.md');
+  assert.equal(JSON.parse(r.stdout).template, 'workflow-run/docnexus/library/templates/project-review/report.md');
   const review = ['# 代码审查报告 — feature-x', '> 审查范围：分支对比 ｜ 日期：2026-10-15', '> 对比分支：`feature-x` ←→ `main`', '> 审查方式：全量精读 ｜ 清单来源：skill 默认',
     '## 结论摘要', '可合并。', '## 严重问题（CRITICAL / HIGH）', '无', '## 一般问题（MEDIUM）', '无', '## 优化建议（LOW）', '无', '## 影响面', '无', '## 未覆盖与待确认', '无', ''].join('\n');
   fs.writeFileSync(path.join(root, 'review.md'), review);

@@ -8,6 +8,10 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { matchGlob, globToRegExp, parseDiff, scope, plan, rulesFor, checklistSections, classify, stripRegexLiterals } from '../workflow/scripts/review-scope.mjs';
 import { locate, snippetLines, findAll } from '../workflow/scripts/locate.mjs';
+import { useLocalDocNexus } from './helpers/docnexus-pkg.mjs';
+
+// 必装组件 DocNexus 用本地夹具接入：不依赖 npm registry，也不写用户的 ~/.npm。
+useLocalDocNexus();
 
 const REPO = fileURLToPath(new URL('..', import.meta.url));
 const CHECKLIST = fs.readFileSync(path.join(REPO, 'project-review/references/checklist.md.tpl'), 'utf8');
@@ -216,7 +220,8 @@ test('CLI：装好的项目里 review-scope 读画像 review 配置，rules 用 
   assert.equal(out.skipped.find((f) => f.path.endsWith('Order.java'))?.reason, 'user_exclude');
   const rules = run('review-scope.mjs', 'rules', 'src/main/java/com/x/order/controller/OrderController.java', '--diff', 'main...feature');
   assert.equal(rules.status, 0, rules.stderr);
-  assert.match(rules.stdout, /清单：\.agents\/skills\/project-review\/references\/checklist\.md/);
+  // 模板一律从知识库取：安装已把清单导入 workflow-run/docnexus/library/
+  assert.match(rules.stdout, /清单：workflow-run\/docnexus\/library\/templates\/project-review\/checklist\.md/);
   assert.match(rules.stdout, /接口要校验登录态/);
   fs.mkdirSync(path.join(root, 'workflow-run/tmp/review'), { recursive: true });
   fs.writeFileSync(path.join(root, 'workflow-run/tmp/review/findings.json'), JSON.stringify([{ file: 'src/main/resources/application.yml', code: 'page-size: 20' }]));

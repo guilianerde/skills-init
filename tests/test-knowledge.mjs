@@ -6,6 +6,10 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { useLocalDocNexus, resetDocNexus } from './helpers/docnexus-pkg.mjs';
+
+// 必装组件 DocNexus 用本地夹具接入：不依赖 npm registry，也不写用户的 ~/.npm。
+useLocalDocNexus();
 
 const REPO = fileURLToPath(new URL('..', import.meta.url));
 const skip = process.platform === 'win32' ? '假 CLI 用 shebang 脚本实现，Windows 跳过' : false;
@@ -30,6 +34,8 @@ function project({ connect = true } = {}) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'knowledge-'));
   const r = spawnSync(process.execPath, [path.join(REPO, 'bin', 'workflow-run.mjs'), '--project-root', root, '--envs', 'codex', '--skip-db', '--yes'], { encoding: 'utf8' });
   assert.equal(r.status, 0, r.stderr);
+  // 安装一定会接入 DocNexus；本文件用假 CLI，先清掉再按 connect 需要搭。
+  resetDocNexus(root);
   if (connect) {
     fs.mkdirSync(path.join(root, '.docnexus'), { recursive: true });
     fs.writeFileSync(path.join(root, '.docnexus', 'project.json'), '{"format_version":7,"output_dir":"workflow-run"}');

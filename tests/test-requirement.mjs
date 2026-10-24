@@ -6,8 +6,11 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { useLocalDocNexus } from './helpers/docnexus-pkg.mjs';
 import { dirName, parseFile, which, bind, nextPath, sync, ensureIgnore, list, legacyRequirements, migrateLayout } from '../workflow/scripts/requirement.mjs';
 import { collect, branchView } from '../workflow/scripts/artifacts.mjs';
+
+useLocalDocNexus();
 
 const REPO = fileURLToPath(new URL('..', import.meta.url));
 const SCRIPT = path.join(REPO, 'workflow/scripts/requirement.mjs');

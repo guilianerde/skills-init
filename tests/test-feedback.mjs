@@ -6,7 +6,10 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { useLocalDocNexus } from './helpers/docnexus-pkg.mjs';
 import { parseAdd, add, readAll, rotate, summarize, installedVersion, ensureUnionMerge } from '../workflow/scripts/feedback.mjs';
+
+useLocalDocNexus();
 
 const REPO = fileURLToPath(new URL('..', import.meta.url));
 const PKG = JSON.parse(fs.readFileSync(path.join(REPO, 'package.json'), 'utf8'));

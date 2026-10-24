@@ -7,6 +7,10 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { useLocalDocNexus } from './helpers/docnexus-pkg.mjs';
+
+// 必装组件 DocNexus 用本地夹具接入：不依赖 npm registry，也不写用户的 ~/.npm。
+useLocalDocNexus();
 
 const REPO = fileURLToPath(new URL('..', import.meta.url));
 const G = ['-c', 'user.email=t@t', '-c', 'user.name=t'];
@@ -27,7 +31,12 @@ function workspace() {
     fs.mkdirSync(root);
     const git = (...a) => spawnSync('git', [...G, ...a], { cwd: root, encoding: 'utf8' });
     git('init', '-q', '-b', 'main'); git('commit', '-q', '--allow-empty', '-m', 'init'); git('checkout', '-q', '-b', branch);
-    const cloneDocs = () => assert.equal(spawnSync('git', ['clone', '-q', remote, 'workflow-run'], { cwd: root }).status, 0);
+    // 安装现在一定会接入 DocNexus，workflow-run/ 里有 docnexus/，git 拒绝克隆进非空目录；
+    // 这里按产品 docs-repo 命令的同样做法先腾空该目录（本用例要自己走 git clone 这一步）。
+    const cloneDocs = () => {
+      fs.rmSync(path.join(root, 'workflow-run'), { recursive: true, force: true });
+      assert.equal(spawnSync('git', ['clone', '-q', remote, 'workflow-run'], { cwd: root }).status, 0);
+    };
     if (clone) cloneDocs();
     const cli = (...a) => spawnSync(process.execPath, [path.join(REPO, 'bin/workflow-run.mjs'), '--project-root', root, ...a], { cwd: root, encoding: 'utf8', env: ENV });
     const r = cli('--envs', 'codex', '--skip-db', '--yes');
@@ -151,7 +160,10 @@ test('docs-repo 一条命令切到文档仓库：克隆、忽略、项目名、t
   assert.equal(r.status, 0, r.stdout + r.stderr);
   assert.ok(fs.existsSync(path.join(p.docs, '.git')));
   assert.equal(fs.readFileSync(path.join(p.docs, 'tmp/view/index.html'), 'utf8'), 'x', 'tmp/ 放回');
-  assert.equal(p.docsGit('status', '--porcelain').stdout, '', 'tmp/ 不进文档仓库');
+  // tmp/ 是本机临时文件，不进文档仓库；docnexus/ 是有意共享的知识库，会以未跟踪状态出现（由团队提交）
+  const untracked = p.docsGit('status', '--porcelain').stdout;
+  assert.doesNotMatch(untracked, /tmp\//, 'tmp/ 不进文档仓库');
+  assert.equal(untracked.trim(), '?? docnexus/', `文档仓库里只有知识库待提交：${untracked}`);
   assert.match(fs.readFileSync(path.join(p.root, '.gitignore'), 'utf8'), /^\/workflow-run\/$/m);
   assert.match(r.stdout, /项目名：order-service/);
   const w = p.req('which').out;

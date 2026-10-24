@@ -8,18 +8,26 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { useLocalDocNexus, draftProtocolSource } from './helpers/docnexus-pkg.mjs';
+
+// 必装组件 DocNexus 用本地夹具接入：不依赖 npm registry，也不写用户的 ~/.npm。
+useLocalDocNexus();
 
 const REPO = fileURLToPath(new URL('..', import.meta.url));
 const skip = process.platform === 'win32' ? '假 CLI 与软链接用 POSIX 实现，Windows 跳过' : false;
 const G = ['-c', 'user.email=t@t', '-c', 'user.name=t'];
 
-// 假 docnexus：记录运行目录；document query 从运行目录下的 docs.json 返回
+// 假 docnexus：记录运行目录；document query 从运行目录下的 docs.json 返回。
+// 另外要能跑通安装时的模板导入（draft new / seal / document add），否则必装组件
+// 的接入会在导入模板这步失败——这里复用夹具的 draft 协议实现。
 const FAKE = `#!/usr/bin/env node
 const fs = require('fs');
+const path = require('path');
 fs.appendFileSync(process.env.FAKE_LOG || '/dev/null', process.cwd() + ' ' + process.argv.slice(2).join(' ') + '\\n');
 const [cmd, sub, ...rest] = process.argv.slice(2);
 if (cmd === '--help') { console.log('  docnexus recall "q" --limit 5 [--category <name>]\\n  docnexus draft seal --category-reason'); process.exit(0); }
 if (cmd === 'recall') { console.log(JSON.stringify({ query: sub, context_groups: [] })); process.exit(0); }
+${draftProtocolSource()}
 if (cmd === 'document' && sub === 'query') {
   const cat = rest[rest.indexOf('--category') + 1];
   const docs = JSON.parse(fs.readFileSync('docs.json', 'utf8')).filter((d) => d.category === cat);

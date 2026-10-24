@@ -7,6 +7,10 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { useLocalDocNexus } from './helpers/docnexus-pkg.mjs';
+
+// 必装组件 DocNexus 用本地夹具接入：不依赖 npm registry，也不写用户的 ~/.npm。
+useLocalDocNexus();
 
 const REPO = fileURLToPath(new URL('..', import.meta.url));
 const IS_WIN = process.platform === 'win32';
@@ -297,7 +301,8 @@ test('普通聊天落盘约定：无需 DocNexus，重装与升级更新原段�
     assert.ok(installed[f].startsWith(before), f);
     assert.match(installed[f], /workflow-run\/other\//);
     assert.match(installed[f], /普通聊天不得.*requirement\.mjs.*run\.mjs/);
-    assert.doesNotMatch(installed[f], /workflow-run:docnexus:start/, '不依赖 DocNexus');
+    const artifactBlock = installed[f].split('<!-- workflow-run:artifacts:start -->')[1].split('<!-- workflow-run:artifacts:end -->')[0];
+    assert.doesNotMatch(artifactBlock, /DocNexus/, '落盘边界独立于 DocNexus 段落');
   }
   ok(p.install(['--envs', 'codex,claude,doubao,qwen,workbuddy', '--copy', '--yes', '--skip-db', '--skills', 'workflow']));
   for (const f of files) assert.equal(p.read(f), installed[f], '重装幂等');
@@ -435,6 +440,7 @@ test('共享参考文件：仓库只有一份，装进每个声明它的 skill�
 test('旧包 skills-init 装过的项目：列出改名命令后停下，不做改动；按提示改名后 upgrade 正常，旧段落与旧忽略规则只提示', () => {
   const p = project('legacy');
   ok(p.install(['--envs', 'codex', '--yes', '--skip-db']));
+  fs.rmSync(p.at('workflow-run'), { recursive: true, force: true });
   p.write('skills-init/docs/requirements/x/plan.md', '# 方案\n');
   fs.renameSync(p.at('.agents/skills/.workflow-run.json'), p.at('.agents/skills/.skills-init.json'));
   p.write('CLAUDE.md', '# 项目\n\n<!-- skills-init:docnexus:start -->\n旧段落\n<!-- skills-init:docnexus:end -->\n');

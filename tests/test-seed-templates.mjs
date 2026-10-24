@@ -9,6 +9,10 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { seedTemplates, templateStatus, updateTemplates, TEMPLATES } from '../bin/seed-templates.mjs';
+import { useLocalDocNexus } from './helpers/docnexus-pkg.mjs';
+
+// 必装组件 DocNexus 用本地夹具接入：不依赖 npm registry，也不写用户的 ~/.npm。
+useLocalDocNexus();
 
 const REPO = fileURLToPath(new URL('..', import.meta.url));
 const skip = process.platform === 'win32' ? '假 CLI 用 shebang 脚本实现，Windows 跳过' : false;
@@ -210,6 +214,7 @@ test('CLI：upgrade 自动导入新增的模板（只新增）；seed-templates 
   assert.match(r.stdout, /^\+## 11\. 幂等与消息一致性$/m);
   assert.equal(fs.readFileSync(path.join(root, 'calls.log'), 'utf8'), '', '--diff 不调用 DocNexus');
   r = cli('upgrade');
-  assert.match(r.stdout, /文档模板齐全/);
+  assert.equal(r.status, 0, r.stderr);
+  assert.equal(fs.readFileSync(path.join(root, 'calls.log'), 'utf8'), '', '模板齐全时不重复导入');
   fs.rmSync(root, { recursive: true, force: true });
 });

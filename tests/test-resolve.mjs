@@ -6,6 +6,10 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { useLocalDocNexus, resetDocNexus } from './helpers/docnexus-pkg.mjs';
+
+// 必装组件 DocNexus 用本地夹具接入：不依赖 npm registry，也不写用户的 ~/.npm。
+useLocalDocNexus();
 
 const REPO = fileURLToPath(new URL('..', import.meta.url));
 
@@ -13,6 +17,8 @@ function project() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'resolve-'));
   const r = spawnSync(process.execPath, [path.join(REPO, 'bin', 'workflow-run.mjs'), '--project-root', root, '--envs', 'codex,claude', '--skip-db', '--yes'], { encoding: 'utf8' });
   assert.equal(r.status, 0, r.stderr);
+  // 安装一定会接入 DocNexus；本文件自己搭接入状态（connect / 缺失 / 未接入），先回到基线。
+  resetDocNexus(root);
   const resolve = (...args) => {
     // 经 .claude 下的软链接调用，和 Claude Code 中的实际路径一致（Windows 建不了链接时退回 .agents）
     const viaLink = fs.lstatSync(path.join(root, '.claude', 'skills', 'workflow')).isSymbolicLink();
@@ -29,23 +35,35 @@ test('未接入 DocNexus：只用默认模板，项目文件不生效；技术�
   let r = resolve('template', 'create-tech-md-doc', 'template.md');
   assert.equal(r.status, 2);
   assert.deepEqual([r.out.error, r.out.need_docnexus, r.out.on_demand, r.out.docnexus], ['missing', true, undefined, false]);
-  assert.match(r.out.hint, /--with-docnexus/);
-  assert.equal(resolve('template', 'project-review', 'checklist.md').out.path, '.agents/skills/project-review/references/checklist.md');
-  assert.equal(resolve('template', 'dev', 'plan-template.md').out.source, 'default');
+  assert.match(r.out.hint, /必装组件/);
+  // 包内模板只用于导入，模板一律从知识库取：未接入时 checklist 也报缺失，不回退内置默认
+  const listed = resolve('template', 'project-review', 'checklist.md');
+  assert.equal(listed.status, 2);
+  assert.equal(listed.out.expected, 'workflow-run/docnexus/library/templates/project-review/checklist.md');
+  // 未接入时提前返回，只给 expected 与「必装组件」提示，不算 import_from
+  assert.equal(listed.out.import_from, undefined);
+  const devTpl = resolve('template', 'dev', 'plan-template.md');
+  assert.equal(devTpl.status, 2);
+  assert.equal(devTpl.out.expected, 'workflow-run/docnexus/library/templates/dev/plan-template.md');
   r = resolve('template', 'no-such-skill', 'checklist.md');
   assert.deepEqual([r.status, r.out.error], [1, 'unknown']);
   assert.match(r.out.message, /没有安装/);
   const s0 = resolve('status').out;
   assert.deepEqual(s0.templates_to_create, []);
-  assert.deepEqual(s0.templates_need_docnexus.map((t) => t.skill).sort(), ['create-release-md-doc', 'create-tech-md-doc']);
+  // 未接入时 6 份模板一律报 need_docnexus（包内模板不再作为默认来源兜底）
+  assert.equal(s0.templates.filter((t) => t.need_docnexus).length, 6);
+  assert.deepEqual([...new Set(s0.templates.filter((t) => t.need_docnexus).map((t) => t.skill))].sort(),
+    ['create-release-md-doc', 'create-tech-md-doc', 'dev', 'project-review']);
   put('workflow-run/templates/create-tech-md-doc/template.md', '# 团队模板');
   put('workflow-run/templates/dev/plan-template.md', '# 项目里的方案模板');
   r = resolve('template', 'create-tech-md-doc', 'template.md');
   assert.equal(r.status, 2, '项目模板不再生效');
   assert.equal(r.out.stale_project_file, 'workflow-run/templates/create-tech-md-doc/template.md');
-  assert.match(r.out.hint, /不再生效/);
+  // 未接入时提前返回「必装组件」提示；项目模板不再生效由 stale_project_file 表达
+  assert.match(r.out.hint, /必装组件/);
   r = resolve('template', 'dev', 'plan-template.md');
-  assert.deepEqual([r.out.source, r.out.path, r.out.stale_project_file], ['default', '.agents/skills/dev/references/plan-template.md', 'workflow-run/templates/dev/plan-template.md']);
+  // 未接入时同样不回退默认模板；项目目录里的旧模板只作为 stale 提示（导入来源改从包内模板取）
+  assert.deepEqual([r.status, r.out.error, r.out.stale_project_file], [2, 'missing', 'workflow-run/templates/dev/plan-template.md']);
   assert.deepEqual(resolve('status').out.docnexus.stale_project_templates.sort(), ['workflow-run/templates/create-tech-md-doc/template.md', 'workflow-run/templates/dev/plan-template.md']);
   assert.equal(resolve('template', 'dev', 'nope.md').status, 1);
   fs.rmSync(root, { recursive: true, force: true });
@@ -60,7 +78,7 @@ test('已接入 DocNexus：只用知识库，缺失退出 2 并给出导入来�
   assert.equal(r.out.error, 'missing');
   assert.equal(r.out.expected, 'workflow-run/docnexus/library/templates/dev/plan-template.md');
   assert.equal(r.out.import_from, 'workflow-run/templates/dev/plan-template.md');
-  assert.match(r.out.hint, /--seed-templates/);
+  assert.match(r.out.hint, /seed-templates 导入/);
   put('workflow-run/docnexus/library/templates/dev/plan-template.md', '# 库里的模板');
   r = resolve('template', 'dev', 'plan-template.md');
   assert.equal(r.status, 0);

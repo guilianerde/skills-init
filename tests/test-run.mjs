@@ -7,12 +7,15 @@ import { fork, spawnSync } from 'node:child_process';
 import { createHash, randomUUID } from 'node:crypto';
 import { once } from 'node:events';
 import { fileURLToPath } from 'node:url';
+import { useLocalDocNexus } from './helpers/docnexus-pkg.mjs';
 import vm from 'node:vm';
 import { bind, sync, which } from '../workflow/scripts/requirement.mjs';
 import { startRun, changeRun, runState, FLOWS } from '../workflow/scripts/run.mjs';
 import { branchView } from '../workflow/scripts/artifacts.mjs';
 import { viewData, renderHtml } from '../workflow/scripts/view.mjs';
 import { readMeta, updateMeta } from '../workflow/scripts/meta-store.mjs';
+
+useLocalDocNexus();
 
 const REPO = fileURLToPath(new URL('..', import.meta.url));
 const BRANCH = 'feature/order';

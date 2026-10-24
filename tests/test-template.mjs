@@ -7,6 +7,10 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { checkFormat, compare } from '../workflow/scripts/template.mjs';
+import { useLocalDocNexus, resetDocNexus } from './helpers/docnexus-pkg.mjs';
+
+// 必装组件 DocNexus 用本地夹具接入：不依赖 npm registry，也不写用户的 ~/.npm。
+useLocalDocNexus();
 
 const REPO = fileURLToPath(new URL('..', import.meta.url));
 const node = (args, opts = {}) => spawnSync(process.execPath, args, { encoding: 'utf8', ...opts });
@@ -14,6 +18,8 @@ const node = (args, opts = {}) => spawnSync(process.execPath, args, { encoding: 
 function project() {
   const root = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'tpl-')), 'svc'); fs.mkdirSync(root); // 目录名 svc = 自动取的项目名
   assert.equal(node([path.join(REPO, 'bin/workflow-run.mjs'), '--project-root', root, '--envs', 'codex', '--skip-db', '--yes'], { cwd: root, env: { ...process.env, WORKFLOW_RUN_ADMIN: '1' } }).status, 0);
+  // 安装一定会接入 DocNexus；本文件自己控制接入状态（需要时调 connect），先回到基线。
+  resetDocNexus(root);
   const run = (...a) => { const r = node([path.join(root, '.agents/skills/workflow/scripts/template.mjs'), ...a], { cwd: root }); return { code: r.status, out: r.stdout ? JSON.parse(r.stdout) : null, err: r.stderr }; };
   return { root, run, draftFile: (skill, id = 'template.md') => path.join(root, 'workflow-run/tmp/template-draft', skill, id) };
 }
@@ -49,8 +55,10 @@ test('未接入 DocNexus：默认模板只读，draft / save 退出码 2 提示�
   const { root, run, draftFile } = project();
   let r = run('draft', 'delivery');
   assert.equal(r.code, 2);
-  assert.deepEqual([r.out.need_docnexus, r.out.current], [true, '.agents/skills/dev/references/delivery-template.md']);
-  assert.match(r.out.hint, /--with-docnexus/);
+  assert.equal(r.out.need_docnexus, true);
+  // 包内模板只用于导入，不再作为默认来源：未接入时不给 current，只给 expected 与提示
+  assert.equal(r.out.expected, 'workflow-run/docnexus/library/templates/dev/delivery-template.md');
+  assert.match(r.out.hint, /必装组件/);
   assert.ok(!fs.existsSync(draftFile('dev', 'delivery-template.md')), '不起草稿');
   fs.mkdirSync(path.dirname(draftFile('dev', 'delivery-template.md')), { recursive: true });
   fs.writeFileSync(draftFile('dev', 'delivery-template.md'), '# 交付\n\n## 验证 *\n');
@@ -147,7 +155,8 @@ test('参数：未知模板与缺子命令退出 1；list 列出别名与来源'
   assert.equal(run().code, 1);
   const l = run('list').out;
   assert.deepEqual(l.map((x) => x.alias), ['tech', 'release', 'plan', 'delivery', 'review', 'checklist']);
-  assert.equal(l.find((x) => x.alias === 'review').source, 'default');
+  // 未接入时模板没有来源（不再回退包内默认），标记为缺失
+  assert.deepEqual([l.find((x) => x.alias === 'review').source, l.find((x) => x.alias === 'review').missing], [null, true]);
   assert.equal(l.find((x) => x.alias === 'tech').missing, true);
   fs.rmSync(root, { recursive: true, force: true });
 });
