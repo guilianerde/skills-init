@@ -17,43 +17,10 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { resolveTemplate, skillMeta } from './resolve.mjs';
+import { proseLines, headings } from '../lib/document-model.mjs';
+export { headings, headingKey } from '../lib/document-model.mjs';
 
 const TODO = /待填写|待补充|待人工确认/;
-
-// 去掉代码块后返回 [{ line, text }]，行号从 1 开始
-function proseLines(md) {
-  const out = [];
-  let fence = null;
-  md.replace(/\r/g, '').split('\n').forEach((text, i) => {
-    const m = text.match(/^\s*(```+|~~~+)/);
-    if (m) { if (!fence) fence = m[1][0]; else if (m[1][0] === fence) fence = null; return; }
-    if (!fence) out.push({ line: i + 1, text });
-  });
-  return out;
-}
-
-// 章节标题归一化：去掉编号（1. / 4.1 / 一、/ 第一部分）、必填标记 *、可选标记（如有），用于模板与文档比对
-export function headingKey(text) {
-  return text
-    .replace(/\*+\s*$/, '')
-    .replace(/[（(]\s*如有[^)）]*[)）]/g, '')
-    .replace(/^\s*(?:第?[一二三四五六七八九十]+[、.．]|[0-9]+(?:\.(?:[0-9]+|x))*[.、．]?)\s*/, '')
-    .replace(/\s+/g, '')
-    .trim();
-}
-
-export function headings(md) {
-  return proseLines(md)
-    .map(({ line, text }) => ({ line, m: text.match(/^(#{1,6})\s+(.+?)\s*#*\s*$/) }))
-    .filter((h) => h.m)
-    .map(({ line, m }) => ({
-      line, level: m[1].length, text: m[2],
-      key: headingKey(m[2]),
-      required: /\*\s*$/.test(m[2]),
-      optional: /[（(]\s*如有/.test(m[2]),
-      placeholder: /\{\{|<[^>]*填写[^>]*>/.test(m[2]),
-    }));
-}
 
 export function lint(doc, template, { requiredMeta = [] } = {}) {
   const errors = [];

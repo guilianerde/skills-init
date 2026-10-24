@@ -16,74 +16,22 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { collect, collectGit, localBranches, KINDS } from './artifacts.mjs';
-import { sections, section, tableRows, listItems, meta, isEmpty } from './doc-sections.mjs';
+import { KINDS } from '../lib/artifact-model.mjs';
+import { loadWorkspace, projectArtifacts, artifactEntry } from '../lib/workspace-read.mjs';
+export { captureState, citesKnowledge, parseReview, parseDelivery } from '../lib/artifact-model.mjs';
 
 const LEVELS = ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'];
 const pct = (a, b) => (b ? Math.round((a / b) * 100) : null);
 
-// DocNexus 元信息行 → captured / not_captured / not_asked / not_needed / not_connected / missing
-export function captureState(text) {
-  const v = meta(text, 'DocNexus');
-  if (!v) return 'missing';
-  if (/docnexus\/library\//.test(v)) return 'captured';
-  if (/未接入/.test(v)) return 'not_connected';
-  if (/未询问/.test(v)) return 'not_asked';
-  if (/无需沉淀/.test(v)) return 'not_needed';
-  if (/未沉淀/.test(v)) return 'not_captured';
-  return 'missing';
-}
-
-// 正文（元信息行之外）有没有引用知识库文档
-export const citesKnowledge = (text) => text.split(/\r?\n/).some((l) => !/^>\s*DocNexus[：:]/.test(l) && /docnexus\/library\//.test(l));
-
-export function parseReview(text) {
-  const secs = sections(text);
-  const levels = Object.fromEntries(LEVELS.map((l) => [l, 0]));
-  let verified = 0; let pending = 0;
-  for (const cells of tableRows(section(secs, '严重问题'))) {
-    const lv = LEVELS.find((l) => cells[1]?.toUpperCase().includes(l));
-    if (lv) levels[lv]++;
-    const last = cells[cells.length - 1] ?? '';
-    if (last.includes('✅')) verified++; else if (last.includes('⚠')) pending++;
-  }
-  levels.MEDIUM += tableRows(section(secs, '一般问题')).length;
-  levels.LOW += tableRows(section(secs, '优化建议')).length;
-  const followUp = { fixed: 0, open: 0, obsolete: 0 };
-  for (const cells of tableRows(section(secs, '与上次审查对比'))) {
-    const s = cells[2] ?? '';
-    if (s.includes('已修复')) followUp.fixed++; else if (s.includes('仍存在')) followUp.open++; else if (s.includes('不再适用')) followUp.obsolete++;
-  }
-  return { levels, verified, pending, follow_up: followUp, is_rereview: followUp.fixed + followUp.open + followUp.obsolete > 0 };
-}
-
-export function parseDelivery(text) {
-  const secs = sections(text);
-  const type = meta(text, '类型');
-  const scale = meta(text, '规模');
-  const unverified = section(secs, '验证')?.match(/未验证项[：:]\s*(.*)/)?.[1]?.trim();
-  return {
-    type: type && /缺陷/.test(type) ? 'bug' : type ? 'feature' : null,
-    scale: scale && /^[SML]$/.test(scale) ? scale : null,
-    decisions: listItems(section(secs, '已确认的决定')).length,
-    has_unverified: !!unverified && !isEmpty(unverified) && !/^\{\{/.test(unverified),
-  };
-}
-
 // 工作区 + （可选）各本地分支提交过的产物；同一路径只取第一次见到的（工作区优先）
-export function gather(root, allBranches) {
-  const seen = new Set(); const out = [];
-  const add = (list) => { for (const a of list) if (!seen.has(a.path)) { seen.add(a.path); out.push(a); } };
-  add(collect(root));
-  const branches = allBranches ? localBranches(root) : [];
-  for (const b of branches) add(collectGit(root, b));
-  return { items: out, scanned: branches };
+export function gather(root, allBranches, workspace = loadWorkspace(root, { allBranches })) {
+  return { items: projectArtifacts(workspace).map(artifactEntry), scanned: workspace.scanned_branches };
 }
 
-export function buildReport(root, { since = null, allBranches = false } = {}) {
-  const g = gather(root, allBranches);
+export function buildReport(root, { since = null, allBranches = false, workspace = loadWorkspace(root, { allBranches }) } = {}) {
+  const g = gather(root, allBranches, workspace);
   const all = g.items.filter((a) => !since || !a.date || a.date.slice(0, 10) >= since);
-  const read = (a) => a.text ?? fs.readFileSync(path.join(root, a.path), 'utf8');
+  const models = new Map(workspace.artifacts.map((a) => [a.path, a]));
   const counts = Object.fromEntries(KINDS.map((k) => [k.kind, all.filter((a) => a.kind === k.kind).length]));
 
   const review = { reports: 0, rereviews: 0, levels: Object.fromEntries(LEVELS.map((l) => [l, 0])), verified: 0, pending: 0, follow_up: { fixed: 0, open: 0, obsolete: 0 } };
@@ -91,24 +39,24 @@ export function buildReport(root, { since = null, allBranches = false } = {}) {
   const capture = { captured: 0, not_captured: 0, not_asked: 0, not_needed: 0, not_connected: 0, missing: 0 };
   let cites = 0;
   for (const a of all) {
-    const text = read(a);
-    if (citesKnowledge(text)) cites++;
+    const model = models.get(a.path);
+    if (model.citesKnowledge) cites++;
     if (a.kind === 'review') {
-      const r = parseReview(text);
+      const r = model.review;
       review.reports++; if (r.is_rereview) review.rereviews++;
       for (const l of LEVELS) review.levels[l] += r.levels[l];
       review.verified += r.verified; review.pending += r.pending;
       for (const k of Object.keys(review.follow_up)) review.follow_up[k] += r.follow_up[k];
     }
     if (a.kind === 'delivery') {
-      const d = parseDelivery(text);
+      const d = model.delivery;
       delivery.total++;
       if (d.type) delivery[d.type]++;
       if (d.scale) delivery.scale[d.scale]++;
       if (d.decisions) { delivery.with_decisions++; delivery.decisions += d.decisions; }
       if (d.has_unverified) delivery.with_unverified++;
     }
-    if (a.kind === 'delivery' || a.kind === 'review') capture[captureState(text)]++;
+    if (a.kind === 'delivery' || a.kind === 'review') capture[model.capture]++;
   }
   const f = review.follow_up;
   review.fix_rate = pct(f.fixed, f.fixed + f.open);
@@ -129,6 +77,7 @@ export function buildReport(root, { since = null, allBranches = false } = {}) {
     knowledge: { citing: cites, rate: pct(cites, all.length) },
     branches,
     without_branch: all.filter((a) => !a.branch).map((a) => a.path),
+    ...(workspace.diagnostics.length ? { diagnostics: workspace.diagnostics } : {}),
   };
 }
 
@@ -137,6 +86,7 @@ const show = (v) => (v == null ? '—' : `${v}%`);
 export function toMarkdown(r) {
   const L = [];
   L.push(`# 工作流效果报告${r.since ? `（${r.since} 起）` : ''}`, '');
+  for (const d of r.diagnostics ?? []) L.push(`> 数据检查：${d.path}：${d.message}`, '');
   L.push(r.scanned_branches.length
     ? `范围：工作区 + ${r.scanned_branches.length} 个本地分支（其中 ${r.from_branches} 份只在分支里）。`
     : '范围：只看工作区。随特性分支提交、还没合并的产物不在内，加 `--all-branches` 一起统计。', '');

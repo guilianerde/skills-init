@@ -220,10 +220,10 @@ codegraph --version<span class="c">   # 没装也没关系，安装器会装</sp
         <p class="hint" id="hint"></p>
       </div>
 
-      <p>直接运行不带参数的 <code>npx @rowansenne/workflow-run</code> 也行，按提示选环境、填数据库，但 DocNexus 和 CodeGraph 只有带上这两个参数才会接入：</p>
+      <p>直接运行不带参数的 <code>npx @rowansenne/workflow-run</code> 也行，按提示选环境、填数据库，DocNexus 必装且缺失时自动接入；CodeGraph 需要 --with-codegraph，--with-docnexus 用于强制更新 DocNexus：</p>
       <div class="tblwrap"><table>
         <tr><th>参数</th><th>作用</th></tr>
-        <tr><td><code>--with-docnexus</code></td><td>在项目根的 <code>.docnexus/</code> 安装运行环境，知识输出到 <code>workflow-run/docnexus/</code>，并导入文档模板</td></tr>
+        <tr><td><code>--with-docnexus</code></td><td>强制更新必装的 DocNexus；默认缺失即安装、已有则复用。运行环境在 <code>.docnexus/</code>，知识输出到 <code>workflow-run/docnexus/</code></td></tr>
         <tr><td><code>--with-codegraph</code></td><td>没有 <code>codegraph</code> 命令就全局安装，给 claude / codex 写项目级 MCP 配置，建本项目索引 <code>.codegraph/</code></td></tr>
         <tr><td><code>--envs</code></td><td><code>codex,claude,doubao,qwen,workbuddy</code>，<code>all</code> 是全部</td></tr>
         <tr><td><code>--skip-db</code></td><td>不配置数据库连接（database-query 不生成 <code>config.json</code>）</td></tr>
@@ -233,7 +233,7 @@ codegraph --version<span class="c">   # 没装也没关系，安装器会装</sp
 
     <section id="flow">
       <h2><span class="n">03</span>安装器做了什么</h2>
-      <p>按执行顺序列出。前面的步骤失败会停下；DocNexus 和 CodeGraph 某一步失败时只跳过它自己，skills 照常装好。</p>
+      <p>按执行顺序列出。前面的步骤失败会停下；必装组件 DocNexus 或模板导入失败时，安装不算完成；CodeGraph 为可选增强。</p>
       <ol class="steps">
         <li><div><strong>检查 Node ≥ 22.13 和 npm</strong><span class="phase">DocNexus</span><p>不满足就报错退出，此时还没有写任何文件。</p></div></li>
         <li><div><strong>确定环境、数据库连接</strong><p>来自 <code>--envs</code> 或交互选择；<code>--skip-db</code> 时跳过数据库。</p></div></li>
@@ -388,7 +388,7 @@ npx @rowansenne/workflow-run docs-repo git@git.example.com:team/team-docs.git --
       <h3>升级 workflow-run</h3>
       <div class="cmd"><pre>npx @rowansenne/workflow-run upgrade</pre><button class="copy" type="button">复制</button></div>
       <p>读安装清单里记录的环境，非交互升级 skills；手改过的文件先备份到 <code>workflow-run/tmp/upgrade-backup/</code>。</p>
-      <p><strong>DocNexus 要升级，必须带上 <code>--with-docnexus</code></strong>：它会用 <code>@latest</code> 重装 DocNexus 包（升到最新版）、刷新 skill 链接和说明段落，并导入新版本新增的模板（已有模板不动）。不带这个参数时只升级 skills，DocNexus 包原地不动：</p>
+      <p><strong>DocNexus 要升级，必须带上 <code>--with-docnexus</code></strong>：它会用 <code>@latest</code> 重装 DocNexus 包（升到最新版）、刷新 skill 链接和说明段落，并导入新版本新增的模板（已有模板不动）。不带这个参数时复用已有 DocNexus，缺失则自动补装，并补入新增模板：</p>
       <div class="cmd"><pre>npx @rowansenne/workflow-run upgrade --with-docnexus</pre><button class="copy" type="button">复制</button></div>
       <p>只用 npm 单独升级 DocNexus 包（不刷新链接和段落）也可以，效果一样：</p>
       <div class="cmd"><pre>npm install --prefix ./.docnexus --save-exact @rowansenne/docnexus@latest</pre><button class="copy" type="button">复制</button></div>

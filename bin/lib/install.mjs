@@ -6,7 +6,7 @@ import { TPL_DIR, PKG, CANON_DIR, INSTALL_BASES, SKILLS, SKILL_LIST, USER_FILES,
 import { writeDbConfig } from './db.mjs';
 import { linkPointsTo } from './uninstall.mjs';
 import { layout, ensureIgnore, homeIsRepo, migrateLayout, IGNORE_LINE, TMP_DIR } from '../../workflow/scripts/requirement.mjs';
-import { detectEnv } from '../../workflow/scripts/resolve.mjs';
+import { detectEnv } from '../../workflow/lib/project.mjs';
 import { rotate as rotateFeedback, ensureUnionMerge } from '../../workflow/scripts/feedback.mjs';
 
 // 结尾汇总：被手改过、已用新版覆盖（原文件已备份）的 / 模板已删除、手改过而备份后删除的文件 /

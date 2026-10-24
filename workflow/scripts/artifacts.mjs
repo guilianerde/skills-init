@@ -13,82 +13,19 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { REQ_DIR, parseFile, artifactFiles } from './requirement.mjs';
-import { runState, allRuns } from './run.mjs';
+import { runState } from '../lib/runs.mjs';
+import { KINDS } from '../lib/artifact-model.mjs';
+import { loadWorkspace, projectArtifacts, artifactEntry, readGitArtifacts } from '../lib/workspace-read.mjs';
+export { KINDS, parseBranch, parseWiki } from '../lib/artifact-model.mjs';
+export { localBranches } from '../lib/workspace-read.mjs';
 
-// 产物种类；顺序即链路顺序
-export const KINDS = [
-  { kind: 'plan', label: '方案' },
-  { kind: 'delivery', label: '交付说明' },
-  { kind: 'review', label: '审查报告' },
-  { kind: 'tech', label: '技术方案' },
-  { kind: 'release', label: '上线方案' },
-];
-
-const HEAD_LINES = 20;
-const toPosix = (p) => p.split(path.sep).join('/');
-
-// 元信息行里的分支：「对比分支：`dev` ←→ `main`」取 dev；「分支：feature/x」「分支：`feature/x`」
-export function parseBranch(text) {
-  const head = text.split(/\r?\n/).slice(0, HEAD_LINES).join('\n');
-  const m = head.match(/(?:对比)?分支[：:]\s*`?([^`\s｜|←，,）)]+)`?/);
-  return m && !/^[{<]/.test(m[1]) ? m[1] : null; // 未填写的模板占位符不算
+export function collect(root, { allProjects = false, workspace = null } = {}) {
+  const data = workspace ?? loadWorkspace(root, { allProjects });
+  return projectArtifacts(data, allProjects).filter((a) => a.source === 'worktree').map(artifactEntry);
 }
 
-export function parseWiki(text) {
-  const m = /^<!-- md-to-wiki: ([^\n]*?) -->/.exec(text);
-  if (!m) return null;
-  const kv = Object.fromEntries([...m[1].matchAll(/(\w+)=(\S+)/g)].map((x) => [x[1], x[2]]));
-  return kv.pageId ? { pageId: kv.pageId, version: kv.version ? Number(kv.version) : null, url: kv.url ?? null, at: kv.at ?? null } : null;
-}
-
-
-const headerDate = (text) => /(\d{4}-\d{2}-\d{2})/.exec(text.replace(/<!--[\s\S]*?-->/g, '').split(/\r?\n/).slice(0, 8).join('\n'))?.[1] ?? ''; // 跳过 md-to-wiki 发布记录里的 at=
-
-// workflow-run/docs/requirements/<需求>/<项目>/<文件> → 产物条目；不是已知产物返回 null。
-// 分支里还没迁移的旧结构（<需求>/<文件>，没有项目这一层）也认，project 为 null
-function entry(rel, text, mtime) {
-  const parts = rel.split('/');
-  if ((parts.length !== 5 && parts.length !== 6) || parts.slice(0, 3).join('/') !== REQ_DIR) return null;
-  const p = parseFile(parts.at(-1));
-  const k = p && KINDS.find((x) => x.kind === p.kind);
-  // 排序键：文档头里的日期 + 版本号（需求目录里的文件名不带日期）
-  return k ? { kind: k.kind, label: k.label, path: rel, requirement: parts[3], project: parts.length === 6 ? parts[4] : null, branch: parseBranch(text), date: `${headerDate(text)}#${String(p.version).padStart(3, '0')}`, mtime, wiki: parseWiki(text) } : null;
-}
-
-const byDate = (a, b) => a.date.localeCompare(b.date) || a.mtime - b.mtime;
-
-// allProjects：文档仓库模式下连同其他项目的产物一起读（跨服务视图）
-export function collect(root, { allProjects = false } = {}) {
-  const out = [];
-  for (const f of artifactFiles(root, { allProjects })) {
-    const k = KINDS.find((x) => x.kind === f.kind);
-    const text = fs.readFileSync(f.abs, 'utf8');
-    // 排序键：文档头里的日期 + 版本号（需求目录里的文件名不带日期）
-    out.push({ kind: k.kind, label: k.label, path: f.rel, cite: f.cite, requirement: f.slug, project: f.project, version: f.version, branch: parseBranch(text), date: `${headerDate(text)}#${String(f.version).padStart(3, '0')}`, mtime: fs.statSync(f.abs).mtimeMs, wiki: parseWiki(text) });
-  }
-  // 同一天、无日期的文件按修改时间排
-  return out.sort(byDate);
-}
-
-// 只读扫描一个 git 引用（分支）里提交过的产物；条目带 ref 与 text（正文），mtime 取 0
 export function collectGit(root, ref) {
-  const ls = spawnSync('git', ['ls-tree', '-r', '--name-only', ref, '--', REQ_DIR], { cwd: root, encoding: 'utf8' });
-  if (ls.status !== 0) return [];
-  const out = [];
-  for (const rel of ls.stdout.split('\n').filter(Boolean)) {
-    const show = spawnSync('git', ['show', `${ref}:${rel}`], { cwd: root, encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 });
-    if (show.status !== 0) continue;
-    const e = entry(rel, show.stdout, 0);
-    if (e) out.push({ ...e, ref, text: show.stdout });
-  }
-  return out.sort(byDate);
-}
-
-// 本地分支名列表
-export function localBranches(root) {
-  const r = spawnSync('git', ['for-each-ref', '--format=%(refname:short)', 'refs/heads'], { cwd: root, encoding: 'utf8' });
-  return r.status === 0 ? r.stdout.split('\n').filter(Boolean) : [];
+  return readGitArtifacts(root, ref).map(artifactEntry);
 }
 
 // 下一步建议：按链路顺序找第一个缺的环节，再看哪些文档还没发布到 wiki
@@ -107,12 +44,12 @@ export function nextSteps(latest) {
   return steps;
 }
 
-export function branchView(root, branch) {
-  const items = collect(root).filter((a) => a.branch === branch);
+export function branchView(root, branch, workspace = loadWorkspace(root)) {
+  const items = collect(root, { workspace }).filter((a) => a.branch === branch);
   const latest = {};
   for (const a of items) latest[a.kind] = a; // 已按时间升序，最后一个即最新
   const strip = ({ mtime, ...a }) => a;
-  const execution = runState(root, branch);
+  const execution = runState(root, branch, workspace);
   return {
     branch,
     artifacts: items.map(strip),
@@ -138,15 +75,16 @@ function main(argv) {
     else if (argv[i] === '--all') all = true;
     else { console.error('用法: artifacts.mjs [--root <项目根>] [--branch <分支> | --all]'); return 1; }
   }
+  const workspace = loadWorkspace(root);
   if (all) {
-    const branches = [...new Set([...collect(root).map((a) => a.branch), ...allRuns(root).map((r) => r.branch)].filter(Boolean))].sort();
-    const unknown = collect(root).filter((a) => !a.branch).map((a) => a.path);
-    console.log(JSON.stringify({ branches: branches.map((b) => branchView(root, b)), without_branch: unknown }, null, 2));
+    const branches = [...new Set([...workspace.artifacts.map((a) => a.branch), ...workspace.runs.map((r) => r.branch)].filter(Boolean))].sort();
+    const unknown = collect(root, { workspace }).filter((a) => !a.branch).map((a) => a.path);
+    console.log(JSON.stringify({ branches: branches.map((b) => branchView(root, b, workspace)), without_branch: unknown }, null, 2));
     return 0;
   }
   branch ??= currentBranch(root);
   if (!branch) { console.error('无法确定当前分支（不在 git 仓库或处于 detached HEAD），请用 --branch 指定'); return 1; }
-  console.log(JSON.stringify(branchView(root, branch), null, 2));
+  console.log(JSON.stringify(branchView(root, branch, workspace), null, 2));
   return 0;
 }
 

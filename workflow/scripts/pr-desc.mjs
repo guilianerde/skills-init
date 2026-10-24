@@ -13,16 +13,18 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { branchView } from './artifacts.mjs';
-import { readProfile } from './resolve.mjs';
-import { sections, section, tableRows, isEmpty } from './doc-sections.mjs';
+import { readProfile } from '../lib/project.mjs';
+import { sections, section, tableRows, isEmpty } from '../lib/document-model.mjs';
+import { loadWorkspace } from '../lib/workspace-read.mjs';
 
 const git = (root, args) => { const r = spawnSync('git', args, { cwd: root, encoding: 'utf8' }); return r.status === 0 ? r.stdout.trim() : null; };
 const keep = (body) => (body && !isEmpty(body) ? body : null);
 const LEVEL_RE = /CRITICAL|HIGH/i;
 
-export function buildDescription(root, branch, base) {
-  const view = branchView(root, branch);
-  const read = (a) => (a ? fs.readFileSync(path.join(root, a.path), 'utf8') : null);
+export function buildDescription(root, branch, base, workspace = loadWorkspace(root)) {
+  const view = branchView(root, branch, workspace);
+  const texts = new Map(workspace.artifacts.map((a) => [a.path, a.text]));
+  const read = (a) => a ? texts.get(a.path) : null;
   const { delivery, review, plan, tech, release } = view.latest;
   const L = [];
   const add = (title, body) => { if (body) L.push(`## ${title}`, '', body, ''); };

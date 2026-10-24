@@ -79,8 +79,8 @@ export function run(cmd, args, cwd, quiet = false) {
 }
 export function checkNodeForDocNexus() {
   const [maj, min] = process.versions.node.split('.').map(Number);
-  if (maj < 22 || (maj === 22 && min < 13)) fail(`--with-docnexus 需要 Node >= 22.13，当前为 v${process.versions.node}。请升级 Node 后重试，或去掉 --with-docnexus。`);
-  if (spawnSync(IS_WIN ? 'npm.cmd' : 'npm', ['-v'], { stdio: 'ignore', shell: IS_WIN }).status !== 0) fail('--with-docnexus 需要 npm，但未找到。请安装后重试，或去掉 --with-docnexus。');
+  if (maj < 22 || (maj === 22 && min < 13)) fail(`必装组件 DocNexus 需要 Node >= 22.13，当前为 v${process.versions.node}。请升级 Node 后重试。`);
+  if (spawnSync(IS_WIN ? 'npm.cmd' : 'npm', ['-v'], { stdio: 'ignore', shell: IS_WIN }).status !== 0) fail('必装组件 DocNexus 需要 npm，但未找到。请安装后重试。');
   ok(`Node v${process.versions.node}`);
 }
 // DocNexus 的 skills（.docnexus/skills/*）链接到所选 Agent 环境；init --agent none，由本工具统一接入。
@@ -179,9 +179,9 @@ export function refreshDocNexusLinks(root, sel) {
 export function setupDocNexus(root, sel) {
   const npmArgs = ['install', '--prefix', './.docnexus', '--save-exact', DOCNEXUS_SPEC];
   step(`接入 DocNexus（运行环境 .docnexus/；知识输出 ${HOME}/docnexus/）`);
-  if (!run(IS_WIN ? 'npm.cmd' : 'npm', npmArgs, root)) { warn('npm 安装 DocNexus 失败，已跳过 DocNexus 接入（skills 已正常安装）'); return 'failed'; }
+  if (!run(IS_WIN ? 'npm.cmd' : 'npm', npmArgs, root)) { warn('npm 安装必装组件 DocNexus 失败'); return 'failed'; }
   const bin = docnexusBin(root);
-  if (!bin) { warn('安装后未找到 .docnexus/node_modules/.bin/docnexus，已跳过 DocNexus 接入'); return 'failed'; }
+  if (!bin) { warn('安装后未找到 .docnexus/node_modules/.bin/docnexus，接入失败'); return 'failed'; }
   if (!run(bin, ['init', '--output-dir', HOME, '--agent', 'none'], root)) {
     warn(`DocNexus 初始化失败：需要支持 --output-dir 的 format 7 版本。修复后在项目根运行 ./.docnexus/node_modules/.bin/docnexus init --output-dir ${HOME} --agent none`);
     return 'failed';

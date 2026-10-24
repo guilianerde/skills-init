@@ -15,7 +15,7 @@
   "type": "module",
   "license": "MIT",
   "engines": {
-    "node": ">=22"
+    "node": ">=22.13"
   },
   "bin": {
     "workflow-run": "bin/workflow-run.mjs"

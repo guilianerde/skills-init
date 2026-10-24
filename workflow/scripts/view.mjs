@@ -11,20 +11,22 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { collect, KINDS } from './artifacts.mjs';
-import { repoRequirements, layout, parseDocnexus, REQ_DIR } from './requirement.mjs';
-import { parseReview, parseDelivery, captureState, buildReport } from './report.mjs';
+import { KINDS } from '../lib/artifact-model.mjs';
+import { loadWorkspace } from '../lib/workspace-read.mjs';
+import { groupRequirements } from '../lib/requirement-read.mjs';
+import { REQ_DIR } from '../lib/project.mjs';
+import { buildReport } from './report.mjs';
 
 const DEFAULT_OUT = 'workflow-run/tmp/view/index.html';
 
 // 页面数据：按需求分组
-export function viewData(root) {
+export function viewData(root, workspace = loadWorkspace(root, { allProjects: true })) {
   // 连同其他项目（服务）的产物一起看，一个需求下按项目区分（文档仓库里常见；两种模式目录结构相同）
-  const L = layout(root);
+  const L = workspace.layout;
   const reqDirOf = (slug) => (L.mode === 'repo' ? `${L.repo_name}:docs/requirements/${slug}` : `${REQ_DIR}/${slug}`);
-  const metas = new Map(repoRequirements(root, L).map((r) => [r.slug, { name: r.name, dir: reqDirOf(r.slug), branches: [...new Set(r.projects.flatMap((p) => p.meta.branches ?? []))], meta: r.projects.find((p) => p.project === L.project)?.meta ?? r.projects[0]?.meta ?? {}, runs: r.projects.flatMap((p) => Object.values(p.meta.runs ?? {}).map((run) => ({ ...run, project: p.project }))) }]));
+  const metas = new Map(groupRequirements(workspace.requirements).map((r) => [r.slug, { name: r.name, dir: reqDirOf(r.slug), branches: [...new Set(r.projects.flatMap((p) => p.meta.branches ?? []))], meta: r.projects.find((p) => p.project === L.project)?.meta ?? r.projects[0]?.meta ?? {}, runs: r.projects.flatMap((p) => workspace.runs.filter((run) => run.dir === p.dir).map(({ requirement, dir, ...run }) => run)) }]));
   const groups = new Map();
-  for (const a of collect(root, { allProjects: true })) {
+  for (const a of workspace.artifacts) {
     const id = a.requirement ? `req:${a.requirement}` : `branch:${a.branch ?? '（无分支）'}`;
     if (!groups.has(id)) {
       const m = a.requirement ? metas.get(a.requirement) : null;
@@ -36,12 +38,12 @@ export function viewData(root) {
     const g = groups.get(id);
     if (a.branch) g.branches.add(a.branch);
     if (a.project) g.projects.add(a.project);
-    const text = fs.readFileSync(path.join(root, a.path), 'utf8');
-    const item = { kind: a.kind, label: a.label, path: a.path, cite: a.cite ?? a.path, project: a.project ?? null, file: a.project && L.mode === 'repo' ? `${a.project}/${path.basename(a.path)}` : path.basename(a.path), date: (a.date || '').slice(0, 10) || null, version: a.version ?? 1, branch: a.branch, wiki: a.wiki, text };
-    if (a.kind === 'review') item.review = parseReview(text);
-    if (a.kind === 'delivery') item.delivery = parseDelivery(text);
-    if (a.kind === 'review' || a.kind === 'delivery') item.docnexus = captureState(text);
-    item.knowledge = parseDocnexus(text) ?? []; // 产物里「DocNexus：docnexus/library/<path>」行：沉淀到的知识文档
+    const text = a.text;
+    const item = { kind: a.kind, label: a.label, path: a.path, cite: a.cite ?? a.path, project: a.project ?? null, file: a.project && L.mode === 'repo' ? `${a.project}/${path.basename(a.path)}` : path.basename(a.path), date: a.date, version: a.version ?? 1, branch: a.branch, wiki: a.wiki, text };
+    if (a.kind === 'review') item.review = a.review;
+    if (a.kind === 'delivery') item.delivery = a.delivery;
+    if (a.kind === 'review' || a.kind === 'delivery') item.docnexus = a.capture;
+    item.knowledge = a.knowledge; // 产物里「DocNexus：docnexus/library/<path>」行：沉淀到的知识文档
     g.artifacts.push(item);
   }
   // 完整流程在首次产物前也可能已保存状态，不能因为没有 Markdown 就隐藏需求。
@@ -75,7 +77,8 @@ export function viewData(root) {
     generated: new Date().toISOString(),
     kinds: KINDS.map(({ kind, label }) => ({ kind, label })),
     requirements: list,
-    report: buildReport(root),
+    report: buildReport(root, { workspace }),
+    ...(workspace.diagnostics.length ? { diagnostics: workspace.diagnostics } : {}),
   };
 }
 
@@ -208,7 +211,8 @@ function overview() {
     ['复审修复率', pct(v.fix_rate)],
     ['沉淀率', pct(r.capture.capture_rate)],
   ];
-  return '<div class="overview">' + cards.map(([k, v]) => '<div class="card"><div class="k">' + k + '</div><div class="v">' + esc(v) + '</div></div>').join('') + '</div>';
+  const warnings = (D.diagnostics ?? []).map((d) => '<p>' + esc(d.path + '：' + d.message) + '</p>').join('');
+  return (warnings ? '<section class="block"><h3>数据检查</h3>' + warnings + '</section>' : '') + '<div class="overview">' + cards.map(([k, v]) => '<div class="card"><div class="k">' + k + '</div><div class="v">' + esc(v) + '</div></div>').join('') + '</div>';
 }
 
 let current = null; let currentDoc = null;

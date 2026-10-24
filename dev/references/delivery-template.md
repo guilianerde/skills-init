@@ -3,7 +3,7 @@
 > 类型：{{功能开发 / 缺陷修复}} ｜ 规模：{{S / M / L}} ｜ 日期：{{YYYY-MM-DD}}
 > 对比分支：`{{当前分支}}` ←→ `{{主分支}}`
 > 参考产物：{{最新审查报告路径（独立子 agent 或当前会话自查）；方案路径（非快速通道都有）}}
-> DocNexus：{{尚未发起询问写「未询问」；沉淀后写 workflow-run/docnexus/library/<path>；没有值得沉淀的内容写「无需沉淀」，已询问但未成功入库（含用户拒绝）写「未沉淀」，未接入写「未接入」}}
+> DocNexus：{{尚未发起询问写「未询问」；沉淀后写 workflow-run/docnexus/library/<path>；没有值得沉淀的内容写「无需沉淀」，已询问但未成功入库（含用户拒绝）写「未沉淀」}}
 
 <!-- F7 审查报告交给用户且用户明确选择交付后，F8 / B5 才按此落盘到 requirement.mjs path delivery 给出的路径（workflow-run/docs/requirements/<需求名>/<项目名>/delivery.md）。小改动每节写一两行即可，不适用的节写「无」；验证结果必须如实 -->
 

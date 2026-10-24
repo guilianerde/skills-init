@@ -116,10 +116,9 @@ export function doctor(root, offline) {
     if (st.docnexus.ok) {
       if (!reportTemplateStatus(root, meh)) ok('DocNexus 已接入，文档模板齐全且与默认模板同步（或为团队定制版）');
     } else if (fs.existsSync(path.join(root, '.docnexus', 'project.json'))) bad('DocNexus 配置或运行环境不完整：需要 format 7、output_dir=workflow-run 和 .docnexus/ 下的 CLI，运行 upgrade --with-docnexus 修复');
-    else console.log('    --  DocNexus 未接入（可选；未接入时只能用 skills 自带的默认模板，不能修改）');
+    else bad('必装组件 DocNexus 缺失：运行 npx @rowansenne/workflow-run 修复，工作流不提供降级模式');
     // workflow-run/templates/ 已不再生效：模板定制只放 DocNexus
     for (const f of st.docnexus.stale_project_templates ?? []) meh(st.docnexus.ok ? `${f} 已不再生效：确认已导入 DocNexus 知识库后删除` : `${f} 已不再生效（模板定制只放 DocNexus）：重跑 npx @rowansenne/workflow-run 并加 --with-docnexus 接入后导入知识库，再删除`);
-    for (const t of st.templates_need_docnexus ?? []) console.log(`    --  ${t.skill} 的模板 ${t.id} 不随 skills 提供，要先接入 DocNexus 才能创建（重跑 npx @rowansenne/workflow-run 并加 --with-docnexus）`);
     for (const t of st.templates_to_create ?? []) console.log(`    --  ${t.skill} 的模板 ${t.id} 还没有创建（不随 skills 提供）：第一次生成文档时会请你给一份样例文档来创建，保存到 ${t.expected}`);
     if (st.codegraph?.ok) ok(`CodeGraph 已接入（codegraph ${codegraphVersion(root)}，索引在 .codegraph/）`);
     else if (st.codegraph?.indexed) meh('有 .codegraph/ 索引但找不到 codegraph 命令：npm i -g @colbymchenry/codegraph，或重跑 npx @rowansenne/workflow-run 并加 --with-codegraph');

@@ -5,6 +5,8 @@ description: "Publish a local Markdown document to an existing Confluence wiki p
 
 # MD to Wiki
 
+**开工能力**：先运行 `node <skills>/workflow/scripts/resolve.mjs status`，按 `<skills>/workflow/references/capabilities.md` 选择本轮能力与模板；同一项目链路复用已有快照，失败统一按该规则处理。
+
 把本地 Markdown 转成 Confluence Storage Format（严格 XHTML），校验后写入**已有**的 wiki 页面。
 
 ## GATE — 未配置则禁止启动（最高优先级）
@@ -39,7 +41,7 @@ description: "Publish a local Markdown document to an existing Confluence wiki p
 1. GATE 通过。
 2. `<mdPath>` 存在。
 3. 确定目标页面：用户给了 pageId / URL 就解析它（提取不出 → 请用户重新提供，**不要猜**）；没给就运行 `node <skillDir>/scripts/upload.mjs target <mdPath>` 读文档第一行的发布记录（`<!-- md-to-wiki: pageId=... -->`，转换时会被丢弃，不会出现在页面上）。有记录就用它，并在 Step 2 的确认里注明「沿用上次发布的页面」；没有记录 → 请用户提供 pageId，停。用户给的 pageId 与记录不同时以用户给的为准，并提醒。
-4. 选择上传通道：环境有 wiki MCP 工具 → 通道 A；否则用 `wiki-config.json` 的 REST 参数 → 通道 B；都不可用 → 停。
+4. 按本轮 `wiki.channel` 选择上传通道：mcp 为 A，rest 为 B。发布的前置门槛按共享能力规则处理。
 5. 读取目标页面当前的标题、版本号：通道 A 用 MCP 的 `get_page`，通道 B 用 `node <skillDir>/scripts/upload.mjs info <pageId|url>`（细节见 `references/upload.md`）。页面不存在或无权限 → 停。
 6. 本机有 Node.js（≥ 18）；转换脚本不依赖任何第三方库。
 

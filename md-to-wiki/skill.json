@@ -1,10 +1,10 @@
 {
   "name": "md-to-wiki",
   "order": 5,
-  "requires": [],
-  "optional": [
+  "requires": [
     "workflow"
   ],
+  "optional": [],
   "userFiles": {
     "wiki-config.json": "wiki-config.json.tpl"
   }

@@ -1,6 +1,6 @@
 # `/workflow status` 输出
 
-先运行 `node <skills>/workflow/scripts/resolve.mjs status` 和 `node <skills>/workflow/scripts/artifacts.mjs`（当前分支的产物进度），`artifacts.mjs` 的 `execution` 给出当前运行、历史、阶段、已完成步骤、waiting_for、reason 和完成时间；没有运行时说明暂无可恢复状态，不根据文档齐全推断已完成。前者按上表判定画像、wiki 配置、DocNexus（含缺失模板）、代码图谱、数据库连接（只给连接名、driver、是否只读，不含凭据），再据此填写下表。wiki MCP 脚本探测不到，需你自己看当前环境有没有 wiki 相关工具。
+复用开工时 `resolve.mjs status` 的输出，并运行 `node <skills>/workflow/scripts/artifacts.mjs`（当前分支的产物进度），`artifacts.mjs` 的 `execution` 给出当前运行、历史、阶段、已完成步骤、waiting_for、reason 和完成时间；没有运行时说明暂无可恢复状态，不根据文档齐全推断已完成。前者按 capabilities.md 读取本轮能力快照，展示 ready / blockers，再展示画像、wiki 配置、DocNexus（含缺失模板）、代码图谱、数据库连接（只给连接名、driver、是否只读，不含凭据），再据此填写下表。wiki MCP 脚本探测不到，需你自己看当前环境有没有 wiki 相关工具。
 
 ```
 # Workflow 状态
@@ -9,7 +9,7 @@
 |---|---|---|
 | 项目画像 | ✅ / ⚠️ 部分字段为空 | <空字段>；运行 /workflow profile |
 | wiki | ✅ / ❌ | 填写 md-to-wiki/wiki-config.json 或接入 wiki MCP |
-| DocNexus | ✅ / ❌ | 重跑 npx @rowansenne/workflow-run 并加 --with-docnexus；已接入但缺模板时列出缺的模板并提示 `npx @rowansenne/workflow-run seed-templates`；未接入时说明默认模板只读、不能定制，技术方案 / 上线方案要先接入（`templates_need_docnexus`）；`stale_project_templates` 非空时提示这些项目模板已不再生效 |
+| DocNexus（必装） | ✅ / ❌ 阻塞 | 缺失运行 npx @rowansenne/workflow-run 修复；缺模板按 templates.md；无默认模板降级 |
 | 数据库 | ✅ / ❌ | 重跑 `npx @rowansenne/workflow-run` 补配 |
 | 代码图谱 | ✅ / ⚠️ 已装未建索引 / ❌ | 重跑 npx @rowansenne/workflow-run 并加 --with-codegraph；已装 codegraph 但没有 .codegraph/ 时提示用户自己运行 codegraph init |
 

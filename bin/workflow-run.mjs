@@ -36,7 +36,7 @@ const HELP = `用法: workflow-run [命令] [选项]
 命令：
   init（默认）         安装或重装 skills
   upgrade              按安装清单里的环境与模式非交互升级到当前版本（保留数据库配置等用户配置；skills 文件一律更新为新版，手改过的先备份到 workflow-run/tmp/upgrade-backup/）；
-                       加 --with-docnexus 时把 DocNexus 包也升到最新版（@latest），刷新 skill 链接与 CLAUDE.md / AGENTS.md 段落，并导入新增的文档模板（只新增，不覆盖已有模板）；不加则 DocNexus 包原地不动，只顺带导入新增模板
+                       加 --with-docnexus 时把 DocNexus 包也升到最新版（@latest），刷新 skill 链接与 CLAUDE.md / AGENTS.md 段落，并导入新增的文档模板（只新增，不覆盖已有模板）；不加则复用已安装的 DocNexus；缺失时自动安装，并导入新增模板
   doctor               自检：版本、手改 / 缺失文件、软链接、项目画像、DocNexus 模板、数据库连通性、.gitignore
   uninstall            按安装清单卸载本项目装的 skills 与链接（用户配置备份到 workflow-run/tmp/uninstall-backup/）
   seed-templates       只把自带的文档模板导入 DocNexus（workflow-run/docnexus/library/templates/，已有的不覆盖）
@@ -50,11 +50,11 @@ init 选项：
   --envs <列表>        环境，逗号分隔：codex,claude,doubao,qwen,workbuddy；all = 全部（不传则交互选择）
   --skip-db            跳过数据库连接配置
   --yes                非交互：使用已有数据库配置；都没有且未 --skip-db 时报错退出
-  --with-docnexus      同时接入 DocNexus 文档库（装在 workflow-run/docnexus/，需 Node >= 22.13 与 npm），并导入文档模板
+  --with-docnexus      强制更新必装的 DocNexus 到最新版（默认缺失即安装、已安装则复用；运行环境在 .docnexus/，需 Node >= 22.13 与 npm）
   --with-codegraph     同时接入 CodeGraph 代码图谱：没有 codegraph 命令时 npm 全局安装，为 claude / codex 写项目级 MCP 配置，并建本项目索引（.codegraph/）
   --copy               不用软链接，各环境独立拷贝
   --skills <列表>      只装这些 skill（逗号分隔），自动带上 skill.json 里 requires 声明的依赖；缺省为全部
-  --seed-templates     安装后把文档模板导入 DocNexus；接入 DocNexus 后文档类 skill 只从知识库取模板
+  --seed-templates     安装已自动补入文档模板，此参数可省略
   --uninstall          同 uninstall 命令
 seed-templates 选项：
   --update             同时把「导入后未改动、但默认模板有新版」的知识库模板更新为新版
@@ -76,7 +76,7 @@ view 选项：
   -h, --help           显示帮助`;
 
 function parseArgs(argv) {
-  const o = { cmd: 'init', envs: '', skipDb: false, yes: false, withDocNexus: false, withCodeGraph: false, copy: false, seedTemplates: false, update: false, diff: false, skills: '', offline: false, root: process.cwd() };
+  const o = { cmd: 'init', envs: '', skipDb: false, yes: false, withDocNexus: false, withCodeGraph: false, copy: false, update: false, diff: false, skills: '', offline: false, root: process.cwd() };
   let cmdGiven = false; // 命令可以出现在选项之间（封装脚本会先传 --project-root）
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
@@ -89,7 +89,7 @@ function parseArgs(argv) {
       case '--with-codegraph': o.withCodeGraph = true; break;
       case '--copy': o.copy = true; break;
       case '--skills': o.skills = val(); break;
-      case '--seed-templates': o.seedTemplates = true; break;
+      case '--seed-templates': break; // 安装始终补入模板，保留旧参数写法
       case '--uninstall': o.cmd = 'uninstall'; cmdGiven = true; break;
       case '--offline': o.offline = true; break;
       case '--update': o.update = true; break;
@@ -190,7 +190,8 @@ async function main() {
   ${again}`);
   }
   if (o.cmd === 'upgrade') o = upgradeOptions(o);
-  if (o.withDocNexus) { step('检查 DocNexus 依赖'); checkNodeForDocNexus(); }
+  step('检查必装组件 DocNexus 的依赖');
+  checkNodeForDocNexus();
 
   const sel = await resolveEnvs(o);
   step(`目标环境：${sel.join(' ')}`);
@@ -237,26 +238,16 @@ async function main() {
   setupHome(o.root);
   recordEnv(o.root);
   writeArtifactContext(o.root, sel);
-  const docnexus = o.withDocNexus ? setupDocNexus(o.root, sel) : 'skipped';
-  // 升级 / 重装都刷新本项目里的 DocNexus skills 链接与 CLAUDE.md / AGENTS.md 段落
-  if (!o.withDocNexus) refreshDocNexusLinks(o.root, sel);
+  if (o.withDocNexus || !docnexusConnected(o.root)) {
+    if (setupDocNexus(o.root, sel) !== 'ok') fail('必装组件 DocNexus 接入失败，安装未完成。修复上方错误后重新运行安装命令。');
+  } else refreshDocNexusLinks(o.root, sel);
   const codegraph = o.withCodeGraph ? setupCodeGraph(o.root, sel) : 'skipped';
-  let seedFailed = false;
-  // 接入 DocNexus 后文档类 skill 只从知识库取模板，所以 --with-docnexus 时一并导入（已有的不覆盖）；
-  // upgrade 时新版本可能新增了模板（缺了 skill 会停下），已接入就顺带导入缺的，不改动已有模板
-  const upgradeSeed = o.upgrading && docnexusConnected(o.root);
-  if ((o.seedTemplates || o.withDocNexus || upgradeSeed) && docnexus !== 'failed') {
-    step(upgradeSeed && !o.seedTemplates && !o.withDocNexus ? '导入新增的文档模板到 DocNexus（只新增，已有模板不动）' : '导入文档模板到 DocNexus（--seed-templates）');
-    try {
-      const r = seedTemplates(o.root, TPL_DIR, { ok, warn, version: PKG.version, skills: installedSkills(o.root), quietSkip: upgradeSeed });
-      saveTemplateRecords(o.root, r.records);
-      // upgrade 顺带的导入是尽力而为：失败只提示，不让升级本身算失败
-      const explicit = o.seedTemplates || o.withDocNexus;
-      seedFailed = explicit && r.failed.length > 0;
-      if (!explicit && r.failed.length) warn('新增模板导入失败（skills 已升级）：修复后运行 npx @rowansenne/workflow-run seed-templates 重试');
-      if (upgradeSeed && !r.seeded.length && !r.failed.length) ok('知识库里的文档模板齐全，无需导入');
-    } catch (e) { warn(e.message); seedFailed = o.seedTemplates || o.withDocNexus; }
-  }
+  step('导入文档模板到 DocNexus（只新增，已有模板不动）');
+  try {
+    const r = seedTemplates(o.root, TPL_DIR, { ok, warn, version: PKG.version, skills: installedSkills(o.root), quietSkip: true });
+    saveTemplateRecords(o.root, r.records);
+    if (r.failed.length) fail('必需文档模板导入失败，安装未完成。修复后运行 npx @rowansenne/workflow-run seed-templates 重试。');
+  } catch (e) { fail(e.message); }
 
   step('安装完成，启用方式');
   console.log('  codex     : 重启 codex 后自动发现项目级 skills（.agents/skills）；也可 /use project-review 手动加载');
@@ -269,10 +260,9 @@ async function main() {
   else warn('注意：本次未写入数据库连接。可重跑补配，或手动放置 database-query/config.json（已有的保留不动）。');
   warn('注意：md-to-wiki 的 wiki 连接（wiki-config.json）默认留空（enabled=false），未配置前 md-to-wiki 与 create-*-md-doc 的 --prd 增强不启动。');
   warn('        启用方法：填写 .agents/skills/md-to-wiki/wiki-config.json（enabled: true + base_url + api_token），或接入对应环境的 wiki MCP。重跑不会覆盖已填写的配置。');
-  if (docnexus === 'ok') ok('DocNexus 已接入：dev / project-review 会按 docnexus-recall 查项目约定；文档类 skill 只从 workflow-run/docnexus/library/templates/ 取模板；任何写入 DocNexus 的操作都需你授权。');
+  ok('DocNexus 已接入：dev / project-review 会按 docnexus-recall 查项目约定；文档类 skill 只从 workflow-run/docnexus/library/templates/ 取模板；任何写入 DocNexus 的操作都需你授权。');
   // 已接入 DocNexus：缺模板时文档类 skill 会停下来要求导入；默认模板有新版时提示更新或合并
   if (docnexusConnected(o.root)) reportTemplateStatus(o.root);
-  if (docnexus === 'failed') warn('注意：DocNexus 接入失败（见上方输出），其他 skills 不受影响；修复后可重跑（加 --with-docnexus）。');
   if (codegraph === 'failed') warn('注意：CodeGraph 接入失败（见上方输出），其他 skills 不受影响；skills 会退回 grep / 读文件；修复后可重跑（加 --with-codegraph）。');
   const keep = '（skills 目录里的文件以安装包为准；项目定制请放到 workflow/profile.json、DocNexus（文档模板只能在这里定制）或 CLAUDE.md / AGENTS.md）';
   if (report.overwritten.length || report.removed.length) {
@@ -285,8 +275,7 @@ async function main() {
     ok(`${report.unlistedDirs.join('、')} 里没有安装清单，${report.unlisted.length} 个和新版不同的文件已备份到 ${report.backupDir}/ 后覆盖（无从判断是否手改过）`);
   }
   console.log('先运行 /workflow profile 填写项目画像；说明见 workflow-run README。');
-  // skills 已装好，但显式要求的 DocNexus 未接入：返回非 0 便于自动化感知
-  return docnexus === 'failed' || codegraph === 'failed' || seedFailed ? 1 : 0;
+  return codegraph === 'failed' ? 1 : 0;
 }
 
 main().then((code) => process.exit(code), (e) => {

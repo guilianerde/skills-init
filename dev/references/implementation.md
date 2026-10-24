@@ -1,0 +1,19 @@
+# 实现与验证
+
+进入 F5 / F6，或缺陷修复 B4 执行修复与验证前读取对应小节。
+
+### F5 — 实现
+
+- **小步推进**：按逻辑分步实现，一步改完（或改了公共签名、跨了模块）运行 `profile.build`（没有则用对应构建工具的编译命令）确认通过，再进入下一步。不必每改一个文件就编译，代码没变时不重复跑。
+- **改动前看影响面**：要改公共方法、接口签名、DTO 字段时，先 `node <skills>/code-graph/scripts/cg.mjs entry <Class.method>`（按本轮 CodeGraph 通道），把会被波及的入口和调用方纳入本次改动或写进交付说明。
+- **贴合现有代码**：沿用参照实现的写法；不顺手重构、不改无关代码、不升级依赖。看到范围外的问题记进交付说明，不在本次修。
+- **配置**：新增配置项记入配置清单（key、位置、用途、建议默认值、上线前需下发的环境），按 `profile.config_center` 与审查清单的配置维度处理（清单路径用 `node <skills>/workflow/scripts/resolve.mjs template project-review checklist.md` 取，接入 DocNexus 时是团队维护的版本）。
+- **数据库变更**：DDL / 数据修正写成 SQL 脚本放进项目约定的目录（没有约定则放进交付说明），**不在任何环境直接执行**。写之前按 `<skills>/workflow/references/tables.md` 核对实际表结构：要加的列 / 索引是否已存在、新查询条件有没有索引、表有多大（大表 DDL 写进上线注意事项）。
+- **敏感信息**：不硬编码密钥、密码、内网地址；日志不打印敏感字段。
+
+### F6 — 验证
+
+- 按验收标准补充或更新单元测试 / 集成测试，测试放在项目既有测试目录、沿用既有测试框架。
+- **验收项对应到证据**：F1 / F3 的每条验收标准写明靠哪个测试或手动操作验证、结果如何；没有测试也没法操作的标「未验证」并写原因。交付说明「验证」节的表格按这个填，快速通道在对话里列同样的对应。
+- 先跑相关测试（`profile.test_single`，或代码图谱的 `impact` 选出的测试），修到通过；最后跑一次 `profile.test` 全量（之后又改了代码就再跑）。有 `profile.lint` 时一并运行。全量里出现、基线没跑到的失败，先看失败的测试是否碰到本次改动的代码，确认无关的按已有失败记录并写明依据。按本轮 CodeGraph 通道分析相关测试；script 模式取自 `node <skills>/code-graph/scripts/cg.mjs impact --base <main_branch>` 输出的 `tests`；`impact` 的 `entry_points`、`sql`、`config_keys` 写进交付说明（受影响的接口 / 消费者 / 定时任务、表、配置）。改动碰到 SQL、实体或 DDL 时运行 `node <skills>/workflow/scripts/tables.mjs --base <main_branch>`，对其中的表再核对一次实际表结构（见 `<skills>/workflow/references/tables.md`），结果写进交付说明的 SQL 节。
+- 如实报告结果：失败就给出失败输出并继续修；环境跑不了（缺依赖、缺中间件）就明确写「未验证」以及用户该如何验证。**不得声称未运行的测试已通过。**

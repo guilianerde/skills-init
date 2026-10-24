@@ -13,17 +13,17 @@
 > 本工具在项目里的产出（需求产物、DocNexus 工作区、项目模板、临时文件）都放在项目根的
 > `workflow-run/`
 > 一个目录里，不往项目的其他地方写；它可以随代码提交，也可以整个是团队的独立文档仓库（见「独立文档仓库」）。
-> 安装只用 npx，在项目根执行。推荐 `npx @rowansenne/workflow-run --with-docnexus --with-codegraph`，同时接入 DocNexus 文档库和 CodeGraph 代码图谱。
+> 安装只用 npx，在项目根执行。推荐 `npx @rowansenne/workflow-run --with-codegraph`；DocNexus 必装，缺失时自动接入。
 
 ## 快速开始
 
-需要 **Node.js >= 22.13**（DocNexus 的要求；不接 DocNexus 时 >= 22 即可，code-graph 的 `impact` / `entry` 需 >= 22.5）。只用 npx 安装，在项目根执行（以当前目录为项目根；Windows 要在管理员终端里运行）。推荐全量安装：
+需要 **Node.js >= 22.13** 与 npm（DocNexus 为必装组件）。只用 npx 安装，在项目根执行（以当前目录为项目根；Windows 要在管理员终端里运行）。推荐全量安装：
 
 ```
-npx @rowansenne/workflow-run --with-docnexus --with-codegraph
+npx @rowansenne/workflow-run --with-codegraph
 ```
 
-按提示：选择环境（编号多选，回车 = 全部）→ 确认 / 填写数据库连接 → 自动生成。`--with-docnexus` 接入 DocNexus 文档库（开发约定与审查问题的沉淀和召回、团队定制的文档模板），`--with-codegraph` 接入 CodeGraph 代码图谱（改动影响到的接口、MQ、定时任务和测试）；不需要哪一项就去掉对应参数。装完后在 agent 里运行 `/workflow profile` 填写项目画像。
+按提示：选择环境（编号多选，回车 = 全部）→ 确认 / 填写数据库连接 → 自动生成。安装时自动接入 DocNexus 文档库（开发约定与审查问题的沉淀和召回、团队定制的文档模板），`--with-codegraph` 接入 CodeGraph 代码图谱（改动影响到的接口、MQ、定时任务和测试）；不需要 CodeGraph 就去掉 `--with-codegraph`。装完后在 agent 里运行 `/workflow profile` 填写项目画像。
 
 全量安装的分步说明见图文教程 [docs/full-install.html](docs/full-install.html)（下载后用浏览器打开）。
 
@@ -44,7 +44,7 @@ npx @rowansenne/workflow-run uninstall                                          
 | 命令 | 作用 |
 | --- | --- |
 | `init`（默认，可省略） | 安装或重装 |
-| `upgrade` | 读安装清单里记录的环境与模式，非交互升级到当前版本：保留数据库配置等用户配置，skills 文件一律更新为新版（手改过的先备份到 `workflow-run/tmp/upgrade-backup/`）。加 `--with-docnexus` 时把 DocNexus 包也升到最新版（`@latest`），刷新 skill 链接与 `CLAUDE.md` / `AGENTS.md` 段落，并导入新增的文档模板（只新增，不改动已有模板）；不加则 DocNexus 包原地不动，只顺带导入新增模板 |
+| `upgrade` | 读安装清单里记录的环境与模式，非交互升级到当前版本：保留数据库配置等用户配置，skills 文件一律更新为新版（手改过的先备份到 `workflow-run/tmp/upgrade-backup/`）。加 `--with-docnexus` 时把 DocNexus 包也升到最新版（`@latest`），刷新 skill 链接与 `CLAUDE.md` / `AGENTS.md` 段落，并导入新增的文档模板（只新增，不改动已有模板）；不加则复用已安装的 DocNexus，缺失时自动补装，并导入新增模板 |
 | `doctor` | 自检：已装版本与当前包对比、手改 / 缺失的文件、软链接是否断开、项目画像、DocNexus 模板是否齐全、各数据库连接能否只读 `SELECT 1`（`--offline` 跳过）、`.gitignore` 是否忽略了凭据。有错误时退出码 1 |
 | `uninstall` | 等价于 `--uninstall` |
 | `report` | 本地效果报告：只读统计 `workflow-run/docs/requirements/` 下的产物（`--since YYYY-MM-DD`、`--all-branches`、`--json`），见「workflow：入口与项目画像」 |
@@ -217,7 +217,7 @@ node .agents/skills/workflow/scripts/resolve.mjs env --check   # 逐个字段核
 * **缺陷修复**：收集现象 → 用失败测试复现 → 用证据定位根因 → **判定规模并告知（S 规模问是否走快速通道；M / L 确认根因与修复方式后再改）** → 完整流程先把根因与修复方式追加到 `plan.md`，同步更新文档头的修复分支与日期（不另建文件）→ 最小修复让测试转绿 → 审查并落盘报告（无子 agent 时当前会话自查）→ 用户选择修复或交付（修复后验证与复审；交付必须写明根因）。
 * 审查优先用独立子 agent（期间不继续改被审代码，子 agent 只审查、写报告，不直接修复）；没有子 agent 时降级为当前会话自查并把「审查者」写成当前 agent，不阻塞、也不跳过审查。遗留严重问题须说明风险并由用户明确接受，不能把选择交付写成审查通过。
 * 守则：不写库、不改凭据、不擅自 commit / push、不装新依赖；测试没跑就写「未验证」。
-* 其他 skill 都是可选增强：wiki、DocNexus、数据库没配置时自动跳过，并在交付说明中注明。
+* DocNexus 是必装组件，缺失或查询失败时先修复；wiki、CodeGraph、数据库为可选增强，所有 Skill 共用开工能力快照与失败处理规则（`workflow/references/capabilities.md`）。
 
 ## 参数
 
@@ -227,11 +227,11 @@ node .agents/skills/workflow/scripts/resolve.mjs env --check   # 逐个字段核
 | ----------------------- | --------------------------------------------------------------------- |
 | `--envs`      | 环境列表，逗号分隔：`codex,claude,doubao,qwen,workbuddy`；`all` = 全部                       |
 | `--skip-db` | 跳过数据库连接配置（database-query 不生成 config.json）                             |
-| `--with-docnexus` | 可选：接入 [DocNexus](https://www.npmjs.com/package/@rowansenne/docnexus) 项目文档库（需 Node >= 22.13），见下方「DocNexus 文档库（可选）」 |
+| `--with-docnexus` | 强制将必装的 DocNexus 更新到最新版；默认缺失即安装、已有则复用（需 Node >= 22.13 与 npm） |
 | `--with-codegraph` | 可选：接入 [CodeGraph](https://github.com/colbymchenry/codegraph) 代码图谱，见下方「CodeGraph 代码图谱（可选）」 |
 | `--copy`      | 不建软链接，各环境独立拷贝一份完整 skills                                  |
 | `--skills <列表>` | 只装这些 skill（逗号分隔），自动带上 `requires` 依赖；之后可以再用 `--skills` 补装，已装的保留；`upgrade` 只升级装过的。不含 database-query 时不询问数据库 |
-| `--seed-templates` | 把自带的文档模板导入 DocNexus（已有的不覆盖）；接入 DocNexus 后文档类 skill 只从知识库取模板。`--with-docnexus` 会自动执行 |
+| `--seed-templates` | 把自带的文档模板导入 DocNexus（已有的不覆盖）；接入 DocNexus 后文档类 skill 只从知识库取模板。每次安装 / 升级都会自动执行 |
 | `--uninstall` | 按安装清单卸载本项目装的 skills 与链接，见下方「卸载」 |
 | `--offline` | `doctor` 不测试数据库连通性 |
 | `--yes`        | 非交互：自动使用已有数据库配置（依次查找 `.codex/database-query/config.json` 与各环境已安装的 `database-query/config.json`）；都没有且未 `-SkipDb` 时报错退出 |
@@ -239,7 +239,7 @@ node .agents/skills/workflow/scripts/resolve.mjs env --check   # 逐个字段核
 | `--version`      | 显示版本                                                                |
 | `--help`         | 帮助                                                                    |
 
-## DocNexus 文档库（可选）
+## DocNexus 文档库（必装）
 
 接入支持 `--output-dir` 的 DocNexus format 7，在**业务项目根**执行安装和初始化：
 
@@ -248,7 +248,7 @@ npm install --prefix ./.docnexus --save-exact @rowansenne/docnexus
 ./.docnexus/node_modules/.bin/docnexus init --output-dir workflow-run --agent none
 ```
 
-`workflow-run --with-docnexus` 自动执行这两步，并链接所选 Agent 的 skills、写入项目说明、导入文档模板。
+`workflow-run` 自动补齐 DocNexus 接入，并链接所选 Agent 的 skills、写入项目说明、导入文档模板。
 
 ### 运行环境与知识输出
 
@@ -306,7 +306,7 @@ node .agents/skills/workflow/scripts/docnexus.mjs usage export > workflow-run/do
 npx @rowansenne/workflow-run upgrade --with-docnexus
 ```
 
-新项目用 `npx @rowansenne/workflow-run --with-docnexus`。默认从 npm 安装最新版（`@rowansenne/docnexus@latest`），接入和升级都取最新版；离线或本地验证可设 `DOCNEXUS_PKG=/path/to/package-or-source` 指定安装来源（此时不再追加 `@latest`），必须使用支持 format 7 和 `--output-dir` 的版本。
+新项目用 `npx @rowansenne/workflow-run`，自动安装必需的 DocNexus。默认从 npm 安装最新版（`@rowansenne/docnexus@latest`），接入和升级都取最新版；离线或本地验证可设 `DOCNEXUS_PKG=/path/to/package-or-source` 指定安装来源（此时不再追加 `@latest`），必须使用支持 format 7 和 `--output-dir` 的版本。
 
 ## CodeGraph 代码图谱与 code-graph skill（可选）
 
@@ -330,7 +330,7 @@ npx @rowansenne/workflow-run upgrade --with-docnexus
 | `cg.mjs tables [--table t]` | MyBatis XML 语句（namespace.id）涉及的表 |
 | `cg.mjs status` | 索引与库是否可用 |
 
-`mq`、`jobs`、`tables` 只扫源码，没有索引也能用。`impact`、`entry` 需要 `.codegraph/` 索引和 CodeGraph 的库（Node >= 22.5）；缺了就退出码 2 并说明原因，skill 会退回 grep / 读文件。
+`mq`、`jobs`、`tables` 只扫源码，没有索引也能用。`impact`、`entry` 需要 `.codegraph/` 索引和 CodeGraph 的库（Node >= 22.5）；开工快照区分 script / cli / source，Skill 按共享规则选择一次，不逐步试错。
 
 dev、project-review、技术方案、上线方案都在对应环节调用它：
 - **dev**：改公共方法前看入口；验证时先跑受影响的测试；交付说明里写受影响的接口 / 表 / 配置。
@@ -452,7 +452,11 @@ npx @rowansenne/workflow-run uninstall
 
 `tests/test-skills-meta.mjs` 会检查：skill 的文件里出现了别的 skill 的路径（如 `md-to-wiki/scripts/…`、`workflow/scripts/…`），就必须在 `requires` 或 `optional` 里声明；`requires` 声明了就必须真的用到，而且不能成环。
 
-当前依赖关系：`workflow` 是共享核心（模板来源、画像、文档自检脚本），`dev`、`project-review`、两个文档 skill 依赖它；`dev` 还依赖 `project-review`（自审必做，要读它的审查清单）；`database-query`、`md-to-wiki` 完全独立；wiki 凭据只由 `md-to-wiki` 的脚本读取，其他 skill 拉 PRD 统一调用 `upload.mjs get`。
+当前依赖关系：`workflow` Skill 负责入口编排，其 `lib/` 提供共享核心（项目配置、需求、运行、文档与产物模型），`scripts/` 保留对外命令路径；`dev`、`project-review`、两个文档 skill 依赖它；`dev` 还依赖 `project-review`（自审必做，要读它的审查清单）；`database-query`、`md-to-wiki` 也自动带上 workflow，以复用统一开工检查；wiki 凭据只由 `md-to-wiki` 的脚本读取，其他 skill 拉 PRD 统一调用 `upload.mjs get`。
+
+dev 与 project-review 的 SKILL.md 保留门禁、步骤路由、必要命令和结果去向；进入阶段前才读取对应 reference 的小节。dev 的开工、调研方案、实现验证、审查交付和缺陷修复分开加载；审查的方法、复核、报告与后续也分开加载。完整流程的步骤编号、用户选择、运行状态与正式产物规则沿用原协议，必守规则不藏在脚本注释中。
+
+状态查询、文档视图、效果报告和 PR 描述共用 `workflow/lib/workspace-read.mjs` 的单次命令内存快照，正文与元信息采集一次，使用统一解析规则。需求绑定、运行状态和已登记版本来自 `meta.json`；正文、文档头和发布记录来自 Markdown，产物索引由显式 `sync` 重建。`list` 只读，`sync` 不再从文档头隐式增加绑定分支，绑定使用 `bind`。跨项目视图仍展示全部服务，分支查询和效果报告默认当前项目；`--all-branches` 保持同路径工作区优先，Git 中的版本信息从同一引用读取。异常数据通过 diagnostics 报告，可读的正文仍展示，读取不修复或覆盖元信息。边界与数据归属详见 [内部架构](workflow/references/architecture.md)。
 
 新增一个 skill 就是新建目录、写 `SKILL.md.tpl` 和 `skill.json`，再加进 `package.json` 的 `files`。`tests/test-skills-meta.mjs` 会检查它们是否一致。
 
@@ -462,13 +466,14 @@ npx @rowansenne/workflow-run uninstall
 
 | 脚本（安装后在 `<skills>/` 下） | 作用 |
 | --- | --- |
-| `workflow/scripts/resolve.mjs template <skill> <文件名>` | 判定用哪份模板：已接入 DocNexus 只用知识库，缺失时退出码 2 并给出导入来源；未接入时项目文件优先，其次默认模板 |
+| `workflow/scripts/resolve.mjs template <skill> <文件名>` | 只从 DocNexus 知识库解析模板；缺失时给出导入或创建指引，不回退到包内模板 |
 | `workflow/scripts/resolve.mjs profile` | 读项目画像，列出空字段 |
 | `workflow/scripts/resolve.mjs env` | 本机系统与终端（安装时记录在 `profile.local.json`），写终端命令按它来 |
 | `workflow/scripts/resolve.mjs env --check` | 核对画像里的开发环境配置（`toolchain`）在本机是否存在：每个字段给出 `resolved`（展开后）、`exists`、`unset_vars`，以及 `current`（本机实际的 `JAVA_HOME` / `MAVEN_HOME` / Node 目录）便于对照 |
 | `workflow/scripts/docnexus.mjs <参数>` / `--node <脚本> <参数>` | 在业务项目根运行 `.docnexus/` 中的 CLI 或它的 node 脚本，知识输出到 `workflow-run/docnexus/`；Windows 上直接用 node 跑 CLI 入口，不经过 `.cmd` |
-| `workflow/scripts/knowledge.mjs <skill> [--match 词] [--limit n] [--query 问题]` | 按 `readFrom` 的分类列出 DocNexus 文档（标题、摘要、路径，不含正文）；`--query` 再在每个分类内 `recall --category`，直接使用新版按分类检索能力。未接入时退出码 2 |
+| `workflow/scripts/knowledge.mjs <skill> [--match 词] [--limit n] [--query 问题]` | 按 `readFrom` 的分类列出 DocNexus 文档（标题、摘要、路径，不含正文）；`--query` 再在每个分类内 `recall --category`，直接使用新版按分类检索能力。必装组件不可用时退出码 2，查询失败返回非 0，不当作无匹配 |
 | `workflow/scripts/resolve.mjs category <skill>` | 该 skill 写入 DocNexus 时的显式分类（画像 `docnexus_categories` 优先，其次 skill.json），输出 `seal_args` 与 `metadata`；未声明时退出码 1 |
+| `workflow/lib/capabilities.mjs` | 集中探测必装 DocNexus 与可选增强；供 resolve status 输出本轮能力快照 |
 | `workflow/scripts/resolve.mjs status` | `/workflow status` 的能力探测（不输出任何凭据） |
 | `workflow/scripts/resolve.mjs infer-profile` | 按固定规则从构建文件、Makefile、依赖与配置文件、git 推断项目画像草稿，每个字段附依据；不写文件 |
 | `workflow/scripts/lint-doc.mjs <文档> --skill <skill> [--facts]` | 对照当前生效的模板检查生成的文档：必填章节、残留 `{{...}}` 占位符、元信息行为错误；缺普通章节、顺序不一致为警告；列出待填写位置。`--facts` 再核对正文里的类名、文件、接口、表名：在对比分支的 diff 和代码里都找不到的记为警告（防编造） |
@@ -481,7 +486,7 @@ npx @rowansenne/workflow-run uninstall
 | `workflow/scripts/review-scope.mjs [--diff b...h \| --base b] [--exclude a,b]` / `rules <文件…>` | 审查范围：由脚本决定审哪些文件、跳过哪些（删除、二进制、敏感文件、依赖目录、生成文件、文档、本工具产物，各带原因）、每个文件的风险级别和分批，以及按文件类型和改动内容该看审查清单的哪几节；`--base` 含未提交和未跟踪的新文件。`rules` 打印这些小节的原文和画像 `review.rules` 里匹配的项目规则。project-review 第 1、3、4 步与 dev 自审使用 |
 | `workflow/scripts/locate.mjs <发现.json> [--diff b...h \| --base b]` | 给审查发现定位行号：按每条发现引用的原代码片段在文件里查找（精确 → 忽略空白 → 单行部分匹配），多处时优先本次改动的行，输出起止行、是否落在本次改动上；找不到的标出来要求重读代码。project-review 第 6 步复核使用 |
 | `workflow/scripts/tables.mjs [--diff b...h \| --base b \| --files a,b]` | 找出改动涉及哪些表：实体注解（`@TableName` / `@Table`，没写表名时按类名推断）、Mapper XML 与代码里的 SQL、DDL 脚本；标出 DDL、是否在 `schema.md` 里，并给出拉表结构的命令。dev 调研 / 自检与 project-review 审 SQL / DDL 时使用 |
-| `workflow/scripts/template.mjs list / draft / check / save <模板>` | 修改 / 创建模板（`/workflow template`）：把当前模板复制成草稿（或 `--from <样例>` 抽骨架），`check` 校验格式、列出章节变化、拿最近几份已生成文档试跑 lint 看影响，`save` 给出写入 DocNexus 知识库的 capture 指引，不直接写知识库；未接入 DocNexus 时 `draft` / `save` 提示先接入（默认模板只读） |
+| `workflow/scripts/template.mjs list / draft / check / save <模板>` | 修改 / 创建模板（`/workflow template`）：把当前模板复制成草稿（或 `--from <样例>` 抽骨架），`check` 校验格式、列出章节变化、拿最近几份已生成文档试跑 lint 看影响，`save` 给出写入 DocNexus 知识库的 capture 指引，不直接写知识库；必装组件不可用时先修复 |
 | `workflow/scripts/pr-desc.mjs [--branch b] [--base m] [--out f]` | 按本分支产物生成 PR / MR 描述；没有交付说明时退回用 git 记录 |
 | `database-query/scripts/query.mjs` | 执行 SQL：选连接、取密码（只通过环境变量传给客户端）、会话层只读、拦截写语句和多语句、自动补 LIMIT、超时、脱敏敏感列；支持 mysql / psql 客户端，其他 driver 退回 JDBC |
 | `database-query/scripts/query.mjs --schema [--tables a,b] [--write]` | 按只读会话导出表结构为 Markdown；`--write` 写入 `references/schema.md` 的 `schema:begin` / `schema:end` 之间，标记外的补充说明保留；指定的表在库里不存在时标出 |
@@ -658,7 +663,7 @@ npx @rowansenne/workflow-run docs-repo <团队文档仓库地址> [--project <�
 ```
 workflow-run（安装器仓库）/
 ├── bin/
-│   ├── workflow-run.mjs                # 安装器入口（唯一实现，Node >= 22）：参数解析与 init / upgrade / doctor / uninstall / seed-templates / report / view / docs-repo 调度
+│   ├── workflow-run.mjs                # 安装器入口（唯一实现，Node >= 22.13）：参数解析与 init / upgrade / doctor / uninstall / seed-templates / report / view / docs-repo 调度
 │   ├── lib/                           # core / prompt / db / install / uninstall / docnexus / doctor / docsrepo
 │   ├── skills.mjs                     # 读取各 skill 的 skill.json
 │   └── seed-templates.mjs             # 把文档模板导入 DocNexus
@@ -670,6 +675,15 @@ workflow-run（安装器仓库）/
 ├── README.md                          # 本说明
 ├── workflow/
 │   ├── SKILL.md.tpl · skill.json
+│   ├── lib/                           # 共享核心；不反向依赖 scripts 命令入口
+│   │   ├── project.mjs                # 布局、画像、环境与配置
+│   │   ├── requirement-read.mjs       # 需求目录与元信息读取
+│   │   ├── requirements.mjs           # 绑定、版本归档与索引同步
+│   │   ├── runs.mjs                   # 运行状态、阶段与完成校验
+│   │   ├── meta-store.mjs             # 写锁与原子存储
+│   │   ├── document-model.mjs         # 标题、章节、表格等纯文本模型
+│   │   ├── artifact-model.mjs         # 产物类型、元信息、审查与交付解析
+│   │   └── workspace-read.mjs         # 工作区 / Git 采集、统一读取快照
 │   ├── scripts/resolve.mjs            # 模板来源 / 画像 / 画像推断 / 能力探测
 │   ├── scripts/lint-doc.mjs           # 对照模板检查生成的文档
 │   ├── scripts/infer-profile.mjs      # 画像推断规则（resolve.mjs infer-profile 调用）
@@ -682,8 +696,8 @@ workflow-run（安装器仓库）/
 │   ├── scripts/requirement.mjs        # 产物按需求归档：绑定需求名、落盘路径、meta.json
 │   ├── scripts/view.mjs               # 项目文档视图（本地静态页面）
 │   ├── scripts/make-template.mjs      # 从样例文档抽模板骨架
-│   ├── scripts/doc-sections.mjs       # 读产物的章节、表格、元信息（report / pr-desc 共用，标题解析复用 lint-doc）
-│   ├── references/                    # profile.md、templates.md、docnexus.md、status.md、tables.md、requirements.md、codegraph.md（其他 skill 直接读对应文件）
+│   ├── scripts/doc-sections.mjs       # 原解析导出入口，转交 lib/document-model.mjs
+│   ├── references/                    # profile.md、capabilities.md、templates.md、docnexus.md、status.md、tables.md、requirements.md、codegraph.md（其他 skill 直接读对应文件）
 │   └── profile.json.tpl               # 空画像，首次使用时由 agent 推断并经确认后填写
 ├── dev/
 │   ├── SKILL.md.tpl · skill.json
@@ -728,7 +742,7 @@ workflow-run（安装器仓库）/
 文档类 skill 的模板来源取决于项目是否接入了 DocNexus，生成的文档开头会注明「模板来源」：
 
 * **已接入 DocNexus：只用知识库里的模板** `workflow-run/docnexus/library/templates/<skill>/<文件名>`（分类 `doc-template`）。不再使用 skill 自带的默认模板。库里缺模板时 skill 会停下来，提示你导入后再继续，不会悄悄回退到默认模板。
-* **未接入 DocNexus**：只用 skill 自带的默认模板。
+* **DocNexus 不可用**：修复必装组件后继续，不使用包内模板降级。
 * **默认模板只读，定制只走 DocNexus**：要改模板或新建模板，都写进 DocNexus 知识库，团队共享同一份、每次变更有 timeline。不要直接改 skills 目录里的模板（升级会覆盖）；`workflow-run/templates/` 下的项目模板已不再生效，`doctor` 会提示你导入知识库后删除。
 
 | skill | 文件名 | 用途 | 默认模板 |

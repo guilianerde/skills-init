@@ -12,7 +12,7 @@ import { bind, sync, which } from '../workflow/scripts/requirement.mjs';
 import { startRun, changeRun, runState, FLOWS } from '../workflow/scripts/run.mjs';
 import { branchView } from '../workflow/scripts/artifacts.mjs';
 import { viewData, renderHtml } from '../workflow/scripts/view.mjs';
-import { updateMeta } from '../workflow/scripts/meta-store.mjs';
+import { readMeta, updateMeta } from '../workflow/scripts/meta-store.mjs';
 
 const REPO = fileURLToPath(new URL('..', import.meta.url));
 const BRANCH = 'feature/order';
@@ -178,6 +178,22 @@ test('独立审查、技术／上线方案、wiki 和 bug 的步骤与完成标�
     assert.ok(run.completed_at, kind);
   }
   assert.equal(runState(f.root, BRANCH).runs.length, 5);
+});
+
+test('元信息写入自动创建不存在的父目录；只读不创建，后续更新保留已有字段', (t) => {
+  const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'workflow-meta-create-'));
+  t.after(() => fs.rmSync(temp, { recursive: true, force: true }));
+  const root = path.join(temp, 'new-project');
+  const file = path.join(root, 'workflow-run/docs/requirements/新需求/service/meta.json');
+  assert.deepEqual(readMeta(file), {});
+  assert.equal(fs.existsSync(root), false, '读取不存在的元信息不创建目录');
+  const first = updateMeta(file, (meta) => ({ ...meta, counter: 1, extension: { keep: true } }), { root });
+  assert.deepEqual(readMeta(file), first);
+  const second = updateMeta(file, (meta) => ({ ...meta, counter: meta.counter + 1 }), { root });
+  assert.equal(second.counter, 2);
+  assert.deepEqual(second.extension, { keep: true });
+  assert.deepEqual(JSON.parse(fs.readFileSync(file, 'utf8')), second);
+  assert.deepEqual(fs.readdirSync(path.join(root, 'workflow-run/tmp/locks')), [], '锁与临时文件已释放');
 });
 
 test('元信息锁阻止并发覆盖，异常释放锁；损坏 JSON 不会被重建为空索引', (t) => {

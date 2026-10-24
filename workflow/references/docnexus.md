@@ -44,4 +44,4 @@ node <skills>/workflow/scripts/knowledge.mjs <skill> [--match 词1,词2] [--limi
 - 列表：每个分类下的文档（标题、摘要、`path`、更新时间，按更新时间倒序，不含正文）。`--match` 只按标题 / 摘要 / 标签 / 路径过滤，先用本次的模块名、业务名词，没结果再去掉 `--match` 看最近的几篇。
 - `--query`：在每个分类内 `recall`，结果放在各分类的 `recall` 字段，能找到标题里没写、正文里提到的内容。问题写成一句话，带上模块名和业务名词，例如「订单列表按创建时间筛选 时区 分页」。
 - 从列表和 recall 结果里挑与本次任务相关的读 `path`（普通 Markdown），引用时写 `workflow-run/docnexus/library/<path>`。需要跨分类找（例如别的团队的约定）时，仍可按 `docnexus-recall` 做不带分类的 `recall`。
-- 退出码 2 表示未接入 DocNexus，跳过即可；只读，不写入。
+- 退出码 2 表示必装组件 DocNexus 不可用；按 capabilities.md 修复后继续，不跳过知识库参考。查询或 recall 失败也不能当作无相关知识；只读，不写入。

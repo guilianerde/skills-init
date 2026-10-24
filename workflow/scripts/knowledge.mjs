@@ -15,6 +15,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { DOCNEXUS_HINT } from '../lib/capabilities.mjs';
 import { skillMeta, resolveCategory, docnexusConnected, docnexusBin, docnexusRoot } from './resolve.mjs';
 
 const IS_WIN = process.platform === 'win32';
@@ -37,7 +38,7 @@ function query(root, category) {
 export function knowledge(root, skill, { match = [], limit = 20, query: question = '', recallLimit = 5 } = {}) {
   const meta = skillMeta(skill);
   if (!meta) return { ok: false, error: 'unknown', message: `未安装 skill「${skill}」` };
-  if (!docnexusConnected(root)) return { ok: false, error: 'no_docnexus', message: '未接入 DocNexus，跳过知识库参考' };
+  if (!docnexusConnected(root)) return { ok: false, error: 'no_docnexus', message: DOCNEXUS_HINT };
   const terms = match.map((t) => t.toLowerCase()).filter(Boolean);
   const hit = (d) => !terms.length || terms.some((t) => [d.title, d.summary, d.file_path, ...(d.tags ?? [])].some((v) => String(v ?? '').toLowerCase().includes(t)));
   const seen = new Set();
@@ -59,7 +60,8 @@ export function knowledge(root, skill, { match = [], limit = 20, query: question
     }
     categories.push(entry);
   }
-  const out = { ok: true, skill, categories };
+  const failed = categories.some((c) => !c.ok || c.recall?.ok === false);
+  const out = { ok: !failed, ...(failed ? { error: 'query_failed', message: 'DocNexus 查询失败，修复后重试，不能当作没有相关知识' } : {}), skill, categories };
   if (question) out.recall_by_category = true;
   return out;
 }

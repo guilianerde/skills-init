@@ -4,7 +4,7 @@
 
 任一步失败都**只回退**（不用 PRD 继续），在产出中写明「PRD 增强已跳过」，绝不因此中止主流程。
 
-1. **wiki 是否可用**：运行 `node <skills>/workflow/scripts/resolve.mjs status`，看 `wiki.ok`；或者当前环境有 wiki MCP 工具（如 `mcp__wiki-mcp__get_page`）。两者都没有 → 回退。不要直接读 `wiki-config.json`，凭据只由 md-to-wiki 的脚本使用。
+1. **wiki 通道**：复用开工能力快照的 `wiki.channel`（见 `<skills>/workflow/references/capabilities.md`），不重复探测。无通道时回退；不要读取或输出凭据。
 2. **解析 pageId**：纯数字直接用；URL 用 `[?&]pageId=(\d+)` 或 `/pages/(\d+)` 提取；提取不出 → 请用户提供 pageId，或回退。
 3. **拉取页面**（按可用性）：
    - MCP：`get_page({pageId, expand: "body.storage,version"})`；

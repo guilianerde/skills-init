@@ -50,10 +50,6 @@ export function target(name) {
   return t ? { skill, id: t.id } : null;
 }
 
-// 未接入 DocNexus：默认模板只读，不能改也不能新建
-const NEED_DOCNEXUS = '默认模板随 skills 提供、只读不能改；自定义模板只保存在 DocNexus 知识库里，便于团队共享。告诉用户先重跑 npx @rowansenne/workflow-run 并加 --with-docnexus 接入，再修改或创建模板。';
-const needDocNexus = (t, r) => ({ code: 2, out: { ok: false, skill: t.skill, id: t.id, docnexus: false, need_docnexus: true, current: r.ok ? r.path : null, hint: NEED_DOCNEXUS } });
-
 const draftPath = (root, { skill, id }) => path.join(root, 'workflow-run', 'tmp', 'template-draft', skill, id);
 
 // 草稿本身的格式检查：错误挡住保存，警告给用户看
@@ -123,7 +119,7 @@ export function draft(root, t, { from = null, force = false, stdin = () => fs.re
   const file = draftPath(root, t);
   const { r, text } = current(root, t);
   if (r.error === 'unknown') return { code: 1, out: { ok: false, skill: t.skill, id: t.id, message: r.message } };
-  if (!r.docnexus) return needDocNexus(t, r);
+  if (!r.docnexus) return { code: 2, out: r };
   const base = { skill: t.skill, id: t.id, draft: rel(root, file), source: r.ok ? r.source : null, current: r.ok ? r.path : null, docnexus: true, expected: r.ok ? r.path : r.expected };
   if (fs.existsSync(file) && !force && !from) return { code: 0, out: { ok: true, ...base, created: false, note: '草稿已存在，沿用上次的草稿；要从当前模板重来加 --force' } };
   let content;
@@ -169,7 +165,7 @@ export function save(root, t, file = null) {
   if (c.code) return c;
   if (c.out.unchanged) return { code: 0, out: { ok: true, skill: t.skill, id: t.id, saved: null, note: '草稿与当前模板相同，没有写入' } };
   const r = resolveTemplate(root, t.skill, t.id);
-  if (!r.docnexus) return needDocNexus(t, r);
+  if (!r.docnexus) return { code: 2, out: r };
   return {
     code: 2, out: {
       ok: false, skill: t.skill, id: t.id, docnexus: true, draft: c.out.draft, expected: r.ok ? r.path : r.expected,

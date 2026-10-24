@@ -15,7 +15,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { readProfile } from './resolve.mjs';
+import { readProfile } from '../lib/project.mjs';
 
 const SKILLS_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const EXT = /\.(java|kt|scala|groovy|go|py|ts|js|xml|sql)$/i;

@@ -5,6 +5,8 @@ description: "Generate a Markdown technical design doc (技术方案) from the d
 
 # Create Tech MD Doc
 
+**开工能力**：先运行 `node <skills>/workflow/scripts/resolve.mjs status`，按 `<skills>/workflow/references/capabilities.md` 选择本轮能力与模板；同一项目链路复用已有快照，失败统一按该规则处理。
+
 对比开发分支与主分支的 diff，按项目自己的技术方案模板生成 Markdown。模板不随 skills 提供：第一次使用时请用户给一份团队现有的技术方案作样例来创建（见 Step 3）。
 
 ## Command Format
@@ -24,13 +26,13 @@ description: "Generate a Markdown technical design doc (技术方案) from the d
 1. `git rev-parse --is-inside-work-tree` 为 `true`，否则停。
 2. 两个分支都能 `git rev-parse --verify`（或 `origin/<branch>`）；不存在 → 列出 `git branch -a -i --list "*<关键词>*"` 的候选让用户挑，停。
 3. 读 `workflow/profile.json`：发布平台、Region、配置中心、定时任务注解、是否需要数据评审都取自这里；未配置的写「待填写」，**不要沿用其他项目的取值**。
-4. DocNexus 可用时运行 `node <skills>/workflow/scripts/knowledge.mjs create-tech-md-doc --match <模块名 / 业务名词> --query "<一句话：本次改动做了什么>"`（模块名取分支名或 diff 涉及的模块），看以往技术方案沉淀的决策与约定、相关开发沉淀；相关的在文档对应章节引用 `workflow-run/docnexus/library/<path>`（见 `<skills>/workflow/references/docnexus.md`「按分类参考知识库」）。未接入就跳过。
+4. 运行 `node <skills>/workflow/scripts/knowledge.mjs create-tech-md-doc --match <模块名 / 业务名词> --query "<一句话：本次改动做了什么>"`（模块名取分支名或 diff 涉及的模块），看以往技术方案沉淀的决策与约定、相关开发沉淀；相关的在文档对应章节引用 `workflow-run/docnexus/library/<path>`（见 `<skills>/workflow/references/docnexus.md`「按分类参考知识库」）。
 
 **完整流程状态**：Step 0 通过后确定需求名、绑定目标 dev 分支，按 `<skills>/workflow/references/runs.md` 用 kind `tech` 创建／恢复运行；带上 `--branch <dev分支>`，T0～T4 对应 Step 0～4。已完成步骤、PRD 跳过原因、模板等待／阻塞和证据都写 checkpoint；缺模板停下时不能丢失进度。Step 4 文档写完、自检和交付摘要完成后，将 T4 标 completed，再 complete 保存“已完成”与完成时间；Step 5 的可选下一步另行处理，不把 dev 的已完成记录覆盖成文档运行。
 
 ### Step 1 — PRD（仅传入 `--prd` 时）
 
-按 `references/prd-fetch.md` 判断 wiki 是否可用并拉取 PRD（不可用 → 告知「wiki 连接未配置，PRD 增强已跳过」，继续纯 diff 流程），再按 `references/prd.md` 抽取本文档需要的字段并做对齐校验。PRD 任何环节失败都只回退，不中止。
+按本轮 wiki 通道与 `references/prd-fetch.md` 拉取 PRD，再按 `references/prd.md` 抽取本文档需要的字段并做对齐校验。PRD 任何环节失败都只回退，不中止。
 
 ### Step 2 — 分层采集 diff 并抽取事实
 
@@ -38,10 +40,7 @@ description: "Generate a Markdown technical design doc (技术方案) from the d
 
 ### Step 3 — 选模板并填充
 
-- 模板：在项目根运行 `node <skills>/workflow/scripts/resolve.mjs template create-tech-md-doc template.md`（`<skills>` 是本 skill 所在的 skills 目录，如 `.agents/skills`），读输出的 `path`，并把 `source` 写进元数据行。技术方案模板**不随 skills 提供**，由各团队按自己 wiki 上的格式创建：
-  - 退出码 2 且 `on_demand: true` → 还没有创建模板：**停下这一步**，按 `<skills>/workflow/references/templates.md`「创建模板」请用户给一份团队现有的技术方案作样例，生成模板、用户确认后保存到输出的 `expected`，再继续。不要自己编一份通用模板凑数。
-  - 退出码 2 且 `need_docnexus: true` → 未接入 DocNexus：技术方案模板只保存在 DocNexus 里，**停下这一步**告诉用户先重跑 workflow-run 并加 `--with-docnexus` 接入，再按「创建模板」创建。不要另存到别处。
-  - 退出码 2 的其他情况 → 按输出的 `hint` 处理。
+- 模板：在项目根运行 `node <skills>/workflow/scripts/resolve.mjs template create-tech-md-doc template.md`（`<skills>` 是本 skill 所在的 skills 目录，如 `.agents/skills`），读输出的 `path`，并把 `source` 写进元数据行。模板缺失统一按 `workflow/references/templates.md` 创建或导入。
   - 用户要修改、重新生成或换一份技术方案模板时，按 `<skills>/workflow/references/templates.md`「修改模板」用 `template.mjs` 处理（模板别名 `tech`；按样例重做用 `draft tech --from <样例>`），保存写入 DocNexus 知识库。
 - 填充：模板的章节和编号因团队而异，**按章节含义**放事实，不按编号。下表是事实的来源，放进模板里含义对应的章节；模板里没有对应章节的事实不擅自加章节，在交付摘要里列出「模板中没有位置的事实」；模板有、但 diff 和 PRD 都给不出内容的章节写「待补充」。
 
@@ -80,9 +79,9 @@ description: "Generate a Markdown technical design doc (技术方案) from the d
 ### Step 5 — 后续（都需要用户同意）
 
 - 发布到 wiki：`/md-to-wiki <文档路径> [pageId]`（发布过的文档有发布记录，可省略 pageId）。
-- 模板回写：用户对生成的文档做了结构性调整（新增 / 删除 / 重排章节、改表格列）时，问要不要同步回模板：未接入 DocNexus 时按「修改模板」用 `template.mjs draft / check / save tech` 改（用户确认后保存）；已接入时按 `<skills>/workflow/references/templates.md`「模板随知识库更新」提议同步回模板。
+- 模板回写：用户对生成的文档做了结构性调整（新增 / 删除 / 重排章节、改表格列）时，问要不要同步回模板：按 `<skills>/workflow/references/templates.md`「模板随知识库更新」提议同步回模板。
 - 要上线：`/create-release-md-doc <dev> <main> --tech <文档路径>` 复用本文档的事实。
-- 沉淀到 DocNexus（DocNexus 可用时，判定见 `<skills>/workflow/SKILL.md`「增强能力探测」）：列出值得长期记住的决策、约定、配置 / 依赖变化、风险，**有值得记的才询问用户**，没有就跳过；同意后按 DocNexus 入口 skill `docnexus` 的 capture 流程写入，分类用 `node <skills>/workflow/scripts/resolve.mjs category create-tech-md-doc` 的结果作为调用方显式分类封存（见 `<skills>/workflow/references/docnexus.md`「写入 DocNexus 的分类」），并回报 `workflow-run/docnexus/library/<path>`。只沉淀确认过的事实，不沉淀「待补充」「待人工确认」的推断。未检测到 DocNexus 就跳过，不提示安装。
+- 沉淀到 DocNexus：列出值得长期记住的决策、约定、配置 / 依赖变化、风险，**有值得记的才询问用户**，没有就跳过；同意后按 DocNexus 入口 skill `docnexus` 的 capture 流程写入，分类用 `node <skills>/workflow/scripts/resolve.mjs category create-tech-md-doc` 的结果作为调用方显式分类封存（见 `<skills>/workflow/references/docnexus.md`「写入 DocNexus 的分类」），并回报 `workflow-run/docnexus/library/<path>`。只沉淀确认过的事实，不沉淀「待补充」「待人工确认」的推断。
 
 ## Red Flags — STOP
 

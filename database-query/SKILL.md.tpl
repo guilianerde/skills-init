@@ -5,6 +5,8 @@ description: "Query the project database via SQL and report results. Use when th
 
 # Database Query
 
+**开工能力**：先运行 `node <skills>/workflow/scripts/resolve.mjs status`，按 `<skills>/workflow/references/capabilities.md` 选择本轮能力与模板；同一项目链路复用已有快照，失败统一按该规则处理。
+
 查询本项目数据库并结构化返回结果。默认只读；只读连接上**任何**写操作都不执行。
 
 ## 连接配置（config.json）

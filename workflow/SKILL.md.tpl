@@ -5,6 +5,8 @@ description: "Entry point for this project's dev workflow skills: routes a reque
 
 # Workflow
 
+**开工能力**：先运行 `node <skills>/workflow/scripts/resolve.mjs status`，按 `<skills>/workflow/references/capabilities.md` 选择本轮能力与模板；同一项目链路复用已有快照，失败统一按该规则处理。
+
 本项目个人开发工作流的入口：决定由哪个 skill 处理请求，维护所有 skill 共用的**项目画像**，并统一**增强能力探测**。本 skill 自身不写业务代码。
 
 ## Command Format
@@ -35,7 +37,7 @@ description: "Entry point for this project's dev workflow skills: routes a reque
 | 继续上次任务、恢复中断的流程 | `/workflow resume` | 先读运行状态和上下文，等待中的决定不能自动跳过 |
 | 这套工作流效果怎么样、用得怎么样 | `/workflow report` | 只读统计 `workflow-run/docs/requirements/` 下的产物 |
 | 看看项目文档、某个需求留下了哪些文档、审查记录 | `/workflow view` | 生成本地静态页面，按需求浏览 |
-| 改技术方案 / 上线方案 / 交付说明 / 审查报告的模板，按样例建模板 | `/workflow template` | 草稿 → 校验与影响 → 用户确认后写入 DocNexus（默认模板只读，未接入 DocNexus 时不能改） |
+| 改技术方案 / 上线方案 / 交付说明 / 审查报告的模板，按样例建模板 | `/workflow template` | 草稿 → 校验与影响 → 用户确认后写入 DocNexus（知识库是模板唯一来源） |
 | 记住 / 查找项目决策与约定 | DocNexus（入口 skill `docnexus`） | 需已接入；写入必须用户授权 |
 
 意图明确时直接按对应 skill 执行，不必先输出这张表。目标 skill 没有安装（`resolve.mjs status` 输出的 `skills` 里没有它，安装时用了 `--skills` 子集）→ 告诉用户可以运行 `npx @rowansenne/workflow-run --skills <名称>` 补装，不要假装执行。意图横跨多个阶段时按下面的「完整链路」逐段推进，每段结束告诉用户下一段是什么，由用户决定是否继续。走到哪一步不靠记忆：运行 `node <skills>/workflow/scripts/artifacts.mjs [--branch <分支>]`，它扫描 `workflow-run/docs/requirements/` 下的产物，按元信息行里的分支归组，输出每类最新的一份、wiki 发布记录和 `next`（下一步建议）。
@@ -65,6 +67,7 @@ dev（确定工作分支 → 定需求名 → 理解需求 → 方案 → 实现
 | `references/profile.md` | 项目画像 `profile.json` 各字段含义（含开发环境配置 `toolchain` / `env_vars`）、填写与更新步骤（`resolve.mjs infer-profile`、`env --check`） |
 | `references/templates.md` | 模板来源判定（`resolve.mjs template`）、创建与修改模板（`/workflow template`）、模板随知识库更新 |
 | `references/docnexus.md` | 写入 DocNexus 的分类（`resolve.mjs category`）、按分类参考知识库（`knowledge.mjs`） |
+| `references/capabilities.md` | 开工快照、必装组件门槛、可选增强通道与统一失败处理 |
 | `references/status.md` | `/workflow status` 的输出格式 |
 | `references/runs.md` | 完整流程在 meta.json 中的运行状态、步骤完成标记、保存与恢复、运行完成时间 |
 | `references/requirements.md` | 产物按需求归档（`workflow-run/docs/requirements/<需求名>/<项目名>/`）：什么时候问需求名、`requirement.mjs` 绑定分支与给出落盘路径、`meta.json` |
@@ -75,16 +78,7 @@ dev（确定工作分支 → 定需求名 → 理解需求 → 方案 → 实现
 
 ## 增强能力探测
 
-所有 skill 用同一套判断；任何一项不可用都**不阻塞主流程**，只是跳过对应增强并在产出中注明。
-
-| 能力 | 判定为可用 | 用途 |
-|---|---|---|
-| wiki | `md-to-wiki/wiki-config.json` 中 `enabled=true` 且 `wiki.base_url` 非空；或环境存在 wiki MCP 工具 | 读 PRD（各 skill 按 `references/prd-fetch.md`，REST 通道统一调 `md-to-wiki/scripts/upload.mjs get`）、发布文档 |
-| DocNexus | `.docnexus/project.json` 为 format 7 且 `output_dir=workflow-run`，CLI 可执行：`.docnexus/node_modules/.bin/docnexus`（`resolve.mjs status` 的 `docnexus.bin`）；命令用 `node <skills>/workflow/scripts/docnexus.mjs <参数>` 运行（`docnexus.run`），见 `references/docnexus.md`「DocNexus 的运行位置」 | 查约定与历史决策、沉淀知识、提供文档模板 |
-| 数据库 | `database-query/config.json` 存在且 `connections` 非空 | 查表结构、核对数据 |
-| 代码图谱（CodeGraph） | 项目根有 `.codegraph/` 索引，且 `codegraph` 命令可用（`resolve.mjs status` 的 `codegraph.ok`） | 读代码、查调用链与影响面、找受影响的测试；用法见 `references/codegraph.md` |
-| 项目画像 | `workflow/profile.json` 中 `main_branch` 与 `build` / `test` 非空 | dev 构建与测试 |
-| 开发环境配置 | `profile.json` 的 `toolchain`（可被 `profile.local.json` 覆盖）配了 JDK / Maven / Node 的路径；`resolve.mjs env --check` 逐个核对在本机是否存在 | dev 跑编译与测试（跑不起来时先看它） |
+能力探测与选择统一由 `resolve.mjs status` 和 `references/capabilities.md` 负责。DocNexus 是必装组件；开工检查不通过时先修复。CodeGraph、wiki、数据库作为可选增强，按本轮能力快照选择通道，不在各步骤重复探测或复制降级规则。模板只从 DocNexus 读取，缺失处理见 `references/templates.md`。
 
 ## Rules
 
@@ -92,7 +86,7 @@ dev（确定工作分支 → 定需求名 → 理解需求 → 方案 → 实现
 - 本 skill 只路由和维护 `profile.json`，不写业务代码；具体工作交给对应 skill，并遵守该 skill 的规则。
 - `profile.json` 只记录项目事实（含 `toolchain` 开发环境配置：JDK / Maven / Node 的路径），**不写密码、token、内网凭据**；路径里的变量在 `env_vars` 里声明。
 - 写 `toolchain` 前先用 `resolve.mjs env --check` 核对路径在本机存在；本机对不上、又只是个人差异的，写进个人的 `profile.local.json`（覆盖 `profile.json`），不要改团队那份。
-- 用户的请求明显只属于某个 skill 时，不要先跑完整链路或状态检查，直接进入那个 skill。
+- 用户的请求明显只属于某个 skill 时，直接进入对应 skill，并复用本轮开工能力快照。
 
 ## 终端命令
 

@@ -11,21 +11,18 @@
 //   node .agents/skills/workflow/scripts/resolve.mjs status                      # 能力探测（/workflow status）
 //   node .agents/skills/workflow/scripts/resolve.mjs env                         # 本机系统与终端（安装时记录），写终端命令按它来
 //   node .agents/skills/workflow/scripts/resolve.mjs env --check                 # 核对画像里的开发环境配置（JDK / Maven / Node 路径）在本机是否存在
-// 输出 JSON。退出码：0 正常；2 缺该模板（知识库里没有，或未接入 DocNexus 而该模板没有默认版本；按输出的 hint 处理）；1 参数错误 / 该 skill 没有声明分类
+// 输出 JSON。退出码：0 正常；2 缺模板或必装 DocNexus 不可用（按共享能力与模板规则处理）；1 参数错误 / 该 skill 没有声明分类
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { inferProfile } from './infer-profile.mjs';
-import { layout, HOME, TEMPLATES_DIR } from './requirement.mjs';
-import { docnexusWorkspace, docnexusConnected, docnexusBinPath } from './docnexus-layout.mjs';
-export { docnexusRoot, docnexusWorkspace, docnexusConnected } from './docnexus-layout.mjs';
+import { layout, TEMPLATES_DIR, detectEnv, SHELL_NOTES, readEnv, expandPath, readToolchain, checkToolchain, readProfile } from '../lib/project.mjs';
+export { detectEnv, SHELL_NOTES, readEnv, expandPath, readToolchain, checkToolchain, readProfile } from '../lib/project.mjs';
+import { capabilities, DOCNEXUS_HINT, docnexusWorkspace, docnexusConnected } from '../lib/capabilities.mjs';
+export { docnexusRoot, docnexusWorkspace, docnexusConnected, docnexusBin, codegraphStatus } from '../lib/capabilities.mjs';
 
 const SKILLS_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
-const PROFILE_FIELDS = ['main_branch', 'build', 'test', 'test_single', 'lint', 'config_center', 'deploy.platform', 'deploy.regions', 'job_annotation'];
-const PROFILE_REQUIRED = ['main_branch', 'build', 'test'];
-
 const readJson = (f) => { try { return JSON.parse(fs.readFileSync(f, 'utf8')); } catch { return null; } };
 const rel = (root, p) => path.relative(root, p).split(path.sep).join('/');
 
@@ -40,25 +37,6 @@ function skillMetas() {
 
 export const skillMeta = (name) => skillMetas().find((m) => m.name === name);
 
-// CLI 位于项目根的 .docnexus/，对 Agent 返回项目相对路径。
-export function docnexusBin(root) {
-  const bin = docnexusBinPath(root);
-  return bin ? path.relative(path.resolve(root), bin) : null;
-}
-// 给 agent 的命令写法（相对项目根）：./.docnexus/...
-const cmdPath = (p) => { const s = p.split(path.sep).join('/'); return s.startsWith('./') || s.startsWith('../') ? s : `./${s}`; };
-
-// CodeGraph 代码图谱：本项目建过索引（.codegraph/）且 codegraph 命令可用。索引是否建立由用户决定，skill 不自行 codegraph init
-export function codegraphStatus(root) {
-  const indexed = fs.existsSync(path.join(root, '.codegraph'));
-  const r = spawnSync('codegraph', ['--version'], { cwd: root, encoding: 'utf8', shell: process.platform === 'win32', env: { ...process.env, DO_NOT_TRACK: '1' }, timeout: 30000 });
-  const cli = r.status === 0;
-  return {
-    ok: indexed && cli, cli, indexed,
-    how: cli && indexed ? null : !cli ? '重跑 npx @rowansenne/workflow-run 并加 --with-codegraph（或 npm i -g @colbymchenry/codegraph）' : '在项目根运行 codegraph init 建索引（由用户决定）',
-  };
-}
-
 export function resolveTemplate(root, skill, id) {
   const meta = skillMeta(skill);
   if (!meta) return { ok: false, error: 'unknown', message: `skill「${skill}」没有安装（${rel(root, SKILLS_DIR)} 下找不到 ${skill}/skill.json）；重跑安装并在 --skills 里带上它` };
@@ -66,36 +44,22 @@ export function resolveTemplate(root, skill, id) {
   if (!t) return { ok: false, error: 'unknown', message: `skill「${skill}」没有登记模板「${id}」（见 ${skill}/skill.json 的 templates）` };
   const lib = path.join(docnexusWorkspace(root), 'library', 'templates', skill, id);
   const project = path.join(root, TEMPLATES_DIR, skill, id);
-  // 没有 src 的模板（技术方案、上线方案）不随 skills 提供，缺失时按「创建模板」由用户给样例生成
+  // 包内模板仅用于导入；技术 / 上线方案需要用户提供样例创建
   const builtin = t.src ? path.join(SKILLS_DIR, skill, t.src.replace(/\.tpl$/, '')) : null;
   const CREATE = '按 <skills>/workflow/references/templates.md「创建模板」处理：请用户给一份团队现有的同类文档作样例（本地 md 或 wiki pageId / URL），用 workflow/scripts/make-template.mjs 抽骨架，和用户确认后保存到 expected';
   // workflow-run/templates/ 下的项目模板已不再生效（定制模板只放 DocNexus，便于共享），留着的只用来提示导入
   const stale = fs.existsSync(project) ? rel(root, project) : null;
-  if (docnexusConnected(root)) {
-    const res = { skill, id, docnexus: true, stale_project_file: stale };
-    if (fs.existsSync(lib)) return { ok: true, ...res, source: 'docnexus', path: rel(root, lib) };
-    if (!builtin) {
-      return {
-        ok: false, ...res, error: 'missing', on_demand: true, expected: rel(root, lib),
-        import_from: fs.existsSync(project) ? rel(root, project) : null,
-        hint: `已接入 DocNexus，只使用知识库中的模板，这份模板还没有创建。停下这一步告诉用户：${fs.existsSync(project) ? '项目里已有 import_from，经用户确认后可直接按 capture 流程写入 expected；否则' : ''}${CREATE}（写入 DocNexus 需要用户授权，以显式分类 --category doc-template 封存）。`,
-      };
-    }
-    return {
-      ok: false, ...res, error: 'missing', expected: rel(root, lib),
-      import_from: fs.existsSync(project) ? rel(root, project) : rel(root, builtin),
-      hint: '已接入 DocNexus，只使用知识库中的模板。停下这一步告诉用户缺这份模板：可在项目根运行 npx @rowansenne/workflow-run seed-templates（或重跑安装加 --seed-templates），或经用户确认后把 import_from 按 capture 流程写入 expected（以显式分类 --category doc-template 封存）。',
-    };
-  }
-  // 未接入 DocNexus：只用 skill 自带的默认模板（只读，不能改）；没有默认版本的（技术方案、上线方案）要先接入 DocNexus 才能创建
-  const res = { skill, id, docnexus: false, stale_project_file: stale };
-  if (!builtin) {
-    return {
-      ok: false, ...res, error: 'missing', need_docnexus: true, expected: rel(root, lib),
-      hint: `这份模板不随 skills 提供，自定义模板只保存在 DocNexus 知识库里（便于团队共享），本项目还没有接入 DocNexus。停下这一步告诉用户：先重跑 npx @rowansenne/workflow-run 并加 --with-docnexus 接入${stale ? `（项目里的 ${stale} 已不再生效，接入后可导入知识库）` : ''}，再${CREATE}。`,
-    };
-  }
-  return { ok: true, ...res, source: 'default', path: rel(root, builtin) };
+  const res = { skill, id, docnexus: docnexusConnected(root), stale_project_file: stale };
+  if (!res.docnexus) return { ok: false, ...res, error: 'missing', need_docnexus: true, expected: rel(root, lib), hint: DOCNEXUS_HINT };
+  if (fs.existsSync(lib)) return { ok: true, ...res, source: 'docnexus', path: rel(root, lib) };
+  return {
+    ok: false, ...res, error: 'missing', expected: rel(root, lib),
+    ...(!builtin ? { on_demand: true } : {}),
+    import_from: stale ?? (builtin ? rel(root, builtin) : null),
+    hint: builtin
+      ? '知识库缺少模板。运行 npx @rowansenne/workflow-run seed-templates 导入，或经用户确认后按 capture 流程把 import_from 写入 expected（分类 doc-template）。'
+      : `知识库还没有这份团队模板。${CREATE}（写入需用户授权，以 --category doc-template 封存）。`,
+  };
 }
 
 // DocNexus 对显式分类名的约束：1–80 字符，无首尾空白与控制字符（与 bin/skills.mjs 一致）
@@ -125,118 +89,12 @@ export function resolveCategory(root, skill) {
 
 // 本机系统与终端：安装时检测一次，写进 workflow/profile.local.json 的 env（个人设置，不提交，各人各机器不同）。
 // agent 写命令时按它来，不必每次自己探测（uname、$PSVersionTable）。没记录时（还没重跑安装器）当场检测系统，终端为 null
-const OS_NAMES = { win32: 'windows', darwin: 'macos', linux: 'linux' };
-export function detectEnv() {
-  const os = OS_NAMES[process.platform] ?? process.platform;
-  let shell;
-  if (process.platform === 'win32') {
-    shell = spawnSync('pwsh', ['-NoProfile', '-NonInteractive', '-Command', 'exit 0'], { stdio: 'ignore', timeout: 15000 }).status === 0 ? 'pwsh' : 'powershell';
-  } else shell = path.basename(process.env.SHELL || 'sh');
-  return { os, shell };
-}
-// 终端的写法提示：PowerShell 5.1 没有 && / ||，pwsh 7 有
-export const SHELL_NOTES = {
-  powershell: 'Windows PowerShell 5.1：没有 && 和 ||，多条命令用 ; 分开；不要用 2>/dev/null、grep、head 等 Unix 命令',
-  pwsh: 'PowerShell 7：支持 &&；不要用 2>/dev/null、grep、head 等 Unix 命令',
-};
-export function readEnv() {
-  const rec = readJson(path.join(SKILLS_DIR, 'workflow', 'profile.local.json'))?.env;
-  const env = rec?.os ? { os: rec.os, shell: rec.shell ?? null, source: 'install' } : { os: OS_NAMES[process.platform] ?? process.platform, shell: null, source: 'runtime' };
-  const note = SHELL_NOTES[env.shell];
-  return { ...env, ...(note ? { note } : {}) };
-}
-
-// 开发环境配置（toolchain）：画像里的路径可能写 $JAVA_HOME / ${VAR} / %VAR% / ~，用 env_vars 与进程环境展开。
-// env_vars 优先（画像里显式声明的是对的），缺失的键回退到本机进程环境（HOME、USERPROFILE 这类）。
-// 展开后为空 = 变量确实没配（不是「留空」，要报出来）；路径里有空格照常，不做 shell 求值。
-const VAR_RE = /\$\{(\w+)\}|\$(\w+)|%(\w+)%/g;
-export function expandPath(v, vars = {}, env = process.env) {
-  if (typeof v !== 'string' || !v) return { raw: v ?? '', resolved: '', missing: [] };
-  const look = (n) => (vars[n] !== undefined && vars[n] !== '' ? vars[n] : (env[n] ?? ''));
-  const home = look('HOME') || look('USERPROFILE') || '';
-  let s = v;
-  if (s === '~' || s.startsWith('~/') || s.startsWith('~\\')) s = home ? home + s.slice(1) : s;
-  const missing = [];
-  for (const m of v.matchAll(VAR_RE)) { const n = m[1] ?? m[2] ?? m[3]; if (!look(n)) missing.push(n); }
-  const resolved = s.replace(VAR_RE, (m, a, b, c) => look(a ?? b ?? c)).replace(/[\\/]+$/, '');
-  return { raw: v, resolved, missing };
-}
-
-// 画像里的 toolchain（profile.json）与个人覆盖（profile.local.json），逐个子字段合并，后者优先。
-// 「没声明」和「显式写空」是两回事：本机写 "" 表示**不使用**团队那个值（用工具自己的默认配置），
-// 所以要按 null / "" 区分来源，不能只看值真不真。
-export function readToolchain(root) {
-  const dir = path.join(SKILLS_DIR, 'workflow');
-  const team = readJson(path.join(dir, 'profile.json')) ?? {};
-  const mine = readJson(path.join(dir, 'profile.local.json')) ?? {};
-  const declared = (o) => typeof o === 'string';
-  // 个人声明过（含 ""）就以个人为准；否则用团队值。cleared 表示被个人显式留空
-  const merge = (t, m) => {
-    if (declared(m)) return m === '' ? { value: '', source: 'local', cleared: true } : { value: m, source: 'local' };
-    if (declared(t) && t !== '') return { value: t, source: 'team' };
-    return { value: '', source: null };
-  };
-  const vars = { ...(team.env_vars ?? {}), ...(mine.env_vars ?? {}) };
-  const fields = {
-    java_home: merge(team.toolchain?.java_home, mine.toolchain?.java_home),
-    'maven.settings': merge(team.toolchain?.maven?.settings, mine.toolchain?.maven?.settings),
-    'maven.repository': merge(team.toolchain?.maven?.repository, mine.toolchain?.maven?.repository),
-    gradle_user_home: merge(team.toolchain?.gradle_user_home, mine.toolchain?.gradle_user_home),
-    node: merge(team.toolchain?.node, mine.toolchain?.node),
-  };
-  const out = {};
-  const cleared = [];
-  for (const [k, { value, source, cleared: c }] of Object.entries(fields)) {
-    if (c) { cleared.push(k); continue; } // 个人明确不用这个字段：不展开、不校验、也不报缺失
-    if (value) out[k] = { ...expandPath(value, vars), source };
-  }
-  // toolchain 为空时也给出 env_vars，便于 agent 知道该用什么变量写路径
-  return { fields: out, env_vars: vars, cleared, configured: Object.keys(out).length > 0 };
-}
-
-// 每个字段的路径在本机是否存在（写入画像前、构建跑不起来时核对用）。
-// 只判断存在性，不判断版本对不对；current 是本机当前进程的值，便于和画像对照
-export function checkToolchain(root, { env = process.env } = {}) {
-  const tc = readToolchain(root);
-  const check = (f) => {
-    // 变量没配时展开结果可能是别处真存在的路径（$MISSING/bin 展开成 /bin），必须按「没配」算不通过
-    let exists = false;
-    try { exists = !f.missing.length && !!f.resolved && fs.existsSync(f.resolved); } catch { exists = false; }
-    const kind = exists ? (() => { try { return fs.statSync(f.resolved).isDirectory() ? 'dir' : 'file'; } catch { return 'other'; } })() : null;
-    return { ...f, exists, kind, ...(f.missing.length ? { unset_vars: f.missing } : {}), ...(f.raw !== f.resolved ? { expanded: true } : {}) };
-  };
-  const fields = Object.fromEntries(Object.entries(tc.fields).map(([k, f]) => [k, check(f)]));
-  const bad = Object.entries(fields).filter(([, f]) => !f.exists).map(([k]) => k);
-  return {
-    fields, configured: tc.configured, env_vars: tc.env_vars, ok: bad.length === 0,
-    missing: bad,
-    // 个人在 profile.local.json 里显式留空、表示不用团队那个值的字段（用工具默认配置）
-    ...(tc.cleared.length ? { cleared: tc.cleared } : {}),
-    // 本机当前值：和画像对不上时，多半是画像抄的是别人的机器
-    current: { JAVA_HOME: env.JAVA_HOME ?? null, MAVEN_HOME: env.MAVEN_HOME ?? null, GRADLE_USER_HOME: env.GRADLE_USER_HOME ?? null, node: path.dirname(process.execPath) },
-    how: tc.configured ? (bad.length ? `核对 toolchain 里不存在或变量没配的字段：${bad.join('、')}（本机值见 current）；改本机的那份用 profile.local.json，见 workflow/references/profile.md` : null) : '还没有配置开发环境：运行 /workflow profile 由脚本推断后确认，见 workflow/references/profile.md',
-  };
-}
-
-export function readProfile(root) {
-  const f = path.join(SKILLS_DIR, 'workflow', 'profile.json');
-  const profile = readJson(f);
-  const get = (k) => k.split('.').reduce((o, p) => (o == null ? undefined : o[p]), profile);
-  const isEmpty = (v) => v == null || v === '' || (Array.isArray(v) && !v.length);
-  const empty = profile ? PROFILE_FIELDS.filter((k) => isEmpty(get(k))) : PROFILE_FIELDS;
-  return {
-    path: rel(root, f), exists: !!profile, profile: profile ?? {}, empty, env: readEnv(), toolchain: readToolchain(root),
-    complete: !!profile && PROFILE_REQUIRED.every((k) => !empty.includes(k)),
-  };
-}
-
 export function status(root) {
   const p = readProfile(root);
-  const wikiCfg = readJson(path.join(SKILLS_DIR, 'md-to-wiki', 'wiki-config.json'));
-  const db = readJson(path.join(SKILLS_DIR, 'database-query', 'config.json'));
-  const dn = docnexusConnected(root);
+  const caps = capabilities(root);
   const templates = skillMetas().flatMap((m) => m.templates.map((t) => resolveTemplate(root, m.name, t.id)));
   return {
+    ...caps,
     // 已安装的 skill（--skills 子集安装时只有一部分），路由前据此判断目标 skill 是否可用
     skills: skillMetas().map((m) => m.name),
     // 本机系统与终端（安装时记录），写命令按它来
@@ -246,43 +104,17 @@ export function status(root) {
     toolchain: p.toolchain.configured
       ? { configured: true, fields: Object.fromEntries(Object.entries(p.toolchain.fields).map(([k, v]) => [k, v.resolved])), ...(p.toolchain.cleared.length ? { cleared: p.toolchain.cleared } : {}) }
       : { configured: false, ...(p.toolchain.cleared.length ? { cleared: p.toolchain.cleared } : {}) },
-    wiki: {
-      ok: wikiCfg?.enabled === true && !!wikiCfg?.wiki?.base_url,
-      how: '填写 md-to-wiki/wiki-config.json（enabled + base_url + api_token），或接入 wiki MCP（脚本无法探测 MCP，请另行检查可用工具）',
-    },
     docnexus: {
-      ok: dn,
-      // 调用 DocNexus CLI 时用这个路径（在项目根执行）
-      bin: dn ? cmdPath(docnexusBin(root)) : null,
-      // CLI、草稿及返回的文档路径均相对业务项目根。
-      root: '.',
-      internal: '.docnexus',
-      workspace: `${HOME}/docnexus`,
-      output_dir: HOME,
-      // 运行 DocNexus 命令的写法（在项目根执行，任何终端都一样）：后面接原命令的参数；node 脚本前加 --node
-      run: `node ${(rel(root, path.join(SKILLS_DIR, 'workflow', 'scripts', 'docnexus.mjs')))}`,
-      missing_templates: dn ? templates.filter((t) => !t.ok && !t.on_demand).map((t) => t.expected) : [],
-      // workflow-run/templates/ 下已不生效的项目模板：接入 DocNexus 后导入知识库再删除
+      ...caps.docnexus,
+      missing_templates: caps.docnexus.ok ? templates.filter((t) => !t.ok && !t.on_demand).map((t) => t.expected) : [],
       stale_project_templates: templates.map((t) => t.stale_project_file).filter(Boolean),
-      // 各 skill 写入时使用的显式分类（没声明的 skill 不列出）
       categories: Object.fromEntries(skillMetas().map((m) => [m.name, resolveCategory(root, m.name)]).filter(([, c]) => c.ok).map(([n, c]) => [n, c.category])),
-      how: dn ? '缺模板时运行 npx @rowansenne/workflow-run seed-templates' : '重跑 npx @rowansenne/workflow-run 并加 --with-docnexus',
     },
     // 产物位置：项目里（默认）或独立文档仓库，两种都是 docs/requirements/<需求>/<项目>/（workflow/references/requirements.md）
     artifacts: (() => { const L = layout(root); return { mode: L.mode, ok: L.ok, dir: 'workflow-run/docs/requirements', project: L.project, ...(L.mode === 'repo' ? { repo: L.repo_rel, commit_prompt: L.commit_prompt } : {}), how: L.ok ? null : L.hint }; })(),
-    // 代码图谱：可用时读代码、查调用链与影响面优先用它（见 workflow/references/codegraph.md）
-    codegraph: codegraphStatus(root),
-    database: {
-      ok: !!db?.connections && Object.keys(db.connections).length > 0,
-      default: db?.default_connection ?? (db?.connections?.default ? 'default' : null),
-      connections: Object.fromEntries(Object.entries(db?.connections ?? {}).map(([k, c]) => [k, { driver: c.driver ?? 'mysql', readonly: c.readonly !== false }])),
-      how: '重跑 npx @rowansenne/workflow-run 补配数据库',
-    },
-    templates: templates.map(({ skill, id, source, path: p2, ok, on_demand, need_docnexus, expected }) => ({ skill, id, ok, source: source ?? 'missing', path: p2 ?? null, ...(on_demand ? { on_demand: true, expected } : {}), ...(need_docnexus ? { need_docnexus: true } : {}) })),
+    templates, // 包含 path / expected / hint，按共享模板规则处理，不在各 Skill 重复分支
     // 不随 skills 提供、还没创建的模板（技术方案、上线方案）：第一次生成文档时按「创建模板」引导用户创建
     templates_to_create: templates.filter((t) => t.on_demand).map((t) => ({ skill: t.skill, id: t.id, expected: t.expected })),
-    // 没有默认版本、要先接入 DocNexus 才能创建的模板（未接入时）
-    templates_need_docnexus: templates.filter((t) => t.need_docnexus).map((t) => ({ skill: t.skill, id: t.id })),
   };
 }
 

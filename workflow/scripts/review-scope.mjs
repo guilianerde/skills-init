@@ -18,7 +18,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { readProfile, resolveTemplate } from './resolve.mjs';
+import { readProfile } from '../lib/project.mjs';
+import { resolveTemplate } from './resolve.mjs';
 
 const git = (root, args) => spawnSync('git', ['-c', 'core.quotepath=false', ...args], { cwd: root, encoding: 'utf8', maxBuffer: 256 * 1024 * 1024 });
 const toPosix = (p) => p.split(path.sep).join('/');

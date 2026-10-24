@@ -5,14 +5,9 @@ description: "Answer structural questions about this project's source code from 
 
 # Code Graph
 
+**开工能力**：先运行 `node <skills>/workflow/scripts/resolve.mjs status`，按 `<skills>/workflow/references/capabilities.md` 选择本轮能力与模板；同一项目链路复用已有快照，失败统一按该规则处理。
+
 在 [CodeGraph](https://github.com/colbymchenry/codegraph) 代码图谱之上回答「代码结构」类问题：影响面、调用方、入口、MQ、定时任务、SQL 涉及的表。脚本 `scripts/cg.mjs` 直接调用 CodeGraph 的库，并补上它看不到的 Java / Spring 关联。只读：不建索引、不改代码。
-
-## 先看能不能用
-
-运行 `node <skills>/code-graph/scripts/cg.mjs status`：
-
-- `indexed: false` → 本项目没有 `.codegraph/` 索引。**不要替用户建索引**；告诉用户可以运行 `codegraph init`（或重跑 workflow-run 加 `--with-codegraph`），这次改用 grep / 读文件回答，并说明「未使用代码图谱」。
-- `library` 里有 `error` → 找不到库或 Node 低于 22.5：`impact` / `entry` 不可用，改用 CodeGraph 的 CLI（`codegraph impact` / `callers` / `explore`，见 `<skills>/workflow/references/codegraph.md`）；`mq` / `jobs` / `tables` 只扫源码，照常可用。
 
 ## 命令
 

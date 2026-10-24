@@ -103,6 +103,8 @@ h3 { font-size: 16px; margin: 0 0 6px; }
 .layer.agent .cell { background: transparent; border: 1px solid var(--line); }
 .layer.core .cells { border-color: var(--accent); background: var(--accent-soft); }
 .layer.core .cell { background: var(--surface); }
+.layer.flow .cells { border-color: var(--accent); background: var(--accent-soft); }
+.layer.flow .cell { background: var(--surface); }
 .layer.view .cells { border-color: var(--line); background: var(--surface); }
 .layer.view .cell { background: var(--warn-soft); }
 .layer.out .cells { background: var(--term-bg); border-color: var(--term-bg); }
@@ -238,9 +240,9 @@ footer { margin-top: 40px; font-size: 13px; color: var(--muted); }
 
 <section>
   <div class="kicker">整体架构</div>
-  <h2>四层：底层文档库托底，工具与编排分层，代理和用户只看最上面一层</h2>
+  <h2>六层：底层文档库托底，流程、命令与规则各归一层，代理和用户只看最上面一层</h2>
   <div class="prose">
-    <p>skill 只写流程和判断，所有能确定的事（找模板、定产物路径、识别涉及的表、文档自检）都交给脚本。脚本结果是固定的，模型强弱只影响判断，不影响格式。</p>
+    <p>skill 只写流程和判断，所有能确定的事（找模板、定产物路径、识别涉及的表、文档自检）都交给脚本；脚本只做命令入口，路径、解析和读写规则收敛到共享核心 <code>workflow/lib</code> 的一份定义。一次命令只读一遍数据，写入带锁原子落盘。脚本结果是固定的，模型强弱只影响判断，不影响格式。</p>
   </div>
   <div class="arch">
     <div class="stack">
@@ -251,31 +253,54 @@ footer { margin-top: 40px; font-size: 13px; color: var(--muted); }
         </div>
       </div>
       <div class="layer view">
-        <div class="tag">用户 view<small>只读页面，回看下面两层</small></div>
+        <div class="tag">用户 view<small>只读页面，回看下面的数据</small></div>
         <div class="cells">
           <div class="cell"><b>view.mjs</b><span>按需求浏览产物，生成静态页面（/workflow view）</span></div>
           <div class="cell"><b>docnexus view</b><span>本地只读浏览知识库，Ctrl+C 停止</span></div>
           <div class="cell"><b>report.mjs</b><span>效果报告，只读统计产物</span></div>
         </div>
       </div>
-      <div class="layer core">
-        <div class="tag">工作流编排<small>共享核心 workflow/scripts</small></div>
+      <div class="layer flow">
+        <div class="tag">skill 流程<small>SKILL.md：步骤、确认点与降级判断</small></div>
         <div class="cells">
           <div class="cell"><b>workflow</b><span>入口路由、能力探测</span></div>
           <div class="cell"><b>dev</b><span>需求 → 交付</span></div>
           <div class="cell"><b>project-review</b><span>代码审查</span></div>
           <div class="cell"><b>create-tech-md-doc</b><span>技术方案</span></div>
           <div class="cell"><b>create-release-md-doc</b><span>上线方案</span></div>
-          <div class="cell"><b>profile.json</b><span>项目画像</span></div>
-          <div class="cell"><b>resolve.mjs</b><span>模板来源、能力状态</span></div>
-          <div class="cell"><b>requirement.mjs</b><span>需求绑定、产物路径</span></div>
-          <div class="cell"><b>tables.mjs</b><span>改动涉及的表</span></div>
-          <div class="cell"><b>lint-doc.mjs</b><span>文档自检</span></div>
-          <div class="cell"><b>feedback.mjs</b><span>运行反馈</span></div>
+          <div class="cell"><b>profile.json</b><span>项目画像（用户文件，升级保留）</span></div>
         </div>
       </div>
       <div class="layer">
-        <div class="tag">工具<small>query 与 md-wiki</small></div>
+        <div class="tag">命令脚本<small>workflow/scripts · 确定性命令</small></div>
+        <div class="cells">
+          <div class="cell"><b>resolve.mjs</b><span>模板来源、能力状态</span></div>
+          <div class="cell"><b>requirement.mjs</b><span>需求绑定、产物路径</span></div>
+          <div class="cell"><b>run.mjs</b><span>运行状态与恢复</span></div>
+          <div class="cell"><b>review-scope.mjs</b><span>审查范围与分批</span></div>
+          <div class="cell"><b>tables.mjs</b><span>改动涉及的表</span></div>
+          <div class="cell"><b>lint-doc.mjs</b><span>文档自检</span></div>
+          <div class="cell"><b>pr-desc.mjs</b><span>PR 描述汇总</span></div>
+          <div class="cell"><b>feedback.mjs</b><span>运行反馈</span></div>
+          <div class="cell"><b>template · locate · knowledge · …</b><span>模板、样例定位、知识检索等</span></div>
+        </div>
+      </div>
+      <div class="layer core">
+        <div class="tag">共享核心<small>workflow/lib · 一份定义，读快照、写带锁</small></div>
+        <div class="cells">
+          <div class="cell"><b>capabilities</b><span>必装组件门槛、可选增强通道</span></div>
+          <div class="cell"><b>project</b><span>布局、路径、画像、环境</span></div>
+          <div class="cell"><b>document-model</b><span>标题、章节、表格解析（纯模型，无 I/O）</span></div>
+          <div class="cell"><b>artifact-model</b><span>产物类型与元信息解析（纯模型，无 I/O）</span></div>
+          <div class="cell"><b>requirement-read</b><span>需求目录与元信息读取</span></div>
+          <div class="cell"><b>workspace-read</b><span>工作区／Git 统一快照，一次命令读一遍</span></div>
+          <div class="cell"><b>requirements</b><span>绑定、版本、归档、sync</span></div>
+          <div class="cell"><b>runs</b><span>运行阶段、revision、完成校验</span></div>
+          <div class="cell"><b>meta-store</b><span>写锁与原子替换</span></div>
+        </div>
+      </div>
+      <div class="layer">
+        <div class="tag">工具<small>执行与凭据在各自目录</small></div>
         <div class="cells">
           <div class="cell"><b>code-graph</b><span>影响面、调用入口、MQ、定时任务</span></div>
           <div class="cell"><b>database-query</b><span>只读查库、脱敏</span></div>
@@ -285,16 +310,19 @@ footer { margin-top: 40px; font-size: 13px; color: var(--muted); }
       <div class="layer out">
         <div class="tag">底层文档库<small>只写这一个目录</small></div>
         <div class="cells">
-          <div class="cell">workflow-run/docs/requirements/ <span>需求产物</span></div>
+          <div class="cell">workflow-run/docs/requirements/ <span>需求产物 + meta.json（分支、运行状态、版本）</span></div>
           <div class="cell">workflow-run/docnexus/ <span>团队知识库</span></div>
           <div class="cell">workflow-run/feedback/ <span>运行反馈</span></div>
+          <div class="cell">workflow-run/other/ <span>聊天顺手产物，不进需求</span></div>
+          <div class="cell">workflow-run/tmp/ <span>写锁与临时文件，git 忽略</span></div>
         </div>
       </div>
     </div>
     <aside class="side">
       <h3>安装器 <code>bin/</code></h3>
       <p>和运行流程分开：负责安装、升级、卸载、自检，不参与开发。</p>
-      <p>每个 skill 的依赖、模板、知识库分类都写在自己的 <code>skill.json</code> 里，安装器、脚本、测试都从这一份读。</p>
+      <p>每个 skill 的依赖、模板、知识库分类都写在自己的 <code>skill.json</code> 里，安装器、脚本、测试都从这一份读；<code>workflow/lib</code> 随 workflow skill 一起安装，对外命令路径不变。</p>
+      <p>共享核心不反向依赖命令脚本、纯模型不做 I/O——这条边界写进了测试，违反会直接跑挂。安装器自己的环境探测也用 <code>lib/project</code>，不另写一份。</p>
       <p>升级只换 skills 文件；项目画像、数据库和 wiki 配置保留不动，手改过的文件先备份。</p>
       <p><code>npx @rowansenne/workflow-run doctor</code> 检查链接、画像、凭据是否被忽略、数据库能否只读连上。</p>
     </aside>
@@ -341,8 +369,8 @@ footer { margin-top: 40px; font-size: 13px; color: var(--muted); }
       <p>模板该取哪份、产物写到哪、改动涉及哪些表、文档缺了哪节，都由脚本给出 JSON 结果。命令在 bash、zsh、PowerShell 里写法一样。</p>
     </div>
     <div>
-      <h3>增强能力缺了就降级</h3>
-      <p>没装 CodeGraph 就用 grep，查不了库就读 DDL 并注明「未与实际库核对」，没接 wiki 就请用户贴 PRD。任何一项不可用都不会卡住流程。</p>
+      <h3>开工统一选择能力</h3>
+      <p>DocNexus 是必装组件，不可用时先修复。开工快照统一选择 CodeGraph、数据库和 wiki 的增强通道；所需模板缺失、发布或查库的必要条件不满足时停在相关步骤。</p>
     </div>
     <div>
       <h3>不可逆的事一律先问</h3>
@@ -371,10 +399,10 @@ footer { margin-top: 40px; font-size: 13px; color: var(--muted); }
         <tr><td>dev</td><td>功能开发与缺陷修复，从需求澄清到交付说明</td><td><span class="pill req">workflow</span> <span class="pill req">project-review</span></td></tr>
         <tr><td>project-review</td><td>审分支或未提交改动：14 维度清单、影响面、发现复核、复审对比</td><td><span class="pill req">workflow</span></td></tr>
         <tr><td>code-graph</td><td>基于 CodeGraph：改动影响到的接口、MQ 消费者、定时任务、测试、SQL 和表</td><td><span class="pill req">workflow</span></td></tr>
-        <tr><td>database-query</td><td>会话级只读查询，拦截写语句、自动 LIMIT、敏感字段脱敏</td><td><span class="pill">独立</span></td></tr>
+        <tr><td>database-query</td><td>会话级只读查询，拦截写语句、自动 LIMIT、敏感字段脱敏</td><td><span class="pill req">workflow</span></td></tr>
         <tr><td>create-tech-md-doc</td><td>从分支 diff 按团队模板生成技术方案</td><td><span class="pill req">workflow</span></td></tr>
         <tr><td>create-release-md-doc</td><td>从分支 diff 生成上线方案，自动引用同分支的技术方案和交付说明</td><td><span class="pill req">workflow</span></td></tr>
-        <tr><td>md-to-wiki</td><td>把 md 转成 Confluence 格式并发布；未配置时不启动</td><td><span class="pill">独立</span></td></tr>
+        <tr><td>md-to-wiki</td><td>把 md 转成 Confluence 格式并发布；未配置时不启动</td><td><span class="pill req">workflow</span></td></tr>
       </tbody>
     </table>
   </div>
@@ -394,7 +422,7 @@ footer { margin-top: 40px; font-size: 13px; color: var(--muted); }
         <tr><td>/dev --bug &lt;现象&gt;</td><td>缺陷修复全流程：复现 → 定位根因 → 最小修复 → 验证 → 审查报告 → 用户选择修复或交付</td></tr>
         <tr><td>/workflow</td><td>入口路由：直接说需求也行；不带请求时输出能力地图和状态</td></tr>
         <tr><td>/workflow profile</td><td>填写或更新项目画像（主分支、构建测试命令、toolchain）</td></tr>
-        <tr><td>/workflow status</td><td>能力探测：CodeGraph、数据库、DocNexus、wiki 是否可用</td></tr>
+        <tr><td>/workflow status</td><td>开工快照：DocNexus 必装门槛、CodeGraph 通道、数据库与 wiki 配置</td></tr>
         <tr><td>/workflow template &lt;模板&gt; [怎么改]</td><td>修改或创建文档模板：tech、release、plan、delivery、review、checklist</td></tr>
         <tr><td>/create-tech-md-doc &lt;dev分支&gt; &lt;主分支&gt;</td><td>从分支 diff 按团队模板生成技术方案</td></tr>
         <tr><td>/create-release-md-doc &lt;dev分支&gt; &lt;主分支&gt;</td><td>生成上线方案，自动引用同分支的技术方案和交付说明</td></tr>
@@ -491,7 +519,7 @@ footer { margin-top: 40px; font-size: 13px; color: var(--muted); }
 <pre>workflow-run/docs/requirements/
 └── 订单导出/                <span class="c"># 需求名由你定</span>
     └── order-service/       <span class="c"># 项目名，跨服务各占一层</span>
-        ├── meta.json        <span class="c"># 分支、版本、wiki、沉淀记录</span>
+        ├── meta.json        <span class="c"># 分支、运行状态、版本、wiki、沉淀记录</span>
         ├── plan.md          <span class="c"># 方案（F4；非快速通道都写。缺陷修复在 B4 追加「修复方案」节）</span>
         ├── delivery.md      <span class="c"># 交付说明（F8 / B5，选择交付后）</span>
         ├── review.md        <span class="c"># 审查报告（F7 / B5，每轮）</span>
@@ -505,7 +533,7 @@ footer { margin-top: 40px; font-size: 13px; color: var(--muted); }
       <div class="step"><div class="dot">2</div><div><b>过程中引用</b><p>用上的知识在产物里写明出处 <code>workflow-run/docnexus/library/&lt;path&gt;</code>。</p></div></div>
       <div class="step"><div class="dot">3</div><div><b>交付时沉淀</b><p>交付里有值得记的内容才问：已确认的决定、新约定、缺陷根因；没有就跳过，元信息行写「无需沉淀」。同主题的更新原文，不重复新建。</p></div></div>
       <div class="step"><div class="dot">4</div><div><b>下次被召回</b><p>审查沉淀的问题模式，会在下一次 dev 开工时被列出来。</p></div></div>
-      <div class="callout">写入知识库每次都要你同意；没有值得沉淀的内容时不问，没接入 DocNexus 时也不提问、不提示安装。</div>
+      <div class="callout">写入知识库每次都要你同意；没有值得沉淀的内容时不问。DocNexus 是必装组件，不可用时先修复，不降级。</div>
       <p class="sub" style="margin-top:12px;font-size:14px">想直接翻知识库：在项目根运行 <code>npx @rowansenne/workflow-run docnexus view</code>，会起一个本地只读的文档浏览服务并打印访问地址，<code>Ctrl+C</code> 停止。加 <code>--port 8080</code> 可指定端口，不加则随机。</p>
     </div>
   </div>

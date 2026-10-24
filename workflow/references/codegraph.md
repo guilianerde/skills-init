@@ -1,10 +1,10 @@
 # CodeGraph：用代码图谱读代码
 
-[CodeGraph](https://github.com/colbymchenry/codegraph) 把项目预先解析成本地的代码知识图谱（符号、调用边、继承 / 实现、Spring 等框架的路由），查询一次就拿到相关源码、调用路径和影响面，不用一个个文件 grep、Read。可用性看 `node <skills>/workflow/scripts/resolve.mjs status` 的 `codegraph.ok`（本项目有 `.codegraph/` 索引且 `codegraph` 命令可用）。不可用时照常用 grep / 读文件，不阻塞流程。
+[CodeGraph](https://github.com/colbymchenry/codegraph) 把项目预先解析成本地的代码知识图谱（符号、调用边、继承 / 实现、Spring 等框架的路由），查询一次就拿到相关源码、调用路径和影响面，不用一个个文件 grep、Read。按开工能力快照的 `codegraph.mode` 选择 script / cli / source，统一规则见 `capabilities.md`。
 
 ## 优先用 code-graph skill 的脚本
 
-影响面、入口、MQ、定时任务、表这几类问题，先用 `node <skills>/code-graph/scripts/cg.mjs`（见 `<skills>/code-graph/SKILL.md`）：它直接调 CodeGraph 的库，一次给出改动符号 → 受影响的接口 / MQ 消费者 / 定时任务 / 测试 / 表 / 配置 key，并补上 CodeGraph 看不到的 MQ topic、定时任务和 MyBatis XML 里的表。
+script 模式下，影响面、入口、MQ、定时任务、表这几类问题用 `node <skills>/code-graph/scripts/cg.mjs`（见 `<skills>/code-graph/SKILL.md`）：它直接调 CodeGraph 的库，一次给出改动符号 → 受影响的接口 / MQ 消费者 / 定时任务 / 测试 / 表 / 配置 key，并补上 CodeGraph 看不到的 MQ topic、定时任务和 MyBatis XML 里的表。
 
 | 场景 | 命令 |
 |---|---|
@@ -13,7 +13,7 @@
 | 一个方法从哪些入口进来 | `cg.mjs entry <Class.method>` |
 | topic / 定时任务 / 表 | `cg.mjs mq` / `jobs` / `tables`（只扫源码，没有索引也能用） |
 
-`cg.mjs` 退出码 2（没有索引、找不到库、Node < 22.5）时，改用下面的 CodeGraph 原生工具或 grep。
+cli 模式用下面的原生命令；source 模式直接读代码。执行失败按 capabilities.md 统一处理。
 
 ## 读代码：CodeGraph 原生工具
 
