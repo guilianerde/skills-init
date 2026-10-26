@@ -28,7 +28,7 @@ description: "Implement a feature or fix a bug in this project end to end: under
 
 确定工作分支后先 `run.mjs show`；恢复时核对 context、代码与证据，不能把“继续”当作交付选择。
 非快速通道在 F4 / B4 首次落盘前 bind，再 `run.mjs start --kind feature|bug --size <规模> --input <checkpoint.json>`，补记真实完成的前置步骤。
-每步完成、等待、阻塞和结束会话前 save；修复回 F5 / B4，交付进 F8 / B5。具体协议读 `<skills>/workflow/references/runs.md`。
+每步完成、等待、阻塞和结束会话前 save；修复回 F5 / B4，交付进 F8 / B5。具体协议读 `<skills>/workflow/references/runs.md` 与 [execution.md](../workflow/references/execution.md)。
 交付、自检、摘要与反馈处理后，末步标 completed，再 `run.mjs complete`，保存 completed（已完成）和 completed_at；已完成运行不覆盖。
 
 ## 功能开发流程
@@ -47,23 +47,23 @@ description: "Implement a feature or fix a bug in this project end to end: under
 
 ### F4 — 方案（落盘只看是否快速通道，写法按规模）
 
-先读 [planning.md 的 F4](references/planning.md) 再选择快速通道；完整流程用 `requirement.mjs path plan` 写 `plan.md` 并 lint / sync，S / M 简版、L 完整版；M / L 确认后继续。
+先读 [planning.md 的 F4](references/planning.md) 再选择快速通道；完整流程用 `artifact.mjs finalize --kind plan` 将草稿收尾为 `plan.md`，S / M 简版、L 完整版；M / L 确认后记录 approval，再进入实现。
 
 ### F5 — 实现
 
-读 [implementation.md 的 F5](references/implementation.md)；小步修改、小步运行 `profile.build`，公共签名先看影响面；改动、配置清单与 SQL 脚本进入交付依据。
+读 [implementation.md 的 F5](references/implementation.md)；完整流程先通过方案版本门禁，再小步修改、运行 `profile.build`，公共签名先看影响面；改动、配置清单与 SQL 脚本进入交付依据。
 
 ### F6 — 验证
 
-读 [implementation.md 的 F6](references/implementation.md)；执行相关测试、`profile.test` 与已配置的 lint；记录“验收项 → 测试或操作 → 结果”，已有失败与未验证项如实保留。
+读 [implementation.md 的 F6](references/implementation.md)；完整流程执行前用 `run.mjs snapshot --id <id>` 取快照、执行后 save validation；两种通道都执行相关测试、`profile.test` 与 lint，记录“验收项 → 测试或操作 → 结果”，已有失败与未验证项如实保留。
 
 ### F7 — 审查、报告与用户选择
 
-先读 [delivery.md 的 F7](references/delivery.md)，完整流程按 project-review 第 1～7 步审查；优先独立子 agent，无则当前会话并如实署名。完整流程落报告、交用户、等修复或交付选择；内部审查不另起运行、不单独沉淀或记反馈。快速通道只在当前会话审查。
+先读 [delivery.md 的 F7](references/delivery.md)，完整流程用 `review-handoff.mjs --id <id>` 生成交接材料，按 project-review 第 1～7 步审查；优先独立子 agent，无则当前会话并如实署名。子 agent 返回草稿与结构化结果，主 agent 用 `artifact.mjs finalize --kind review` 收尾，交用户、等修复或交付选择；内部审查不另起运行、不单独沉淀或记反馈。快速通道只在当前会话审查。
 
 ### F8 — 交付
 
-读 [delivery.md 的 F8](references/delivery.md)；完整流程取得交付选择后用 `requirement.mjs path delivery` 写 `delivery.md`、自检并汇总，快速通道仅对话交付。反馈用 `feedback.mjs add`；沉淀分类用 `resolve.mjs category dev`，详细授权、元信息与后续操作按该文执行。
+读 [delivery.md 的 F8](references/delivery.md)；完整流程记录绑定本轮代码和报告的交付选择后，用 `artifact.mjs finalize --kind delivery` 收尾 `delivery.md` 并汇总，快速通道仅对话交付。反馈用 `feedback.mjs add`；沉淀分类用 `resolve.mjs category dev`，详细授权、元信息与后续操作按该文执行。
 
 ## 缺陷修复流程（`--bug`）
 
@@ -81,7 +81,7 @@ description: "Implement a feature or fix a bug in this project end to end: under
 
 ### B4 — 修复与验证
 
-先读 [bug.md 的 B4](references/bug.md) 和 planning.md 的 F4；完整流程通过 `requirement.mjs path plan` 归档旧版后，在原 `plan.md` 追加修复方案并更新文档头，不另建方案；M / L 确认后修复，复现测试由红变绿。
+先读 [bug.md 的 B4](references/bug.md) 和 planning.md 的 F4；完整流程在原方案草稿追加修复方案、更新文档头，用 `artifact.mjs finalize --kind plan` 收尾；M / L 确认后记录 approval、implement 再修复，复现测试由红变绿。
 
 ### B5 — 审查与交付
 
@@ -89,7 +89,7 @@ description: "Implement a feature or fix a bug in this project end to end: under
 
 ## Artifact Location
 
-正式产物按 `<skills>/workflow/references/requirements.md` 归入 `workflow-run/docs/requirements/<需求>/<项目>/`，首次落盘前 bind；写入与归档细则见 [delivery.md 的 Artifact Location](references/delivery.md)。写完 sync，用输出的 cite 引用，lint 错误先修正。
+正式产物按 `<skills>/workflow/references/requirements.md` 归入 `workflow-run/docs/requirements/<需求>/<项目>/`，首次落盘前 bind；写入与归档细则见 [delivery.md 的 Artifact Location](references/delivery.md) 与 execution.md。正式产物统一 finalize，用输出的 cite 引用；中断先 resume。
 普通聊天的辅助文件默认放 `workflow-run/other/`，不绑定需求、不登记运行；源码、已有文件和用户指定路径沿用原规则。
 
 ## Rules

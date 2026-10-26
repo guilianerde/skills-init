@@ -5,7 +5,8 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
-import { STATUS_LABELS, runState, startRun, changeRun } from '../lib/runs.mjs';
+import { runState, startRun, changeRun, readRun } from '../lib/runs.mjs';
+import { codeSnapshot } from '../lib/code-snapshot.mjs';
 export { FLOWS, STATUS_LABELS, allRuns, branchRuns, runState, startRun, changeRun } from '../lib/runs.mjs';
 const branchOf = (root) => spawnSync('git', ['symbolic-ref', '--short', 'HEAD'], { cwd: root, encoding: 'utf8' }).stdout?.trim() || null;
 
@@ -22,13 +23,10 @@ function main(argv) {
     const input = opts.input ? JSON.parse(fs.readFileSync(opts.input === '-' ? 0 : path.resolve(root, opts.input), 'utf8')) : {};
     let out;
     if (action === 'show') {
-      out = runState(root, branch);
-      if (opts.id) {
-        out.current = out.runs.find((r) => r.id === opts.id) ?? null;
-        if (!out.current) throw new Error('当前分支没有这个运行');
-        out.next = `${STATUS_LABELS[out.current.status]}：${out.current.stage}（${out.current.id}）`;
-      }
-    } else if (action === 'start') out = startRun(root, { branch, kind: opts.kind, size: opts.size, input, dir: opts.dir });
+      out = runState(root, branch, undefined, opts.id);
+      if (opts.id && !out.current) throw new Error('当前分支没有这个运行');
+    } else if (action === 'snapshot') out = { ok: true, snapshot: codeSnapshot(root, readRun(root, branch, opts.id).run) };
+    else if (action === 'start') out = startRun(root, { branch, kind: opts.kind, size: opts.size, input, dir: opts.dir });
     else out = changeRun(root, { branch, id: opts.id, revision: opts['expect-revision'] === undefined ? null : Number(opts['expect-revision']), input, action });
     console.log(JSON.stringify(out, null, 2)); return 0;
   } catch (e) { console.error(e.message); return 1; }

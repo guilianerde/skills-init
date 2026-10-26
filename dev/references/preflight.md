@@ -1,10 +1,10 @@
 # 开工与运行状态
 
-进入 Step 0 或恢复运行前读取；只读当前事项对应小节。完整状态协议复用 `<skills>/workflow/references/runs.md`。
+进入 Step 0 或恢复运行前读取；只读当前事项对应小节。完整状态协议复用 `<skills>/workflow/references/runs.md`；关键阶段进入方式与正式产物收尾按 `<skills>/workflow/references/execution.md`。
 
 ## 完整流程的运行状态
 
-按 `<skills>/workflow/references/runs.md` 保存和恢复进度，状态统一在需求的 `meta.json`，不另建状态文件。确定工作分支后先 `run.mjs show`；用户要求继续时读取对应运行的 context、已完成步骤与等待事项，核对代码和证据后从保存的阶段恢复，不重走有效的已完成步骤。不能把“继续”当成用户选择交付。
+按 `<skills>/workflow/references/runs.md` 保存和恢复进度，状态统一在需求的 `meta.json`，不另建状态文件。确定工作分支后先 `run.mjs show`；有 pending_finalization 先按 execution.md 恢复／取消收尾，用户要求继续时读取对应运行的 context、已完成步骤与等待事项，核对代码和证据后从保存的阶段恢复，不重走有效的已完成步骤。不能把“继续”当成用户选择交付。
 
 新任务确定不走快速通道后，先绑定需求，再 `run.mjs start --kind feature|bug --size <规模> --input <checkpoint.json>`，把前置步骤、验收标准、已确认决定、范围、基线与待办补入第一份 checkpoint。功能开发在 F4 创建（Step0、F1～F3 按真实进度补记），缺陷修复在 B4 创建（Step0、B1～B3 补记）；快速通道不 start、不 save。
 

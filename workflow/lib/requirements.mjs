@@ -22,6 +22,15 @@ export const OLD_DIR = `${TMP_DIR}/old-artifacts`;
 const archivePath = (root, dirAbs, kind, v) => path.join(root, OLD_DIR, path.relative(path.join(root, REQ_DIR), dirAbs), `${FILES[kind]}_v${v}.md`);
 const versionsOf = (dirAbs) => readJson(path.join(dirAbs, 'meta.json'))?.versions ?? {};
 
+export function indexArtifacts(dir, versions = {}) {
+  return fs.readdirSync(dir).map((name) => {
+    const p = parseFile(name);
+    if (!p) return null;
+    const text = fs.readFileSync(path.join(dir, name), 'utf8');
+    return { kind: p.kind, version: name === `${FILES[p.kind]}.md` ? versions[p.kind] ?? 1 : p.version, file: name, branch: parseBranch(text), date: headerDate(text), wiki: parseWiki(text), docnexus: parseDocnexus(text) };
+  }).filter(Boolean).sort((a, b) => Object.keys(FILES).indexOf(a.kind) - Object.keys(FILES).indexOf(b.kind) || a.version - b.version);
+}
+
 // 按目录里的文件重建 meta.json（保留需求名、分支、创建时间）
 // bump：写完新版后（sync <path>）确认新版本——和 path 时归档的上一版副本内容不同就把版本号加一，返回归档了哪些
 export function sync(root, dirRel, { bump = false } = {}) {
@@ -40,12 +49,7 @@ export function sync(root, dirRel, { bump = false } = {}) {
         archived.push({ kind, version: v, file: relOf(root, arc) });
       }
     }
-    const artifacts = fs.readdirSync(dir).map((name) => {
-      const p = parseFile(name);
-      if (!p) return null;
-      const text = fs.readFileSync(path.join(dir, name), 'utf8');
-      return { kind: p.kind, version: name === `${FILES[p.kind]}.md` ? versions[p.kind] ?? 1 : p.version, file: name, branch: parseBranch(text), date: headerDate(text), wiki: parseWiki(text), docnexus: parseDocnexus(text) };
-    }).filter(Boolean).sort((a, b) => Object.keys(FILES).indexOf(a.kind) - Object.keys(FILES).indexOf(b.kind) || a.version - b.version);
+    const artifacts = indexArtifacts(dir, versions);
     const branches = old.branches ?? []; // 绑定只由 bind 更新；文档头不隐式修改需求归属。
     const latest = Object.fromEntries(Object.keys(FILES).map((k) => [k, artifacts.filter((a) => a.kind === k).at(-1)?.file ?? null]));
     // 内容没变就不写（meta.json 随需求目录提交，避免无谓的改动）；产物有变化才更新 updated
@@ -67,7 +71,7 @@ export function which(root, branch) {
   if (!L.ok) return notReady(L);
   const r = find(root, branch, L);
   const where = L.mode === 'repo' ? { mode: 'repo', repo: L.repo_rel, project: L.project } : { mode: 'project', project: L.project };
-  if (r) return { bound: true, ...where, branch, name: r.name, dir: r.dir, meta: sync(root, r.dir) };
+  if (r) return { bound: true, ...where, branch, name: r.name, dir: r.dir, meta: r.meta.pending_finalization ? r.meta : sync(root, r.dir) };
   const recent = requirements(root, L).sort((a, b) => String(b.updated).localeCompare(String(a.updated))).slice(0, 5).map(({ name, dir, branches, updated }) => ({ name, dir, branches, updated }));
   // 其他项目已有的需求（跨服务需求，本项目可以用同一个名字加入）；文档仓库里常见，随代码提交时一般没有
   const mine = new Set(requirements(root, L).map((x) => x.slug));
@@ -118,6 +122,7 @@ export function nextPath(root, kind, branch) {
   if (!L.ok) return { code: 2, out: notReady(L) };
   const r = find(root, branch, L);
   if (!r) return { code: 2, out: { ok: false, ...which(root, branch) } };
+  if (r.meta.pending_finalization) return { code: 1, out: { ok: false, hint: `产物收尾尚未完成，先运行 artifact.mjs resume --id ${r.meta.pending_finalization.run_id}` } };
   const abs = path.join(r.abs, `${FILES[kind]}.md`);
   let v = 1; let previous = null; let record = null;
   if (fs.existsSync(abs)) {

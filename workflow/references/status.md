@@ -17,6 +17,7 @@
 运行：<id / 暂无记录> ｜ 状态：<进行中 / 等待用户 / 受阻 / 已完成 / 已取消> ｜ 当前阶段：<stage>
 已完成步骤：<steps 中 completed 的名称> ｜ 完成时间：<completed_at / —>
 等待 / 阻塞：<waiting_for / reason / 无>
+产物收尾：<pending_finalization 的种类与恢复命令 / 无> ｜ 代码证据：<freshness / 暂未记录>
 | 环节 | 产物 | wiki |
 |---|---|---|
 | 方案 / 交付说明 / 审查报告 / 技术方案 / 上线方案 | <path 或「—」> | <pageId vN 或「未发布」> |

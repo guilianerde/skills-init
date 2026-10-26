@@ -103,7 +103,9 @@ export function loadWorkspace(root, { allProjects = false, allBranches = false }
         diagnostics.push({ code: 'invalid_run', path: `${req.dir}/meta.json`, message: `运行 ${id} 结构无效，不能恢复` });
         continue;
       }
-      runs.push({ ...run, requirement: req.name, dir: req.dir, project: req.project });
+      const pending = req.meta.pending_finalization;
+      runs.push({ ...run, requirement: req.name, dir: req.dir, project: req.project,
+        ...(pending?.run_id === id ? { pending_finalization: { kind: pending.kind, id: pending.id } } : {}) });
     }
   }
   artifacts.sort(byArtifactDate);

@@ -4,15 +4,15 @@
 
 ## 运行状态
 
-独立运行且确定要落盘完整报告时，先确定目标分支与需求名、绑定需求，按 `<skills>/workflow/references/runs.md` 用 kind `review` 创建／恢复运行，R1～R7 对应 SKILL.md 第 1～7 步；每步完成、等待用户或受阻时保存。报告落盘、自检并交给用户后，将 R7 标 completed 并 complete，记录“已完成”和完成时间。可选沉淀、反馈与后续动作按原规则处理。灵活模式只在对话里审查时不创建运行；dev 内部调用也不另起运行，由 dev 主 agent 把报告结果记录到 F7／B5。
+独立运行且确定要落盘完整报告时，先确定目标分支与需求名、绑定需求，按 `<skills>/workflow/references/runs.md` 用 kind `review` 创建／恢复运行，R1～R7 对应 SKILL.md 第 1～7 步；每步完成、等待用户或受阻时保存。报告落盘、自检并交给用户后，将 R7 标 completed 并 complete，记录“已完成”和完成时间。可选沉淀、反馈与后续动作按原规则处理。灵活模式只在对话里审查时不创建运行；dev 内部调用也不另起运行，由 dev 主 agent 用 finalize 把报告和证据记录到 F7／B5。正式 review 的交接快照与收尾命令见 `<skills>/workflow/references/execution.md`。
 
 ## dev 内部调用
 
-优先由未参与本轮实现的子 agent 执行第 1～7 步；没有子 agent 时由当前会话的 dev 执行同样的步骤，报告「审查者」写当前 agent，不写成独立审查。完整流程必须落盘报告（零发现也写），不使用下文「灵活模式」免落盘；S 快速通道不落盘，不适用本节。跳过第 8～9 步，沉淀与反馈由 dev 交付时统一处理。只审代码、写报告，不修改业务代码、不生成 `delivery.md`、不提交。元信息写「未询问（由 dev 交付统一处理）」，不将 F8 的交付沉淀结果复制到内部审查报告；缺少本轮交付说明是正常时序，需求、已确认决定和验证结果以 dev 交接为准，旧交付说明只作历史参考。报告完成后交回主 agent，由主 agent 询问用户修复或交付。
+优先由未参与本轮实现的子 agent 执行第 1～7 步；没有子 agent 时由当前会话的 dev 执行同样的步骤，报告「审查者」写当前 agent，不写成独立审查。完整流程必须落盘报告（零发现也写），不使用下文「灵活模式」免落盘；S 快速通道不落盘，不适用本节。跳过第 8～9 步，沉淀与反馈由 dev 交付时统一处理。只审代码、写 tmp 报告草稿和结构化结果，交回 dev 主 agent finalize；不修改业务代码、不生成 `delivery.md`、不提交。元信息写「未询问（由 dev 交付统一处理）」，不将 F8 的交付沉淀结果复制到内部审查报告；缺少本轮交付说明是正常时序，需求、已确认决定和验证结果以 dev 交接为准，旧交付说明只作历史参考。报告完成后交回主 agent，由主 agent 询问用户修复或交付。
 
 ## 第 7 步 — 输出报告（dev 完整流程的自审同样执行本步，只跳过第 8～9 步）
 
-尚未发起沉淀询问时，报告元信息先写「未询问」。按报告模板输出（`node <skills>/workflow/scripts/resolve.mjs template project-review report.md` 取 `path`），落盘规则见 Artifact Location。
+尚未发起沉淀询问时，报告元信息先写「未询问」。按报告模板输出（`node <skills>/workflow/scripts/resolve.mjs template project-review report.md` 取 `path`），按 `<skills>/workflow/references/execution.md`「自动审查交接」生成交接 JSON，返回报告草稿与 packet.result_schema 对应的结果；范围逐文件登记。独立 review 用本运行 finalize；dev 内部由主 agent finalize，同样验证报告仍对应当前代码、方案和验收。落盘规则见 Artifact Location。
 
 ## 第 8 步 — 沉淀到 DocNexus（需用户授权）
 
@@ -37,11 +37,11 @@
 
 审查报告按需求归档在 `workflow-run/docs/requirements/<需求名>/<项目名>/`，规则见 `<skills>/workflow/references/requirements.md`：
 
-- 路径用 `node <skills>/workflow/scripts/requirement.mjs path review`（分支对比按 dev 分支加 `--branch <dev分支>`），写到输出的 `path`（文件名固定为 `review.md`）；已有报告时脚本先把它归档，输出的 `previous` 是上次报告，复审对照它。
-- 退出码 2（这个分支还没绑定需求）：问用户这个需求叫什么，默认值用输出的 `suggested_name`，再 `requirement.mjs bind --name "<需求名>" [--branch <dev分支>]`；用户不给名字时 `bind` 按分支名生成。
-- 报告同时完整输出到对话；落盘文件与对话内容一致
-- 写完运行 `requirement.mjs sync <path>` 更新 `meta.json`；输出里 `archived` 非空（上一版已归档到 `workflow-run/tmp/old-artifacts/`）时告诉用户归档了哪些文件，请用户确认不再需要后自己删除；输出里 `commit` 非空（独立文档仓库模式）时按 `<skills>/workflow/references/requirements.md`「文档仓库的提交」处理。文档里引用其他产物（「参考产物」等）写 `requirement.mjs path` 输出的 `cite`
-- 写完运行 `node <skills>/workflow/scripts/lint-doc.mjs <报告路径> --skill project-review --facts` 自检：「错误」（缺必填章节、缺元信息行、残留 `{{...}}`）先修正；「在 diff 和代码里都找不到」的名字逐个核实，写错了就改成真实的名字
+- 正式审查在目标分支工作区进行，绑定并创建 review 运行后，用 `review-handoff.mjs --id <id>` 固定代码快照和范围；各步保存实际进度，需求／范围变化后重新审查。其他分支的只读灵活审查仍按 diff 命令执行，不创建运行。
+- 报告先写 tmp 草稿，另写结构化结果（findings、coverage）；按 execution.md 用 `artifact.mjs finalize --kind review --packet <交接JSON> --result <结果JSON>` 收尾，输出 path / cite / previous。dev 内部只交回草稿与结果，不由子 agent 更新 meta。
+- 正式报告同时完整交给用户，内容与落盘文件一致；独立 review 将 R7 标 completed 后 complete，dev 内部由主 agent 保存 waiting_user 等选择。
+- 事实核对仍用 `lint-doc.mjs <草稿> --skill project-review --facts`；错误先修正，无法核实的标待确认。finalize 另校验模板、分支、代码快照与覆盖登记。
+- previous 非空时说明旧版已归档，不能替用户删除；独立文档仓库按 requirements.md 运行 pending 后提示提交，dev 内部延后到 F8。已完成报告的沉淀／wiki 元信息更新仍用 sync。
 
 ## 终端命令
 

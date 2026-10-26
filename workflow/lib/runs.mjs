@@ -6,6 +6,9 @@ import { find, requirements } from './requirement-read.mjs';
 import { parseBranch } from './artifact-model.mjs';
 import { updateMeta } from './meta-store.mjs';
 import { loadWorkspace } from './workspace-read.mjs';
+import { readProfile } from './project.mjs';
+import { isDev, applyDevEvidence, assertReview, assertDelivery, receipt } from './run-gates.mjs';
+import { codeSnapshot } from './code-snapshot.mjs';
 
 export const FLOWS = {
   feature: ['Step0', 'F1', 'F2', 'F3', 'F4', 'F5', 'F6', 'F7', 'F8'],
@@ -27,19 +30,30 @@ export function allRuns(root, workspace = loadWorkspace(root)) {
 
 export const branchRuns = (root, branch, workspace) => allRuns(root, workspace).filter((run) => run.branch === branch);
 
-export function runState(root, branch, workspace = loadWorkspace(root)) {
+export function runState(root, branch, workspace = loadWorkspace(root), id = null) {
   const runs = branchRuns(root, branch, workspace);
-  const current = runs.filter((r) => !terminal(r.status)).at(-1) ?? runs.at(-1) ?? null;
-  const next = !current ? null : current.status === 'waiting_user' ? `等待用户：${current.waiting_for}`
+  const current = id ? runs.find((r) => r.id === id) ?? null : runs.filter((r) => !terminal(r.status)).at(-1) ?? runs.at(-1) ?? null;
+  let next = !current ? null : current.pending_finalization ? `先恢复产物收尾：artifact.mjs resume --id ${current.id}` : current.status === 'waiting_user' ? `等待用户：${current.waiting_for}`
     : current.status === 'blocked' ? `处理阻塞：${current.reason}`
       : terminal(current.status) ? `${STATUS_LABELS[current.status]}：${current.kind}（${current.id}）`
         : `继续 ${current.stage}（${current.kind}，运行 ${current.id}）`;
-  return { branch, current, runs, next, ...(workspace.diagnostics.length ? { diagnostics: workspace.diagnostics } : {}) };
+  let freshness = null;
+  if (current && (isDev(current) || current.kind === 'review') && !terminal(current.status) && (current.validation || current.review)) {
+    try {
+      const snapshot = codeSnapshot(root, current);
+      freshness = { validation: current.validation ? snapshot.digest === current.validation.snapshot.digest : null, review: current.review ? current.review.snapshot.digest === snapshot.digest : null };
+      if ((freshness.validation === false || freshness.review === false) && !current.pending_finalization) next = isDev(current) ? '代码或基线已变化：回到验证阶段，重新验证、审查并取得交付选择' : '代码或基线已变化：重新审查并生成报告';
+    } catch (e) {
+      freshness = { validation: false, review: false, reason: e.message };
+      if (!current.pending_finalization) next = `核对证据失败：${e.message}`;
+    }
+  }
+  return { branch, current, runs, next, ...(freshness ? { freshness } : {}), ...(workspace.diagnostics.length ? { diagnostics: workspace.diagnostics } : {}) };
 }
 
-function applyCheckpoint(run, patch, at, reopen = true) {
+export function applyCheckpoint(run, patch, at, reopen = true) {
   if (!object(patch)) throw new Error('checkpoint 必须是 JSON 对象');
-  const allowed = ['stage', 'status', 'size', 'waiting_for', 'reason', 'steps', 'context', 'decision'];
+  const allowed = ['stage', 'status', 'size', 'waiting_for', 'reason', 'steps', 'context', 'decision', 'approval', 'implement', 'validation', 'scope'];
   for (const key of Object.keys(patch)) if (!allowed.includes(key)) throw new Error(`不支持修改字段：${key}`);
   if (patch.status !== undefined && !['running', 'waiting_user', 'blocked'].includes(patch.status)) throw new Error('save 的状态只支持 running / waiting_user / blocked；完成用 complete，取消用 cancel');
   if (patch.size !== undefined) {
@@ -54,6 +68,12 @@ function applyCheckpoint(run, patch, at, reopen = true) {
   if (reopen && patch.stage && (stages.indexOf(stage) < stages.indexOf(run.stage) || (status === 'running' && done(run.steps[stage].status)))) {
     for (const name of stages.slice(stages.indexOf(stage))) run.steps[name] = { status: 'pending' };
     run.decision = null;
+    if (isDev(run)) {
+      const index = stages.indexOf(stage);
+      if (run.kind === 'bug' || index <= stages.indexOf('F7')) run.review = null;
+      if (run.kind === 'bug' || index <= stages.indexOf('F6')) run.validation = null;
+      if (run.kind === 'bug' || index <= stages.indexOf('F4')) run.implementation = null;
+    }
   }
   if (patch.steps !== undefined) {
     if (!object(patch.steps)) throw new Error('steps 必须是对象');
@@ -64,12 +84,18 @@ function applyCheckpoint(run, patch, at, reopen = true) {
       run.steps[name] = { ...value, updated_at: at, completed_at: value.status === 'completed' ? (run.steps[name].completed_at ?? at) : null };
     }
   }
+  if (patch.scope !== undefined) {
+    if (!object(patch.scope) || typeof patch.scope.base !== 'string' || !patch.scope.base.trim() || !Array.isArray(patch.scope.exclude) || patch.scope.exclude.some((v) => typeof v !== 'string')) throw new Error('scope 需要 base 和 exclude 字符串数组');
+    if (run.validation && JSON.stringify(run.scope) !== JSON.stringify(patch.scope)) throw new Error('调整审查范围前先回退到实现／验证阶段，使旧证据失效');
+    run.scope = patch.scope;
+  }
   if (patch.context !== undefined) {
     if (!object(patch.context)) throw new Error('context 必须是对象');
     run.context = { ...run.context, ...patch.context };
   }
   if (patch.decision !== undefined) {
     if (!object(patch.decision) || !['fix', 'deliver'].includes(patch.decision.action) || patch.decision.confirmed !== true) throw new Error('decision 必须记录用户明确确认的 fix / deliver');
+    if (patch.decision.accepted_risks !== undefined && (!Array.isArray(patch.decision.accepted_risks) || patch.decision.accepted_risks.some((v) => typeof v !== 'string'))) throw new Error('accepted_risks 必须是已明确接受的问题 id 数组');
     run.decision = { ...patch.decision, at };
   }
   run.stage = stage;
@@ -94,25 +120,39 @@ export function startRun(root, { branch, kind = 'feature', size = null, input = 
     const runs = meta.runs ?? {};
     selected = Object.values(runs).find((r) => r.branch === branch && r.kind === kind && !terminal(r.status));
     if (selected) { resumed = true; return meta; }
+    const profile = readProfile(root).profile;
     const at = timestamp(); const id = randomUUID();
     selected = applyCheckpoint({ id, kind, size, branch, revision: 1, status: 'running', stage: FLOWS[kind][0],
       created_at: at, updated_at: at, completed_at: null, steps: Object.fromEntries(FLOWS[kind].map((s) => [s, { status: 'pending' }])),
-      context: {}, waiting_for: null, reason: null, decision: null, history: [] }, input, at);
+      scope: { base: meta.base || profile?.main_branch || 'main', exclude: Array.isArray(profile?.review?.exclude) ? profile.review.exclude.filter((v) => typeof v === 'string') : [] },
+      artifacts: {}, context: {}, waiting_for: null, reason: null, decision: null, history: [] }, input, at);
+    applyDevEvidence(root, req, selected, input, at);
     return { ...meta, runs: { ...runs, [id]: selected }, updated: at };
   }, { root });
   return { ok: true, resumed, dir: req.dir, run: selected };
 }
 
-export function changeRun(root, { branch, id, revision, input = {}, action = 'save' }) {
-  if (!branch || !id || !['save', 'complete', 'cancel'].includes(action)) throw new Error('需要当前分支、运行 id 和有效动作');
+export function readRun(root, branch, id) {
   const req = requirements(root).find((r) => Object.hasOwn(r.meta.runs ?? {}, id));
   if (!req) throw new Error(`找不到运行：${id}`);
+  const run = req.meta.runs[id];
+  if (run.branch !== branch) throw new Error('运行属于其他分支，请切换到对应分支后恢复，不要修改原运行的分支');
+  return { req, run };
+}
+
+export function assertRunVersion(run, branch, revision) {
+  if (run.branch !== branch) throw new Error('运行属于其他分支，请切换到对应分支后恢复，不要修改原运行的分支');
+  if (!Number.isInteger(revision) || run.revision !== revision) throw new Error(`运行版本冲突，重新读取状态后使用 --expect-revision ${run.revision}`);
+  if (terminal(run.status)) throw new Error('运行已结束，不再修改；新的工作请 start 新运行');
+}
+
+export function changeRun(root, { branch, id, revision, input = {}, action = 'save' }) {
+  if (!branch || !id || !['save', 'complete', 'cancel'].includes(action)) throw new Error('需要当前分支、运行 id 和有效动作');
+  const { req } = readRun(root, branch, id);
   let result;
   updateMeta(path.join(req.abs, 'meta.json'), (meta) => {
     const run = structuredClone(meta.runs[id]);
-    if (run.branch !== branch) throw new Error('运行属于其他分支，请切换到对应分支后恢复，不要修改原运行的分支');
-    if (!Number.isInteger(revision) || run.revision !== revision) throw new Error(`运行版本冲突，重新读取状态后使用 --expect-revision ${run.revision}`);
-    if (terminal(run.status)) throw new Error('运行已结束，不再修改；新的工作请 start 新运行');
+    assertRunVersion(run, branch, revision);
     const at = timestamp();
     if (action === 'cancel') {
       if (!input.reason?.trim()) throw new Error('取消运行需要 reason');
@@ -120,13 +160,17 @@ export function changeRun(root, { branch, id, revision, input = {}, action = 'sa
       run.history.push({ at, stage: run.stage, status: 'cancelled', reason: input.reason });
     } else {
       applyCheckpoint(run, input, at, action !== 'complete');
+      applyDevEvidence(root, req, run, input, at);
       if (action === 'complete') {
         const steps = FLOWS[run.kind];
         if (run.status !== 'running' || run.stage !== steps.at(-1) || !steps.every((s) => done(run.steps[s].status)) || run.steps[steps.at(-1)].status !== 'completed') throw new Error('还有未完成步骤、待用户决定或阻塞，不能标记已完成');
         if (['feature', 'bug'].includes(run.kind)) {
           const required = run.kind === 'feature' ? ['F4', 'F5', 'F6', 'F7', 'F8'] : ['B4', 'B5'];
+          assertDelivery(root, req, run);
+          receipt(root, req, run, 'delivery');
           if (required.some((s) => run.steps[s].status !== 'completed') || run.decision?.action !== 'deliver' || !run.decision.confirmed) throw new Error('完整 dev 流程必须完成方案、实现、验证、审查和交付，且用户已选择交付');
         }
+        if (run.kind === 'review') assertReview(root, req, run);
         const files = { feature: ['plan.md', 'review.md', 'delivery.md'], bug: ['plan.md', 'review.md', 'delivery.md'], review: ['review.md'], tech: ['tech-doc.md'], release: ['release-doc.md'] };
         for (const name of files[run.kind] ?? []) {
           const file = path.join(req.abs, name);

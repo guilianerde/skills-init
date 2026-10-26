@@ -21,10 +21,12 @@
 ### B4 — 修复与验证
 
 - 修复前按 F4 的标准判定规模并告知用户（规模不询问确认）；S 规模符合快速通道条件时照 F4 问用户是否走快速通道，问完等本轮答复再改代码：明确同意才走快速通道（不落盘），拒绝或未明确同意按完整流程。
-- **完整流程先把修复方案追加进 `plan.md`**：按 Artifact Location 运行 `requirement.mjs bind`（未绑定时），再用 `requirement.mjs path plan` 拿路径（已有 `plan.md` 时脚本会先把上一版归档到 `workflow-run/tmp/old-artifacts/`），把根因结论与修复方式写成 `plan.md` 的「修复方案」一节**追加**在原文之后（前面留一个空行与上一节隔开，避免标题被上一行吞掉）——保留已有方案正文、不另建文件；同时将文档头的分支更新为当前修复分支、日期更新为本次日期，不能只在追加的章节里写新分支，否则产物索引仍会归到旧分支。没有 `plan.md` 时按模板建一份，只填适用的节。写完 `requirement.mjs sync <方案路径>` 更新 `meta.json`，运行 `node <skills>/workflow/scripts/lint-doc.mjs <方案路径> --skill dev` 自检，再运行 `artifacts.mjs --branch <当前修复分支>` 确认 `latest.plan` 指向这份方案；M / L 等用户确认修复方式后再改代码，S 可以在同一轮确认并开始。修复中规模变化时说明变化依据，按新规模继续。
+- **完整流程先把修复方案追加进 `plan.md`**：按 Artifact Location 绑定需求并创建 bug 运行；已有方案先复制到 tmp 草稿，保留正文，在末尾留空行后追加「修复方案」节（根因结论与修复方式），更新文档头为当前修复分支和本次日期。没有方案则按模板创建草稿，只填适用节。用 `artifact.mjs finalize --kind plan` 自检、归档旧版、发布并更新索引，不直接覆盖正式文件；输出的 previous 用于历史对照。运行 `artifacts.mjs --branch <当前修复分支>` 确认 latest.plan。M / L 取得用户确认后记录 approval，再 save implement: true；S 省 approval，仍须 implement。具体 JSON 和证据协议见 `<skills>/workflow/references/execution.md`。规模变化时说明依据、按新规模继续。
 - 做能消除根因的**最小改动**；B2 的测试由红变绿，相关已有测试保持通过（运行方式同 F6）。
 - 如果历史脏数据需要修正，写成 SQL 脚本交给用户，不直接执行。
 
 ### B5 — 审查与交付
 
 同 F7、F8：优先由独立子 agent 审查（没有子 agent 时在当前会话自查）并落盘 `review.md`，交报告后等待用户选择修复或交付；修复后验证、复审，再等选择，完整流程仅在用户选择交付后生成 `delivery.md`（「类型」写缺陷修复）。快速通道同样适用于缺陷修复：S 规模、用户在 B4 已同意走快速通道，不涉及配置 / SQL / 对外接口 / 表结构 / 权限 / 资金，且同类风险排查没有发现其他调用方受影响时，不绑定需求、不落任何产物文件，审查在当前会话做，交付在对话里一次完成并注明「DocNexus：未询问（快速通道不问沉淀）」；根因（证据链、修复方式）必须在对话里写清楚。完整交付时，交付说明的「根因」节必须写：证据链、修复方式、为什么这样修、同类风险排查结果；DocNexus 沉淀时根因是首要候选。
+
+B4 的方案、实现进入与验证证据分开登记：方案 finalize 后，M / L 记录 approval，再 save implement: true；验证用执行前 snapshot 与实际 checks，B4 最后才标 completed。B5 按 execution.md 的交接、报告收尾、交付选择和交付收尾执行，报告完成不代表 B5 已完成。

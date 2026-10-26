@@ -237,7 +237,7 @@ function runBlock(r) {
   if (!r.runs?.length) return '';
   const labels = { running: '进行中', waiting_user: '等待用户', blocked: '受阻', completed: '已完成', cancelled: '已取消' };
   const stepLabels = { pending: '未开始', in_progress: '进行中', completed: '已完成', skipped: '已跳过' };
-  return '<section class="block"><h3>流程运行状态</h3><table><thead><tr><th>运行 / 分支</th><th>阶段</th><th>状态</th><th>步骤进度</th><th>等待 / 阻塞 / 完成时间</th></tr></thead><tbody>' + r.runs.map((run) => '<tr><td>' + esc(run.project + ' · ' + run.kind + ' · ' + run.id) + '<br>' + esc(run.branch) + '</td><td>' + esc(run.stage) + '</td><td>' + esc(labels[run.status] ?? run.status) + '</td><td>' + Object.entries(run.steps).map(([name, s]) => esc(name + '：' + (stepLabels[s.status] ?? s.status))).join('<br>') + '</td><td>' + esc(run.waiting_for ?? run.reason ?? run.completed_at ?? '') + '</td></tr>').join('') + '</tbody></table></section>';
+  return '<section class="block"><h3>流程运行状态</h3><table><thead><tr><th>运行 / 分支</th><th>阶段</th><th>状态</th><th>步骤进度</th><th>等待 / 阻塞 / 完成时间</th></tr></thead><tbody>' + r.runs.map((run) => '<tr><td>' + esc(run.project + ' · ' + run.kind + ' · ' + run.id) + '<br>' + esc(run.branch) + '</td><td>' + esc(run.stage) + '</td><td>' + esc(labels[run.status] ?? run.status) + '</td><td>' + Object.entries(run.steps).map(([name, s]) => esc(name + '：' + (stepLabels[s.status] ?? s.status))).join('<br>') + '</td><td>' + esc(run.pending_finalization ? '待恢复产物收尾：' + run.pending_finalization.kind + '（artifact.mjs resume --id ' + run.id + '）' : run.waiting_for ?? run.reason ?? run.completed_at ?? '') + '</td></tr>').join('') + '</tbody></table></section>';
 }
 
 function knowledgeBlock(r) {

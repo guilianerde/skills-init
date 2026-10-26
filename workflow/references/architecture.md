@@ -14,6 +14,10 @@ dev / project-review 的 SKILL.md 只保留触发边界、门禁、步骤路由�
 | requirement-read | 需求目录和元信息读取、查询与分组 |
 | requirements | 需求绑定、产物版本、归档、索引写入 |
 | runs | 运行阶段、用户选择、revision、完成与取消 |
+| run-gates | 方案确认、实现／验证／审查／交付转换门禁，核对证据与版本 |
+| code-snapshot | 基线、HEAD 与工作区文件内容摘要，校验验证／审查仍适用 |
+| artifact-finalize | 草稿检查、正式发布、归档、索引与运行证据登记；在 meta 中记录可恢复收尾 |
+| path-match | 审查范围与代码快照复用的纯 glob 匹配 |
 | meta-store | 元信息写锁与原子替换；写入前自动创建父目录，再按真实路径归一化加锁；读取不创建目录 |
 | document-model | 标题、章节、表格、元信息等纯文本解析 |
 | artifact-model | 产物种类、文件名、分支、日期、发布与沉淀、审查和交付解析 |
@@ -41,3 +45,9 @@ lib 不依赖 scripts；纯模型不依赖 I/O。读侧不调用 sync 或推进�
 `lib/capabilities.mjs` 集中探测接入，`resolve.mjs status` 输出本轮能力快照（ready / blockers、通道、模板解析结果），`references/capabilities.md` 定义所有 Skill 共用的失败处理。CodeGraph 的库探测通过其 status 命令交给能力适配器，lib 不导入 Skill 执行脚本。新会话或环境变化时刷新，不持久化个人能力状态到需求元信息。
 
 DocNexus 是必装组件：安装器缺失即接入，安装失败不报告完成；已有组件默认复用，`--with-docnexus` 强制更新。模板只从知识库读取，包内模板仅用于导入。知识查询失败不作为空结果继续。CodeGraph、wiki、数据库仍按共享规则选择增强通道；必需目标、需求绑定和语句拦截按各自语义处理。
+
+## 执行可靠性
+
+关键转换由 run-gates 执行，不仅在 complete 检查。方案批准关联具体正文；验证在执行前 snapshot、执行后登记；review-handoff 从已保存事实和代码范围生成交接材料，不传实现者结论。审查结果同时返回报告草稿与结构化 findings／coverage，主 agent 统一收尾，交付选择绑定该轮代码与报告版本。
+
+artifact.mjs 在命令层解析知识模板并传入精确草稿检查；artifact-finalize 不导入命令入口。两次带锁写入先登记 pending_finalization，再发布文档并提交索引与运行；meta 中的待办是恢复依据，不另建状态数据库。中断后拒绝其他元信息写入，resume 重查证据并幂等完成，abort 安全还原原文件。只读命令展示待办，不自动修复。快照与阶段协议见 execution.md。

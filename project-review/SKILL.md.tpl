@@ -12,7 +12,7 @@ description: "Review source code (any language; Java/Spring, Go, TypeScript, Pyt
 - 开工运行 `node <skills>/workflow/scripts/resolve.mjs status`，按 `<skills>/workflow/references/capabilities.md` 复用本轮能力快照；DocNexus 必装，不可用先修复。
 - 审查范围以 `review-scope.mjs` 输出为准；只报本次引入的问题，范围外发现单列，不把没覆盖写成没问题。
 - 每条结论引用真实代码与文件行号，行号由 `locate.mjs` 定位；CRITICAL / HIGH 必须复核，有条件时交独立 agent。
-- dev 完整流程调用：执行第 1～7 步，零发现也落盘；只返回报告与证据，不修代码、不生成 delivery.md、不提交、不另开 review 运行，跳过第 8～9 步。
+- dev 完整流程调用：执行第 1～7 步，零发现也落盘；只返回报告草稿与结构化证据，由主 agent finalize，不修代码、不生成 delivery.md、不提交、不另开 review 运行，跳过第 8～9 步。
 - dev 内部报告写「未询问（由 dev 交付统一处理）」，缺本轮 delivery.md 是正常时序；主 agent 交报告后等用户选修复或交付。S 快速通道仅当前会话审查。
 - 深审大改动的分角度并行查找须用户同意；写入知识库与其他对外动作仍须授权。
 
@@ -38,7 +38,7 @@ description: "Review source code (any language; Java/Spring, Go, TypeScript, Pyt
 
 6. **复核**：必须先读 [verification.md](references/verification.md)。运行 `locate.mjs workflow-run/tmp/review/findings.json`，带相同范围；验证触发条件、防护与引入时间，排除误报，保留成立或待确认的证据。
 
-7. **输出报告**：先读 [reporting.md 的第 7 步与 Artifact Location](references/reporting.md)。用 `resolve.mjs template project-review report.md` 取模板；正式报告落 review.md，sync、lint 后完整交给用户，灵活模式在对话给 findings。
+7. **输出报告**：先读 [reporting.md 的第 7 步与 Artifact Location](references/reporting.md)。用 `resolve.mjs template project-review report.md` 取模板；正式报告按 execution.md 用 `artifact.mjs finalize --kind review` 收尾为 review.md 后完整交给用户，灵活模式在对话给 findings。
 
 8. **沉淀到 DocNexus**：独立审查交报告后读 [reporting.md 的第 8 步](references/reporting.md)。有值得记录的才询问授权，分类用 `resolve.mjs category project-review`；沉淀结果写报告元信息并 sync。dev 内部不执行。
 
@@ -62,7 +62,7 @@ description: "Review source code (any language; Java/Spring, Go, TypeScript, Pyt
 
 ## Artifact Location
 
-正式报告按 `<skills>/workflow/references/requirements.md`，用 `requirement.mjs path review [--branch <目标分支>]` 获取路径、归档旧版；写完 sync，并运行 `lint-doc.mjs <路径> --skill project-review --facts`，错误修正后交付。具体执行读 reporting.md。
+正式报告按 `<skills>/workflow/references/requirements.md`，在目标工作分支用 `review-handoff.mjs --id <id>` 生成交接材料，报告草稿与结构化结果交 `artifact.mjs finalize --kind review` 收尾；事实用 `lint-doc.mjs <草稿> --skill project-review --facts`，错误修正后交付。具体执行读 reporting.md。
 普通聊天的分析与草稿默认在 `workflow-run/other/`，不 bind、不建运行、不写需求 meta.json；用户明确路径优先。
 
 ## Verification

@@ -7,12 +7,12 @@
 **S 快速通道不走本节**：在当前会话按 project-review 的标准清单自查，不写方案、不落 `review.md`、不绑定需求、不交报告等选择；审查结论写进 F8 的对话交付。碰到快速通道的退出条件时，再按下面的完整流程走。
 
 - 按 `project-review` skill 审本次改动，用户未指定深度时按 project-review 的「标准」审查。范围用 `node <skills>/workflow/scripts/review-scope.mjs --base <main_branch>`：分支已有的提交、未提交的改动和未跟踪的新文件一起列出。Step 0 确认不属于本需求的文件用 `--exclude <文件,文件>` 排除，它们不计入本次结论（见 Step 0「工作区状态与工作分支」）；之后 project-review 的 `rules`、`locate.mjs` 都带同样的参数。
-- **优先由独立子 agent 审查**：派一个未参与本轮实现的子 agent，执行 project-review 的第 1～7 步（含复核和落盘报告）。只交接项目根、skills 路径、分支 / 基线、排除范围、审查深度（默认标准）、需求与验收标准、已确认决定、方案路径、验证命令与结果、上次报告路径；不要传实现者的自审结论或预设问题，让它自己读当前代码判断。审查期间主 agent 不再修改被审代码。子 agent 只审查、写审查产物，不修代码、不生成交付说明、不提交。
+- **优先由独立子 agent 审查**：派一个未参与本轮实现的子 agent，执行 project-review 的第 1～7 步（含复核、报告草稿和结构化结果）。交接材料用 `review-handoff.mjs --id <id>` 自动生成，参数与结果结构见 `<skills>/workflow/references/execution.md`「自动审查交接」；不要传实现者的自审结论或预设问题，让它自己读当前代码判断。审查期间主 agent 不再修改被审代码。子 agent 只审查、写 tmp 草稿和结果 JSON，主 agent 负责 finalize、更新同一运行；不修代码、不生成交付说明、不提交。
 - **没有子 agent 时在当前会话审查**：按 project-review 第 1～7 步自己走完并落盘 `review.md`，报告的「审查者」写当前 agent（未派子 agent）；问题表、复核、报告、等用户选择都不省。不要写成独立审查，也不要跳过审查直接进 F8。
-- **每轮必须落盘 `review.md`**：按 Artifact Location 先绑定需求，再按 project-review 第 7 步生成报告、运行 lint 和 sync。问题表、影响面、未覆盖项都要保留；没有发现也生成报告。只跳过 project-review 第 8 步沉淀与第 9 步反馈，沉淀和反馈留给 dev F8 统一处理；报告的元信息固定写「未询问（由 dev 交付统一处理）」。F8 只更新交付说明的沉淀状态，不将内部审查报告同步为交付的沉淀结果，避免把一次询问或沉淀重复计数。本轮尚无交付说明，不能把缺少 `delivery.md` 当成漏项；旧交付说明只能作为历史参考，当前需求与验证以本次交接为准。
+- **每轮必须落盘 `review.md`**：按 Artifact Location 先绑定需求，再按 project-review 第 7 步生成草稿与结构化结果，由主 agent 用 `artifact.mjs finalize --kind review` 统一自检、落盘和登记证据。问题表、影响面、未覆盖项都要保留；没有发现也生成报告。只跳过 project-review 第 8 步沉淀与第 9 步反馈，沉淀和反馈留给 dev F8 统一处理；报告的元信息固定写「未询问（由 dev 交付统一处理）」。F8 只更新交付说明的沉淀状态，不将内部审查报告同步为交付的沉淀结果，避免把一次询问或沉淀重复计数。本轮尚无交付说明，不能把缺少 `delivery.md` 当成漏项；旧交付说明只能作为历史参考，当前需求与验证以本次交接为准。
 - **先交报告，再等选择**：主 agent 读取报告，将报告内容与路径交给用户，明确询问「修复报告中的问题，还是按当前结果交付？」并等待本轮明确答复。没有发现时也要等用户选择交付；答复含糊或未答复时留在 F7。此时**不创建、不覆盖 `delivery.md`，不提前进入提交、PR 或沉淀环节**。
   - **修复问题**：按用户选定的问题回到 F5 修复、F6 验证，再由未参与修复的子 agent（没有子 agent 时在当前会话）重新走 F7；复审更新 `review.md`，旧版按产物规则归档，逐条核对「已修复 / 仍存在 / 不再适用」。再次交报告、等待选择，不因已修复就自动交付。用户自己修复后也走 F6 → F7，不能只凭口头说已修复关闭问题。
-  - **交付**：确认报告对应当前代码；审查后代码有变动就先回 F6 → F7。仍有已复核的 CRITICAL / HIGH 时，明确建议先修复，说明具体风险并让用户确认是否仍按当前结果交付；不能将一般的「交付」视为接受未说明的严重风险。用户明确接受遗留风险后才进 F8，如实记录遗留问题与未验证项，不得把带问题交付写成「审查通过」或「建议合并」。MEDIUM / LOW 的处理结果也写进交付说明（快速通道写在对话里）。
+  - **交付**：按 execution.md 保存 decision，绑定报告版本与代码摘要；确认报告对应当前代码；审查后代码有变动就先回 F6 → F7。仍有已复核的 CRITICAL / HIGH 时，明确建议先修复，说明具体风险并让用户确认是否仍按当前结果交付；不能将一般的「交付」视为接受未说明的严重风险。用户明确接受遗留风险后才进 F8，如实记录遗留问题与未验证项，不得把带问题交付写成「审查通过」或「建议合并」。MEDIUM / LOW 的处理结果也写进交付说明（快速通道写在对话里）。
 
 ### F8 — 交付
 
@@ -24,10 +24,12 @@
 
 完整流程：
 
-1. **落盘交付说明**：模板路径用 `node <skills>/workflow/scripts/resolve.mjs template dev delivery-template.md` 取，写到 `requirement.mjs path delivery` 给出的路径（见 Artifact Location）。元信息行的「对比分支」写当前分支和 `profile.main_branch`，`artifacts.mjs`、project-review、上线方案靠它找到这份交付；「参考产物」写最新审查报告，有方案（`plan.md`）时也写方案路径。「审查」节记录报告结论、修复与复审结果、用户选择交付及接受的遗留风险。尚未发起沉淀询问时，元信息先写「未询问」，再按第 5 步更新。小改动每节一两行即可，不适用的节写「无」，但验证结果必须如实。
-2. **自检**：运行 `node <skills>/workflow/scripts/lint-doc.mjs <交付路径> --skill dev --template delivery-template.md`，有「错误」先修正。
+1. **落盘交付说明**：模板路径用 `node <skills>/workflow/scripts/resolve.mjs template dev delivery-template.md` 取，先写到 tmp 草稿，按 execution.md 用 `artifact.mjs finalize --kind delivery` 发布（见 Artifact Location）。元信息行的「对比分支」写当前分支和 `profile.main_branch`，`artifacts.mjs`、project-review、上线方案靠它找到这份交付；「参考产物」写最新审查报告，有方案（`plan.md`）时也写方案路径。「审查」节记录报告结论、修复与复审结果、用户选择交付及接受的遗留风险。尚未发起沉淀询问时，元信息先写「未询问」，再按第 5 步更新。小改动每节一两行即可，不适用的节写「无」，但验证结果必须如实。
+2. **自检与收尾**：finalize 内部使用知识库交付模板检查草稿，有错误先修正；成功输出正式路径、cite 和版本。不要直接覆盖正式文件后用 sync 代替。
 3. **对话里给摘要**：结果、验证（含未验证项）、最新审查报告路径与结论、遗留问题和用户接受的风险、配置 / SQL 有无、交付文件路径；不必把全文贴进对话。
 4. **记录运行反馈**（不问用户）：按 `<skills>/workflow/references/feedback.md` 运行 `node <skills>/workflow/scripts/feedback.mjs add --skill dev --model <模型名> --mode <feature|bug> --size <S|M|L> --fast <yes|no> --rounds <提问轮数> --corrections <用户纠正理解的次数> --acceptance <已验证>/<总数> --baseline-failures <n>`，有跳过的步骤、不清楚或做不到的规则、用户的抱怨时再加 `--skipped` / `--unclear` / `--feedback`。只写过程，不写代码和业务名词；报错就提一句，不影响交付。
+完成上述交付摘要与反馈后，按运行状态协议将 F8（bug 为 B5）标 completed 并 complete。下面的可选后续动作在完成标记后处理。
+
 5. **询问下一步**，不要自行执行：
    - 提交：给出建议的 commit message 和要 add 的文件（只含本需求的改动，Step 0 确认无关的不 add；建议把方案、审查报告和交付说明一起提交，随分支保留），用户同意后再 `git commit`；**不 push**，除非用户明确要求。
    - PR / MR：用户要提 PR / MR 时，运行 `node <skills>/workflow/scripts/pr-desc.mjs`（缺省当前分支、基线 `profile.main_branch`），它把本分支的交付说明、审查报告、技术方案、上线方案汇总成描述（没有交付说明时退回用提交记录和改动文件），把输出给用户；用 `gh pr create` / `glab mr create` 创建要用户明确同意。
@@ -44,5 +46,5 @@
 产物按需求归档在 `workflow-run/docs/requirements/<需求名>/<项目名>/`，规则见 `<skills>/workflow/references/requirements.md`：
 
 - **需求名**：Step 0 已运行 `requirement.mjs which` 并问定名字。第一次落盘前运行 `requirement.mjs bind --name "<需求名>"`（用户明确同意按分支名生成时不带 `--name`）；S 快速通道不 bind、不落盘。缺陷修复同样处理（可以选择挂到原需求下）。
-- **路径**：交付说明用 `requirement.mjs path delivery`，方案（非快速通道一律落，S / M 写简版）用 `requirement.mjs path plan`，写到输出的 `path`；文件名固定，已有旧版时直接写新版，上一版由脚本归档（输出的 `previous`）。缺陷修复在 B4 把根因与修复方式**追加**到同一个 `plan.md`（不另建文件）。
-- 写完运行 `requirement.mjs sync <path>` 更新 `meta.json`；输出里 `archived` 非空（上一版已归档到 `workflow-run/tmp/old-artifacts/`）时告诉用户归档了哪些文件，请用户确认不再需要后自己删除；输出里 `commit` 非空（独立文档仓库模式）时按 `<skills>/workflow/references/requirements.md`「文档仓库的提交」处理。文档里引用其他产物（「参考产物」等）写 `requirement.mjs path` 输出的 `cite`。
+- **正式写入**：按 `<skills>/workflow/references/execution.md`，方案、审查、交付都先写 tmp 草稿，再用 `artifact.mjs finalize --kind plan|review|delivery` 完成自检、旧版归档、索引与运行证据登记。缺陷修复在 B4 的方案草稿中保留原文并追加修复方案，不另建正式文件。
+- 使用输出的 path / cite 引用；previous 非空时告知上一版归档位置，不能替用户删除。中断先 `artifact.mjs resume --id <id>`，不能继续 sync / save 覆盖待办。独立文档仓库在交付完成后运行 pending，按 requirements.md 提示提交。已完成交付的 wiki／DocNexus 元信息更新仍显式 sync。

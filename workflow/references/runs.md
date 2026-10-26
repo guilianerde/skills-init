@@ -37,6 +37,8 @@ node <skills>/workflow/scripts/run.mjs cancel --id <运行id> --expect-revision 
 
 “已完成”表示**本次运行范围已交付**，不是整个需求已经上线。dev 完成后，用户选择的技术方案、上线方案、wiki 发布是同一个 meta.json 中的新运行，不把已完成的 dev 改回未完成。提交、推送和知识沉淀仍按既有授权规则处理，不因 completed 自动执行；这些可选后续动作不阻止已完成的技能交付标记完成。
 
+关键门禁、代码快照、自动审查交接和正式文档收尾见 [execution.md](execution.md)。运行创建时机保持不变；方案确认绑定 hash／版本，验证和审查绑定代码快照，交付选择绑定本轮报告。
+
 ## 写 checkpoint
 
 完整 dev 开始记录前已经完成的前置步骤，要把对话中确认的事实补入第一份 checkpoint；没有实际完成的步骤不能补成 completed。例如 F4 开始时：
@@ -64,7 +66,7 @@ node <skills>/workflow/scripts/run.mjs cancel --id <运行id> --expect-revision 
 
 每完成一个步骤、发生阻塞、准备等待用户，或结束本轮会话前，save 一次；`context` 按顶层字段合并，列表字段更新时提供完整列表，不写密码、token。每一步可记录 `evidence`（命令、结果、产物路径、未验证原因）和 `note`；这些是已观察到的结果，不得用计划冒充。
 
-审查报告已交给用户、等待修复或交付时：
+报告必须先由 artifact.mjs finalize 收尾并登记审查证据；报告已交给用户、等待修复或交付时：
 
 ```json
 {
@@ -79,20 +81,20 @@ node <skills>/workflow/scripts/run.mjs cancel --id <运行id> --expect-revision 
 前面的 F4～F6 必须已按实际进度保存，不能为凑齐示例而直接标完成。bug 的 B5 同时包含审查与交付，报告完成等待选择时 B5 仍为 in_progress，最后交付才标完成。
 
 - 用户选修复：save `stage: F5`、`status: running`、`decision: {"action":"fix","confirmed":true}`；bug 回 B4。回到前面的阶段会自动重置该阶段及后续的完成标记、清除旧交付选择，旧 checkpoint 保留在 history；修复、验证和复审后再次等待选择。需求变化需回 F3，规模变化同时写 size。
-- 用户明确选交付：save `stage: F8`、`status: running`、`decision: {"action":"deliver","confirmed":true}`；bug 留在 B5。只记录用户实际确认的选择，遗留风险写 context。
+- 用户明确选交付：按 execution.md 核对本轮证据，save `stage: F8`、`status: running`、`decision: {"action":"deliver","confirmed":true}`；bug 留在 B5。只记录用户实际确认的选择，遗留风险写 context。
 - 等方案确认：`status: waiting_user`，waiting_for 说明待确认方案；方案已写不代表用户已同意。
 - 环境等阻塞：`status: blocked`、reason 说明原因，保留步骤与 remaining；解除后 save running。
 - 取消：用 cancel，input 提供 reason，不能用 complete 把取消记成完成。
 
-交付产物、自检、摘要和反馈已处理后，把最后步骤标 completed，再运行 complete。complete 要求所有步骤 completed 或有原因的 skipped；完整 dev 的方案、实现、验证、审查、交付核心步骤不能跳过，用户必须已选择交付，并有当前分支的 plan.md、review.md、delivery.md。其他文档／审查运行也检查当前分支的对应文件。验证步骤完成可以包含如实记录的“未验证”，不等于所有测试都通过。
+交付产物、自检、摘要和反馈已处理后，把最后步骤标 completed，再运行 complete。complete 要求所有步骤 completed 或有原因的 skipped；完整 dev 的方案、实现、验证、审查、交付核心步骤在 save 时就不能跳过，用户必须已选择交付，并有本运行已收尾、内容仍匹配且属于当前分支的 plan.md、review.md、delivery.md，以及有效代码与审查证据。独立审查也核对代码快照与报告收尾凭据，其他文档运行检查当前分支的对应文件。验证步骤完成可以包含如实记录的“未验证”，不等于所有测试都通过。
 
 complete 不接受待用户确认或 blocked 的运行。还在处理本次已承诺的交付事项时不能提前完成；可选下一步不属于本次运行范围。状态写入具有 revision 检查和短时元信息写锁；版本冲突时重新 show，核对并合并进度，不盲目重试覆盖。写入用 workflow-run/tmp/locks/ 下的短时锁目录（不落在需求目录、不会随产物提交），目录名为元信息相对路径的 SHA-256，避免长中文路径超过文件名限制。每次写入持有唯一的 PID／UUID 标记；只回收超过 30 秒且进程已退出的旧标记，非空锁目录不能删除，释放时也只删除自己的标记。mkdir 后尚未写入标记就崩溃的空目录，过期后同样自动恢复。
 
 ## 新会话恢复
 
-1. 先确认业务项目根和当前工作分支，再 show；多个运行时按用户的任务选 id，不能把其他分支的状态直接套过来。
+1. 先确认业务项目根和当前工作分支，再 show；若提示 pending_finalization，先按 execution.md 恢复／取消收尾。多个运行时按用户的任务选 id，不能把其他分支的状态直接套过来。
 2. 读取 context、各步骤状态、waiting_for、reason、history 和关联文档，核对 git 改动、已有产物与证据是否仍适用。记录不是当前代码仍然正确的保证。
-3. 从保存的阶段继续，已完成的有效步骤不重复执行。waiting_user 时先取得对应答复；不能将“继续”直接当成“交付”或接受风险。代码已变化而验证／报告失效时，回退到实现或验证阶段并 save，再验证与复审。
+3. 从保存的阶段继续，已完成的有效步骤不重复执行。waiting_user 时先取得对应答复；不能将“继续”直接当成“交付”或接受风险。show 的 freshness 会提示代码证据是否仍有效；代码已变化而验证／报告失效时，回退到实现或验证阶段并 save，再验证与复审。
 4. completed 运行只展示已完成及时间，不自动重启；需要新的工作时 start 新记录。旧需求没有 runs 时明确说明暂无可恢复状态，按文档和代码重建，经核对后再记录，不自动假定已完成。
 
 `artifacts.mjs` 的 execution 和 `/workflow status` 使用同一份状态；有未结束运行时 next 优先显示等待、阻塞或当前阶段，不越过修复／交付选择推荐后续动作。`/workflow view` 即使尚无 Markdown 也展示已有运行，包含“已完成”标识和完成时间。

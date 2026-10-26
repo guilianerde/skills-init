@@ -69,11 +69,9 @@ description: "Generate a Markdown technical design doc (技术方案) from the d
 
 ### Step 4 — 写文件
 
-- 路径：运行 `node <skills>/workflow/scripts/requirement.mjs path tech --branch <dev分支>`，写到输出的 `path`（`workflow-run/docs/requirements/<需求名>/<项目名>/tech-doc.md`，文件名固定；已有旧版时直接写新版，上一版由脚本归档到输出的 `previous`）。规则见 `<skills>/workflow/references/requirements.md`。
-  - 退出码 2（这个分支还没绑定需求）：问用户这个需求叫什么，默认值用输出的 `suggested_name`，再 `requirement.mjs bind --name "<需求名>" --branch <dev分支>`；用户不给名字时 `bind` 按分支名生成。
-  - `wiki_record` 非空：上一版已发布到 wiki，新版第一行原样写这条记录，重新发布时更新同一页面。
-- 写完运行 `requirement.mjs sync <path>` 更新 `meta.json`；输出里 `archived` 非空（上一版已归档到 `workflow-run/tmp/old-artifacts/`）时告诉用户归档了哪些文件，请用户确认不再需要后自己删除；输出里 `commit` 非空（独立文档仓库模式）时按 `<skills>/workflow/references/requirements.md`「文档仓库的提交」处理。文档里引用其他产物（「参考产物」等）写 `requirement.mjs path` 输出的 `cite`。
-- 写完运行 `node <skills>/workflow/scripts/lint-doc.mjs <文档路径> --skill create-tech-md-doc --facts` 自检（`--facts` 按元信息行的对比分支核对正文里的类名、文件、接口、表名）：有「错误」先修正再交付（缺必填章节、残留 `{{...}}` 占位符、缺元信息行）；「警告」按实际情况处理，其中「在 diff 和代码里都找不到」的名字逐个核实：确属编造就改成 diff 里的真实名字或写「待补充」，是外部系统 / 配置中心的名字就保留；「提示」里的待填写位置在交付摘要中告诉用户。
+- 正式收尾：Step 4 进入 T4，先写 `workflow-run/tmp/tech-doc.md` 草稿，再用 `node <skills>/workflow/scripts/artifact.mjs finalize --id <运行id> --expect-revision <revision> --kind tech --draft <草稿> --branch <dev分支>` 自检、归档旧版、发布并更新索引／运行证据；使用返回的 path / cite，规则见 `<skills>/workflow/references/execution.md`。
+- 收尾输出 previous 非空时告诉用户上一版的归档位置，不能替用户删除；中断先 `artifact.mjs resume --id <运行id>`。独立文档仓库的提交提示用 `requirement.mjs pending`，按 requirements.md 处理；后续 wiki／沉淀元信息仍可显式 sync。
+- 收尾前对草稿运行 `node <skills>/workflow/scripts/lint-doc.mjs <草稿> --skill create-tech-md-doc --facts` 自检（`--facts` 按元信息行的对比分支核对正文里的类名、文件、接口、表名）：有「错误」先修正再交付（缺必填章节、残留 `{{...}}` 占位符、缺元信息行）；「警告」按实际情况处理，其中「在 diff 和代码里都找不到」的名字逐个核实：确属编造就改成 diff 里的真实名字或写「待补充」，是外部系统 / 配置中心的名字就保留；「提示」里的待填写位置在交付摘要中告诉用户。
 - 再把路径和摘要告诉用户。
 
 ### Step 5 — 后续（都需要用户同意）

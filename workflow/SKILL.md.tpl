@@ -69,6 +69,7 @@ dev（确定工作分支 → 定需求名 → 理解需求 → 方案 → 实现
 | `references/docnexus.md` | 写入 DocNexus 的分类（`resolve.mjs category`）、按分类参考知识库（`knowledge.mjs`） |
 | `references/capabilities.md` | 开工快照、必装组件门槛、可选增强通道与统一失败处理 |
 | `references/status.md` | `/workflow status` 的输出格式 |
+| `references/execution.md` | 关键阶段门禁、执行前代码快照、自动审查交接、统一产物收尾与中断恢复 |
 | `references/runs.md` | 完整流程在 meta.json 中的运行状态、步骤完成标记、保存与恢复、运行完成时间 |
 | `references/requirements.md` | 产物按需求归档（`workflow-run/docs/requirements/<需求名>/<项目名>/`）：什么时候问需求名、`requirement.mjs` 绑定分支与给出落盘路径、`meta.json` |
 | `references/tables.md` | 确定改动涉及哪些表（`tables.mjs`）、只读拉取实际表结构 / 索引 / 行数核对（`query.mjs --schema --indexes`），没有库连接时怎么退回 |

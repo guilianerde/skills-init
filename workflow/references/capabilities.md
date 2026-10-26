@@ -6,7 +6,7 @@
 node <skills>/workflow/scripts/resolve.mjs status
 ```
 
-保留输出作为本轮能力快照；同一项目的流程跳转、子 agent 直接复用，由主 agent 一并交接。新会话恢复、切换项目、配置或安装发生变化时重新探测。快照只放在会话上下文，不作为团队配置或固定状态写入 meta.json。
+保留输出作为本轮能力快照；同一项目的流程跳转、子 agent 直接复用，由主 agent 一并交接，可用 workflow-run/tmp/capabilities.json 暂存交接。新会话恢复、切换项目、配置或安装发生变化时重新探测。快照仅本轮使用，不作为团队配置或固定状态写入 meta.json。
 
 ## 开工门槛
 

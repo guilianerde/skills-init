@@ -18,17 +18,7 @@ import { readMeta, updateMeta } from '../workflow/scripts/meta-store.mjs';
 useLocalDocNexus();
 
 const REPO = fileURLToPath(new URL('..', import.meta.url));
-const BRANCH = 'feature/order';
-function fixture(t) {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'workflow-run-state-'));
-  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
-  const req = bind(root, { name: '订单导出', branch: BRANCH });
-  const file = path.join(root, req.dir, 'meta.json');
-  const put = (name, branch = BRANCH) => fs.writeFileSync(path.join(root, req.dir, name), `# ${name}\n\n> 分支：${branch} ｜ 日期：2026-10-23\n\n内容\n`);
-  const start = (branch = BRANCH, kind = 'feature') => startRun(root, { branch, kind, size: 'M', input: kind === 'feature' ? { stage: 'F4', steps: Object.fromEntries(['Step0', 'F1', 'F2', 'F3'].map((s) => [s, { status: 'completed' }])), context: { summary: '需求与验收已确认', decisions: ['使用分页'] } } : {} }).run;
-  const save = (run, input, action = 'save') => changeRun(root, { branch: run.branch, id: run.id, revision: run.revision, input, action }).run;
-  return { root, req, file, put, start, save };
-}
+import { BRANCH, flowFixture as fixture } from './helpers/run-flow.mjs';
 const completed = (names) => Object.fromEntries(names.map((name) => [name, { status: 'completed' }]));
 const lockOf = (root, file) => {
   const target = path.join(fs.realpathSync.native(path.dirname(file)), path.basename(file));
@@ -49,8 +39,8 @@ function seedLock(lock, pid, old = false) {
 
 test('运行保存在同一 meta.json；sync / which / 重新 bind 均保留上下文、已完成步骤与其他扩展字段', (t) => {
   const f = fixture(t);
-  let run = f.start();
-  run = f.save(run, { stage: 'F5', steps: { F4: { status: 'completed', evidence: ['plan.md 自检通过'] } }, context: { remaining: ['实现分页'] } });
+  let run = f.plan(f.start());
+  run = f.save(run, { approval: { confirmed: true }, stage: 'F5', steps: { F4: { status: 'completed', evidence: ['plan.md 自检通过'] } }, context: { remaining: ['实现分页'] } });
   updateMeta(f.file, (meta) => ({ ...meta, extension: { keep: true } }), { root: f.root });
   f.put('plan.md');
   sync(f.root, f.req.dir);
@@ -67,8 +57,7 @@ test('运行保存在同一 meta.json；sync / which / 重新 bind 均保留上�
 
 test('等待修复 / 交付时不因报告存在而自动前进；修复回退重置后续完成标记并保留历史', (t) => {
   const f = fixture(t);
-  let run = f.start();
-  f.put('review.md');
+  let run = f.ready();
   run = f.save(run, { stage: 'F7', status: 'waiting_user', waiting_for: '修复问题或交付', steps: completed(['F4', 'F5', 'F6', 'F7']) });
   assert.match(branchView(f.root, BRANCH).next[0], /等待用户/);
   const before = fs.readFileSync(f.file, 'utf8');
@@ -85,16 +74,15 @@ test('等待修复 / 交付时不因报告存在而自动前进；修复回退�
 
 test('完成必须有明确交付选择和当前分支产物，记录 completed 与完成时间；完成后的新运行不覆盖历史', (t) => {
   const f = fixture(t);
-  let run = f.start();
-  run = f.save(run, { stage: 'F8', steps: completed(FLOWS.feature) });
-  assert.throws(() => f.save(run, {}, 'complete'), /用户已选择交付/);
-  run = f.save(run, { decision: { action: 'deliver', confirmed: true } });
-  assert.throws(() => f.save(run, {}, 'complete'), /缺少当前分支的产物/);
-  for (const name of ['plan.md', 'review.md', 'delivery.md']) f.put(name);
+  let run = f.ready();
+  assert.throws(() => f.save(run, { stage: 'F8' }), /用户明确选择/);
+  run = f.save(run, { stage: 'F8', decision: { action: 'deliver', confirmed: true } });
+  assert.throws(() => f.save(run, {}, 'complete'), /未完成步骤/);
+  run = f.finalize(run, 'delivery', { steps: { F8: { status: 'completed' } } });
   f.put('review.md', 'feature/other');
   assert.throws(() => f.save(run, {}, 'complete'), /review.md/);
   f.put('review.md');
-  run = f.save(run, { stage: 'F8', steps: completed(['F8']) }, 'complete');
+  run = f.save(run, {}, 'complete');
   assert.equal(run.status, 'completed');
   assert.ok(run.completed_at);
   assert.equal(branchView(f.root, BRANCH).execution.current.status, 'completed');
@@ -172,14 +160,19 @@ test('无运行的读取不创建目录；只有 meta 状态也能在 view 中�
 test('独立审查、技术／上线方案、wiki 和 bug 的步骤与完成标识一致', (t) => {
   const f = fixture(t);
   for (const name of ['plan.md', 'review.md', 'delivery.md', 'tech-doc.md', 'release-doc.md']) f.put(name);
-  for (const kind of ['review', 'tech', 'release', 'wiki', 'bug']) {
+  for (const kind of ['review', 'tech', 'release', 'wiki']) {
     const steps = FLOWS[kind];
     const input = { stage: steps.at(-1), steps: completed(steps), ...(kind === 'bug' ? { decision: { action: 'deliver', confirmed: true } } : {}) };
     let run = startRun(f.root, { branch: BRANCH, kind, size: 'M', input }).run;
+    if (kind === 'review') run = f.review(run);
     run = f.save(run, {}, 'complete');
     assert.equal(run.status, 'completed', kind);
     assert.ok(run.completed_at, kind);
   }
+  let bug = f.ready('bug');
+  bug = f.save(bug, { decision: { action: 'deliver', confirmed: true } });
+  bug = f.finalize(bug, 'delivery', { steps: { B5: { status: 'completed' } } });
+  assert.equal(f.save(bug, {}, 'complete').status, 'completed');
   assert.equal(runState(f.root, BRANCH).runs.length, 5);
 });
 

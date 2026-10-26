@@ -92,13 +92,15 @@ function acquire(lock) {
   throw busy(lock);
 }
 
-export function updateMeta(file, update, { root = process.cwd() } = {}) {
+export function updateMeta(file, update, { root = process.cwd(), allowFinalization = false } = {}) {
   fs.mkdirSync(path.dirname(file), { recursive: true });
   const lock = lockPath(root, file);
   const release = acquire(lock);
   const tmp = path.join(path.dirname(lock), `${path.basename(file)}.${randomUUID()}.tmp`);
   try {
-    const next = update(readMeta(file));
+    const current = readMeta(file);
+    if (current.pending_finalization && !allowFinalization) throw new Error(`产物收尾尚未完成，先运行 artifact.mjs resume --id ${current.pending_finalization.run_id}`);
+    const next = update(current);
     const text = `${JSON.stringify(next, null, 2)}\n`;
     if (!fs.existsSync(file) || fs.readFileSync(file, 'utf8') !== text) {
       fs.writeFileSync(tmp, text);

@@ -620,8 +620,10 @@ workflow-run/docs/requirements/<需求名>/<项目名>/
 * **随代码提交和独立文档仓库两种用法的结构完全一样**，切换时文件不用挪。一个需求横跨多个服务时，各服务在同一个需求目录下各占一个 `<项目名>/`。项目名写在 `workflow/profile.json` 的 `artifacts.project`：随代码提交时不用配置，取 git 远端仓库名（没有远端用目录名），第一次落盘时自动写进去；独立文档仓库时由 `docs-repo` 配置。
 * 旧版本随代码提交时没有 `<项目名>/` 这一层；`upgrade` 会把这些需求目录里的文件迁到 `<需求>/<项目名>/`（被 git 跟踪的用 `git mv`，保留历史），结尾列出迁移了哪些需求，改动由你提交。目标里已有同名文件的需求不动，并提示手动处理；`doctor` 也会提示还没迁移的需求。
 * **需求名由你定**：dev 在 Step 0 先确定工作分支，再查询绑定并确认需求名，给不出名字或说不清这次要做什么时不会进入开发流程（默认值按分支名生成；也可以选已有的需求，例如修 bug 的新分支挂到原需求下）。从 `/workflow` 完整链路开始时同样先问（只问名字，第一次落盘时才 `bind`）；S 快速通道也问，但不绑定、不落盘。确定后，同一分支上的各 skill 都写到这个目录，不再问。一个需求可以绑定多个分支。
-* 路径由 `workflow/scripts/requirement.mjs path <种类>` 给出，每种产物文件名固定，目录里只留最新版，引用不会失效；版本号记在 `meta.json` 的 `versions`。已有旧版时，上一版先复制到 `workflow-run/tmp/old-artifacts/<需求>/<项目>/<种类>_v<N>.md`（不提交），新版直接覆盖写入；skill 会列出归档的文件，请你确认后自己删除。上一版发布过 wiki 时，新版沿用同一个页面。
+* 正式文档先写 tmp 草稿，再用 `artifact.mjs finalize` 自检、归档旧版、发布并更新索引与运行证据，输出 path / cite；文件名固定、目录只留最新版。中断后用 resume 恢复，重复命令不会重复升版本；旧版在 tmp/old-artifacts/，不替用户删除，wiki 页面记录自动沿用。底层 requirement path / sync 仍保留，新的正式流程统一走 finalize。
 * 需求目录写在项目根的 `.ignore` 里，ripgrep 和 agent 的代码搜索会跳过它，产物多了不会污染搜索结果（找历史决策用 DocNexus）。git 不受影响，建议随代码提交。
+
+完整 dev 的关键阶段由程序校验：M / L 方案确认绑定具体版本，测试证据和审查报告绑定包含未提交改动的代码快照，交付选择绑定本轮报告。相关代码、基线或报告变化后需重新验证／审查和选择。独立审查交接由脚本从需求事实、范围与验证结果生成；快速通道和首次创建运行的时机保持不变。协议见 [execution.md](workflow/references/execution.md)。
 
 **独立文档仓库（可选）**：不想让产物进代码仓库、或一个需求横跨多个服务时，装好 skills 后在项目根运行一条命令：
 
@@ -680,6 +682,10 @@ workflow-run（安装器仓库）/
 │   │   ├── requirement-read.mjs       # 需求目录与元信息读取
 │   │   ├── requirements.mjs           # 绑定、版本归档与索引同步
 │   │   ├── runs.mjs                   # 运行状态、阶段与完成校验
+│   │   ├── run-gates.mjs              # 方案、验证、审查与交付门禁
+│   │   ├── code-snapshot.mjs          # 代码内容摘要，绑定验证和审查证据
+│   │   ├── artifact-finalize.mjs      # 可恢复的产物收尾
+│   │   ├── path-match.mjs             # 共享范围匹配
 │   │   ├── meta-store.mjs             # 写锁与原子存储
 │   │   ├── document-model.mjs         # 标题、章节、表格等纯文本模型
 │   │   ├── artifact-model.mjs         # 产物类型、元信息、审查与交付解析
@@ -693,6 +699,8 @@ workflow-run（安装器仓库）/
 │   ├── scripts/pr-desc.mjs            # 按本分支产物生成 PR / MR 描述
 │   ├── scripts/template.mjs           # 修改 / 创建模板：草稿 → 校验与影响 → 保存
 │   ├── scripts/tables.mjs             # 找出改动涉及的数据库表
+│   ├── scripts/artifact.mjs           # 草稿收尾 / 中断恢复 / 安全取消
+│   ├── scripts/review-handoff.mjs     # 自动生成审查交接与结果结构
 │   ├── scripts/requirement.mjs        # 产物按需求归档：绑定需求名、落盘路径、meta.json
 │   ├── scripts/view.mjs               # 项目文档视图（本地静态页面）
 │   ├── scripts/make-template.mjs      # 从样例文档抽模板骨架

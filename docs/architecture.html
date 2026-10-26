@@ -277,6 +277,8 @@ footer { margin-top: 40px; font-size: 13px; color: var(--muted); }
           <div class="cell"><b>resolve.mjs</b><span>模板来源、能力状态</span></div>
           <div class="cell"><b>requirement.mjs</b><span>需求绑定、产物路径</span></div>
           <div class="cell"><b>run.mjs</b><span>运行状态与恢复</span></div>
+          <div class="cell"><b>artifact.mjs</b><span>产物收尾、中断恢复与安全取消</span></div>
+          <div class="cell"><b>review-handoff.mjs</b><span>审查交接与结构化结果</span></div>
           <div class="cell"><b>review-scope.mjs</b><span>审查范围与分批</span></div>
           <div class="cell"><b>tables.mjs</b><span>改动涉及的表</span></div>
           <div class="cell"><b>lint-doc.mjs</b><span>文档自检</span></div>
@@ -296,6 +298,10 @@ footer { margin-top: 40px; font-size: 13px; color: var(--muted); }
           <div class="cell"><b>workspace-read</b><span>工作区／Git 统一快照，一次命令读一遍</span></div>
           <div class="cell"><b>requirements</b><span>绑定、版本、归档、sync</span></div>
           <div class="cell"><b>runs</b><span>运行阶段、revision、完成校验</span></div>
+          <div class="cell"><b>run-gates</b><span>方案、验证、审查与交付门禁</span></div>
+          <div class="cell"><b>code-snapshot</b><span>代码内容摘要与证据有效性</span></div>
+          <div class="cell"><b>artifact-finalize</b><span>发布、归档、索引与可恢复收尾</span></div>
+          <div class="cell"><b>path-match</b><span>审查与代码证据共用的范围匹配</span></div>
           <div class="cell"><b>meta-store</b><span>写锁与原子替换</span></div>
         </div>
       </div>
@@ -343,8 +349,8 @@ footer { margin-top: 40px; font-size: 13px; color: var(--muted); }
       <li class="gate"><span class="code">F3</span><div class="name">需求澄清</div><div class="what">分轮提问，每题带推荐答案；M / L 确认理解一致</div></li>
       <li class="gate"><span class="code">F4</span><div class="name">方案</div><div class="what">按规模分级并告知；S 问是否走快速通道，非快速通道方案一律落盘（S / M 简版）<br><span class="art">plan.md</span></div></li>
       <li><span class="code">F5</span><div class="name">实现</div><div class="what">贴合现有写法，不顺手重构；SQL 只写脚本不执行</div></li>
-      <li><span class="code">F6</span><div class="name">验证</div><div class="what">先相关测试再全量；验收项逐条对应到证据</div></li>
-      <li class="gate"><span class="code">F7</span><div class="name">审查</div><div class="what">完整流程：优先独立子 agent 审查（没有时当前会话自查）并落盘 review.md，交报告后等待用户选择修复或交付；修复后验证、复审<br><span class="art">review.md</span></div></li>
+      <li><span class="code">F6</span><div class="name">验证</div><div class="what">先相关测试再全量；完整流程绑定执行前代码快照，验收项逐条对应到证据</div></li>
+      <li class="gate"><span class="code">F7</span><div class="name">审查</div><div class="what">完整流程自动生成交接材料，优先独立子 agent 审查；返回草稿与结构化结果，由主 agent 收尾 review.md，再等用户选择修复或交付<br><span class="art">review.md</span></div></li>
       <li class="gate"><span class="code">F8</span><div class="name">交付</div><div class="what">用户选择交付后才生成交付说明；提交、PR 先问，沉淀有值得记的内容才问<br><span class="art">delivery.md</span></div></li>
     </ol>
   </div>
