@@ -49,6 +49,25 @@ test('YAML 嵌套、点分 key、数组、多文档与显式 profile', async () 
   assert.throws(() => mergeDocuments([{ 'spring.profiles': 'test & !prod' }], 'test'), /复杂/);
 });
 
+test('多 profile 选择与文档顺序覆盖生效，拒绝无效名称列表', async (t) => {
+  const remote = await server(t, (_, res) => res.end('flag=true'));
+  const w = workspace();
+  w.put('application.yml', `spring.cloud.nacos.config:\n  server-addr: http://base.invalid:8848\n  namespace: base\n  group: BASE\n---\nspring.config.activate.on-profile: test,staging\nspring.cloud.nacos.config:\n  server-addr: ${remote.address}\n  namespace: test-id\n  group: TEST\n---\nspring.config.activate.on-profile: local\nspring.cloud.nacos.config.group: LOCAL\n`);
+  w.put('override.properties', 'spring.cloud.nacos.config.namespace=override-id');
+  for (const profile of ['test,local', 'local,test', ' test , local ']) {
+    const result = await main(['get', '--file', 'application.yml', '--file', 'override.properties', '--profile', profile, '--data-id', 'app.properties'], w);
+    assert.equal(result.source.server, remote.address);
+    assert.equal(result.source.namespace, 'override-id');
+    assert.equal(result.source.group, 'LOCAL');
+    const params = remote.calls.at(-1).url.searchParams;
+    assert.equal(params.get('tenant'), 'override-id');
+    assert.equal(params.get('group'), 'LOCAL');
+  }
+  for (const profile of ['', 'test,', ',test', 'test,,local', 'test & local']) {
+    assert.throws(() => mergeDocuments([{}], profile), /profile/);
+  }
+});
+
 test('占位符支持环境、本地属性、默认值、嵌套；循环和缺失拒绝', () => {
   const props = { host: 'local', port: '${PORT:8848}', 'spring.cloud.nacos.server-addr': '${HOST:${host}}:${port}', 'spring.cloud.nacos.config.namespace': '${NS:test}' };
   assert.equal(localConnection(props, {}).server_addr, 'local:8848');
@@ -58,6 +77,31 @@ test('占位符支持环境、本地属性、默认值、嵌套；循环和缺�
   assert.throws(() => resolveValue('${A}', {}, {}), /缺少变量/);
   assert.throws(() => resolveValue('${A}', { A: '${B}', B: '${A}' }, {}), /循环/);
   assert.throws(() => resolveValue('@env@', {}, {}), /构建/);
+});
+
+test('密码中的多个 @ 可直接读取或来自环境变量，原始构建占位符仍拒绝', async (t) => {
+  const remote = await server(t, (c, res) => {
+    if (c.url.pathname.endsWith('/login')) return res.end('{"accessToken":"private-token"}');
+    res.end('flag=true');
+  });
+  const w = workspace();
+  for (const format of ['yaml', 'properties']) {
+    for (const [value, env, expected] of [
+      ['abc@def@123', {}, 'abc@def@123'],
+      ['${NACOS_PASSWORD}', { NACOS_PASSWORD: 'abc@def@123' }, 'abc@def@123'],
+      ['${NACOS_PASSWORD}', { NACOS_PASSWORD: '@literal-secret@' }, '@literal-secret@'],
+    ]) {
+      w.env = env;
+      w.put(`application.${format}`, format === 'yaml'
+        ? `spring.cloud.nacos:\n  server-addr: ${remote.address}\n  username: reader\n  password: '${value}'\n`
+        : `spring.cloud.nacos.server-addr=${remote.address}\nspring.cloud.nacos.username=reader\nspring.cloud.nacos.password=${value}\n`);
+      const r = await main(['get', '--file', `application.${format}`, '--data-id', 'app.properties'], w);
+      assert.equal(new URLSearchParams(remote.calls.at(-2).body).get('password'), expected);
+      assert.doesNotMatch(JSON.stringify(r), /abc@def@123|literal-secret|private-token/);
+    }
+  }
+  assert.throws(() => localConnection({ 'spring.cloud.nacos.password': '@NACOS_PASSWORD@' }, {}), /构建/);
+  assert.throws(() => localConnection({ 'spring.cloud.nacos.config.namespace': 'app-@ENV@' }, {}), /构建/);
 });
 
 test('地址 context path、协议、集群和嵌入凭据校验', () => {
@@ -180,6 +224,63 @@ test('脱敏覆盖敏感父级、URL 用户信息、query 与 PEM', () => {
   assert.equal(maskValue('endpoint', 'https://user:secret@host/path?accessToken=private'), 'https://******@host/path?accessToken=******');
   assert.equal(maskValue('cert', '-----BEGIN RSA PRIVATE KEY-----\nprivate'), '******');
   assert.equal(maskValue('feature.enabled', false), false);
+});
+
+test('Oracle Thin / OCI URL 内嵌凭据整值脱敏，无凭据的 URL 保持可见', async (t) => {
+  const urls = ['jdbc:oracle:thin:reader/SYNTHETIC_SECRET@//db:1521/app',
+    'jdbc:oracle:oci:reader/SYNTHETIC_SECRET@tns_alias',
+    'JDBC:ORACLE:THIN:reader/secret@with@signs@//db:1521/app'];
+  for (const url of urls) assert.equal(maskValue('spring.datasource.url', url), '******');
+  for (const url of ['jdbc:oracle:thin:@//db:1521/app', 'jdbc:oracle:oci:@tns_alias',
+    'jdbc:oracle:thin:@(DESCRIPTION=(ADDRESS=(HOST=db))(CONNECT_DATA=(SERVICE_NAME=app)))']) {
+    assert.equal(maskValue('spring.datasource.url', url), url);
+  }
+  const remote = await server(t, (c, res) => {
+    const id = c.url.searchParams.get('dataId');
+    if (id.endsWith('.json')) return res.end(JSON.stringify({ spring: { datasource: { url: urls[0] } } }));
+    res.end(id.endsWith('.yaml') ? `spring.datasource.url: ${urls[0]}\n` : `spring.datasource.url=${urls[1]}\n`);
+  });
+  const w = workspace();
+  w.put('config.json', JSON.stringify({ connections: { test: { server_addr: remote.address } } }));
+  for (const id of ['db.yaml', 'db.json', 'db.properties']) {
+    const r = await main(['get', '--conn', 'test', '--data-id', id, '--key', 'spring.datasource.url'], w);
+    assert.equal(r.values['spring.datasource.url'], '******');
+    assert.doesNotMatch(JSON.stringify(r), /SYNTHETIC_SECRET/);
+  }
+});
+
+test('CLI 支持目录软链接执行 inspect / get，作为模块导入不启动命令', async (t) => {
+  const remote = await server(t, (_, res) => res.end('flag=true'));
+  const w = workspace();
+  const skill = path.join(w.cwd, 'real-skill');
+  fs.mkdirSync(path.join(skill, 'scripts'), { recursive: true });
+  fs.copyFileSync(SCRIPT, path.join(skill, 'scripts/config.mjs'));
+  fs.writeFileSync(path.join(skill, 'config.json'), JSON.stringify({ connections: { test: { server_addr: remote.address } } }));
+  const alias = path.join(w.cwd, 'skill-link');
+  try { fs.symlinkSync(skill, alias, process.platform === 'win32' ? 'junction' : 'dir'); }
+  catch (e) { if (['EPERM', 'EACCES', 'ENOTSUP'].includes(e.code)) { t.skip('当前环境不允许建立目录链接'); return; } throw e; }
+  const run = (args, input = '') => new Promise((resolve) => {
+    const p = spawn(process.execPath, args, { cwd: w.cwd, env: process.env });
+    let stdout = ''; let stderr = '';
+    p.stdout.on('data', (c) => stdout += c); p.stderr.on('data', (c) => stderr += c);
+    p.stdin.end(input);
+    p.on('close', (status) => resolve({ status, stdout, stderr }));
+  });
+  for (const dir of [skill, alias]) {
+    const script = path.join(dir, 'scripts/config.mjs');
+    const inspected = await run([script, 'inspect']);
+    assert.equal(inspected.status, 0, inspected.stderr);
+    assert.deepEqual(JSON.parse(inspected.stdout).connections, ['test']);
+    const read = await run([script, 'get', '--conn', 'test', '--data-id', 'app.properties']);
+    assert.equal(read.status, 0, read.stderr);
+    assert.equal(JSON.parse(read.stdout).values.flag, 'true');
+    const bad = await run([script, 'get', '--password=private-secret']);
+    assert.equal(bad.status, 2);
+    assert.doesNotMatch(bad.stderr, /private-secret/);
+  }
+  const imported = await run(['--input-type=module', '-'], `await import(${JSON.stringify(new URL('../nacos-config/scripts/config.mjs', import.meta.url).href)}); console.log('imported');`);
+  assert.equal(imported.status, 0, imported.stderr);
+  assert.equal(imported.stdout.trim(), 'imported');
 });
 
 test('CLI stdout 结构化输出与参数退出码，不接受凭据参数', async () => {

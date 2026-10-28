@@ -193,7 +193,7 @@ footer { margin-top: 40px; font-size: 13px; color: var(--muted); }
 
 <header class="hero">
   <div>
-    <div class="eyebrow">@rowansenne/workflow-run · 0.28.0 + Unreleased · 2026-10-28</div>
+    <div class="eyebrow">@rowansenne/workflow-run · 0.29.0 · 2026-10-28</div>
     <h1>让 AI 编程代理按团队的规矩干活</h1>
     <p class="lede">一套装进项目里的 Agent Skills：从需求澄清、开发、测试、自审到技术方案和上线方案，每一步怎么做、做到什么程度、哪些事必须先问人，都写成团队共享的规则和脚本，随代码一起提交。</p>
     <div class="facts">
@@ -243,7 +243,7 @@ footer { margin-top: 40px; font-size: 13px; color: var(--muted); }
   <h2>安装分发独立，流程、命令、共享核心与能力工具协作</h2>
   <div class="prose">
     <p>宿主代理读取 skill 规则、判断任务并调用脚本；workflow-run 不提供常驻的 Agent 调度服务。工作流命令将共享的路径、数据模型、读取和状态写入交给 <code>workflow/lib</code>，数据库、wiki、Nacos 等能力的执行留在各自目录。</p>
-    <p>下图按职责分区，每次请求只经过需要的部分。<code>nacos-config</code> 可以由代理直接调用，也可在开发或审查中提供配置证据；独立读取不经过需求状态与产物收尾。</p>
+    <p>下图按职责分区，每次请求只经过需要的部分。dev 仅在实际调用 <code>/dev</code> / <code>$dev</code>、点选 skill 或明确要求完整开发工作流时启动；普通分析、修改、测试、提交和推送直接处理。<code>nacos-config</code> 可独立查询，也可在开发或审查中提供配置证据。</p>
   </div>
   <div class="arch">
     <div class="stack">
@@ -369,7 +369,8 @@ footer { margin-top: 40px; font-size: 13px; color: var(--muted); }
   <div class="kicker">主线：dev</div>
   <h2>一个需求从描述到交付，人只在关键处拍板</h2>
   <div class="prose">
-    <p><code>/dev &lt;需求&gt;</code> 或 <code>/dev --bug &lt;现象&gt;</code> 进入。事实代理自己查（代码、表结构、远程配置、PRD、历史沉淀），决定交给人（业务规则、取舍、范围）。</p>
+    <p>用户实际调用 <code>/dev &lt;需求&gt;</code>、<code>/dev --bug &lt;现象&gt;</code>、<code>$dev</code>，或明确要求 dev / 完整开发工作流后才进入。事实代理自己查（代码、表结构、远程配置、PRD、历史沉淀），决定交给人（业务规则、取舍、范围）。</p>
+    <p>Codex 元数据关闭隐式调用；其他环境也由入口规则和项目说明约束。讨论命令、发现旧运行、要求分析或提交代码都不启动新流程。已授权任务可按保存阶段续接，当前独立操作不重做前置步骤或自行推进阶段。</p>
   </div>
   <div class="flow">
     <ol>
@@ -457,7 +458,7 @@ footer { margin-top: 40px; font-size: 13px; color: var(--muted); }
       <tbody>
         <tr><td>/dev &lt;需求描述&gt;</td><td>功能开发全流程：确定工作分支 → 定需求名 → 澄清 → 方案 → 实现 → 测试 → 独立子 agent 审查与报告（无则当前会话自查）→ 用户选择修复或交付（完整交付才生成交付说明）</td></tr>
         <tr><td>/dev --bug &lt;现象&gt;</td><td>缺陷修复全流程：复现 → 定位根因 → 最小修复 → 验证 → 审查报告 → 用户选择修复或交付</td></tr>
-        <tr><td>/workflow</td><td>入口路由：直接说需求也行；不带请求时输出能力地图和状态</td></tr>
+        <tr><td>/workflow</td><td>按明确请求路由独立能力；dev 须有显式流程授权。普通修改或提交不进入 dev；不带请求时输出能力地图和状态</td></tr>
         <tr><td>/workflow profile</td><td>填写或更新项目画像（主分支、构建测试命令、toolchain）</td></tr>
         <tr><td>/workflow status</td><td>开工快照：DocNexus 必装门槛、CodeGraph 通道、数据库与 wiki 配置</td></tr>
         <tr><td>读取测试环境 Nacos 的 order.yaml，查看 order.timeout</td><td>进入 nacos-config：定位本地连接，选择环境和 Data ID，再只读获取脱敏结果</td></tr>
@@ -551,7 +552,7 @@ footer { margin-top: 40px; font-size: 13px; color: var(--muted); }
   <div class="tree"><pre>node .agents/skills/nacos-config/scripts/config.mjs inspect
 node .agents/skills/nacos-config/scripts/config.mjs get --file src/main/resources/bootstrap.yml --file src/main/resources/application-test.yml --data-id order-test.yaml --key order.timeout</pre></div>
   <p class="sub" style="margin-top:12px">支持 JSON / YAML / properties；首次解析 YAML 若缺依赖，在该 skill 目录运行 npm 安装。默认使用 Nacos 1.x / 2.x 的兼容 API，也可显式选择 2.x API 或 3.x Client API。<code>/workflow status</code> 与 <code>doctor</code> 均不测试 Nacos 远端连通性；doctor 会检查本机连接文件的忽略规则。</p>
-  <div class="callout">本页包含当前工作区的 Unreleased 改动：nacos-config 尚未发布到 npm。已发布包以对应版本的文件为准。</div>
+  <div class="callout">本页对应 0.29.0：新增独立 nacos-config 与需求文档，dev 工作流仅在用户显式要求时启动。</div>
 </section>
 
 <section>

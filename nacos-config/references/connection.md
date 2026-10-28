@@ -38,8 +38,10 @@
 
 1 / 2 版 token 按兼容协议放在请求参数中，3 版放在 `accessToken` 请求头中；脚本不输出请求 URL、token、登录响应或服务端原始错误体。网关若不兼容默认登录路径，可用 `token_env`。云厂商 AK/SK、专有鉴权插件、配置加密插件不在首版支持范围，不能把加密结果当成明文值。
 
-本地配置支持 YAML 的普通嵌套、点分 key、数组和多文档，以及 Java properties 的转义、续行和 Unicode。`--profile` 仅选择精确名称（或逗号分隔的名称列表），不计算 Spring 表达式；文件覆盖顺序由重复的 `--file` 决定，不自动激活 `spring.profiles.active`、profile group 或加载外部文件。Maven `@...@` 过滤值、未解析的连接占位符会拒绝请求。
+本地配置支持 YAML 的普通嵌套、点分 key、数组和多文档，以及 Java properties 的转义、续行和 Unicode。`--profile test,local` 按名称集合选择，条件文档匹配其中任一名称即可；不支持空名称或 Spring 表达式。覆盖仍按 `--file` 的传入顺序及文件内文档顺序，后者覆盖前者，不由 profile 参数的排列顺序决定；不自动激活 `spring.profiles.active`、profile group 或加载外部文件。
 
-远程支持 JSON、YAML、properties；解析后输出点分属性（数组用数字下标）。`--key a.b` 匹配 `a.b` 或 `a.b.*`，敏感父节点下的全部子项均脱敏。其他格式不输出原文，需先明确如何解析。
+未解析的 `${...}` 会拒绝请求；地址、Namespace、Group 和用户名中的 Maven `@...@` 构建过滤值也会拒绝。密码里的普通 `@`（如 `abc@def@123`）合法，环境变量提供的密码不会被当作 Maven 占位符；原始密码若整体为 `@NAME@`，仍按未过滤的构建变量处理，确需该字面密码时通过环境变量提供。
+
+远程支持 JSON、YAML、properties；解析后输出点分属性（数组用数字下标）。`--key a.b` 匹配 `a.b` 或 `a.b.*`，敏感父节点下的全部子项均脱敏。Oracle Thin / OCI URL 使用内嵌凭据（如 `jdbc:oracle:thin:user/password@...`）时整值显示 `******`；不含内嵌凭据的 URL 保持可见，查询参数中的密码仍按规则遮盖。其他格式不输出原文，需先明确如何解析。
 
 协议依据：[Nacos 1.x API](https://nacos.io/en/docs/v1/guide/user/open-api/)、[Nacos 2.x API](https://nacos.io/en/docs/v2/guide/user/open-api/)、[Nacos 3.x Client API](https://nacos.io/en/docs/v3.0/manual/user/open-api/)、[Nacos 鉴权](https://nacos.io/en/docs/latest/manual/admin/auth/)。

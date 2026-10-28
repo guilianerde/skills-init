@@ -9,7 +9,7 @@
 
 ## 当前架构
 
-本文按当前工作区（0.28.0 + Unreleased，2026-10-28）说明；`nacos-config` 与独立需求文档属于尚未发布的改动。
+本文对应 0.29.0（2026-10-28），包括独立 `nacos-config`、需求文档与 dev 显式触发规则。
 
 安装分发与任务运行分开。运行时由宿主代理读取 skill 规则、调用脚本；workflow-run 本身不启动常驻 Agent 服务。
 
@@ -35,7 +35,7 @@ flowchart TD
   View[view / report：只读展示] --> Core
 ```
 
-这张图表示职责和调用关系，每次请求只经过需要的分支。明确的任务可以直接调用对应 skill；`workflow` 提供统一路由，`dev` 编排完整开发流程。`nacos-config` 的 `requires` 为空，可独立读取远程配置，也可由 dev / project-review 按需调用；目前 Nacos 不纳入 `resolve.mjs status` 的集中能力探测，`inspect` 只检查本地候选，实际网络和鉴权由 `get` 验证。
+这张图表示职责和调用关系，每次请求只经过需要的分支。独立能力按各自入口调用；`workflow` 提供路由，`dev` 仅在用户显式选择开发工作流时启动。`nacos-config` 的 `requires` 为空，可独立读取远程配置，也可由 dev / project-review 按需调用；目前 Nacos 不纳入 `resolve.mjs status` 的集中能力探测，`inspect` 只检查本地候选，实际网络和鉴权由 `get` 验证。
 
 共享核心随 workflow 安装，`lib` 不反向依赖 `scripts`，纯模型不做 I/O。需求 `meta.json` 保存绑定、版本索引和运行；Markdown 保存正文及发布 / 沉淀引用。只读展示不推进状态，文件存在不代表运行完成。完整流程通过方案版本、执行前代码快照、验证和审查证据校验阶段转换，产物收尾支持恢复与取消。
 
@@ -81,6 +81,8 @@ node .agents/skills/nacos-config/scripts/config.mjs get --file src/main/resource
 ```
 
 首次读取 YAML 如缺少依赖，运行 `npm install --prefix .agents/skills/nacos-config --ignore-scripts --no-package-lock`。支持 application / bootstrap 的 YAML、properties、环境变量及本地属性占位符；多环境不自动猜选。也可配置本机 `nacos-config/config.json` 多连接并用 `--conn test` 选择，该文件和本 skill 的依赖目录由安装器加入 gitignore，重装保留配置。密码 / token 使用环境变量，不接受命令行明文凭据。
+
+真实目录与 Claude / Qwen / WorkBuddy 的默认软链接入口均可运行。多个 profile 可传 `--profile test,local`，匹配任一条件文档并按文件 / 文档顺序覆盖；包含多个 `@` 的普通密码可用。Oracle Thin / OCI 连接串包含内嵌凭据时整值脱敏，详细规则见连接说明。
 
 按明确的 Namespace / Group / Data ID 获取单个配置，支持 Nacos 1.x / 2.x 兼容 API（默认 `1`）、2.x API（`--api-version 2`）和 3.x Client API（`--api-version 3`），输出脱敏属性和读取来源。只允许配置 GET 与登录 POST，不发布、不删除、不自动写入数据库连接；不模拟 Spring 完整的配置合并与运行时最终值。连接格式与协议说明见 [nacos-config/references/connection.md](nacos-config/references/connection.md)。
 
@@ -260,6 +262,10 @@ node .agents/skills/workflow/scripts/resolve.mjs env --check   # 逐个字段核
 /dev <需求描述 | PRD pageId/url>     # 功能开发
 /dev --bug <现象 | 报错 | 日志>       # 缺陷修复
 ```
+
+**仅显式触发 dev**：实际调用 `/dev` / `$dev`、点选 dev skill，或明确说「按 dev 流程」「使用完整开发工作流」时才启动。正常分析、问答、修改代码、修 bug、重构、跑测试、提交 / 推送代码都直接处理，不自动做 dev 的开工检查、需求命名、绑定或文档落盘，也不主动询问是否开启 dev。讨论 dev 或引用命令示例不算启动；任务复杂、分支已有需求目录或旧运行也不算授权。
+
+Codex 原生元数据 `dev/agents/openai.yaml` 设置 `policy.allow_implicit_invocation: false`；所有环境同时遵守 skill 入口规则与安装写入的项目说明。已由用户启动的同一 dev 任务可按当前阶段继续，无需每条消息重复命令；只要求分析或提交时仅处理该请求，不重启流程。升级 / 重装会更新规则，随后新建会话加载；其他宿主的原生调用策略取决于宿主支持，不能将配置校验等同于所有模型的行为保证。
 
 * **功能开发**：开始前先确定工作分支，再确认需求名（给不出名字或说不清要做什么就不开始）→ 理解需求（可读 PRD、查 DocNexus 历史决策）→ 调研现有代码 → 需求澄清（借鉴 grill-me：按决策树分轮提问，每题给推荐答案；事实自己查、决定交给用户；S 规模无未定决定时跳过澄清提问）→ **规模判定（S / M / L 说明判定依据，不再询问确认）** → 按规模出方案（非快速通道一律落方案文档：S 简版、M 精简版、L 完整版；S 符合条件时先问是否走快速通道，走则不落盘）→ 小步实现并编译 → 补测试并运行 → 优先由独立子 agent 按 project-review 审查并落盘 `review.md`（没有子 agent 时在当前会话自查，报告注明审查者）→ 报告交给用户，等待选择「修复问题 / 交付」；修复则验证后重新审查、再次等待选择，选择交付后才将交付说明落盘到 `workflow-run/docs/requirements/<需求名>/<项目名>/delivery.md`（带分支元信息；改动、验证结果、配置清单、未执行的 SQL），已接入 DocNexus 时交付里有值得记录的知识才问要不要沉淀（同意后以 `dev-notes` 分类写入，并把库内路径记回交付说明），没有就跳过并在元信息行写「无需沉淀」。审查和上线方案会按分支自动读取这份交付说明。
 * **S 规模快速通道**：规模判定不询问用户；S 规模且不涉及配置、SQL / DDL、对外接口、表结构，也没有需要澄清的业务决定时，**问用户是否走快速通道**，问完等本轮答复——明确同意才走：编译、测试照常，审查在当前会话按标准清单做，**不绑定需求、不落任何产物文件**（方案 / `review.md` / 交付说明都不写；运行反馈照常记一行），对话里一次交付并注明「DocNexus：未询问（快速通道不问沉淀）」；拒绝或未明确同意就按完整流程落盘交付。实现中碰到上述任何一项或改动超过 3 个文件，先停下后续实现、重新评估规模，绑定需求并先回 F3（缺陷 B3）补需求文档，再到 F4 / B4 补方案、自检；M / L 确认方案后再继续实现、验证、审查与交付选择。缺陷修复同样适用（根因仍须在对话里写清楚）。
@@ -846,7 +852,7 @@ npx @rowansenne/workflow-run seed-templates --diff               # 团队改过�
 
 ## 触发准确度评估
 
-7 个 skill 的描述有交叉（如「修 bug」该走 dev 而不是 project-review），`evals/trigger-cases.json` 收录了 26 条真实口吻的请求及期望的 skill（含不该触发任何 skill 的近似请求）。评估方法：在临时项目里装好全部 skill，用 `claude -p` 逐条发送，取第一个被调用的工具判断分流结果：
+当前 9 个 skills 的分流用例保存在 `evals/trigger-cases.json`，包含显式 `/dev` / `$dev` / 指定开发工作流的正例，以及普通分析、实现、修复、测试、提交和推送不进入 dev 的反例。评估方法：在临时项目里装好全部 skill，用 `claude -p` 逐条发送，取第一个被调用的工具判断分流结果：
 
 ```
 npm run eval:triggers                       # 全量，每条 1 次
@@ -857,7 +863,7 @@ node scripts/eval-triggers.mjs --only dev   # 只跑期望为 dev 的用例
 * 需要已登录的 `claude` CLI（终端执行 `claude` 后 `/login`）；每条请求会真实调用一次模型并计费，检测到第一个工具调用即终止，不会执行任何工具。
 * 期望 `none` 表示不该触发本项目的 skill；触发了你环境里的其他 skill（如全局安装的 pdf skill）也算对。
 * 额度用尽、未登录等调用失败记为 `E`（error），不计作「没触发」，并在结尾提示结果不可信。
-* 结果明细写到 `tmp/evals/`。改了任何 skill 的 description 后建议重跑一次（最近一次：26 条 × 3 次，78/78）。
+* 结果明细写到 `tmp/evals/`。描述改动后可运行模型分流评估；它只观察首个工具调用，不等同于流程实际执行验证。旧触发规则的历史成绩不适用于当前显式入口规则。
 
 ## 为什么这些路径
 

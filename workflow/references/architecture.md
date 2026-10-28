@@ -1,6 +1,6 @@
 # 架构、模块边界与统一读取模型
 
-本文对应当前工作区（0.28.0 + Unreleased，2026-10-28），包括尚未发布的 nacos-config；实现以代码与各 skill 的 skill.json 为准。
+本文对应 0.29.0（2026-10-28），包括独立 nacos-config、需求文档与 dev 显式触发规则；实现以代码与各 skill 的 skill.json 为准。
 
 ## 安装分发与运行
 
@@ -20,6 +20,8 @@ DocNexus 在安装环节必装，即使只选择 nacos-config 也会接入；Nac
 dev / project-review 可在已有流程中按需调用 nacos-config，读取结果作为配置证据；独立查询不自动启动完整工作流。能力型 skill 的 SQL、HTTP、CodeGraph 执行逻辑不因共享核心存在而搬进 lib。
 
 dev / project-review 的 SKILL.md 只保留触发边界、门禁、步骤路由、必要命令和结果去向。方法细节按阶段保存在各自 references 中，进入阶段前只读对应小节，避免开工加载全部方法。F1～F8、B1～B5 与审查第 1～9 步编号不变；报告选择、快速通道、完成标记等关键约束在入口可见，具体执行仍由阶段说明和共享状态协议约束。
+
+dev 的入口要求显式流程授权：实际调用 `/dev` / `$dev`、点选 skill 或明确要求 dev / 完整开发工作流。普通分析、修改、修复、测试和 Git 操作不会经 workflow 自动转进 dev；旧运行与绑定也不构成启动授权。Codex 的 `dev/agents/openai.yaml` 关闭隐式调用，skill 本文在任何开工命令前检查入口；安装器把同一边界写进所选环境的项目说明。已授权同任务按阶段续接，当前独立分析 / 提交请求不重启或自行推进阶段。
 
 ## 共享核心
 

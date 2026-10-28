@@ -56,9 +56,10 @@ export async function documents(text, format) {
   }
 }
 
-export function resolveValue(value, props, env = process.env, stack = []) {
+export function resolveValue(value, props, env = process.env, stack = [], fromEnvironment = false) {
   if (typeof value !== 'string') return value;
   if (stack.length > 30) fail('连接参数占位符嵌套超过 30 层');
+  if (!fromEnvironment && /^@[\w.-]+@$/.test(value)) fail('连接参数含未解析的构建过滤变量');
   let s = ''; let offset = 0;
   for (let start; (start = value.indexOf('${', offset)) >= 0;) {
     s += value.slice(offset, start);
@@ -73,13 +74,14 @@ export function resolveValue(value, props, env = process.env, stack = []) {
     const key = colon < 0 ? expr : expr.slice(0, colon);
     if (key.includes('${')) fail('不支持动态占位符名称');
     if (stack.includes(key)) fail('连接参数的占位符存在循环引用');
-    const v = own(env, key) ? env[key] : own(props, key) ? props[key] : colon >= 0 ? expr.slice(colon + 1) : undefined;
+    const fromEnv = own(env, key);
+    const v = fromEnv ? env[key] : own(props, key) ? props[key] : colon >= 0 ? expr.slice(colon + 1) : undefined;
     if (v === undefined) fail(`连接参数缺少变量：${key}`);
-    s += String(resolveValue(v, props, env, [...stack, key]));
+    s += String(resolveValue(v, props, env, [...stack, key], fromEnv));
     offset = end;
   }
   s += value.slice(offset);
-  if (/\$\{|@[^@\s]+@/.test(s)) fail('连接参数含未解析的占位符或构建过滤变量');
+  if (/\$\{/.test(s)) fail('连接参数含未解析的占位符');
   return s;
 }
 
@@ -101,14 +103,16 @@ function profileOf(doc) {
 }
 
 export function mergeDocuments(docs, profile) {
+  const selected = profile === undefined ? [] : String(profile).split(',').map((s) => s.trim());
+  if (selected.some((s) => !/^[\w.-]+$/.test(s))) fail('profile 只支持精确名称或逗号分隔的名称列表');
   const out = Object.create(null);
   for (const doc of docs) {
     const active = profileOf(doc);
     if (active !== undefined) {
-      if (!profile) fail('存在 profile 条件文档，请传 --profile 明确选择');
+      if (!selected.length) fail('存在 profile 条件文档，请传 --profile 明确选择');
       const names = String(active).split(',').map((s) => s.trim());
       if (names.some((s) => !/^[\w.-]+$/.test(s))) fail('不支持复杂 profile 表达式，请明确提供本次环境配置');
-      if (!names.includes(profile)) continue;
+      if (!names.some((name) => selected.includes(name))) continue;
     }
     Object.assign(out, doc);
   }
@@ -117,7 +121,11 @@ export function mergeDocuments(docs, profile) {
 
 export function localConnection(props, env = process.env) {
   const p = 'spring.cloud.nacos.';
-  const get = (k) => resolveValue(props[`${p}config.${k}`] ?? props[`${p}${k}`], props, env);
+  const get = (k) => {
+    const v = resolveValue(props[`${p}config.${k}`] ?? props[`${p}${k}`], props, env);
+    if (k !== 'password' && typeof v === 'string' && /@[^@\s]+@/.test(v)) fail('连接参数含未解析的构建过滤变量');
+    return v;
+  };
   return { server_addr: get('server-addr'), namespace: get('namespace'), group: get('group'), username: get('username'), password: get('password') };
 }
 
@@ -136,6 +144,8 @@ export function maskValue(key, value) {
   if (SECRET.test(key)) return '******';
   if (typeof value !== 'string') return value;
   if (/-----BEGIN [^-]*PRIVATE KEY-----/.test(value)) return '******';
+  // Oracle 的 user/password@ 不属于 scheme://userinfo@；含内嵌身份时整值隐藏。
+  if (/jdbc:oracle:(?:thin|oci):[^@\r\n]+@/i.test(value)) return '******';
   return value.replace(/(\b[a-z][\w+.-]*:\/\/)[^\s/@]+@/gi, '$1******@')
     .replace(/([?;&](?:password|passwd|pwd|token|access[_-]?token|secret|access[_-]?key|api[_-]?key|authorization)=)[^\s&#;]*/gi, '$1******');
 }
@@ -269,7 +279,7 @@ export async function main(argv, { cwd = process.cwd(), skillDir = SKILL_DIR, en
   return { source: { ...result.source, ...selected }, values, notice: '单个远程配置快照；未计算 Spring 运行时覆盖、灰度和动态刷新。敏感字段已按名称脱敏。' };
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (process.argv[1] && fs.existsSync(process.argv[1]) && fs.realpathSync(process.argv[1]) === fs.realpathSync(fileURLToPath(import.meta.url))) {
   main(process.argv.slice(2)).then((r) => console.log(JSON.stringify(r, null, 2))).catch((e) => {
     // JSON / YAML / fetch 原始错误可能带原文或请求 URL，只输出本脚本产生的消息。
     console.error(e instanceof UsageError || e.constructor === Error ? e.message : '配置处理失败（未输出原文）');

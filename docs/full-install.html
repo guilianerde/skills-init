@@ -168,7 +168,7 @@ footer { margin-top: 56px; padding-top: 18px; border-top: 1px solid var(--line);
     <header class="top">
       <div class="eyebrow">npx @rowansenne/workflow-run --with-docnexus --with-codegraph</div>
       <h1>全量安装教程<span class="pkg">workflow-run · DocNexus 文档库 · CodeGraph 代码图谱</span></h1>
-      <p class="lede">在项目根执行一条命令，装好项目级 skills，同时接入 DocNexus 项目记忆和可选的 CodeGraph 代码图谱。本页按当前工作区（0.28.0 + Unreleased，2026-10-28）说明 9 个 skills 的安装、验证与团队接入；其中 nacos-config 尚未发布到 npm。</p>
+      <p class="lede">在项目根执行一条命令，装好项目级 skills，同时接入 DocNexus 项目记忆和可选的 CodeGraph 代码图谱。本页按 0.29.0（2026-10-28）说明 9 个 skills 的安装、验证与团队接入，包括独立 nacos-config 和 dev 显式触发规则。</p>
       <div class="facts">
         <span class="fact">Node ≥ 22.13</span>
         <span class="fact">npm</span>
@@ -301,6 +301,7 @@ codegraph --version<span class="c">   # 没装也没关系，安装器会装</sp
 
     <section id="first">
       <h2><span class="n">06</span>第一次使用</h2>
+      <p>dev 仅在实际调用 <code>/dev</code> / <code>$dev</code>、点选 dev skill，或明确要求 dev / 完整开发工作流时启动。普通分析、改代码、修复、测试和提交 / 推送直接执行，不自动进入开发流程；旧需求目录与运行记录也不代表恢复授权。升级后新建会话加载最新规则。</p>
       <ol class="plain">
         <li><strong>重启 agent</strong>：MCP 配置要重启后才生效。Codex 只在受信任的项目里加载项目级配置，第一次打开时选择信任这个项目。</li>
         <li><strong>填项目画像</strong>：在 agent 里运行 <code>/workflow profile</code>，填主分支、构建 / 测试命令、配置中心、发布平台，以及开发环境配置（<code>toolchain</code>：JDK / Maven / Node 的位置，脚本会先推断草稿并给出依据）。画像存在 <code>.agents/skills/workflow/profile.json</code>，不含凭据，可以提交；写入前用 <code>resolve.mjs env --check</code> 核对路径在本机存在，个人机器不同的写进不提交的 <code>profile.local.json</code>。</li>
@@ -427,7 +428,7 @@ codegraph uninstall<span class="c">                      # 移除 agent 配置�
       <details><summary>图谱里一个方法「没有调用方」，可以删吗</summary><div>不一定。静态分析看不到 Spring 多实现的选择、AOP、反射和配置驱动的路由，「没有调用方」不等于没人用。</div></details>
     </section>
 
-    <footer>依据当前工作区（0.28.0 + Unreleased，2026-10-28）的 README、skill.json 与安装器源码更新。nacos-config 尚未发布到 npm，已发布包以对应版本为准。</footer>
+    <footer>依据 0.29.0（2026-10-28）的 README、skill.json 与安装器源码更新。</footer>
   </main>
 </div>
 

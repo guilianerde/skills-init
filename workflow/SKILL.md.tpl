@@ -1,11 +1,13 @@
 ---
 name: workflow
-description: "Entry point for this project's dev workflow skills: routes a request to the right skill (dev, project-review, database-query, code-graph, create-tech-md-doc, create-release-md-doc, md-to-wiki, DocNexus), owns the shared project profile (workflow/profile.json) and the wiki / DocNexus / database capability check, and keeps per-requirement artifacts. Use when the user invokes /workflow, asks what the workflow can do, sets up the project profile, checks integrations, wants a PR / MR description from this branch's artifacts, a local report of how well the workflow works, a local page to browse docs per requirement, or to change a doc template, or hands over a multi-stage task. Triggers: 从需求到上线 / 这个需求从头到尾帮我搞定 / skills 配好了吗 / 项目画像 / workflow status / 写 PR 描述 / 提个 PR / 工作流效果怎么样 / workflow report / 看看项目文档 / workflow view / 改模板 / workflow template. When a request clearly belongs to one skill, use that skill directly."
+description: "Entry point for project workflow commands: /workflow, project profile, integration status, PR/MR descriptions, local reports, requirement document views and templates. Routes to dev only when the user explicitly invokes /dev or $dev, requests the dev/full development workflow, or resumes an authorized dev run. Ordinary analysis, code edits, bug fixes, tests, commits and pushes do not start dev or the full workflow. Other independently requested skills (review, database, Nacos, code graph, docs, wiki) retain their own entry rules. Triggers: skills 配好了吗 / 项目画像 / workflow status / 写 PR 描述 / 工作流效果怎么样 / workflow report / 看看项目文档 / workflow view / 改模板 / workflow template."
 ---
 
 # Workflow
 
-**开工能力**：先运行 `node <skills>/workflow/scripts/resolve.mjs status`，按 `<skills>/workflow/references/capabilities.md` 选择本轮能力与模板；同一项目链路复用已有快照，失败统一按该规则处理。
+**先判入口**：普通分析、代码修改、测试与 Git 操作不自动启动 dev，也不因本 skill 被加载而进行流程开工检查；直接处理用户当前任务。只有用户实际调用 dev、明确要求使用完整开发工作流，或要求恢复已授权的 dev 运行时，才路由到 dev。
+
+**工作流开工能力**：进入本 skill 的状态 / 画像 / 文档等具体功能后，运行 `node <skills>/workflow/scripts/resolve.mjs status`，按 `<skills>/workflow/references/capabilities.md` 选择本轮能力与模板；同一项目链路复用已有快照，失败统一按该规则处理。
 
 本项目个人开发工作流的入口：决定由哪个 skill 处理请求，维护所有 skill 共用的**项目画像**，并统一**增强能力探测**。本 skill 自身不写业务代码。
 
@@ -25,8 +27,9 @@ description: "Entry point for this project's dev workflow skills: routes a reque
 
 | 用户意图 | 交给 | 备注 |
 |---|---|---|
-| 开发新功能、改逻辑、加接口 | `dev` | 默认功能开发模式 |
-| 修 bug、排查报错、线上问题 | `dev --bug` | 先复现再修 |
+| `/dev` / `$dev`，或明确要求使用 dev / 完整开发流程 | `dev` | 用户选择功能开发流程 |
+| `/dev --bug`，或明确要求使用 dev 缺陷修复流程 | `dev --bug` | 用户选择修复流程 |
+| 普通分析、改代码、修 bug、重构、测试、提交 / 推送 | 当前会话直接处理 | 不自动进入 dev，不创建需求或运行 |
 | 审代码、审分支、合并前检查 | `project-review` | |
 | 查库、跑 SQL、核对数据 | `database-query` | 只读优先 |
 | 读 Nacos 远程配置、查参数或开关 | `nacos-config` | 按需只读，先确定环境与 Data ID |
@@ -41,7 +44,7 @@ description: "Entry point for this project's dev workflow skills: routes a reque
 | 改技术方案 / 上线方案 / 交付说明 / 审查报告的模板，按样例建模板 | `/workflow template` | 草稿 → 校验与影响 → 用户确认后写入 DocNexus（知识库是模板唯一来源） |
 | 记住 / 查找项目决策与约定 | DocNexus（入口 skill `docnexus`） | 需已接入；写入必须用户授权 |
 
-意图明确时直接按对应 skill 执行，不必先输出这张表。目标 skill 没有安装（`resolve.mjs status` 输出的 `skills` 里没有它，安装时用了 `--skills` 子集）→ 告诉用户可以运行 `npx @rowansenne/workflow-run --skills <名称>` 补装，不要假装执行。意图横跨多个阶段时按下面的「完整链路」逐段推进，每段结束告诉用户下一段是什么，由用户决定是否继续。走到哪一步不靠记忆：运行 `node <skills>/workflow/scripts/artifacts.mjs [--branch <分支>]`，它扫描 `workflow-run/docs/requirements/` 下的产物，按元信息行里的分支归组，输出每类最新的一份、wiki 发布记录和 `next`（下一步建议）。
+先遵守显式触发边界，不能把「帮我实现」「修这个 bug」「代码提交」「从头到尾处理」推断为启动 dev。用户明确要求独立能力时按对应 skill 执行，不必先输出这张表；直接要求提交代码时执行所需 Git 检查与提交，不先生成 PR 描述或补工作流文档。目标 skill 没安装时给出 `npx @rowansenne/workflow-run --skills <名称>` 补装命令，不假装执行。只有明确要求完整开发工作流时才按下面的完整链路逐段推进；用户只给出普通多步任务时直接处理，不套入 dev。已进入工作流时可用 `node <skills>/workflow/scripts/artifacts.mjs [--branch <分支>]` 读取进度；旧运行、绑定和 next 建议都不构成启动或恢复授权。
 
 ### 完整链路（从需求到上线）
 
@@ -55,7 +58,7 @@ dev（确定工作分支 → 定需求名 → 理解与澄清 → 需求文档 �
   → DocNexus 沉淀（可选，需授权）
 ```
 
-开始完整链路时，先进入 dev 的 Step 0 确定本次工作分支，再运行 `node <skills>/workflow/scripts/requirement.mjs which` 确认需求名（见 `references/requirements.md`）。入口只转交用户明确给出或确认的名字，不把切换前从旧分支自动读到的名字当成用户已确认的需求名。**这里只问、不 bind**，等第一次真的要落盘产物时再由对应 skill `bind`。这样从入口进来也可以走 S 快速通道，不会提前创建需求目录和 `meta.json`。
+用户明确要求开始完整链路后，才进入 dev 的 Step 0 确定本次工作分支，再运行 `node <skills>/workflow/scripts/requirement.mjs which` 确认需求名（见 `references/requirements.md`）。入口只转交用户明确给出或确认的名字，不把切换前从旧分支自动读到的名字当成用户已确认的需求名。**这里只问、不 bind**，等第一次真的要落盘产物时再由对应 skill `bind`。这样从入口进来也可以走 S 快速通道，不会提前创建需求目录和 `meta.json`。
 
 提交、推送、发布 wiki、写入 DocNexus 都是对外动作，每一步都要用户明确同意。
 
@@ -88,7 +91,7 @@ dev（确定工作分支 → 定需求名 → 理解与澄清 → 需求文档 �
 - 本 skill 只路由和维护 `profile.json`，不写业务代码；具体工作交给对应 skill，并遵守该 skill 的规则。
 - `profile.json` 只记录项目事实（含 `toolchain` 开发环境配置：JDK / Maven / Node 的路径），**不写密码、token、内网凭据**；路径里的变量在 `env_vars` 里声明。
 - 写 `toolchain` 前先用 `resolve.mjs env --check` 核对路径在本机存在；本机对不上、又只是个人差异的，写进个人的 `profile.local.json`（覆盖 `profile.json`），不要改团队那份。
-- 用户的请求明显只属于某个 skill 时，直接进入对应 skill，并复用本轮开工能力快照。
+- 独立 skill 按自身入口执行；dev 必须先有显式流程授权。普通任务不加载 dev 的开工、需求归档或运行命令，也不为提交代码重启或补齐流程。
 
 ## 终端命令
 

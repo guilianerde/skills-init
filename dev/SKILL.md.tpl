@@ -1,12 +1,19 @@
 ---
 name: dev
-description: "Implement a feature or fix a bug in this project end to end: understand the requirement, study existing code, clarify open decisions with the user in rounds, plan at the right size, implement in small verified steps, run tests, have an independent subagent review and write a report, then let the user choose fixes or delivery with config/SQL checklists. Use when the user asks to develop, implement, add, change or fix something in the codebase — including concrete refactors that touch several classes (swap a type such as Date → LocalDateTime, rename, replace an API) followed by running tests — or invokes /dev 需求 or /dev --bug 现象. Trigger phrases: 帮我开发 / 实现这个需求 / 加个接口 / 改一下这个逻辑 / 把 X 改成 Y / 重构一下 / 改完跑一下测试 / 修这个 bug / 排查并修复 / 线上报错了帮我修 / implement this feature / fix this bug. Not for pure code review (project-review), SQL lookups (database-query) or doc generation (create-tech-md-doc / create-release-md-doc)."
+description: "Explicitly requested dev workflow for feature development or bug fixing, from requirements and planning through implementation, verification, review and delivery. Invoke only when the user issues /dev or $dev, explicitly asks to start/use the dev skill or the full development workflow (按 dev 流程 / 启动完整开发工作流), or explicitly resumes a previously authorized dev run. Ordinary analysis, questions, code edits, refactors, bug fixes, tests, Git commits/pushes, or mentions and quoted examples of dev do not authorize this workflow. Do the requested ordinary task directly without starting dev."
 ---
 
 # Dev
 
-把需求或缺陷推进到可交付。`/dev <需求 | PRD>` 为功能开发，`/dev --bug <现象>` 为缺陷修复；自然语言按同样意图路由。
+把需求或缺陷按用户明确选择的流程推进到可交付。`/dev <需求 | PRD>` 为功能开发，`/dev --bug <现象>` 为缺陷修复；`$dev` 或明确要求「按 dev 流程」「启动完整开发工作流」同样可进入。
 进入每个阶段前，读取下面指向的 reference 对应小节；不在开工时一次加载全部方法说明。
+
+## 触发边界（先于所有流程步骤）
+
+- **仅显式进入**：用户实际调用 `/dev` / `$dev`、点选 dev skill，或明确要求使用 dev / 完整开发工作流。讨论 dev、引用文档或命令示例、改写本 skill 的规则，都不是启动指令。
+- **普通任务直接处理**：分析代码、解释问题、提供建议、实现 / 修改 / 修复 / 重构、运行测试、代码提交 / 推送等请求本身不触发 dev；不因任务复杂、文件多、涉及配置或分支已有需求绑定而升级为 dev。不要为这些任务主动询问是否开启 dev。
+- **未获流程授权时**：即使本文件已被自动加载，也只处理当前普通任务，不运行 dev 的开工探测、需求命名、bind / start / save / finalize，不生成 requirement / plan / review / delivery 或流程反馈。其他被用户明确要求的独立 skill 按其规则执行。
+- **已启动流程的续接**：同一任务此前已获 dev 授权，可按保存阶段继续，不要求每条消息重复 `/dev`；用户只问分析、只要求提交代码或指定当前独立操作时，仅处理该请求，不重启流程、重做前置步骤或自行推进阶段。新会话仅发现旧运行或旧产物，不等于恢复授权；用户明确要求继续该 dev 运行时才恢复。
 
 ## 门禁
 

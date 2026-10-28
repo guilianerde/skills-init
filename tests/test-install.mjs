@@ -7,6 +7,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { parse as parseYaml } from 'yaml';
 import { useLocalDocNexus } from './helpers/docnexus-pkg.mjs';
 
 // 必装组件 DocNexus 用本地夹具接入：不依赖 npm registry，也不写用户的 ~/.npm。
@@ -105,6 +106,8 @@ test('全新安装：单一来源完整文件 + 相对软链接；重跑不变',
   assert.equal(p.read('.agents/skills/md-to-wiki/wiki-config.json'), repoFile('md-to-wiki/wiki-config.json.tpl'));
   assert.equal(p.read('.agents/skills/workflow/profile.json'), repoFile('workflow/profile.json.tpl'));
   assert.equal(p.read('.claude/skills/workflow/SKILL.md'), repoFile('workflow/SKILL.md.tpl'));
+  assert.equal(parseYaml(p.read('.agents/skills/dev/agents/openai.yaml')).policy.allow_implicit_invocation, false);
+  for (const d of ['.claude/skills', '.qwen/skills']) assert.equal(p.read(`${d}/dev/agents/openai.yaml`), repoFile('dev/agents/openai.yaml'));
   assert.ok(!p.exists('.agents/skills/database-query/config.json'));
   ok(p.install(['--envs', 'claude,qwen', '--yes', '--skip-db']));
   assertLinked(p, '.claude/skills');
@@ -144,6 +147,7 @@ test('--copy：各环境独立拷贝；没选 codex / doubao 时不装 .agents',
   for (const d of ['.claude/skills', '.qwen/skills']) {
     for (const s of SKILLS) { assert.ok(p.isDir(`${d}/${s}`)); assert.ok(p.isFile(`${d}/${s}/SKILL.md`)); }
     assert.equal(p.read(`${d}/workflow/profile.json`), repoFile('workflow/profile.json.tpl'));
+    assert.equal(parseYaml(p.read(`${d}/dev/agents/openai.yaml`)).policy.allow_implicit_invocation, false);
   }
   assert.ok(!p.exists('.agents/skills'));
 });
@@ -301,6 +305,8 @@ test('普通聊天落盘约定：无需 DocNexus，重装与升级更新原段�
     assert.ok(installed[f].startsWith(before), f);
     assert.match(installed[f], /workflow-run\/other\//);
     assert.match(installed[f], /普通聊天不得.*requirement\.mjs.*run\.mjs/);
+    assert.match(installed[f], /dev 工作流仅在用户实际调用/);
+    assert.match(installed[f], /提交代码和推送都不构成启动授权/);
     const artifactBlock = installed[f].split('<!-- workflow-run:artifacts:start -->')[1].split('<!-- workflow-run:artifacts:end -->')[0];
     assert.doesNotMatch(artifactBlock, /DocNexus/, '落盘边界独立于 DocNexus 段落');
   }
@@ -397,6 +403,16 @@ test('.gitignore 只追加缺失的规则，重跑不重复', () => {
   const after = p.read('.gitignore');
   ok(p.install(['--envs', 'claude', '--yes', '--skip-db']));
   assert.equal(p.read('.gitignore'), after);
+});
+
+test('nacos-config 安装后的真实目录与三个环境入口均执行 CLI', () => {
+  const p = project('nacos-linked-cli');
+  ok(p.install(['--envs', 'codex,claude,qwen,workbuddy', '--yes', '--skip-db', '--skills', 'nacos-config']));
+  for (const dir of ['.agents/skills', '.claude/skills', '.qwen/skills', '.codebuddy/skills']) {
+    const r = spawnSync(process.execPath, [p.at(`${dir}/nacos-config/scripts/config.mjs`), 'inspect'], { cwd: p.P, encoding: 'utf8' });
+    assert.equal(r.status, 0, r.stderr);
+    assert.deepEqual(JSON.parse(r.stdout).connections, [], dir);
+  }
 });
 
 test('nacos-config 可单独安装，重装保留连接；凭据与依赖不提交', () => {

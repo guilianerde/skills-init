@@ -19,7 +19,7 @@ node <skills>/nacos-config/scripts/config.mjs get --conn test --data-id common.y
 ```
 
 1. 先 `inspect` 本地候选，输出仅包含连接位置与配置引用，不访问远端、不显示凭据。默认检查项目根、`config/`、`src/main/resources/`；多模块项目用 `rg --files` 定位后传 `--file`。
-2. 根据用户目标和项目证据选环境。多个环境无法确定时先询问；不能把本机默认环境当作用户要求的环境。`--file` 可重复，后面的文件覆盖前面的同名属性；仅传本次选择的文件。带条件的 YAML 文档须用 `--profile <名称>` 显式选择；复杂 profile 表达式不自动计算。
+2. 根据用户目标和项目证据选环境。多个环境无法确定时先询问；不能把本机默认环境当作用户要求的环境。`--file` 可重复，后面的文件覆盖前面的同名属性；仅传本次选择的文件。带条件的 YAML 文档须用 `--profile <名称>` 或 `--profile test,local` 显式选择，匹配任一名称即可；覆盖仍按文件及文档顺序，复杂 profile 表达式不自动计算。
 3. 从 `spring.config.import` 的 `nacos:` 引用、`shared-configs`、`extension-configs` 或源码定位所需 Data ID，明确传 `--data-id`；不猜隐式应用名与 profile 的拼接结果。Group 和 Namespace 默认读本地配置；引用自带的 Group 须显式传 `--group`，Namespace 用 ID。
 4. 用 `get` 拉取一个 Data ID；`--key` 读取精确 key 或子树，不传则返回整个已脱敏的属性集合。JSON / YAML / properties 自动按 Data ID 后缀解析，其他后缀须 `--format json|yaml|properties`。返回读取时间、连接、Namespace、Group、Data ID、内容摘要和所选属性。
 
