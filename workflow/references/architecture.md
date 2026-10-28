@@ -1,7 +1,23 @@
-# 内部模块边界与统一读取模型
+# 架构、模块边界与统一读取模型
 
-安装接入在 `bin/`；各 Skill 的 SKILL.md 与 references 定义流程步骤、确认点和调用时机；`workflow/lib/` 承担共享规则与数据读写；`workflow/scripts/` 保留既有命令和导出入口。数据库、代码图谱、wiki 的执行与凭据仍在各自能力目录。`shared/` 只分发参考文档，运行共享代码随 workflow 的 lib 一起安装。
+本文对应当前工作区（0.28.0 + Unreleased，2026-10-28），包括尚未发布的 nacos-config；实现以代码与各 skill 的 skill.json 为准。
 
+## 安装分发与运行
+
+安装接入在 `bin/`；各 Skill 的 SKILL.md 与 references 定义流程步骤、确认点和调用时机；`workflow/lib/` 承担共享规则与数据读写；`workflow/scripts/` 保留既有命令和导出入口。数据库、代码图谱、wiki、Nacos 的执行与凭据仍在各自能力目录。`shared/` 只分发参考文档，运行共享代码随 workflow 的 lib 一起安装。宿主代理执行规则与命令，workflow-run 不提供常驻的 Agent 调度服务。
+
+`bin/skills.mjs` 从各目录的 `skill.json` 发现当前 9 个 skills，以 `requires` 展开必需依赖，`optional` 标记可选协作；`userFiles` 决定升级保留范围，`templates` 声明知识模板，`docnexus` 声明分类。`package.json.files` 决定 npm 分发内容。默认在 `.agents/skills/` 安装完整文件，其他环境逐 skill 建相对链接；`--copy` 或链接失败时改用拷贝。安装清单记录分发文件 hash，手改文件升级前备份，用户配置不覆盖。
+
+DocNexus 在安装环节必装，即使只选择 nacos-config 也会接入；Nacos 的读取脚本本身没有 workflow / DocNexus 运行依赖。DocNexus 自带的入口、召回等 skills 单独链接给宿主，不计入本包的 9 个 skills。
+
+## 两条执行路径
+
+| 请求 | 调用路径 | 状态归属 |
+|---|---|---|
+| 开发、正式审查、技术 / 上线方案 | 宿主 → 流程 skill → workflow/scripts → workflow/lib；按需调用能力型 skills 或 DocNexus | 正式需求产物与 meta.json；按执行协议记录 runs |
+| 读取 Nacos 参数 | 宿主 → nacos-config → config.mjs → 所选 Nacos 配置接口 | 默认仅返回脱敏快照，不绑定需求、不创建运行、不落盘原文 |
+
+dev / project-review 可在已有流程中按需调用 nacos-config，读取结果作为配置证据；独立查询不自动启动完整工作流。能力型 skill 的 SQL、HTTP、CodeGraph 执行逻辑不因共享核心存在而搬进 lib。
 
 dev / project-review 的 SKILL.md 只保留触发边界、门禁、步骤路由、必要命令和结果去向。方法细节按阶段保存在各自 references 中，进入阶段前只读对应小节，避免开工加载全部方法。F1～F8、B1～B5 与审查第 1～9 步编号不变；报告选择、快速通道、完成标记等关键约束在入口可见，具体执行仍由阶段说明和共享状态协议约束。
 
@@ -42,11 +58,31 @@ lib 不依赖 scripts；纯模型不依赖 I/O。读侧不调用 sync 或推进�
 
 ## 能力边界
 
-`lib/capabilities.mjs` 集中探测接入，`resolve.mjs status` 输出本轮能力快照（ready / blockers、通道、模板解析结果），`references/capabilities.md` 定义所有 Skill 共用的失败处理。CodeGraph 的库探测通过其 status 命令交给能力适配器，lib 不导入 Skill 执行脚本。新会话或环境变化时刷新，不持久化个人能力状态到需求元信息。
+`lib/capabilities.mjs` 集中探测接入，`resolve.mjs status` 输出本轮能力快照（ready / blockers、通道、模板解析结果），`references/capabilities.md` 定义依赖 workflow 的 Skill 共用的失败处理。CodeGraph 的库探测通过其 status 命令交给能力适配器，lib 不导入 Skill 执行脚本。新会话或环境变化时刷新，不持久化个人能力状态到需求元信息。
 
 DocNexus 是必装组件：安装器缺失即接入，安装失败不报告完成；已有组件默认复用，`--with-docnexus` 强制更新。模板只从知识库读取，包内模板仅用于导入。知识查询失败不作为空结果继续。CodeGraph、wiki、数据库仍按共享规则选择增强通道；必需目标、需求绑定和语句拦截按各自语义处理。
 
+nacos-config 独立按需读取，不属于 capabilities.mjs 集中探测的通道。`inspect` 仅列本地 application / bootstrap 候选与命名连接；`get` 才验证远端网络、鉴权和指定配置。项目画像 `config_center: nacos` 只说明项目使用的配置中心，不代表已有 Nacos 连接、鉴权通过或运行时配置已核实。
+
+`config.mjs` 处理 YAML / properties、本地属性与环境变量占位符、显式 profile、指定文件的覆盖顺序和脱敏输出；YAML 解析依赖装在 nacos-config 目录。连接可来自所选文件，或本机 `config.json` 中的命名连接，两者互斥。配置请求仅 GET，POST 仅用于登录；token 不落盘。输出标明 Namespace、Group、Data ID、时间和内容摘要，不模拟完整 Spring 配置合并、灰度或刷新，也不自动生成数据库连接。协议和字段见 `<skills>/nacos-config/references/connection.md`（该 skill 未安装时不可用）。
+
+## 运行环境与数据位置
+
+| 位置 | 保存内容 |
+|---|---|
+| 代理技能目录 | SKILL.md、references、执行脚本和安装清单；连接配置按规则忽略 |
+| workflow/profile.json / profile.local.json | 团队项目事实 / 本机环境与覆盖项，均不放凭据；后者不提交 |
+| .docnexus/ | DocNexus 项目配置、npm 清单、依赖、skills、草稿与索引；内部文件按其 gitignore 管理 |
+| .codegraph/ | 本机代码图谱索引，不提交 |
+| workflow-run/docs/requirements/&lt;需求&gt;/&lt;项目&gt;/ | 正式 Markdown 与需求 meta.json（绑定、产物索引、runs、可恢复收尾待办） |
+| workflow-run/docnexus/ | 团队知识与生效模板；技术 / 上线方案模板首次按用户样例创建 |
+| workflow-run/feedback/、other/、tmp/ | 运行反馈、普通聊天辅助文件、忽略提交的临时文件与锁 |
+
+view / report 读取需求工作区快照展示，不触发运行转换或远程配置拉取。DocNexus 的 view 是单独的本地知识浏览服务。远端数据库 / wiki / Nacos 始终是外部数据源，本地产物仅保留任务所需、允许展示的证据。
+
 ## 执行可靠性
+
+完整流程在 F3 / B3 收尾先生成 requirement.md，独立记录目标、范围、AC 验收与决定；plan.md 保存实现设计并绑定需求 hash / 版本。需求变化后必须重新收尾方案，旧确认与验证、审查、交付证据失效；只改实现方案不修改需求文档。view / report / PR 引用将需求文档作为独立产物展示。
 
 关键转换由 run-gates 执行，不仅在 complete 检查。方案批准关联具体正文；验证在执行前 snapshot、执行后登记；review-handoff 从已保存事实和代码范围生成交接材料，不传实现者结论。审查结果同时返回报告草稿与结构化 findings／coverage，主 agent 统一收尾，交付选择绑定该轮代码与报告版本。
 

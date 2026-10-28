@@ -226,7 +226,7 @@ export function linkSkills(root, envName, rel, skills = SKILLS) {
 // DocNexus 的运行依赖、检索库和草稿由项目根的 .docnexus/.gitignore 忽略。
 export function updateGitignore(root, withCodeGraph = false) {
   const gi = path.join(root, '.gitignore');
-  const rules = ['**/database-query/config.json', '**/wiki-config.json', '**/workflow/profile.local.json', homeIsRepo(root) ? `/${HOME}/` : `/${TMP_DIR}/`];
+  const rules = ['**/database-query/config.json', '**/nacos-config/config.json', '**/nacos-config/node_modules/', '**/wiki-config.json', '**/workflow/profile.local.json', homeIsRepo(root) ? `/${HOME}/` : `/${TMP_DIR}/`];
   if (withCodeGraph) rules.push('.codegraph/'); // 本地索引（SQLite），各人各建
   const existing = fs.existsSync(gi) ? fs.readFileSync(gi, 'utf8').split(/\r?\n/).map((l) => l.trim()) : [];
   const missing = rules.filter((r) => !existing.includes(r));

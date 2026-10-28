@@ -28,7 +28,7 @@ export function handoff(root, { branch, id, depth = '标准', capabilities = nul
   return {
     run_id: id, revision: run.revision, project_root: path.resolve(root), skills: path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..'),
     branch, depth, snapshot, inputs: hash(JSON.stringify(inputs)), scope: reviewScope, requirement: req.name, facts: inputs.facts,
-    plan: run.artifacts?.plan ?? null, previous_report: run.artifacts?.review ?? null,
+    requirement_document: run.artifacts?.requirement ?? null, plan: run.artifacts?.plan ?? null, previous_report: run.artifacts?.review ?? null,
     validation: run.validation ?? null,
     commands: Object.fromEntries(['main_branch', 'build', 'test', 'test_single', 'lint'].map((k) => [k, profile?.[k] ?? null])),
     capabilities,

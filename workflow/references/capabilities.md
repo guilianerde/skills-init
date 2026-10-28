@@ -1,12 +1,14 @@
 # 开工能力与失败处理
 
-所有 Skill 共用本规则。开工在项目根运行一次：
+依赖 workflow 的 Skill 共用本规则。开工在项目根运行一次：
 
 ```sh
 node <skills>/workflow/scripts/resolve.mjs status
 ```
 
 保留输出作为本轮能力快照；同一项目的流程跳转、子 agent 直接复用，由主 agent 一并交接，可用 workflow-run/tmp/capabilities.json 暂存交接。新会话恢复、切换项目、配置或安装发生变化时重新探测。快照仅本轮使用，不作为团队配置或固定状态写入 meta.json。
+
+独立 nacos-config 不要求加载 workflow 或运行本命令，也没有对应的集中能力字段；其 `inspect` 仅检查本地候选，`get` 才验证远端。dev / project-review 内调用它时沿用已有工作流快照，Nacos 读取结果另带配置来源，不据 `profile.config_center` 推断连接可用。
 
 ## 开工门槛
 

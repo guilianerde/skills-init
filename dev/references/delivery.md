@@ -20,18 +20,18 @@
 
 独立文档仓库中 F7 的报告提交提示延后到本步：完整流程交付完成后运行 `requirement.mjs pending`，按 `<skills>/workflow/references/requirements.md`「文档仓库的提交」询问；不让审查环节提前询问或执行提交。
 
-**快速通道交付**（见 F4「S 规模快速通道」）：一次对话交付，不绑定需求、不落任何产物文件——方案、`review.md`、交付说明都不写，不跑 lint、不问 DocNexus 沉淀（运行反馈仍照常记一行），交付里注明「DocNexus：未询问（快速通道不问沉淀）」。给：结果一句话、改动文件、验证（验收项 → 测试 / 操作 → 结果，构建 / 测试命令与结果，开工前已有的失败，未验证项如实写）、当前会话审查的结论与遗留问题；按完整流程第 4 步记录运行反馈；然后只问提交（建议的 commit message）。用户说「落盘交付说明」或之后要出上线方案时，先绑定需求，回到 F4 补方案、F7 补审查报告（`review.md`），取得交付选择后，才按下面的完整流程生成交付说明、判断沉淀。
+**快速通道交付**（见 F4「S 规模快速通道」）：一次对话交付，不绑定需求、不落任何产物文件——方案、`review.md`、交付说明都不写，不跑 lint、不问 DocNexus 沉淀（运行反馈仍照常记一行），交付里注明「DocNexus：未询问（快速通道不问沉淀）」。给：结果一句话、改动文件、验证（验收项 → 测试 / 操作 → 结果，构建 / 测试命令与结果，开工前已有的失败，未验证项如实写）、当前会话审查的结论与遗留问题；按完整流程第 4 步记录运行反馈；然后只问提交（建议的 commit message）。用户说「落盘交付说明」或之后要出上线方案时，先绑定需求，回到 F3 补需求文档、F4 补方案、F7 补审查报告（`review.md`），取得交付选择后，才按下面的完整流程生成交付说明、判断沉淀。
 
 完整流程：
 
-1. **落盘交付说明**：模板路径用 `node <skills>/workflow/scripts/resolve.mjs template dev delivery-template.md` 取，先写到 tmp 草稿，按 execution.md 用 `artifact.mjs finalize --kind delivery` 发布（见 Artifact Location）。元信息行的「对比分支」写当前分支和 `profile.main_branch`，`artifacts.mjs`、project-review、上线方案靠它找到这份交付；「参考产物」写最新审查报告，有方案（`plan.md`）时也写方案路径。「审查」节记录报告结论、修复与复审结果、用户选择交付及接受的遗留风险。尚未发起沉淀询问时，元信息先写「未询问」，再按第 5 步更新。小改动每节一两行即可，不适用的节写「无」，但验证结果必须如实。
+1. **落盘交付说明**：模板路径用 `node <skills>/workflow/scripts/resolve.mjs template dev delivery-template.md` 取，先写到 tmp 草稿，按 execution.md 用 `artifact.mjs finalize --kind delivery` 发布（见 Artifact Location）。元信息行的「对比分支」写当前分支和 `profile.main_branch`，`artifacts.mjs`、project-review、上线方案靠它找到这份交付；「参考产物」写 requirement.md 的 cite / 版本、最新方案与审查报告。「审查」节记录报告结论、修复与复审结果、用户选择交付及接受的遗留风险。尚未发起沉淀询问时，元信息先写「未询问」，再按第 5 步更新。小改动每节一两行即可，不适用的节写「无」，但验证结果必须如实。
 2. **自检与收尾**：finalize 内部使用知识库交付模板检查草稿，有错误先修正；成功输出正式路径、cite 和版本。不要直接覆盖正式文件后用 sync 代替。
 3. **对话里给摘要**：结果、验证（含未验证项）、最新审查报告路径与结论、遗留问题和用户接受的风险、配置 / SQL 有无、交付文件路径；不必把全文贴进对话。
 4. **记录运行反馈**（不问用户）：按 `<skills>/workflow/references/feedback.md` 运行 `node <skills>/workflow/scripts/feedback.mjs add --skill dev --model <模型名> --mode <feature|bug> --size <S|M|L> --fast <yes|no> --rounds <提问轮数> --corrections <用户纠正理解的次数> --acceptance <已验证>/<总数> --baseline-failures <n>`，有跳过的步骤、不清楚或做不到的规则、用户的抱怨时再加 `--skipped` / `--unclear` / `--feedback`。只写过程，不写代码和业务名词；报错就提一句，不影响交付。
 完成上述交付摘要与反馈后，按运行状态协议将 F8（bug 为 B5）标 completed 并 complete。下面的可选后续动作在完成标记后处理。
 
 5. **询问下一步**，不要自行执行：
-   - 提交：给出建议的 commit message 和要 add 的文件（只含本需求的改动，Step 0 确认无关的不 add；建议把方案、审查报告和交付说明一起提交，随分支保留），用户同意后再 `git commit`；**不 push**，除非用户明确要求。
+   - 提交：给出建议的 commit message 和要 add 的文件（只含本需求的改动，Step 0 确认无关的不 add；建议把需求文档、方案、审查报告和交付说明一起提交，随分支保留），用户同意后再 `git commit`；**不 push**，除非用户明确要求。
    - PR / MR：用户要提 PR / MR 时，运行 `node <skills>/workflow/scripts/pr-desc.mjs`（缺省当前分支、基线 `profile.main_branch`），它把本分支的交付说明、审查报告、技术方案、上线方案汇总成描述（没有交付说明时退回用提交记录和改动文件），把输出给用户；用 `gh pr create` / `glab mr create` 创建要用户明确同意。
    - 文档：运行 `node <skills>/workflow/scripts/artifacts.mjs` 看本分支已有哪些产物（方案、交付说明、审查报告、技术方案、上线方案及 wiki 发布记录），按输出的 `next` 建议下一步：M / L 规模缺技术方案时建议 `create-tech-md-doc`，要上线时建议 `create-release-md-doc`（会自动引用本分支的技术方案和交付说明）。
    - **沉淀到 DocNexus**：先判断本次交付有没有**特别值得记录**的内容——已确认的决定、新约定、踩到的坑、缺陷根因、配置 / 表结构变化；标准是「下次做同类需求时，它能不能少踩一次坑或少做一次决定」，分支、产物路径这类工作流信息不算。
@@ -46,5 +46,5 @@
 产物按需求归档在 `workflow-run/docs/requirements/<需求名>/<项目名>/`，规则见 `<skills>/workflow/references/requirements.md`：
 
 - **需求名**：Step 0 已运行 `requirement.mjs which` 并问定名字。第一次落盘前运行 `requirement.mjs bind --name "<需求名>"`（用户明确同意按分支名生成时不带 `--name`）；S 快速通道不 bind、不落盘。缺陷修复同样处理（可以选择挂到原需求下）。
-- **正式写入**：按 `<skills>/workflow/references/execution.md`，方案、审查、交付都先写 tmp 草稿，再用 `artifact.mjs finalize --kind plan|review|delivery` 完成自检、旧版归档、索引与运行证据登记。缺陷修复在 B4 的方案草稿中保留原文并追加修复方案，不另建正式文件。
+- **正式写入**：按 `<skills>/workflow/references/execution.md`，需求、方案、审查、交付都先写 tmp 草稿，再用 `artifact.mjs finalize --kind requirement|plan|review|delivery` 完成自检、旧版归档、索引与运行证据登记。缺陷修复在 B4 的方案草稿中保留原文并追加修复方案，不另建正式文件。
 - 使用输出的 path / cite 引用；previous 非空时告知上一版归档位置，不能替用户删除。中断先 `artifact.mjs resume --id <id>`，不能继续 sync / save 覆盖待办。独立文档仓库在交付完成后运行 pending，按 requirements.md 提示提交。已完成交付的 wiki／DocNexus 元信息更新仍显式 sync。

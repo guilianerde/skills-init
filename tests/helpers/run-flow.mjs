@@ -22,16 +22,21 @@ export function flowFixture(t) {
   git('add', 'app.js'); git('commit', '-m', 'baseline'); git('switch', '-c', BRANCH);
   const req = bind(root, { name: '订单导出', branch: BRANCH, base: 'main' });
   const file = path.join(root, req.dir, 'meta.json');
-  const text = (name, branch = BRANCH) => `# ${name}\n\n> 分支：${branch} ｜ 日期：2026-10-23\n\n内容\n`;
+  const text = (name, branch = BRANCH) => `# ${name}\n\n> 分支：${branch} ｜ 日期：2026-10-23\n${name === 'plan.md' ? '> 需求文档：requirement.md（v1）\n' : ''}\n内容\n`;
   const put = (name, branch = BRANCH) => fs.writeFileSync(path.join(root, req.dir, name), text(name, branch));
   const start = (branch = BRANCH, kind = 'feature', size = 'M') => startRun(root, { branch, kind, size,
-    input: ['feature', 'bug'].includes(kind) ? { stage: kind === 'feature' ? 'F4' : 'B4',
-      steps: Object.fromEntries((kind === 'feature' ? ['Step0', 'F1', 'F2', 'F3'] : ['Step0', 'B1', 'B2', 'B3']).map((s) => [s, { status: 'completed' }])),
+    input: ['feature', 'bug'].includes(kind) ? { stage: kind === 'feature' ? 'F3' : 'B3',
+      steps: Object.fromEntries((kind === 'feature' ? ['Step0', 'F1', 'F2'] : ['Step0', 'B1', 'B2']).map((s) => [s, { status: 'completed' }])),
       context: { summary: '需求与验收已确认', decisions: ['使用分页'], acceptance: ['返回分页结果'] } } : {} }).run;
   const save = (run, input, action = 'save') => changeRun(root, { branch: run.branch, id: run.id, revision: run.revision, input, action }).run;
   const finalize = (run, kind, input = {}, extra = {}) => finalizeArtifact(root, { branch: run.branch, id: run.id, revision: run.revision,
-    kind, text: text(({ plan: 'plan.md', review: 'review.md', delivery: 'delivery.md' })[kind], run.branch), input, ...extra }, () => ({ ok: true })).run;
-  const plan = (run) => finalize(run, 'plan', run.kind === 'feature' ? { steps: { F4: { status: 'completed' } } } : {});
+    kind, text: text(({ requirement: 'requirement.md', plan: 'plan.md', review: 'review.md', delivery: 'delivery.md' })[kind], run.branch), input, ...extra }, () => ({ ok: true })).run;
+  const requirement = (run) => finalize(run, 'requirement', { steps: { [run.kind === 'feature' ? 'F3' : 'B3']: { status: 'completed' } } });
+  const plan = (run) => {
+    if (!run.artifacts.requirement) run = requirement(run);
+    if (run.stage === 'F3' || run.stage === 'B3') run = save(run, { stage: run.kind === 'feature' ? 'F4' : 'B4' });
+    return finalize(run, 'plan', run.kind === 'feature' ? { steps: { F4: { status: 'completed' } } } : {});
+  };
   const implement = (run) => save(run, { approval: { confirmed: true }, ...(run.kind === 'feature' ? { stage: 'F5' } : { implement: true }) });
   const verify = (run) => {
     if (run.kind === 'feature') run = save(run, { stage: 'F6', steps: { F5: { status: 'completed' } } });
@@ -46,5 +51,5 @@ export function flowFixture(t) {
     return finalize(run, 'review', run.kind === 'feature' ? { steps: { F7: { status: 'completed' } } } : {}, { packet, result });
   };
   const ready = (kind = 'feature', findings = []) => review(verify(implement(plan(start(BRANCH, kind)))), findings);
-  return { root, req, file, text, put, start, save, finalize, plan, implement, verify, review, ready, git };
+  return { root, req, file, text, put, start, save, finalize, requirement, plan, implement, verify, review, ready, git };
 }

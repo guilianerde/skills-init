@@ -2,15 +2,23 @@
 
 完整流程进入方案、实现、验证、审查或交付时读对应小节。快速通道不调用本文的运行与落盘命令。所有命令在业务项目根运行，`<skills>` 为安装目录；JSON 输入文件放 `workflow-run/tmp/`。
 
-## 方案与实现门禁
+## 需求、方案与实现门禁
 
-首次创建运行仍在 F4 / B4，不提前 bind。`scope` 保存审查基线和明确排除范围，缺省取需求 base／画像 main_branch 与 review.exclude：
+澄清后先按 F4 标准判定规模与通道；完整流程首次创建运行在 F3 / B3 收尾，bind 后先生成独立需求文档。快速通道仍不 bind。`scope` 保存审查基线和明确排除范围，缺省取需求 base／画像 main_branch 与 review.exclude：
 
 ```json
 {"scope":{"base":"main","exclude":["unrelated/**"]}}
 ```
 
 完整流程的文档先写草稿，再统一收尾；不要直接覆盖正式文件后用 sync 代替收尾。模板仍由调用方用 `resolve.mjs template <skill> <id>` 读取：
+
+```sh
+node <skills>/workflow/scripts/artifact.mjs finalize --id <id> --expect-revision <revision> --kind requirement --draft workflow-run/tmp/requirement.md --input workflow-run/tmp/checkpoint.json
+```
+
+需求文档保存背景目标、范围边界、AC 验收标准、已确认决定与待确认问题。功能收尾 checkpoint 标 `{"steps":{"F3":{"status":"completed"}}}`，bug 改为 B3；随后 save stage F4 / B4。M / L 保留原有需求理解确认，不新增重复确认。未收尾 requirement.md 不能完成 F3 / B3 或进入方案。
+
+plan.md 头部引用需求文档 cite 与版本，只写实现设计、技术风险、实施步骤和验证计划；验证引用 AC 编号，不复制业务需求。方案收尾自动绑定需求 hash / 版本：
 
 ```sh
 node <skills>/workflow/scripts/artifact.mjs finalize --id <id> --expect-revision <revision> --kind plan --draft workflow-run/tmp/plan.md --input workflow-run/tmp/checkpoint.json
@@ -24,6 +32,8 @@ M / L 取得用户实际确认后，用 save 记录 `approval: {"confirmed":true
 - bug：在 B4 save `{"status":"running","approval":{"confirmed":true},"implement":true}`；之后才改代码。
 
 未收尾方案、M / L 未确认、核心步骤 skipped 都会被拒绝。程序校验确认记录与版本，不能替代 agent 核实用户是否真的授权。
+
+需求变化回 F3（bug 回 B3）重新澄清并 finalize requirement；程序清除旧方案确认、实现、验证、审查和交付选择，旧方案不能作为新需求的依据。即使方案正文不变，也要在 F4 / B4 重新收尾以绑定新需求版本；M / L 重新取得方案确认。只改实现方式则仅更新 plan，不改 requirement。手动改需求正文而未收尾也会使后续证据校验失败。
 
 ## 验证证据
 
@@ -60,7 +70,7 @@ result 只接受 passed / failed / unverified；失败或未验证须 reason，�
 node <skills>/workflow/scripts/review-handoff.mjs --id <id> --depth 标准 --capabilities workflow-run/tmp/capabilities.json
 ```
 
-输出 `path` 是交接 JSON，位于 tmp/review/<运行id>/。自动汇总项目／skills 路径、实际基线、排除范围、风险分批、验收和已确认决定、方案、验证命令与结果、上次报告及代码快照。没有能力文件时省略参数，主 agent 补交本轮能力快照；不重新探测。只传事实，不传实现者的自审结论。
+输出 `path` 是交接 JSON，位于 tmp/review/<运行id>/。自动汇总项目／skills 路径、实际基线、排除范围、风险分批、requirement_document（需求文档路径、hash 与版本）、续接事实摘要、方案、验证命令与结果、上次报告及代码快照。验收与业务范围以对应需求文档为准，context 只作缓存摘要。没有能力文件时省略参数，主 agent 补交本轮能力快照；不重新探测。只传事实，不传实现者的自审结论。
 
 独立子 agent 按 project-review 第 1～7 步审查，返回报告草稿与结构化结果，主 agent 负责正式收尾并更新同一运行。没有子 agent 时由当前会话同样执行并如实署名。**审查期间不修改被审代码**。JSON 结果结构以 packet.result_schema 为准，run_id / code / inputs 原样回传，以绑定本轮运行、代码版本和交接内容；范围外发现标 scope: outside，不计入本次交付的严重问题门禁。零发现 findings 为空数组，scope.review 中每个文件必须进入 coverage.reviewed 或 uncovered，不能漏报未审文件。
 

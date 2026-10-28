@@ -6,7 +6,7 @@
 
 按 `<skills>/workflow/references/runs.md` 保存和恢复进度，状态统一在需求的 `meta.json`，不另建状态文件。确定工作分支后先 `run.mjs show`；有 pending_finalization 先按 execution.md 恢复／取消收尾，用户要求继续时读取对应运行的 context、已完成步骤与等待事项，核对代码和证据后从保存的阶段恢复，不重走有效的已完成步骤。不能把“继续”当成用户选择交付。
 
-新任务确定不走快速通道后，先绑定需求，再 `run.mjs start --kind feature|bug --size <规模> --input <checkpoint.json>`，把前置步骤、验收标准、已确认决定、范围、基线与待办补入第一份 checkpoint。功能开发在 F4 创建（Step0、F1～F3 按真实进度补记），缺陷修复在 B4 创建（Step0、B1～B3 补记）；快速通道不 start、不 save。
+新任务在 F3 / B3 收尾确定不走快速通道后，先绑定需求，再 `run.mjs start --kind feature|bug --size <规模> --input <checkpoint.json>`，把前置步骤、需求摘要与基线补入 checkpoint。功能开发从 F3 创建（仅补记 Step0、F1、F2），缺陷修复从 B3 创建（仅补记 Step0、B1、B2）；先 finalize requirement.md 再完成 F3 / B3、进入方案。快速通道不 start、不 save。
 
 每个步骤完成、等待用户、遇到阻塞和结束本轮会话前 save，明确标记步骤 completed 并记录证据。方案待确认时运行为 waiting_user；F7 报告交给用户后也保存 waiting_user 和“修复或交付”，不能仅因报告存在就继续。用户选修复时记录确认的 fix 并回 F5（bug 回 B4），自动重置后续完成标记；选交付时记录确认的 deliver 并进 F8（bug 留 B5）。规模变化同时更新 size。
 

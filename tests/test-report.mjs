@@ -153,7 +153,7 @@ test('report：汇总修复率、复核率、澄清、沉淀率、知识引用�
   const cli = node([path.join(REPO, 'bin/workflow-run.mjs'), 'report', '--project-root', root], root);
   assert.equal(cli.status, 0, cli.stderr);
   assert.match(cli.stdout, /复审时上次问题的修复率：50%/);
-  assert.match(cli.stdout, /\| `feature\/pay`（pay） \| {2}\| ✓ \| ✓×2 \| ✓ \|/);
+  assert.match(cli.stdout, /\| `feature\/pay`（pay） \| {2}\| {2}\| ✓ \| ✓×2 \| ✓ \|/);
   const json = node([path.join(REPO, 'workflow/scripts/report.mjs'), '--json', '--since', '2026-10-16'], root);
   assert.equal(JSON.parse(json.stdout).review.reports, 1);
   assert.equal(node([path.join(REPO, 'workflow/scripts/report.mjs'), '--since', '10/16'], root).status, 1);

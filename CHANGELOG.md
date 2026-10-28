@@ -4,6 +4,13 @@
 
 ## [Unreleased]
 
+### 新增
+- 完整开发 / 修复新增独立 `requirement.md`：F3 / B3 澄清收尾时先生成目标、范围、AC 验收与业务决定，`plan.md` 只维护实现设计并绑定需求版本。支持模板、归档、视图、统计、审查交接和 PR 引用；需求变更使旧方案及下游证据失效，快速通道仍不落盘，不自动拆分历史文档。
+- 独立 `nacos-config` skill：从 application / bootstrap YAML 或 properties 定位连接与占位符，按 Namespace / Group / Data ID 只读获取 Nacos 配置、查询参数或子树，支持命名连接、用户名密码 / token 鉴权、版本 1 / 2 / 3 协议、来源标注和敏感值脱敏。接入安装、升级保留、凭据忽略、workflow 路由及 dev / project-review 的按需核对。
+
+### 文档
+- 同步 README、架构图解、全量安装教程与内部架构 / 能力边界，说明 9 个 skills、Nacos 独立调用、安装时的 DocNexus 策略、数据位置与模板来源；校正旧版本、层数和安装说明。测试与发布 CI 增加 YAML 测试依赖安装步骤。
+
 ## [0.28.0] - 2026-10-26
 
 ### 变更

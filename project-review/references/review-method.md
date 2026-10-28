@@ -14,7 +14,7 @@
 先读实体、接口、DTO、调用链，理清数据流再下结论；不要凭文件名猜内容。
    - **查项目约定（DocNexus）**：先运行 `node <skills>/workflow/scripts/knowledge.mjs project-review --match <模块名 / 业务名词> --query "<一句话：改动涉及的模块与业务>"`，看以往审查沉淀的反复问题和开发约定（`--query` 在这些分类内按正文 recall），找相关的编码约定、历史决策与已知坑，作为审查依据并在报告中引用 `workflow-run/docnexus/library/<path>`。审查过程中**不写入** DocNexus（写入见第 8 步）。
    - **同分支已有产物**：运行 `node <skills>/workflow/scripts/artifacts.mjs --branch <dev分支>`（单文件 / 未提交改动用当前分支，省略 `--branch`），看输出的 `latest`：
-     - `latest.plan` 或 `latest.tech` 存在 → 读其中的验收标准、改动设计、接口 / 数据 / 配置变更，第 3 步审 diff 时做**需求对照**：方案里有、diff 里找不到的 → 漏实现（属于验收标准的按 HIGH，其余 MEDIUM）；diff 里有、方案里没提的接口 / 表结构 / 配置 / 依赖变更 → 列出请作者确认（不一定是问题）。只对照能在 diff 里核对的项，不推测业务语义。
+     - `latest.requirement` 存在 → 读取目标、范围、AC 验收标准与已确认决定，作为需求对照依据；dev 内部审查以 packet.requirement_document 指向的版本为准，context.facts 只作摘要。`latest.plan` / `latest.tech` 提供改动设计、接口 / 数据 / 配置变更。第 3 步审 diff 时区分漏实现和未经需求确认的扩展：验收项漏实现按 HIGH，其余 MEDIUM；未提及的接口 / 表结构 / 配置 / 依赖变更列出核实。旧需求无独立文档时可参考旧方案中的需求内容并标注来源，不自动补造需求文档。只对照能在 diff 核实的项，不推测业务语义。
      - `latest.delivery` 存在（dev 的交付说明）→ 其中「已确认的决定」并入需求对照的依据；「配置清单」「SQL 脚本」和 diff 对照，diff 里有而交付说明漏列的配置 key / DDL 记为 MEDIUM（上线时会被漏掉）。
      - `latest.review` 存在 → 这是**复审**：读上次报告的问题表，并用 `git log --oneline --since=<上次报告日期> <dev分支>` 看之后改了什么。本次报告对上次的每条问题标「已修复 / 仍存在 / 不再适用」（「已修复」要看到对应改动），本次新发现的标「新增」。
    - **涉及数据库**：diff 里有 SQL、Mapper、实体或 DDL 时，按 `<skills>/workflow/references/tables.md` 运行 `node <skills>/workflow/scripts/tables.mjs --diff <基线>...<dev>`（未提交改动用 `--base <基线>`）找出涉及的表；按本轮数据库通道用 `query.mjs --schema --tables <表> --indexes` 只读拉取实际字段、索引与估算行数，作为第 4、6 步判断索引支撑、字段存在与类型、DDL 锁表与滚动发布兼容的依据。查不了库时注明「未与实际库核对」写进「未覆盖与待确认」，这类发现不升到 HIGH 以上，除非 diff 本身就能证明。

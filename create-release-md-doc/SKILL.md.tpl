@@ -38,6 +38,7 @@ description: "Generate a Markdown release/deployment plan (上线方案) from th
 ### Step 2 — 采集 diff 并抽取事实
 
 按 `references/diff-collection.md` 执行：有技术方案（`--tech` 或自动关联）时先解析它复用其事实；其余层用三点 `<main>...<dev>` 分层采集。只写 diff 中可见的事实，看不到写「待补充」。有 `prd_context` 时做 PRD 对齐校验。
+同分支有 `latest.requirement` 时，引用其目标、范围和 AC 验收作为上线回归依据，标明文档路径与版本；部署、SQL 与配置变更仍以 diff / 交付说明核实，不把需求计划当成已实现事实。
 
 ### Step 3 — 选模板并填充
 

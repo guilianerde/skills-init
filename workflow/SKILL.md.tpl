@@ -18,7 +18,7 @@ description: "Entry point for this project's dev workflow skills: routes a reque
 /workflow profile         # 填写或更新项目画像
 /workflow report          # 本地效果报告（审查发现与修复率、需求澄清、沉淀与复用、各分支链路）
 /workflow view            # 项目文档视图：按需求浏览方案、交付、审查、技术 / 上线方案（本地静态页面）
-/workflow template [<模板>] [怎么改]   # 修改 / 创建文档模板：tech、release、plan、delivery、review、checklist
+/workflow template [<模板>] [怎么改]   # 修改 / 创建文档模板：requirement、tech、release、plan、delivery、review、checklist
 ```
 
 ## 能力地图（路由）
@@ -29,6 +29,7 @@ description: "Entry point for this project's dev workflow skills: routes a reque
 | 修 bug、排查报错、线上问题 | `dev --bug` | 先复现再修 |
 | 审代码、审分支、合并前检查 | `project-review` | |
 | 查库、跑 SQL、核对数据 | `database-query` | 只读优先 |
+| 读 Nacos 远程配置、查参数或开关 | `nacos-config` | 按需只读，先确定环境与 Data ID |
 | 影响面、谁调用了、从哪些入口进来、topic 谁发谁收、定时任务、表在哪些 SQL 里 | `code-graph` | 需 CodeGraph 索引；`mq` / `jobs` / `tables` 不需要 |
 | 根据分支 diff 出技术方案 | `create-tech-md-doc` | 可带 `--prd` |
 | 根据分支 diff 出上线方案 | `create-release-md-doc` | 可带 `--tech` 复用技术方案 |
@@ -45,7 +46,7 @@ description: "Entry point for this project's dev workflow skills: routes a reque
 ### 完整链路（从需求到上线）
 
 ```
-dev（确定工作分支 → 定需求名 → 理解需求 → 方案 → 实现 → 测试 → 优先独立子 agent 审查并落盘报告，无则在当前会话自查 → 用户选择修复或交付）
+dev（确定工作分支 → 定需求名 → 理解与澄清 → 需求文档 → 方案 → 实现 → 测试 → 优先独立子 agent 审查并落盘报告，无则在当前会话自查 → 用户选择修复或交付）
   ↳ 修复：实现 → 验证 → 复审（无子 agent 时当前会话）→ 再次选择；交付：完整流程生成 delivery.md，S 快速通道只在对话交付、不落盘
   → create-tech-md-doc（M / L 规模）
   → md-to-wiki（发布技术方案，可选）

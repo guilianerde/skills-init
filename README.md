@@ -1,19 +1,51 @@
 # workflow-run — 项目级 Agent Skills 一键初始化
 
-把 **workflow（入口路由 + 共用项目画像）**、**dev（功能开发 / 缺陷修复编排）**、**database-query（数据库查询）**、**project-review（代码审查）**、**code-graph（代码图谱：影响面、调用入口、MQ、定时任务、SQL 涉及的表）**、**md-to-wiki（发布文档到**
-
-**Confluence）**、**create-tech-md-doc /create-release-md-doc（从 git diff 生成技术 / 上线方案）**
-
-封装成通用项目级 Skills。在工作目录执行一条命令、选择环境，自动生成到各 AI 编程代理的项目级
-
-技能目录，团队共享（可提交 git）。
+将开发、审查、配置查询和文档交付封装为 **9 个项目级 skills**：workflow、dev、project-review、database-query、nacos-config、code-graph、md-to-wiki、create-tech-md-doc、create-release-md-doc。在项目根执行安装命令，为所选代理环境生成 skills、共享规则和执行脚本。
 
 支持环境：**Codex CLI / Claude Code / 豆包办公（Doubao）/ 千问（Qwen Code）/ 腾讯 WorkBuddy**。
 
-> 本工具在项目里的产出（需求产物、DocNexus 工作区、项目模板、临时文件）都放在项目根的
-> `workflow-run/`
-> 一个目录里，不往项目的其他地方写；它可以随代码提交，也可以整个是团队的独立文档仓库（见「独立文档仓库」）。
+> 需求产物、知识输出、反馈与临时文件统一放在 `workflow-run/`，可随代码提交或作为独立文档仓库。已安装 skills 在代理的技能目录，DocNexus 运行环境在 `.docnexus/`，CodeGraph 索引在 `.codegraph/`；业务源码沿用项目原有位置。
 > 安装只用 npx，在项目根执行。推荐 `npx @rowansenne/workflow-run --with-codegraph`；DocNexus 必装，缺失时自动接入。
+
+## 当前架构
+
+本文按当前工作区（0.28.0 + Unreleased，2026-10-28）说明；`nacos-config` 与独立需求文档属于尚未发布的改动。
+
+安装分发与任务运行分开。运行时由宿主代理读取 skill 规则、调用脚本；workflow-run 本身不启动常驻 Agent 服务。
+
+| 部分 | 代码位置 | 职责 |
+| --- | --- | --- |
+| 安装分发 | `bin/`、各 skill 的 `skill.json` | 自动发现 skills，展开 `requires` 依赖，安装 / 链接、升级、卸载、自检；保留用户配置 |
+| 流程规则 | 各 skill 的 `SKILL.md.tpl`、`references/` | 安装后生成 `SKILL.md`；定义触发边界、阶段、确认点和按需读取的细节 |
+| 命令入口 | `workflow/scripts/` | 画像、需求、运行、审查范围、产物收尾、模板、知识检索与报告等命令 |
+| 共享核心 | `workflow/lib/` | 路径和数据模型、统一读取快照、元信息锁、版本、运行门禁、代码证据与可恢复收尾 |
+| 能力型 skills | `code-graph/`、`database-query/`、`md-to-wiki/`、`nacos-config/` | 各自执行代码图谱查询、SQL、wiki 读写或 Nacos 只读查询，连接与凭据留在对应目录 |
+| 数据与展示 | `workflow-run/`、`.docnexus/`、`view` / `report` | 保存需求产物、运行状态和知识；按需生成只读视图与统计 |
+
+```mermaid
+flowchart TD
+  Installer[安装器：bin + skill.json] --> Skills[项目级 skills：规则与 references]
+  Agent[宿主代理：用户请求] --> Skills
+  Skills --> Commands[workflow/scripts：流程命令]
+  Commands --> Core[workflow/lib：共享规则与状态]
+  Core --> Artifacts[workflow-run：文档、meta.json、反馈]
+  Skills --> Tools[能力型 skills：图谱 / 数据库 / wiki / Nacos]
+  Tools --> Systems[CodeGraph / 数据库 / Confluence / Nacos]
+  Commands --> Knowledge[DocNexus：项目知识与模板]
+  View[view / report：只读展示] --> Core
+```
+
+这张图表示职责和调用关系，每次请求只经过需要的分支。明确的任务可以直接调用对应 skill；`workflow` 提供统一路由，`dev` 编排完整开发流程。`nacos-config` 的 `requires` 为空，可独立读取远程配置，也可由 dev / project-review 按需调用；目前 Nacos 不纳入 `resolve.mjs status` 的集中能力探测，`inspect` 只检查本地候选，实际网络和鉴权由 `get` 验证。
+
+共享核心随 workflow 安装，`lib` 不反向依赖 `scripts`，纯模型不做 I/O。需求 `meta.json` 保存绑定、版本索引和运行；Markdown 保存正文及发布 / 沉淀引用。只读展示不推进状态，文件存在不代表运行完成。完整流程通过方案版本、执行前代码快照、验证和审查证据校验阶段转换，产物收尾支持恢复与取消。
+
+安装器仍统一接入必装组件 DocNexus，包括只选择 `nacos-config` 的安装；这属于安装策略，Nacos 读取脚本本身不调用 workflow 或 DocNexus。技术 / 上线方案的生效模板由 DocNexus 保存，首次按用户样例创建；包内审查、开发模板用于导入知识库，不是运行时的回退来源。
+
+图解见 [docs/architecture.html](docs/architecture.html)，共享核心、数据归属与证据门禁见 [workflow/references/architecture.md](workflow/references/architecture.md)。
+
+**需求与方案分开**：完整开发 / 修复在理解、调研和澄清后，先于 F3 / B3 收尾生成 `requirement.md`（背景目标、范围、AC 验收标准、已确认决定），再于 F4 / B4 生成 `plan.md`（实现设计、风险、实施与验证计划）。两份文档独立版本与归档；方案记录依据的需求 hash / 版本，需求变化后旧方案与下游证据失效。S 快速通道仍不落盘，历史 plan 不会自动拆分。
+
+升级会导入新增的 `dev/requirement-template.md`。方案模板默认种子已改为引用需求文档；已有知识库模板不会被重装覆盖，未改过的默认模板可用 `seed-templates --update` 更新，团队定制的方案模板按 `/workflow template plan` 调整为引用需求并保留团队结构。
 
 ## 快速开始
 
@@ -27,7 +59,7 @@ npx @rowansenne/workflow-run --with-codegraph
 
 全量安装的分步说明见图文教程 [docs/full-install.html](docs/full-install.html)（下载后用浏览器打开）。
 
-整体架构（代理 / 用户 view / 工作流编排 / 工具 / 底层文档库四层、dev 主线流程、设计约定、产物与知识闭环）见 [docs/architecture.html](docs/architecture.html)（下载后用浏览器打开）。
+整体架构、dev 主线流程、独立能力调用、数据归属与知识闭环见 [docs/architecture.html](docs/architecture.html)（下载后用浏览器打开）。
 
 非交互示例（bash、zsh、PowerShell 写法一样）：
 
@@ -35,9 +67,22 @@ npx @rowansenne/workflow-run --with-codegraph
 npx @rowansenne/workflow-run --envs all --yes --with-docnexus --with-codegraph              # 用现有数据库配置，装全部环境
 npx @rowansenne/workflow-run --envs codex,qwen --skip-db --with-docnexus --with-codegraph   # 跳过数据库
 npx @rowansenne/workflow-run --envs all --skip-db --copy --with-docnexus --with-codegraph   # 不用软链接，各环境独立拷贝
-npx @rowansenne/workflow-run --envs claude --skip-db                                        # 最小安装：只装 skills，不接 DocNexus 和 CodeGraph
+npx @rowansenne/workflow-run --envs claude --skip-db                                        # 全部 skills + 必装 DocNexus，不接 CodeGraph
 npx @rowansenne/workflow-run uninstall                                                      # 按安装清单卸载
 ```
+
+### Nacos 配置读取（nacos-config）
+
+独立 skill，默认随全量安装，也可用 `npx @rowansenne/workflow-run --skills nacos-config --envs codex --yes --skip-db` 单独安装。可直接请求「读取测试环境 Nacos 的 order-test.yaml，查看 order.timeout」，开发和审查也可按需调用。
+
+```text
+node .agents/skills/nacos-config/scripts/config.mjs inspect
+node .agents/skills/nacos-config/scripts/config.mjs get --file src/main/resources/bootstrap.yml --file src/main/resources/application-test.yml --data-id order-test.yaml --key order.timeout
+```
+
+首次读取 YAML 如缺少依赖，运行 `npm install --prefix .agents/skills/nacos-config --ignore-scripts --no-package-lock`。支持 application / bootstrap 的 YAML、properties、环境变量及本地属性占位符；多环境不自动猜选。也可配置本机 `nacos-config/config.json` 多连接并用 `--conn test` 选择，该文件和本 skill 的依赖目录由安装器加入 gitignore，重装保留配置。密码 / token 使用环境变量，不接受命令行明文凭据。
+
+按明确的 Namespace / Group / Data ID 获取单个配置，支持 Nacos 1.x / 2.x 兼容 API（默认 `1`）、2.x API（`--api-version 2`）和 3.x Client API（`--api-version 3`），输出脱敏属性和读取来源。只允许配置 GET 与登录 POST，不发布、不删除、不自动写入数据库连接；不模拟 Spring 完整的配置合并与运行时最终值。连接格式与协议说明见 [nacos-config/references/connection.md](nacos-config/references/connection.md)。
 
 ### 子命令
 
@@ -93,7 +138,7 @@ npx @rowansenne/workflow-run@latest doctor --offline
 
 如果仍然不可见，先确认业务项目下确实有 `.codebuddy/skills/workflow/SKILL.md`，并保留安装命令、`doctor --offline` 输出与 WorkBuddy 版本以便排查。项目级配置目录见 [WorkBuddy 官方说明](https://www.codebuddy.cn/docs/workbuddy/From-Beginner-to-Expert-Guide/Function-Description/Project)。
 
-每个 skill 目录结构（四环境一致）：
+各环境中的 skill 内容相同；默认共用 `.agents/skills/` 的这一份文件：
 
 
 
@@ -102,6 +147,7 @@ npx @rowansenne/workflow-run@latest doctor --offline
 ├── workflow/                         # 入口：路由到各 skill、能力探测、维护共用项目画像
 │   ├── SKILL.md
 │   ├── scripts/resolve.mjs           # 模板来源 / 画像 / 能力探测的判定脚本
+│   ├── lib/                          # 共享模型、读取、状态与门禁，随 workflow 安装
 │   └── profile.json                  # 项目画像：主分支、构建 / 测试命令、配置中心、发布平台等（无凭据，可提交；重跑不覆盖）
 ├── project-review/                      # 代码审查
 │   ├── SKILL.md                      # 触发描述 + 审查工作流（含大改动分批、发现复核）
@@ -118,19 +164,22 @@ npx @rowansenne/workflow-run@latest doctor --offline
 │   ├── config.json                   # 数据库连接（init 生成，已加入 .gitignore）
 │   ├── scripts/query.mjs             # 执行查询：会话只读、写语句拦截、自动 LIMIT、脱敏
 │   └── references/schema.md          # 表结构速查（初始为空，建议补齐后提交）
+├── nacos-config/                     # 独立只读远程配置查询，无其他 skill 运行依赖
+│   ├── SKILL.md
+│   ├── scripts/config.mjs            # inspect 本地定位 / get 远程读取、参数查询、脱敏
+│   ├── package.json                  # YAML 解析依赖；首次需要时在本目录安装
+│   └── config.json                   # 可选命名连接，用户自行配置，不生成、不提交
 ├── md-to-wiki/                       # 发布 md 到 Confluence wiki
 │   ├── SKILL.md                      # GATE：wiki 未配置则禁止启动
 │   ├── wiki-config.json              # wiki 连接（init 生成，默认 enabled=false，已 gitignore）
 │   └── scripts/md-to-wiki.mjs        # md → Confluence Storage Format XHTML 转换 + 良构校验（Node，无依赖）
-├── create-tech-md-doc/               # 从分支 diff 生成技术方案 md（按项目模板，没有就用样例创建）
-│   ├── SKILL.md
-│   └── template.md
-├── create-release-md-doc/            # 从分支 diff 生成上线方案 md（按项目模板，没有就用样例创建）
-│   ├── SKILL.md
-│   └── template.md
+├── create-tech-md-doc/               # 从分支 diff 生成技术方案，生效模板在 DocNexus
+│   └── SKILL.md                      # 首次按用户样例创建模板，不附带 template.md
+├── create-release-md-doc/            # 从分支 diff 生成上线方案，生效模板在 DocNexus
+│   └── SKILL.md
 └── dev/                              # 开发 / 修 bug：需求→调研→方案→实现→测试→自审→交付
     ├── SKILL.md
-    └── references/plan-template.md   # 方案模板（S / M 简版、L 完整；快速通道不用）
+    └── references/plan-template.md   # 导入 DocNexus 的方案模板种子；快速通道不用
 ```
 
 ## workflow：入口与项目画像
@@ -149,7 +198,7 @@ npx @rowansenne/workflow-run@latest doctor --offline
 * 知识：交付与审查的 DocNexus 沉淀率（只算真正问过沉淀的，「未询问」「无需沉淀」不计入分母；dev 内部审查不单独询问或重复计入交付沉淀）、正文引用了知识库文档的产物占比；
 * 各分支链路：方案、交付说明、审查报告、技术方案、上线方案齐不齐，哪些文档还没发布到 wiki。
 
-**完整流程状态与续接**：需求目录的 `meta.json` 同时保存绑定、产物索引和按运行 id 区分的 `runs`。每次运行关联分支，记录阶段、逐步完成标记、上下文、待用户决定、阻塞原因、历史与 revision；完成后保存 `status: completed` 和 `completed_at`。`/workflow status` 查看状态，`/workflow resume [运行id]` 核对后继续；`/workflow view` 展示运行与“已完成”，尚未生成 Markdown 的运行也可见。快速通道保持不绑定、不创建运行状态。完整 dev 在 F4／B4 确定流程后开始记录，补入此前已确认的进度；后续文档／发布用独立运行保留开发的完成记录。脚本用法见 `workflow/references/runs.md`，`sync` 不会清掉状态。
+**完整流程状态与续接**：需求目录的 `meta.json` 同时保存绑定、产物索引和按运行 id 区分的 `runs`。每次运行关联分支，记录阶段、逐步完成标记、上下文、待用户决定、阻塞原因、历史与 revision；完成后保存 `status: completed` 和 `completed_at`。`/workflow status` 查看状态，`/workflow resume [运行id]` 核对后继续；`/workflow view` 展示运行与“已完成”，尚未生成 Markdown 的运行也可见。快速通道保持不绑定、不创建运行状态。完整 dev 在 F3／B3 收尾确定不走快速通道后开始记录，先生成独立 requirement.md，再进入 F4／B4 的实现方案，补入此前已确认的进度；后续文档／发布用独立运行保留开发的完成记录。脚本用法见 `workflow/references/runs.md`，`sync` 不会清掉状态。
 
 **运行反馈**（`npx @rowansenne/workflow-run feedback [--json]`）：效果报告只看落盘的产物，看不到过程。dev 和 project-review 每跑完一次，用 `workflow/scripts/feedback.mjs add` 静默追加一行到 `workflow-run/feedback/<git 用户名>.jsonl`：模型、规模 / 深度、是否走快速通道、向用户提问几轮、用户纠正过几次理解、验收项验证了几条、跳过了哪些步骤、**哪条规则读不懂或做不到**、用户主动说的抱怨。只记过程，不记代码和业务名词；不额外问用户。每人一个文件，随 `workflow-run/` 提交，多人不冲突。独立文档仓库模式下，安装器在文档仓库的 `workflow-run/.gitattributes` 里给这些文件配 `merge=union`，同一个文件在几个分支上都有记录时合并也不冲突；随代码提交时不改代码仓库的 `.gitattributes`，合并时遇到冲突保留两边的行即可。用来定期精简 skill：
 
@@ -213,8 +262,8 @@ node .agents/skills/workflow/scripts/resolve.mjs env --check   # 逐个字段核
 ```
 
 * **功能开发**：开始前先确定工作分支，再确认需求名（给不出名字或说不清要做什么就不开始）→ 理解需求（可读 PRD、查 DocNexus 历史决策）→ 调研现有代码 → 需求澄清（借鉴 grill-me：按决策树分轮提问，每题给推荐答案；事实自己查、决定交给用户；S 规模无未定决定时跳过澄清提问）→ **规模判定（S / M / L 说明判定依据，不再询问确认）** → 按规模出方案（非快速通道一律落方案文档：S 简版、M 精简版、L 完整版；S 符合条件时先问是否走快速通道，走则不落盘）→ 小步实现并编译 → 补测试并运行 → 优先由独立子 agent 按 project-review 审查并落盘 `review.md`（没有子 agent 时在当前会话自查，报告注明审查者）→ 报告交给用户，等待选择「修复问题 / 交付」；修复则验证后重新审查、再次等待选择，选择交付后才将交付说明落盘到 `workflow-run/docs/requirements/<需求名>/<项目名>/delivery.md`（带分支元信息；改动、验证结果、配置清单、未执行的 SQL），已接入 DocNexus 时交付里有值得记录的知识才问要不要沉淀（同意后以 `dev-notes` 分类写入，并把库内路径记回交付说明），没有就跳过并在元信息行写「无需沉淀」。审查和上线方案会按分支自动读取这份交付说明。
-* **S 规模快速通道**：规模判定不询问用户；S 规模且不涉及配置、SQL / DDL、对外接口、表结构，也没有需要澄清的业务决定时，**问用户是否走快速通道**，问完等本轮答复——明确同意才走：编译、测试照常，审查在当前会话按标准清单做，**不绑定需求、不落任何产物文件**（方案 / `review.md` / 交付说明都不写；运行反馈照常记一行），对话里一次交付并注明「DocNexus：未询问（快速通道不问沉淀）」；拒绝或未明确同意就按完整流程落盘交付。实现中碰到上述任何一项或改动超过 3 个文件，先停下后续实现、重新评估规模，绑定需求并回 F4 补方案、自检；M / L 确认方案后再继续实现、验证、审查与交付选择。缺陷修复同样适用（根因仍须在对话里写清楚）。
-* **缺陷修复**：收集现象 → 用失败测试复现 → 用证据定位根因 → **判定规模并告知（S 规模问是否走快速通道；M / L 确认根因与修复方式后再改）** → 完整流程先把根因与修复方式追加到 `plan.md`，同步更新文档头的修复分支与日期（不另建文件）→ 最小修复让测试转绿 → 审查并落盘报告（无子 agent 时当前会话自查）→ 用户选择修复或交付（修复后验证与复审；交付必须写明根因）。
+* **S 规模快速通道**：规模判定不询问用户；S 规模且不涉及配置、SQL / DDL、对外接口、表结构，也没有需要澄清的业务决定时，**问用户是否走快速通道**，问完等本轮答复——明确同意才走：编译、测试照常，审查在当前会话按标准清单做，**不绑定需求、不落任何产物文件**（方案 / `review.md` / 交付说明都不写；运行反馈照常记一行），对话里一次交付并注明「DocNexus：未询问（快速通道不问沉淀）」；拒绝或未明确同意就按完整流程落盘交付。实现中碰到上述任何一项或改动超过 3 个文件，先停下后续实现、重新评估规模，绑定需求并先回 F3（缺陷 B3）补需求文档，再到 F4 / B4 补方案、自检；M / L 确认方案后再继续实现、验证、审查与交付选择。缺陷修复同样适用（根因仍须在对话里写清楚）。
+* **缺陷修复**：收集现象 → 用失败测试复现 → 用证据定位根因 → **判定规模并告知（S 规模问是否走快速通道；M / L 确认根因与修复方式后再改）** → 完整流程先生成描述现象、期望与验收的 `requirement.md`，再把根因与修复方式追加到 `plan.md`，同步更新文档头的修复分支与日期（不另建文件）→ 最小修复让测试转绿 → 审查并落盘报告（无子 agent 时当前会话自查）→ 用户选择修复或交付（修复后验证与复审；交付必须写明根因）。
 * 审查优先用独立子 agent（期间不继续改被审代码，子 agent 只审查、写报告，不直接修复）；没有子 agent 时降级为当前会话自查并把「审查者」写成当前 agent，不阻塞、也不跳过审查。遗留严重问题须说明风险并由用户明确接受，不能把选择交付写成审查通过。
 * 守则：不写库、不改凭据、不擅自 commit / push、不装新依赖；测试没跑就写「未验证」。
 * DocNexus 是必装组件，缺失或查询失败时先修复；wiki、CodeGraph、数据库为可选增强，所有 Skill 共用开工能力快照与失败处理规则（`workflow/references/capabilities.md`）。
@@ -491,16 +540,18 @@ dev 与 project-review 的 SKILL.md 保留门禁、步骤路由、必要命令�
 | `database-query/scripts/query.mjs` | 执行 SQL：选连接、取密码（只通过环境变量传给客户端）、会话层只读、拦截写语句和多语句、自动补 LIMIT、超时、脱敏敏感列；支持 mysql / psql 客户端，其他 driver 退回 JDBC |
 | `database-query/scripts/query.mjs --schema [--tables a,b] [--write]` | 按只读会话导出表结构为 Markdown；`--write` 写入 `references/schema.md` 的 `schema:begin` / `schema:end` 之间，标记外的补充说明保留；指定的表在库里不存在时标出 |
 | `database-query/scripts/query.mjs --schema --tables a,b --indexes` | 另外列出索引（唯一与否、列顺序）和估算行数，供 dev / project-review 核对字段、索引支撑和 DDL 锁表风险 |
+| `nacos-config/scripts/config.mjs inspect / get` | 本地定位 Nacos 连接；按显式环境、Namespace / Group / Data ID 只读获取配置，查询 key 或子树，返回脱敏属性与来源；独立运行，不创建需求状态 |
 | `md-to-wiki/scripts/upload.mjs info / put / target / record` | REST 上传通道：`info` 读页面标题与版本给用户确认；`put --expect-version <n> [--record <md>]` 先校验 XHTML 良构，版本对不上就拒绝上传，上传后确认版本 +1，并把发布记录写回 Markdown 第一行注释（转换时丢弃，不出现在页面上）；`target` 读出记录，再次发布同一文档不必再给 pageId；`record` 供 MCP 通道上传后补写 |
 
 ## 测试
 
 ```bash
-npm test                                  # bash 冒烟测试 + 全部 node 测试
+npm install --ignore-scripts --no-package-lock # 安装仓库测试依赖（YAML 解析）；不是业务项目安装命令
+npm test                                  # 全部 Node 测试
 node --test "tests/*.mjs"                 # 只跑 node 测试（三个平台都能跑）
 ```
 
-node 测试覆盖：skill.json 一致性、子命令（upgrade / doctor / seed-templates / uninstall）、`resolve.mjs` 与画像推断、`lint-doc.mjs`（含 `--facts` 核对，用临时 git 仓库）、`artifacts.mjs`、`knowledge.mjs`、`query.mjs` 与表结构导出（用假的 mysql / psql 客户端）、md-to-wiki 转换与上传（用本地假 Confluence 服务）、DocNexus 模板导入与版本跟踪（用假的 docnexus CLI）。
+node 测试覆盖：skill.json 一致性、子命令（upgrade / doctor / seed-templates / uninstall）、`resolve.mjs` 与画像推断、`lint-doc.mjs`（含 `--facts` 核对，用临时 git 仓库）、`artifacts.mjs`、`knowledge.mjs`、`query.mjs` 与表结构导出（用假的 mysql / psql 客户端）、md-to-wiki 转换与上传（用本地假 Confluence 服务）、DocNexus 模板导入与版本跟踪（用假的 docnexus CLI），以及 Nacos 本地配置解析、版本 1 / 2 / 3 协议、鉴权、只读、脱敏与错误处理（本地模拟 HTTP 服务，不连接真实配置中心）。
 
 安装器的黑盒场景都在 `tests/test-install.mjs`，三个平台共用：每个用例在临时目录放一份安装器副本（项目外），执行安装后检查目录、软链接和配置。覆盖全新安装（单一来源 + 相对软链接）、`WORKFLOW_RUN_NO_SYMLINK=1` 退回独立拷贝、`--copy`、`--yes` 无数据库配置时退出码 1、含 `/ & | " \` 的密码、重跑保留用户配置、安装清单、手改的 skill 文件备份后更新为新版、删除模板文件后的清理（改过的先备份）、卸载与备份、`--copy` 拷贝换成链接（合并用户配置）、两份配置冲突、`.gitignore` 只追加缺失规则。
 
@@ -541,6 +592,8 @@ CI（`.github/workflows/test.yml`）在 push 到 main 和每个 PR 上运行：m
 | `.gitignore` 规则 | 忽略的内容 | 何时追加 |
 | --- | --- | --- |
 | `**/database-query/config.json` | 数据库连接（含密码） | 总是 |
+| `**/nacos-config/config.json` | 可选 Nacos 本机连接配置，密码 / token 仅引用环境变量 | 总是 |
+| `**/nacos-config/node_modules/` | Nacos skill 的本机 YAML 解析依赖 | 总是 |
 | `**/wiki-config.json` | wiki 地址与 token | 总是 |
 | `**/workflow/profile.local.json` | 个人设置：本机系统与终端、提交提示开关 | 总是 |
 | `/workflow-run/tmp/` | 临时产物：查询导出、wiki 临时 XHTML、旧版产物归档、升级 / 卸载备份、`view` 页面 | `workflow-run/` 不是独立 git 仓库时 |
@@ -574,6 +627,8 @@ git status --short --ignored
 * 技能内置安全规则：database-query 只读查询优先、写操作必须用户确认、敏感字段脱敏、
 
   不在对话中输出密码。
+
+* **Nacos**：优先读取用户选定的 application / bootstrap；可选本机 `nacos-config/config.json` 使用 `password_env` / `token_env` 引用凭据并由 gitignore 忽略。配置获取只读，不输出密码或 token，不缓存远程原文，也不自动改写数据库连接。生效环境与 Data ID 不明确时先确认。
 
 ## wiki 能力说明（连接空着不启动）
 
@@ -610,6 +665,7 @@ git status --short --ignored
 ```
 workflow-run/docs/requirements/<需求名>/<项目名>/
 ├── meta.json        # runs 保存分支运行状态、逐步完成标记与完成时间；另含 需求名、绑定的分支、各产物（版本、日期、wiki 发布记录、DocNexus 沉淀），给以后的可视化用
+├── requirement.md   # 需求文档（F3 / B3 收尾：目标、范围、AC 验收与澄清决定）
 ├── plan.md          # 方案（dev，非快速通道都写；S / M 简版；缺陷修复追加修复方案节）
 ├── delivery.md      # 交付说明（dev，完整流程审查后用户选择交付才写；S 快速通道不落盘）
 ├── review.md        # 审查报告（独立审查或 dev 完整流程自查；S 快速通道不落盘）；复审也写这个文件，上一版归档到 workflow-run/tmp/old-artifacts/

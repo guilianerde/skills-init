@@ -28,8 +28,8 @@ node <skills>/workflow/scripts/run.mjs cancel --id <运行id> --expect-revision 
 
 | kind | 步骤 | 首次创建时机 |
 |---|---|---|
-| `feature` | Step0、F1～F8 | F4 确定不走快速通道并 bind 后 |
-| `bug` | Step0、B1～B5 | B4 确定不走快速通道并 bind 后 |
+| `feature` | Step0、F1～F8 | F3 收尾确定不走快速通道并 bind 后，先写 requirement.md |
+| `bug` | Step0、B1～B5 | B3 收尾确定不走快速通道并 bind 后，先写 requirement.md |
 | `review` | R1～R7（project-review 第 1～7 步） | 独立审查需要落盘且绑定需求后；dev 内部审查不另开运行 |
 | `tech` | T0～T4（技术方案 Step 0～4） | 确定需求和分支、绑定后 |
 | `release` | L0～L4（上线方案 Step 0～4） | 确定需求和分支、绑定后 |
@@ -37,21 +37,20 @@ node <skills>/workflow/scripts/run.mjs cancel --id <运行id> --expect-revision 
 
 “已完成”表示**本次运行范围已交付**，不是整个需求已经上线。dev 完成后，用户选择的技术方案、上线方案、wiki 发布是同一个 meta.json 中的新运行，不把已完成的 dev 改回未完成。提交、推送和知识沉淀仍按既有授权规则处理，不因 completed 自动执行；这些可选后续动作不阻止已完成的技能交付标记完成。
 
-关键门禁、代码快照、自动审查交接和正式文档收尾见 [execution.md](execution.md)。运行创建时机保持不变；方案确认绑定 hash／版本，验证和审查绑定代码快照，交付选择绑定本轮报告。
+关键门禁、代码快照、自动审查交接和正式文档收尾见 [execution.md](execution.md)。完整流程从需求文档开始记录；方案绑定需求 hash／版本，方案确认绑定方案版本，验证和审查绑定代码快照，交付选择绑定本轮报告。
 
 ## 写 checkpoint
 
-完整 dev 开始记录前已经完成的前置步骤，要把对话中确认的事实补入第一份 checkpoint；没有实际完成的步骤不能补成 completed。例如 F4 开始时：
+完整 dev 开始记录前已经完成的前置步骤，要把对话中确认的摘要补入第一份 checkpoint；没有实际完成的步骤不能补成 completed。例如 F3 收尾准备写需求文档时：
 
 ```json
 {
-  "stage": "F4",
+  "stage": "F3",
   "status": "running",
   "steps": {
     "Step0": { "status": "completed" },
     "F1": { "status": "completed" },
-    "F2": { "status": "completed" },
-    "F3": { "status": "completed", "note": "理解与验收已确认" }
+    "F2": { "status": "completed" }
   },
   "context": {
     "summary": "本次要实现的行为",
@@ -65,6 +64,8 @@ node <skills>/workflow/scripts/run.mjs cancel --id <运行id> --expect-revision 
 ```
 
 每完成一个步骤、发生阻塞、准备等待用户，或结束本轮会话前，save 一次；`context` 按顶层字段合并，列表字段更新时提供完整列表，不写密码、token。每一步可记录 `evidence`（命令、结果、产物路径、未验证原因）和 `note`；这些是已观察到的结果，不得用计划冒充。
+
+F3 / B3 只能在需求文档 finalize 后完成；requirement.md 是需求事实来源，context 摘要与它保持一致。需求文档及方案各自独立版本、归档和展示；改需求须重新收尾依赖它的方案。历史文档不自动拆分，旧开发运行恢复时回到 F3 / B3 核实并补齐，不能用旧方案冒充需求文档。
 
 报告必须先由 artifact.mjs finalize 收尾并登记审查证据；报告已交给用户、等待修复或交付时：
 
@@ -86,7 +87,7 @@ node <skills>/workflow/scripts/run.mjs cancel --id <运行id> --expect-revision 
 - 环境等阻塞：`status: blocked`、reason 说明原因，保留步骤与 remaining；解除后 save running。
 - 取消：用 cancel，input 提供 reason，不能用 complete 把取消记成完成。
 
-交付产物、自检、摘要和反馈已处理后，把最后步骤标 completed，再运行 complete。complete 要求所有步骤 completed 或有原因的 skipped；完整 dev 的方案、实现、验证、审查、交付核心步骤在 save 时就不能跳过，用户必须已选择交付，并有本运行已收尾、内容仍匹配且属于当前分支的 plan.md、review.md、delivery.md，以及有效代码与审查证据。独立审查也核对代码快照与报告收尾凭据，其他文档运行检查当前分支的对应文件。验证步骤完成可以包含如实记录的“未验证”，不等于所有测试都通过。
+交付产物、自检、摘要和反馈已处理后，把最后步骤标 completed，再运行 complete。complete 要求所有步骤 completed 或有原因的 skipped；完整 dev 的方案、实现、验证、审查、交付核心步骤在 save 时就不能跳过，用户必须已选择交付，并有本运行已收尾、内容仍匹配且属于当前分支的 requirement.md、plan.md、review.md、delivery.md，以及有效代码与审查证据。独立审查也核对代码快照与报告收尾凭据，其他文档运行检查当前分支的对应文件。验证步骤完成可以包含如实记录的“未验证”，不等于所有测试都通过。
 
 complete 不接受待用户确认或 blocked 的运行。还在处理本次已承诺的交付事项时不能提前完成；可选下一步不属于本次运行范围。状态写入具有 revision 检查和短时元信息写锁；版本冲突时重新 show，核对并合并进度，不盲目重试覆盖。写入用 workflow-run/tmp/locks/ 下的短时锁目录（不落在需求目录、不会随产物提交），目录名为元信息相对路径的 SHA-256，避免长中文路径超过文件名限制。每次写入持有唯一的 PID／UUID 标记；只回收超过 30 秒且进程已退出的旧标记，非空锁目录不能删除，释放时也只删除自己的标记。mkdir 后尚未写入标记就崩溃的空目录，过期后同样自动恢复。
 

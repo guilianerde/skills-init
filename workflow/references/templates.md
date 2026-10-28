@@ -21,7 +21,7 @@ DocNexus 是必装组件，知识库 `workflow-run/docnexus/library/templates/<s
 
 ## 修改模板（/workflow template）
 
-用户要改某份模板（「技术方案模板加一节回滚」「上线方案去掉灰度那节」「审查报告的严重问题表加一列」），或要新建、按样例重做模板时，用 `template.mjs` 一路走完，不要直接编辑生效中的模板文件。`<模板>` 写别名 `tech` / `release` / `plan` / `delivery` / `review` / `checklist`，或 `<skill>/<文件名>`；没说哪份时先 `template.mjs list` 列出来问。
+用户要改某份模板（「技术方案模板加一节回滚」「上线方案去掉灰度那节」「审查报告的严重问题表加一列」），或要新建、按样例重做模板时，用 `template.mjs` 一路走完，不要直接编辑生效中的模板文件。`<模板>` 写别名 `requirement` / `tech` / `release` / `plan` / `delivery` / `review` / `checklist`，或 `<skill>/<文件名>`；没说哪份时先 `template.mjs list` 列出来问。
 
 1. **起草稿**：`node <skills>/workflow/scripts/template.mjs draft <模板>`，把当前生效的模板复制到 `workflow-run/tmp/template-draft/<skill>/<文件名>`（输出的 `draft`）。草稿已存在会沿用（上次没改完）；要从当前模板重来加 `--force`。
    - 退出码 2、`need_sample: true`：还没有这份模板，按下面「创建模板」第 1 步向用户要样例，再运行 `draft <模板> --from <样例文件>`（从 stdin 读用 `--from -`）。用户要「按这份文档重做模板」时同样用 `--from`。
@@ -31,7 +31,7 @@ DocNexus 是必装组件，知识库 `workflow-run/docnexus/library/templates/<s
    - `impact`：最近几份已生成的文档按新模板会多出哪些错误（例如新的必填章节它们没有）。只影响以后生成和 lint，已有文档不会被改；
    - `warnings`：例如没有任何必填章节；
    - 附上草稿全文（或改动的部分）。
-4. **用户确认后保存**：`node <skills>/workflow/scripts/template.mjs save <模板>`。它不直接写知识库，退出码 2：按输出的 `hint` 走 capture 流程把草稿写入知识库（写入要用户授权），完成后运行 `resolve.mjs template <skill> <文件名>` 确认 `path` 指向知识库里的那份，再删除草稿。改的是带默认版本的模板（plan / delivery / review / checklist）时，知识库里的版本取代默认版本，以后升级 skills 也不会覆盖它。
+4. **用户确认后保存**：`node <skills>/workflow/scripts/template.mjs save <模板>`。它不直接写知识库，退出码 2：按输出的 `hint` 走 capture 流程把草稿写入知识库（写入要用户授权），完成后运行 `resolve.mjs template <skill> <文件名>` 确认 `path` 指向知识库里的那份，再删除草稿。改的是带默认版本的模板（requirement / plan / delivery / review / checklist）时，知识库里的版本取代默认版本，以后升级 skills 也不会覆盖它。
 5. 用户想撤销：DocNexus 里的模板按 timeline 恢复旧版本。
 
 ## 创建模板

@@ -31,12 +31,16 @@
     "create-tech-md-doc",
     "create-release-md-doc",
     "code-graph",
+    "nacos-config",
     "README.md",
     "CHANGELOG.md"
   ],
   "scripts": {
     "test": "node --test \"tests/*.mjs\"",
     "eval:triggers": "node scripts/eval-triggers.mjs"
+  },
+  "devDependencies": {
+    "yaml": "^2.8.1"
   },
   "publishConfig": {
     "access": "public"

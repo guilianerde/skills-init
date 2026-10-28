@@ -1,4 +1,6 @@
 [
+  {"query": "读取测试环境 Nacos 的 order-test.yaml，看看 order.timeout 和 feature.enabled 当前是什么值", "expect": ["nacos-config"]},
+  {"query": "从 application.yml 找 Nacos 连接，查一下 common.yaml 里的业务配置，不要修改远程配置", "expect": ["nacos-config"]},
   {"query": "订单列表接口 /order/list 要加一个按创建时间区间筛选的参数，在 OrderController 里，帮我实现一下，记得补单测", "expect": ["dev"]},
   {"query": "线上报 NPE 了，日志里是 UserServiceImpl.getProfile 第 132 行，用户没绑定手机号的时候就会挂，帮我查一下并修掉", "expect": ["dev"]},
   {"query": "把优惠券过期判断从 Date 改成 LocalDateTime，涉及 CouponService 和两个 mapper，改完跑一下测试", "expect": ["dev"]},

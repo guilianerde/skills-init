@@ -6,15 +6,16 @@ import { FILES, parseBranch } from './artifact-model.mjs';
 import { hash, assertWorkingBranch } from './code-snapshot.mjs';
 import { layout } from './project.mjs';
 import { readRun, assertRunVersion, applyCheckpoint } from './runs.mjs';
-import { isDev, applyDevEvidence, assertReview, assertDelivery, reviewEvidence } from './run-gates.mjs';
+import { isDev, coreSteps, applyDevEvidence, assertRequirement, assertPlanBasis, assertReview, assertDelivery, reviewEvidence } from './run-gates.mjs';
 import { updateMeta } from './meta-store.mjs';
 import { OLD_DIR, indexArtifacts } from './requirements.mjs';
 
 export const ARTIFACT_TEMPLATES = {
+  requirement: ['dev', 'requirement-template.md'],
   plan: ['dev', 'plan-template.md'], review: ['project-review', 'report.md'], delivery: ['dev', 'delivery-template.md'],
   tech: ['create-tech-md-doc', 'template.md'], release: ['create-release-md-doc', 'template.md'],
 };
-const allowed = { feature: ['plan', 'review', 'delivery'], bug: ['plan', 'review', 'delivery'], review: ['review'], tech: ['tech'], release: ['release'] };
+const allowed = { feature: ['requirement', 'plan', 'review', 'delivery'], bug: ['requirement', 'plan', 'review', 'delivery'], review: ['review'], tech: ['tech'], release: ['release'] };
 const relative = (root, file) => path.relative(root, file).split(path.sep).join('/');
 const fileHash = (file) => fs.existsSync(file) ? hash(fs.readFileSync(file)) : null;
 
@@ -34,6 +35,7 @@ export function resumeFinalization(root, { branch, id }) {
     if (current !== p.before && current !== p.hash) throw new Error('正式产物在收尾中断后被其他操作修改，请先核对并恢复；不会覆盖');
     // 中断期间代码／报告也可能变化：发布前重新检查本轮门禁。
     applyDevEvidence(root, req, p.run, p.checkpoint, p.run.updated_at, { [p.kind]: fs.readFileSync(staged, 'utf8') });
+    if (p.kind === 'plan') assertPlanBasis(root, req, p.run, { plan: fs.readFileSync(staged, 'utf8') });
     if (p.kind === 'review' || (isDev(p.run) && p.kind === 'delivery')) {
       if (p.kind === 'review') assertReview(root, req, p.run, { review: fs.readFileSync(staged, 'utf8') });
       else assertDelivery(root, req, p.run);
@@ -115,16 +117,26 @@ export function finalizeArtifact(root, { branch, id, revision, kind, text, input
     const run = structuredClone(current);
     // 文档收尾只能登记当前步骤，不能在一次落盘中跳到下游或替用户作确认。
     if (Object.keys(input).some((k) => !['steps', 'status', 'waiting_for', 'reason', 'context'].includes(k))) throw new Error('收尾 checkpoint 只接受 steps / status / waiting_for / reason / context；阶段和用户选择用 run.mjs save');
-    const expectedStep = isDev(run) ? (kind === 'plan' ? (run.kind === 'feature' ? 'F4' : 'B4') : kind === 'review' ? (run.kind === 'feature' ? 'F7' : 'B5') : (run.kind === 'feature' ? 'F8' : 'B5')) : ({ review: 'R7', tech: 'T4', release: 'L4' })[run.kind];
+    const expectedStep = isDev(run) ? (kind === 'requirement' ? (run.kind === 'feature' ? 'F3' : 'B3') : kind === 'plan' ? (run.kind === 'feature' ? 'F4' : 'B4') : kind === 'review' ? (run.kind === 'feature' ? 'F7' : 'B5') : (run.kind === 'feature' ? 'F8' : 'B5')) : ({ review: 'R7', tech: 'T4', release: 'L4' })[run.kind];
     if (run.stage !== expectedStep || Object.keys(input.steps ?? {}).some((s) => s !== expectedStep)) throw new Error(`产物应在 ${expectedStep} 收尾，只能更新该步骤`);
+    let requirement = null;
+    if (kind === 'plan') {
+      requirement = assertRequirement(root, req, run);
+      if (run.steps[run.kind === 'feature' ? 'F3' : 'B3'].status !== 'completed') throw new Error('需求文档尚未完成，不能收尾方案');
+    }
     if (isDev(run) && kind === 'delivery') assertDelivery(root, req, run);
     if ((fs.existsSync(file) ? wikiRecord(fs.readFileSync(file, 'utf8')) : null) !== existingWiki) throw new Error('wiki 发布记录在收尾期间变化，请重新读取后重试');
     const before = fileHash(file);
     const oldVersion = meta.versions?.[kind] ?? 1;
     const version = before === null ? 1 : oldVersion + (before === digest ? 0 : 1);
     const previous = before !== null && before !== digest ? relative(root, path.join(root, OLD_DIR, path.relative(path.join(root, 'workflow-run/docs/requirements'), req.abs), `${FILES[kind]}_v${oldVersion}.md`)) : null;
-    run.artifacts = { ...(run.artifacts ?? {}), [kind]: { hash: digest, version, path: relative(root, file), previous, lint, at } };
-    if (kind === 'plan' && current.artifacts?.plan?.hash !== digest) { run.plan_approval = null; run.implementation = null; run.validation = null; run.review = null; run.decision = null; }
+    run.artifacts = { ...(run.artifacts ?? {}), [kind]: { hash: digest, version, path: relative(root, file), previous, lint, at,
+      ...(requirement ? { requirement: { hash: requirement.hash, version: requirement.version } } : {}) } };
+    if ((kind === 'plan' && (current.artifacts?.plan?.hash !== digest || current.artifacts?.plan?.requirement?.hash !== requirement.hash))
+      || (kind === 'requirement' && current.artifacts?.requirement?.hash !== digest)) {
+      run.plan_approval = null; run.implementation = null; run.validation = null; run.review = null; run.decision = null;
+      if (kind === 'requirement') for (const step of coreSteps(run).slice(1)) run.steps[step] = { status: 'pending' };
+    }
     applyCheckpoint(run, input, at, false);
     if (kind === 'review') {
       run.review = reviewEvidence(root, req, run, packet, result, { review: text });

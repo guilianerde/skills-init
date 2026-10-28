@@ -10,15 +10,23 @@
     "md-to-wiki",
     "create-tech-md-doc",
     "create-release-md-doc",
-    "code-graph"
+    "code-graph",
+    "nacos-config"
   ],
   "templates": [
+    {
+      "id": "requirement-template.md",
+      "src": "references/requirement-template.md",
+      "title": "需求文档模板",
+      "summary": "完整开发 / 修复在 F3 / B3 收尾的需求文档：目标、范围、验收标准和澄清决定，与实现方案分开。",
+      "lint": { "requiredMeta": ["需求来源"] }
+    },
     {
       "id": "plan-template.md",
       "src": "references/plan-template.md",
       "title": "方案模板（开发 / 修复）",
       "summary": "dev skill 在非快速通道（S / M / L）落盘方案时使用；缺陷修复在 B4 追加「修复方案」节。",
-      "lint": {}
+      "lint": { "requiredMeta": ["需求文档"] }
     },
     {
       "id": "delivery-template.md",

@@ -5,7 +5,7 @@ import { FILES, parseBranch } from './artifact-model.mjs';
 import { hash, assertSnapshot, assertWorkingBranch } from './code-snapshot.mjs';
 
 export const isDev = (run) => ['feature', 'bug'].includes(run.kind);
-export const coreSteps = (run) => run.kind === 'feature' ? ['F4', 'F5', 'F6', 'F7', 'F8'] : ['B4', 'B5'];
+export const coreSteps = (run) => run.kind === 'feature' ? ['F3', 'F4', 'F5', 'F6', 'F7', 'F8'] : ['B3', 'B4', 'B5'];
 
 export function receipt(root, req, run, kind, contents = {}) {
   const record = run.artifacts?.[kind];
@@ -15,9 +15,20 @@ export function receipt(root, req, run, kind, contents = {}) {
   return record;
 }
 
+export function assertRequirement(root, req, run, contents) {
+  return receipt(root, req, run, 'requirement', contents);
+}
+
+export function assertPlanBasis(root, req, run, contents) {
+  const requirement = assertRequirement(root, req, run, contents);
+  const plan = receipt(root, req, run, 'plan', contents);
+  if (plan.requirement?.hash !== requirement.hash || plan.requirement.version !== requirement.version) throw new Error('方案依据的需求版本已变化，请根据当前 requirement.md 重新收尾方案');
+  return plan;
+}
+
 export function assertPlan(root, req, run, contents) {
   assertWorkingBranch(root, run);
-  const plan = receipt(root, req, run, 'plan', contents);
+  const plan = assertPlanBasis(root, req, run, contents);
   if (run.size !== 'S' && (run.plan_approval?.hash !== plan.hash || run.plan_approval.version !== plan.version)) throw new Error('M / L 方案尚未由用户确认，或确认后方案已变化；先记录 approval.confirmed');
   return plan;
 }
@@ -53,7 +64,7 @@ export function applyDevEvidence(root, req, run, patch, at, contents = {}) {
   for (const step of coreSteps(run)) if (run.steps[step].status === 'skipped') throw new Error(`完整 dev 核心步骤不能跳过：${step}`);
   if (patch.approval !== undefined) {
     if (patch.approval?.confirmed !== true) throw new Error('approval 必须记录用户明确确认：confirmed: true');
-    const plan = receipt(root, req, run, 'plan', contents);
+    const plan = assertPlanBasis(root, req, run, contents);
     run.plan_approval = { hash: plan.hash, version: plan.version, at };
   }
   const implementing = patch.implement === true || (run.kind === 'feature' && patch.stage === 'F5');
@@ -83,6 +94,12 @@ export function applyDevEvidence(root, req, run, patch, at, contents = {}) {
     assertDelivery(root, req, run, contents);
   }
   const completed = (s) => patch.steps?.[s]?.status === 'completed';
+  const requirementStep = run.kind === 'feature' ? 'F3' : 'B3';
+  if (completed(requirementStep)) assertRequirement(root, req, run, contents);
+  if (patch.stage === (run.kind === 'feature' ? 'F4' : 'B4')) {
+    assertRequirement(root, req, run, contents);
+    if (run.steps[requirementStep].status !== 'completed') throw new Error('需求文档尚未完成，不能进入方案／修复阶段');
+  }
   if (run.kind === 'feature') {
     if (completed('F4')) receipt(root, req, run, 'plan', contents);
     if (patch.stage === 'F6' || completed('F5')) {
@@ -112,7 +129,7 @@ export function applyDevEvidence(root, req, run, patch, at, contents = {}) {
 
 export function reviewInputs(run) {
   const facts = Object.fromEntries(['summary', 'acceptance', 'decisions', 'scope', 'baseline'].filter((k) => run.context[k] !== undefined).map((k) => [k, run.context[k]]));
-  return { facts, scope: run.scope, plan: run.artifacts?.plan ?? null, validation: run.validation ?? null };
+  return { facts, requirement: run.artifacts?.requirement ?? null, scope: run.scope, plan: run.artifacts?.plan ?? null, validation: run.validation ?? null };
 }
 
 export function reviewEvidence(root, req, run, packet, result, contents) {

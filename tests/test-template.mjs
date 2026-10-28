@@ -154,7 +154,7 @@ test('参数：未知模板与缺子命令退出 1；list 列出别名与来源'
   assert.equal(run('draft', 'nope').code, 1);
   assert.equal(run().code, 1);
   const l = run('list').out;
-  assert.deepEqual(l.map((x) => x.alias), ['tech', 'release', 'plan', 'delivery', 'review', 'checklist']);
+  assert.deepEqual(l.map((x) => x.alias), ['requirement', 'tech', 'release', 'plan', 'delivery', 'review', 'checklist']);
   // 未接入时模板没有来源（不再回退包内默认），标记为缺失
   assert.deepEqual([l.find((x) => x.alias === 'review').source, l.find((x) => x.alias === 'review').missing], [null, true]);
   assert.equal(l.find((x) => x.alias === 'tech').missing, true);

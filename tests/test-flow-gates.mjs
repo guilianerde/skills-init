@@ -249,6 +249,18 @@ test('安装后的新 CLI 使用知识模板检查草稿，并生成审查交接
   assert.equal(install.status, 0, install.stdout + install.stderr);
   let run = f.start();
   const scripts = path.join(f.root, '.agents/skills/workflow/scripts');
+  const reqDraft = path.join(f.root, 'workflow-run/tmp/requirement.md');
+  fs.mkdirSync(path.dirname(reqDraft), { recursive: true });
+  const reqTemplate = fs.readFileSync(path.join(REPO, 'dev/references/requirement-template.md'), 'utf8');
+  fs.writeFileSync(reqDraft, reqTemplate.replace(/\{\{([^}]+)\}\}/g, (_, key) => key === 'dev分支' ? BRANCH : key === 'YYYY-MM-DD' ? '2026-10-28' : key === 'S / M / L' ? 'M' : '已确认'));
+  const reqInput = path.join(f.root, 'workflow-run/tmp/requirement-checkpoint.json');
+  fs.writeFileSync(reqInput, JSON.stringify(done('F3')));
+  const reqResult = spawnSync(process.execPath, [path.join(scripts, 'artifact.mjs'), 'finalize', '--id', run.id, '--expect-revision', String(run.revision), '--kind', 'requirement', '--draft', reqDraft, '--input', reqInput], { cwd: f.root, encoding: 'utf8' });
+  assert.equal(reqResult.status, 0, reqResult.stderr);
+  run = JSON.parse(reqResult.stdout).run;
+  assert.equal(run.steps.F3.status, 'completed');
+  assert.equal(fs.existsSync(path.join(f.root, f.req.dir, 'plan.md')), false);
+  run = f.save(run, { stage: 'F4' });
   const draft = path.join(f.root, 'workflow-run/tmp/plan.md'); fs.mkdirSync(path.dirname(draft), { recursive: true });
   fs.writeFileSync(draft, f.text('plan.md') + '\n{{未填写}}');
   const args = ['finalize', '--id', run.id, '--expect-revision', String(run.revision), '--kind', 'plan', '--draft', draft];

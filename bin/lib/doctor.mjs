@@ -143,7 +143,7 @@ export function doctor(root, offline) {
   step('.gitignore');
   const gi = path.join(root, '.gitignore');
   const lines = fs.existsSync(gi) ? fs.readFileSync(gi, 'utf8').split(/\r?\n/).map((l) => l.trim()) : [];
-  const need = ['**/database-query/config.json', '**/wiki-config.json'];
+  const need = ['**/database-query/config.json', '**/nacos-config/config.json', '**/wiki-config.json'];
   const lack = need.filter((r) => !lines.includes(r));
   if (lack.length) bad(`.gitignore 缺少 ${lack.join(' ')}：凭据可能被提交，重跑 npx @rowansenne/workflow-run upgrade 补齐`); else ok('凭据文件已被忽略');
 

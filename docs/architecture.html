@@ -193,14 +193,14 @@ footer { margin-top: 40px; font-size: 13px; color: var(--muted); }
 
 <header class="hero">
   <div>
-    <div class="eyebrow">@rowansenne/workflow-run · 0.26</div>
+    <div class="eyebrow">@rowansenne/workflow-run · 0.28.0 + Unreleased · 2026-10-28</div>
     <h1>让 AI 编程代理按团队的规矩干活</h1>
     <p class="lede">一套装进项目里的 Agent Skills：从需求澄清、开发、测试、自审到技术方案和上线方案，每一步怎么做、做到什么程度、哪些事必须先问人，都写成团队共享的规则和脚本，随代码一起提交。</p>
     <div class="facts">
-      <span class="fact">8 个 skill</span>
+      <span class="fact">9 个 skill</span>
       <span class="fact">5 种代理环境</span>
       <span class="fact">一条命令安装</span>
-      <span class="fact">数据全在本地</span>
+      <span class="fact">产物与状态在本地</span>
     </div>
   </div>
   <div class="term" aria-label="安装示例">
@@ -240,9 +240,10 @@ footer { margin-top: 40px; font-size: 13px; color: var(--muted); }
 
 <section>
   <div class="kicker">整体架构</div>
-  <h2>六层：底层文档库托底，流程、命令与规则各归一层，代理和用户只看最上面一层</h2>
+  <h2>安装分发独立，流程、命令、共享核心与能力工具协作</h2>
   <div class="prose">
-    <p>skill 只写流程和判断，所有能确定的事（找模板、定产物路径、识别涉及的表、文档自检）都交给脚本；脚本只做命令入口，路径、解析和读写规则收敛到共享核心 <code>workflow/lib</code> 的一份定义。一次命令只读一遍数据，写入带锁原子落盘。脚本结果是固定的，模型强弱只影响判断，不影响格式。</p>
+    <p>宿主代理读取 skill 规则、判断任务并调用脚本；workflow-run 不提供常驻的 Agent 调度服务。工作流命令将共享的路径、数据模型、读取和状态写入交给 <code>workflow/lib</code>，数据库、wiki、Nacos 等能力的执行留在各自目录。</p>
+    <p>下图按职责分区，每次请求只经过需要的部分。<code>nacos-config</code> 可以由代理直接调用，也可在开发或审查中提供配置证据；独立读取不经过需求状态与产物收尾。</p>
   </div>
   <div class="arch">
     <div class="stack">
@@ -261,14 +262,13 @@ footer { margin-top: 40px; font-size: 13px; color: var(--muted); }
         </div>
       </div>
       <div class="layer flow">
-        <div class="tag">skill 流程<small>SKILL.md：步骤、确认点与降级判断</small></div>
+        <div class="tag">流程型 skill<small>SKILL.md + references：按阶段读取规则</small></div>
         <div class="cells">
           <div class="cell"><b>workflow</b><span>入口路由、能力探测</span></div>
           <div class="cell"><b>dev</b><span>需求 → 交付</span></div>
           <div class="cell"><b>project-review</b><span>代码审查</span></div>
           <div class="cell"><b>create-tech-md-doc</b><span>技术方案</span></div>
           <div class="cell"><b>create-release-md-doc</b><span>上线方案</span></div>
-          <div class="cell"><b>profile.json</b><span>项目画像（用户文件，升级保留）</span></div>
         </div>
       </div>
       <div class="layer">
@@ -306,16 +306,19 @@ footer { margin-top: 40px; font-size: 13px; color: var(--muted); }
         </div>
       </div>
       <div class="layer">
-        <div class="tag">工具<small>执行与凭据在各自目录</small></div>
+        <div class="tag">能力型 skill<small>按任务调用；执行与凭据在各自目录</small></div>
         <div class="cells">
           <div class="cell"><b>code-graph</b><span>影响面、调用入口、MQ、定时任务</span></div>
           <div class="cell"><b>database-query</b><span>只读查库、脱敏</span></div>
           <div class="cell"><b>md-to-wiki</b><span>发布到 Confluence</span></div>
+          <div class="cell"><b>nacos-config</b><span>独立只读远程配置、参数与开关</span></div>
         </div>
       </div>
       <div class="layer out">
-        <div class="tag">底层文档库<small>只写这一个目录</small></div>
+        <div class="tag">数据与运行环境<small>产物、状态、知识与工具内部文件分开</small></div>
         <div class="cells">
+          <div class="cell">workflow/profile.json <span>项目事实；本机覆盖在 profile.local.json</span></div>
+          <div class="cell">.docnexus/ · .codegraph/ <span>DocNexus 运行环境 · 本机代码索引</span></div>
           <div class="cell">workflow-run/docs/requirements/ <span>需求产物 + meta.json（分支、运行状态、版本）</span></div>
           <div class="cell">workflow-run/docnexus/ <span>团队知识库</span></div>
           <div class="cell">workflow-run/feedback/ <span>运行反馈</span></div>
@@ -327,34 +330,61 @@ footer { margin-top: 40px; font-size: 13px; color: var(--muted); }
     <aside class="side">
       <h3>安装器 <code>bin/</code></h3>
       <p>和运行流程分开：负责安装、升级、卸载、自检，不参与开发。</p>
-      <p>每个 skill 的依赖、模板、知识库分类都写在自己的 <code>skill.json</code> 里，安装器、脚本、测试都从这一份读；<code>workflow/lib</code> 随 workflow skill 一起安装，对外命令路径不变。</p>
+      <p><code>bin/skills.mjs</code> 从各目录的 <code>skill.json</code> 自动发现 skills，读取依赖、用户文件、模板和知识分类；<code>package.json.files</code> 控制 npm 包内容。<code>workflow/lib</code> 随 workflow skill 安装。</p>
       <p>共享核心不反向依赖命令脚本、纯模型不做 I/O——这条边界写进了测试，违反会直接跑挂。安装器自己的环境探测也用 <code>lib/project</code>，不另写一份。</p>
-      <p>升级只换 skills 文件；项目画像、数据库和 wiki 配置保留不动，手改过的文件先备份。</p>
+      <p>升级只换分发文件；项目画像、数据库、wiki 和 Nacos 本机配置保留不动，手改过的文件先备份。默认单一来源 + 相对软链接，也支持 <code>--copy</code>。</p>
+      <p>DocNexus 在安装环节必装，哪怕只选 Nacos；Nacos 读取脚本没有 workflow / DocNexus 运行依赖。DocNexus 自带 skills 不计入本包的 9 个。</p>
       <p><code>npx @rowansenne/workflow-run doctor</code> 检查链接、画像、凭据是否被忽略、数据库能否只读连上。</p>
     </aside>
   </div>
+</section>
+
+<section id="calls">
+  <div class="kicker">调用与状态</div>
+  <h2>完整流程记录证据，独立查询按需读取</h2>
+  <div class="two">
+    <div>
+      <h3>开发 / 审查路径</h3>
+      <div class="tree"><pre>宿主代理 → dev / project-review
+  → workflow/scripts 命令
+  → workflow/lib：门禁、代码证据、状态
+  → workflow-run：Markdown + meta.json
+  ↳ 按需调用图谱、数据库、wiki、Nacos</pre></div>
+      <p class="sub" style="margin-top:12px">完整 dev 的方案批准绑定正文版本，验证和审查绑定执行前代码快照，交付选择绑定本轮报告。artifact 收尾登记待办后发布、归档、更新索引；中断可 resume 或 abort。S 快速通道不绑定需求、不建运行、不落盘。</p>
+    </div>
+    <div>
+      <h3>Nacos 独立路径</h3>
+      <div class="tree"><pre>宿主代理 → nacos-config
+  → inspect：仅查看本地配置候选
+  → 明确环境、Namespace / Group / Data ID
+  → get：鉴权 + 只读 HTTP 获取
+  → 脱敏属性 + 来源、读取时间、摘要</pre></div>
+      <p class="sub" style="margin-top:12px">不创建需求、运行或原文缓存，不改数据库连接。仅配置 GET 与登录 POST；多个环境不猜选。结果是单个配置快照，不代表 Spring 合并、灰度与刷新后的运行时最终值。</p>
+    </div>
+  </div>
+  <div class="callout"><code>meta.json</code> 保存绑定、版本索引、runs 与收尾待办，Markdown 保存正文和发布 / 沉淀引用。<code>view</code> / <code>report</code> 只读取快照；文件存在不等于运行完成。<code>lib</code> 不反向依赖 <code>scripts</code>，纯模型不做 I/O。实现细节见 <a href="../workflow/references/architecture.md">内部模块边界</a>。</div>
 </section>
 
 <section>
   <div class="kicker">主线：dev</div>
   <h2>一个需求从描述到交付，人只在关键处拍板</h2>
   <div class="prose">
-    <p><code>/dev &lt;需求&gt;</code> 或 <code>/dev --bug &lt;现象&gt;</code> 进入。事实代理自己查（代码、表结构、PRD、历史沉淀），决定交给人（业务规则、取舍、范围）。</p>
+    <p><code>/dev &lt;需求&gt;</code> 或 <code>/dev --bug &lt;现象&gt;</code> 进入。事实代理自己查（代码、表结构、远程配置、PRD、历史沉淀），决定交给人（业务规则、取舍、范围）。</p>
   </div>
   <div class="flow">
     <ol>
       <li><span class="code">Step 0</span><div class="name">前置检查</div><div class="what">读画像，先确定工作分支，再问清需求名（给不出就不开始）与工作区里已有的改动归谁，跑一次基线</div></li>
       <li><span class="code">F1</span><div class="name">理解需求</div><div class="what">拉 PRD，召回以往的约定和坑，列初版验收标准</div></li>
       <li><span class="code">F2</span><div class="name">现状调研</div><div class="what">沿调用链读代码，只读查实际表结构</div></li>
-      <li class="gate"><span class="code">F3</span><div class="name">需求澄清</div><div class="what">分轮提问，每题带推荐答案；M / L 确认理解一致</div></li>
-      <li class="gate"><span class="code">F4</span><div class="name">方案</div><div class="what">按规模分级并告知；S 问是否走快速通道，非快速通道方案一律落盘（S / M 简版）<br><span class="art">plan.md</span></div></li>
+      <li class="gate"><span class="code">F3</span><div class="name">需求澄清</div><div class="what">分轮澄清；M / L 确认理解一致；判通道后完整流程先生成需求文档<br><span class="art">requirement.md</span></div></li>
+      <li class="gate"><span class="code">F4</span><div class="name">方案</div><div class="what">引用需求版本，只写实现设计、实施和验证计划（S / M 简版）<br><span class="art">plan.md</span></div></li>
       <li><span class="code">F5</span><div class="name">实现</div><div class="what">贴合现有写法，不顺手重构；SQL 只写脚本不执行</div></li>
       <li><span class="code">F6</span><div class="name">验证</div><div class="what">先相关测试再全量；完整流程绑定执行前代码快照，验收项逐条对应到证据</div></li>
       <li class="gate"><span class="code">F7</span><div class="name">审查</div><div class="what">完整流程自动生成交接材料，优先独立子 agent 审查；返回草稿与结构化结果，由主 agent 收尾 review.md，再等用户选择修复或交付<br><span class="art">review.md</span></div></li>
       <li class="gate"><span class="code">F8</span><div class="name">交付</div><div class="what">用户选择交付后才生成交付说明；提交、PR 先问，沉淀有值得记的内容才问<br><span class="art">delivery.md</span></div></li>
     </ol>
   </div>
-  <div class="legend"><span><i></i>需要人确认的节点</span><span><b>产物落盘</b>：F4 <code>plan.md</code> → F7 <code>review.md</code> → F8 <code>delivery.md</code>（选择交付后）；S 快速通道不落任何产物</span><span>缺陷修复走 B1 收集现象 → B2 复现 → B3 定位根因 → B4 追加 <code>plan.md</code> → B5 审查与交付（<code>review.md</code> / <code>delivery.md</code>）</span></div>
+  <div class="legend"><span><i></i>需要人确认的节点</span><span><b>产物落盘</b>：F3 <code>requirement.md</code> → F4 <code>plan.md</code> → F7 <code>review.md</code> → F8 <code>delivery.md</code>（选择交付后）；S 快速通道不落任何产物</span><span>缺陷修复走 B1 收集现象 → B2 复现 → B3 定位根因并生成 <code>requirement.md</code> → B4 追加 <code>plan.md</code> → B5 审查与交付（<code>review.md</code> / <code>delivery.md</code>）</span></div>
   <div class="sizes">
     <div class="size"><div class="s">S · 快速通道</div><p>≤3 个文件，不碰接口、表、配置、权限、资金。走不走由用户选：同意则编译、测试照常，审查在当前会话做；不绑定需求、不落产物文件（连方案也不写），一次对话交付并注明「未询问」。</p></div>
     <div class="size"><div class="s">M</div><p>改接口、配置项、少量字段，或涉及权限、资金。先确认需求理解，再确认落盘的简要方案。</p></div>
@@ -376,15 +406,15 @@ footer { margin-top: 40px; font-size: 13px; color: var(--muted); }
     </div>
     <div>
       <h3>开工统一选择能力</h3>
-      <p>DocNexus 是必装组件，不可用时先修复。开工快照统一选择 CodeGraph、数据库和 wiki 的增强通道；所需模板缺失、发布或查库的必要条件不满足时停在相关步骤。</p>
+      <p>工作流开工快照检查必装 DocNexus，并选择 CodeGraph、数据库和 wiki 通道。Nacos 由独立 skill 按需读取，尚未纳入集中状态探测；<code>config_center: nacos</code> 只说明项目类型，不代表连接已验证。</p>
     </div>
     <div>
-      <h3>不可逆的事一律先问</h3>
-      <p>不写库、不 commit、不 push、不装依赖、不写知识库，除非用户在本次对话里明确同意。SQL 只写成脚本交给人。</p>
+      <h3>按任务授权执行写操作</h3>
+      <p>提交、推送、发布 wiki、写知识库按流程取得授权；数据库默认只读，可写连接也须明确同意后执行写语句。Nacos skill 仅提供读取；安装器按安装请求接入所需依赖。</p>
     </div>
     <div>
       <h3>一份文件，五个环境</h3>
-      <p>skills 只在 <code>.agents/skills/</code> 装一份，其他环境用相对软链接指过去。改模板、填配置只改一处，整个目录可以提交给团队。</p>
+      <p>默认在 <code>.agents/skills/</code> 装一份，其他环境逐 skill 建相对链接；<code>--copy</code> 可改为各装一份。规则可共享，连接和本机依赖不提交；生效模板保存在 DocNexus。</p>
     </div>
     <div>
       <h3>结论要有出处</h3>
@@ -394,9 +424,9 @@ footer { margin-top: 40px; font-size: 13px; color: var(--muted); }
 </section>
 
 <section>
-  <div class="kicker">8 个 skill</div>
+  <div class="kicker">9 个 skill</div>
   <h2>按需安装，依赖自动带上</h2>
-  <div class="prose"><p><code>--skills dev</code> 会一起装上它必需的 <code>workflow</code> 和 <code>project-review</code>；可选的协作 skill 没装时，对应步骤跳过。</p></div>
+  <div class="prose"><p><code>--skills dev</code> 会一起装上它必需的 <code>workflow</code> 和 <code>project-review</code>；可选协作没装时跳过对应增强。<code>--skills nacos-config</code> 无其他 skill 依赖；安装器仍接入必装 DocNexus。</p></div>
   <div class="tbl">
     <table>
       <thead><tr><th>skill</th><th>做什么</th><th>依赖</th></tr></thead>
@@ -406,6 +436,7 @@ footer { margin-top: 40px; font-size: 13px; color: var(--muted); }
         <tr><td>project-review</td><td>审分支或未提交改动：14 维度清单、影响面、发现复核、复审对比</td><td><span class="pill req">workflow</span></td></tr>
         <tr><td>code-graph</td><td>基于 CodeGraph：改动影响到的接口、MQ 消费者、定时任务、测试、SQL 和表</td><td><span class="pill req">workflow</span></td></tr>
         <tr><td>database-query</td><td>会话级只读查询，拦截写语句、自动 LIMIT、敏感字段脱敏</td><td><span class="pill req">workflow</span></td></tr>
+        <tr><td>nacos-config</td><td>从 application / bootstrap 定位连接，按需只读获取配置、参数与开关；可被 dev / project-review 调用</td><td><span class="pill">无</span></td></tr>
         <tr><td>create-tech-md-doc</td><td>从分支 diff 按团队模板生成技术方案</td><td><span class="pill req">workflow</span></td></tr>
         <tr><td>create-release-md-doc</td><td>从分支 diff 生成上线方案，自动引用同分支的技术方案和交付说明</td><td><span class="pill req">workflow</span></td></tr>
         <tr><td>md-to-wiki</td><td>把 md 转成 Confluence 格式并发布；未配置时不启动</td><td><span class="pill req">workflow</span></td></tr>
@@ -429,7 +460,8 @@ footer { margin-top: 40px; font-size: 13px; color: var(--muted); }
         <tr><td>/workflow</td><td>入口路由：直接说需求也行；不带请求时输出能力地图和状态</td></tr>
         <tr><td>/workflow profile</td><td>填写或更新项目画像（主分支、构建测试命令、toolchain）</td></tr>
         <tr><td>/workflow status</td><td>开工快照：DocNexus 必装门槛、CodeGraph 通道、数据库与 wiki 配置</td></tr>
-        <tr><td>/workflow template &lt;模板&gt; [怎么改]</td><td>修改或创建文档模板：tech、release、plan、delivery、review、checklist</td></tr>
+        <tr><td>读取测试环境 Nacos 的 order.yaml，查看 order.timeout</td><td>进入 nacos-config：定位本地连接，选择环境和 Data ID，再只读获取脱敏结果</td></tr>
+        <tr><td>/workflow template &lt;模板&gt; [怎么改]</td><td>修改或创建文档模板：requirement、tech、release、plan、delivery、review、checklist</td></tr>
         <tr><td>/create-tech-md-doc &lt;dev分支&gt; &lt;主分支&gt;</td><td>从分支 diff 按团队模板生成技术方案</td></tr>
         <tr><td>/create-release-md-doc &lt;dev分支&gt; &lt;主分支&gt;</td><td>生成上线方案，自动引用同分支的技术方案和交付说明</td></tr>
         <tr><td>/workflow report</td><td>效果报告：审查发现与修复率、需求澄清、DocNexus 沉淀与复用</td></tr>
@@ -461,9 +493,9 @@ footer { margin-top: 40px; font-size: 13px; color: var(--muted); }
 
 <section>
   <div class="kicker">连接配置</div>
-  <h2>数据库与 wiki：各填一份 JSON，填完即生效</h2>
+  <h2>各能力维护连接，配置检查与远端验证分开</h2>
   <div class="prose">
-    <p>两份配置都在 <code>.agents/skills/</code> 单一来源目录下，其他环境是软链接，改一处全环境生效（<code>--copy</code> 装的多份在重装时自动并入）；安装器已把这两个文件加进 <code>.gitignore</code>（含凭据，勿提交），重跑和升级都不会覆盖你填的内容。</p>
+    <p>默认在 <code>.agents/skills/</code> 维护连接，其他环境通过相对软链接复用；<code>--copy</code> 时各份独立。数据库、wiki 与可选 Nacos 本机连接均已加入 <code>.gitignore</code>，重装保留。配置存在只说明可以尝试连接，网络与鉴权仍由实际请求验证。</p>
   </div>
   <div class="two">
     <div>
@@ -514,6 +546,12 @@ footer { margin-top: 40px; font-size: 13px; color: var(--muted); }
       <div class="callout">wiki 未配置时 md-to-wiki 直接不启动；技术 / 上线方案的 <code>--prd</code> 增强自动回退纯 diff 流程，文档生成主流程不受影响。dev 拉 PRD 用同一套判定。</div>
     </div>
   </div>
+  <h3 style="margin-top:28px">Nacos · 优先复用 application / bootstrap</h3>
+  <p>不强制填写第二份连接。<code>inspect</code> 列出本地候选，明确环境后，<code>get</code> 从所选文件解析 Nacos 参数与占位符。也可自行创建 <code>nacos-config/config.json</code>，用 <code>--conn test</code> 选择命名连接，密码 / token 仅通过环境变量引用。详情见 <a href="../nacos-config/references/connection.md">连接格式与协议</a>。</p>
+  <div class="tree"><pre>node .agents/skills/nacos-config/scripts/config.mjs inspect
+node .agents/skills/nacos-config/scripts/config.mjs get --file src/main/resources/bootstrap.yml --file src/main/resources/application-test.yml --data-id order-test.yaml --key order.timeout</pre></div>
+  <p class="sub" style="margin-top:12px">支持 JSON / YAML / properties；首次解析 YAML 若缺依赖，在该 skill 目录运行 npm 安装。默认使用 Nacos 1.x / 2.x 的兼容 API，也可显式选择 2.x API 或 3.x Client API。<code>/workflow status</code> 与 <code>doctor</code> 均不测试 Nacos 远端连通性；doctor 会检查本机连接文件的忽略规则。</p>
+  <div class="callout">本页包含当前工作区的 Unreleased 改动：nacos-config 尚未发布到 npm。已发布包以对应版本的文件为准。</div>
 </section>
 
 <section>
@@ -526,6 +564,7 @@ footer { margin-top: 40px; font-size: 13px; color: var(--muted); }
 └── 订单导出/                <span class="c"># 需求名由你定</span>
     └── order-service/       <span class="c"># 项目名，跨服务各占一层</span>
         ├── meta.json        <span class="c"># 分支、运行状态、版本、wiki、沉淀记录</span>
+        ├── requirement.md   <span class="c"># 需求文档（F3 / B3；目标、范围、AC 验收与澄清决定）</span>
         ├── plan.md          <span class="c"># 方案（F4；非快速通道都写。缺陷修复在 B4 追加「修复方案」节）</span>
         ├── delivery.md      <span class="c"># 交付说明（F8 / B5，选择交付后）</span>
         ├── review.md        <span class="c"># 审查报告（F7 / B5，每轮）</span>

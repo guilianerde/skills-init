@@ -168,7 +168,7 @@ footer { margin-top: 56px; padding-top: 18px; border-top: 1px solid var(--line);
     <header class="top">
       <div class="eyebrow">npx @rowansenne/workflow-run --with-docnexus --with-codegraph</div>
       <h1>全量安装教程<span class="pkg">workflow-run · DocNexus 文档库 · CodeGraph 代码图谱</span></h1>
-      <p class="lede">在项目根执行一条命令，装好全部项目级 skills，同时接入 DocNexus 项目记忆和 CodeGraph 代码图谱。本页按顺序讲安装前的准备、安装器每一步做了什么、装完怎么验证，以及团队其他人怎么接入。</p>
+      <p class="lede">在项目根执行一条命令，装好项目级 skills，同时接入 DocNexus 项目记忆和可选的 CodeGraph 代码图谱。本页按当前工作区（0.28.0 + Unreleased，2026-10-28）说明 9 个 skills 的安装、验证与团队接入；其中 nacos-config 尚未发布到 npm。</p>
       <div class="facts">
         <span class="fact">Node ≥ 22.13</span>
         <span class="fact">npm</span>
@@ -237,28 +237,32 @@ codegraph --version<span class="c">   # 没装也没关系，安装器会装</sp
       <ol class="steps">
         <li><div><strong>检查 Node ≥ 22.13 和 npm</strong><span class="phase">DocNexus</span><p>不满足就报错退出，此时还没有写任何文件。</p></div></li>
         <li><div><strong>确定环境、数据库连接</strong><p>来自 <code>--envs</code> 或交互选择；<code>--skip-db</code> 时跳过数据库。</p></div></li>
-        <li><div><strong>安装 skills 到 <code>.agents/skills/</code></strong><p>这是唯一一份完整文件，并写入安装清单 <code>.workflow-run.json</code>。</p></div></li>
+        <li><div><strong>安装 skills 到 <code>.agents/skills/</code></strong><p>从各目录 <code>skill.json</code> 自动发现当前 9 个 skills；<code>--skills</code> 子集自动补齐 requires。默认在这里保留完整文件，并写入安装清单 <code>.workflow-run.json</code>；<code>--copy</code> 时按所选环境分别安装。</p></div></li>
         <li><div><strong>为其他环境建软链接</strong><p><code>.claude/skills/&lt;skill&gt;</code>、<code>.qwen/skills/</code>、<code>.codebuddy/skills/</code> 按 skill 链接到 <code>.agents/skills/</code>。加 <code>--copy</code> 时改为各装一份。</p></div></li>
-        <li><div><strong>补齐 <code>.gitignore</code></strong><p>只追加缺失的行：凭据文件、个人设置、<code>/workflow-run/tmp/</code>，加上 <code>.codegraph/</code>。DocNexus 的依赖和检索库由它自带的 <code>.docnexus/.gitignore</code> 忽略，这里不用加。</p></div></li>
+        <li><div><strong>补齐 <code>.gitignore</code></strong><p>只追加缺失的行：数据库 / wiki / Nacos 本机配置、Nacos skill 的 <code>node_modules/</code>、个人设置、<code>/workflow-run/tmp/</code>，以及本教程选择的 <code>.codegraph/</code>。DocNexus 的依赖和检索库由 <code>.docnexus/.gitignore</code> 忽略。</p></div></li>
         <li><div><strong>安装 DocNexus</strong><span class="phase">DocNexus</span><p>在业务项目根执行 <code>npm install --prefix ./.docnexus --save-exact @rowansenne/docnexus</code>。npm 清单、锁文件和依赖都不进宿主项目的 <code>package.json</code>。</p></div></li>
         <li><div><strong>初始化 DocNexus 工作区</strong><span class="phase">DocNexus</span><p><code>docnexus init --output-dir workflow-run --agent none</code>：创建 <code>workflow-run/docnexus/</code>，把 DocNexus 的 skills 同步到 <code>.docnexus/skills/</code>。</p></div></li>
-        <li><div><strong>把 DocNexus 接到本项目</strong><span class="phase">DocNexus</span><p>把 <code>docnexus-recall</code> 等 skill 软链接到所选环境的 skills 目录，并在 <code>CLAUDE.md</code> / <code>AGENTS.md</code> 写一段说明（有自己的标记，不碰手写内容）。</p></div></li>
+        <li><div><strong>把 DocNexus 接到本项目</strong><span class="phase">DocNexus</span><p>把 DocNexus 自带 skills 链接到所选环境，说明按 Claude → <code>CLAUDE.md</code>、Qwen → <code>QWEN.md</code>、Codex / 豆包 / WorkBuddy → <code>AGENTS.md</code> 写入；有自己的标记，不碰手写内容。这些 skills 不计入本包的 9 个。</p></div></li>
         <li><div><strong>安装 CodeGraph</strong><span class="phase">CodeGraph</span><p>找不到 <code>codegraph</code> 命令时执行 <code>npm i -g @colbymchenry/codegraph@1</code>。</p></div></li>
         <li><div><strong>写 MCP 配置</strong><span class="phase">CodeGraph</span><p>选了 claude / codex 时执行 <code>codegraph install --target=claude,codex --location=local --yes</code>。doubao、qwen、workbuddy 不支持 MCP 配置，在这些环境里 skill 直接调用 <code>codegraph</code> CLI。</p></div></li>
         <li><div><strong>建代码图谱索引</strong><span class="phase">CodeGraph</span><p><code>codegraph init &lt;项目根&gt; --yes</code> 生成 <code>.codegraph/</code>（本地 SQLite）。大项目需要几分钟。</p></div></li>
-        <li><div><strong>导入文档模板到 DocNexus</strong><span class="phase">DocNexus</span><p>默认模板存为 <code>workflow-run/docnexus/library/templates/&lt;skill&gt;/</code>，已有的不覆盖。接入后文档类 skill 只从这里取模板。</p></div></li>
+        <li><div><strong>导入文档模板到 DocNexus</strong><span class="phase">DocNexus</span><p>包内开发 / 审查模板导入 <code>workflow-run/docnexus/library/templates/&lt;skill&gt;/</code>，已有的不覆盖。独立需求文档也有可导入模板；技术 / 上线方案模板不随包提供，首次按用户样例创建；运行时只从知识库取生效模板。</p></div></li>
       </ol>
       <div class="note warn"><b class="tag">注意</b>CodeGraph 默认上报匿名使用统计（不含代码、路径、符号名），<code>--yes</code> 不会询问。本工具调用 codegraph 时都带 <code>DO_NOT_TRACK=1</code>，但 agent 通过 MCP 使用时不受这个控制。要关闭就运行 <code>codegraph telemetry off</code>。</div>
     </section>
 
     <section id="result">
       <h2><span class="n">04</span>装完的目录</h2>
-      <p>以选了 claude 和 codex 为例。<span style="color:var(--warn)">橙色</span>是被 <code>.gitignore</code> 忽略、每人本机各一份的内容，其余都提交。</p>
+      <p>以选了 claude 和 codex 为例，含按需创建的 Nacos 连接与依赖。<span style="color:var(--warn)">橙色</span>是被 <code>.gitignore</code> 忽略、每人本机各一份的内容；<code>.docnexus/</code> 内部依赖另按它自带的规则忽略。</p>
 <div class="tree">项目根/
 ├── .agents/skills/            <span class="c"># skills 唯一来源 + .workflow-run.json 安装清单</span>
 │   ├── workflow/  dev/  project-review/  code-graph/
 │   ├── database-query/
 │   │   └── <span class="ig">config.json</span>        <span class="c"># 数据库连接（含密码）</span>
+│   ├── nacos-config/          <span class="c"># 独立只读配置查询，无其他 skill 运行依赖</span>
+│   │   ├── scripts/config.mjs
+│   │   ├── <span class="ig">config.json</span>        <span class="c"># 可选本机连接，用户创建；凭据引用环境变量</span>
+│   │   └── <span class="ig">node_modules/</span>      <span class="c"># 首次需要 YAML 时安装，不随包分发</span>
 │   ├── md-to-wiki/<span class="ig">wiki-config.json</span>
 │   ├── create-tech-md-doc/  create-release-md-doc/
 │   └── docnexus-recall/ …     <span class="c"># → .docnexus/skills/ 的链接</span>
@@ -290,8 +294,9 @@ codegraph --version<span class="c">   # 没装也没关系，安装器会装</sp
       <div class="cmd"><pre><span class="ok">    OK</span>  DocNexus 运行环境 .docnexus/，知识输出 workflow-run/docnexus/，已接入 Agent
 <span class="ok">    OK</span>  CodeGraph 已接入（codegraph 1.x.x，索引在 .codegraph/）</pre></div>
       <p>再确认索引和凭据都被忽略了：</p>
-      <div class="cmd"><pre>git check-ignore -v .codegraph .agents/skills/database-query/config.json</pre><button class="copy" type="button">复制</button></div>
+      <div class="cmd"><pre>git check-ignore -v .codegraph .agents/skills/database-query/config.json .agents/skills/nacos-config/config.json</pre><button class="copy" type="button">复制</button></div>
       <p>在 agent 里也能看：运行 <code>/workflow status</code>，<code>docnexus</code> 和 <code>codegraph</code> 两项都应是 <code>ok</code>。</p>
+      <p>Nacos 的本地候选用 <code>config.mjs inspect</code> 查看；只有 <code>get</code> 会访问远端。<code>/workflow status</code> 和 doctor 不测试 Nacos 连通性，doctor 只检查其本机连接的忽略规则。</p>
     </section>
 
     <section id="first">
@@ -303,6 +308,13 @@ codegraph --version<span class="c">   # 没装也没关系，安装器会装</sp
       </ol>
       <div class="cmd"><pre>node .agents/skills/code-graph/scripts/cg.mjs status
 node .agents/skills/code-graph/scripts/cg.mjs impact --base main</pre><button class="copy" type="button">复制</button></div>
+      <h3>按需读取 Nacos</h3>
+      <p>直接请求「读取测试环境 Nacos 的 order-test.yaml，查看 order.timeout」。skill 先定位 application / bootstrap，明确本次环境、Namespace、Group 与 Data ID，再读取配置。多环境不猜选；<code>--file</code> 可重复，后面的文件覆盖前面的属性。</p>
+      <div class="cmd"><pre>node .agents/skills/nacos-config/scripts/config.mjs inspect
+node .agents/skills/nacos-config/scripts/config.mjs get --file src/main/resources/bootstrap.yml --file src/main/resources/application-test.yml --data-id order-test.yaml --key order.timeout</pre><button class="copy" type="button">复制</button></div>
+      <p>若首次解析 YAML 提示缺少依赖，只在该 skill 目录安装，不改业务项目 package.json：</p>
+      <div class="cmd"><pre>npm install --prefix .agents/skills/nacos-config --ignore-scripts --no-package-lock</pre><button class="copy" type="button">复制</button></div>
+      <p>也可用本机 <code>nacos-config/config.json</code> 配置命名连接，再传 <code>--conn test</code>；密码 / token 使用环境变量。配置原文不落盘，输出脱敏属性与读取来源。默认兼容 Nacos 1.x / 2.x；3.x 须显式传 <code>--api-version 3</code>。它不模拟 Spring 最终生效值，也不自动写入数据库连接。字段见 <a href="../nacos-config/references/connection.md">连接说明</a>，调用关系见 <a href="architecture.html#calls">架构图解</a>。</p>
       <p>接入后 skills 会自动用上这两样：</p>
       <div class="tblwrap"><table>
         <tr><th>skill</th><th>DocNexus</th><th>CodeGraph</th></tr>
@@ -315,7 +327,7 @@ node .agents/skills/code-graph/scripts/cg.mjs impact --base main</pre><button cl
 
     <section id="team">
       <h2><span class="n">07</span>团队成员接入</h2>
-      <p>skills、软链接、项目画像、DocNexus 知识库都随仓库提交，但这几样每人本机各一份：DocNexus 的依赖和检索库、CodeGraph 的 CLI 和索引、数据库与 wiki 凭据。所以其他人 clone 之后也要跑一次同样的命令：</p>
+      <p>skills、软链接、项目画像、DocNexus 知识库可随仓库提交；DocNexus 依赖和检索库、CodeGraph CLI 与索引、数据库 / wiki 凭据、Nacos 本机连接与依赖各人在本机准备。所以其他人 clone 之后也要跑一次同样的命令：</p>
       <div class="cmd"><pre>git clone &lt;仓库地址&gt; &amp;&amp; cd &lt;项目&gt;
 npx @rowansenne/workflow-run --envs claude,codex --skip-db --with-docnexus --with-codegraph</pre><button class="copy" type="button">复制</button></div>
       <ul>
@@ -405,16 +417,17 @@ codegraph uninstall<span class="c">                      # 移除 agent 配置�
 
     <section id="faq">
       <h2><span class="n">10</span>常见问题</h2>
-      <details><summary>安装结尾退出码是 1，但 skills 装好了</summary><div>DocNexus 的 npm 安装或 <code>docnexus init</code> 失败时只跳过 DocNexus，最后以退出码 1 结束。看输出里的警告，修好网络或 npm 权限后重跑同一条命令即可。CodeGraph 失败同样只跳过它自己。</div></details>
+      <details><summary>退出码是 1，但部分 skills 已落盘</summary><div>DocNexus 接入或必需模板导入失败时安装立即停止，不报告完成；修好输出提示的网络、npm 权限或模板问题后重跑。CodeGraph 是可选增强，接入失败会提示并保留其他已安装能力，随后可带 <code>--with-codegraph</code> 重试。</div></details>
       <details><summary>全局安装 CodeGraph 报权限错误</summary><div>先用你平时的方式全局装好 <code>@colbymchenry/codegraph@1</code>（例如改用 nvm 管理的 Node），确认 <code>codegraph --version</code> 能运行，再重跑带 <code>--with-codegraph</code> 的命令。</div></details>
       <details><summary>codegraph init 失败或太慢</summary><div>安装器会跳过建索引并提示。之后可以在项目根手动执行 <code>codegraph init</code>。索引建好后 agent 使用期间自动增量同步，<code>cg.mjs</code> 发现索引落后于工作区时也会先 <code>codegraph sync</code>。</div></details>
-      <details><summary>Qwen Code 不会自动查 DocNexus</summary><div>安装器不写 <code>QWEN.md</code>。需要自动召回时，在 <code>QWEN.md</code> 里引用 <code>AGENTS.md</code> 的 DocNexus 段落，或在 <code>.qwen/settings.json</code> 的 <code>context.fileName</code> 加入 <code>AGENTS.md</code>。</div></details>
+      <details><summary>Qwen Code 不会自动查 DocNexus</summary><div>当前安装器会将 Qwen 的说明写入项目根 <code>QWEN.md</code>，并链接 DocNexus skills 到 <code>.qwen/skills/</code>。先核对这两处，再重启会话；缺失时用当前版本重跑安装命令刷新接入。</div></details>
+      <details><summary>Nacos 不出现在 workflow status，是否没有安装成功</summary><div>当前 Nacos 是独立按需查询能力，不在集中能力快照中。检查所选环境的 <code>nacos-config/SKILL.md</code>，用 inspect 定位本地配置，明确环境后用 get 验证网络与鉴权。只选 <code>--skills nacos-config</code> 时没有其他 skill 依赖，但安装器仍会接入必装 DocNexus。</div></details>
       <details><summary>Codex 里看不到 codegraph_explore</summary><div>Codex 只在受信任的项目里加载 <code>.codex/config.toml</code>。确认已信任这个项目并重启 Codex。</div></details>
       <details><summary>内网或离线安装 DocNexus</summary><div>用环境变量指定安装包：<code>DOCNEXUS_PKG=/path/to/rowansenne-docnexus-x.y.z.tgz npx @rowansenne/workflow-run --with-docnexus</code>。PowerShell 写成 <code>$env:DOCNEXUS_PKG="..."</code>。</div></details>
       <details><summary>图谱里一个方法「没有调用方」，可以删吗</summary><div>不一定。静态分析看不到 Spring 多实现的选择、AOP、反射和配置驱动的路由，「没有调用方」不等于没人用。</div></details>
     </section>
 
-    <footer>依据 @rowansenne/workflow-run 0.22.0 的 README 与安装器源码编写。</footer>
+    <footer>依据当前工作区（0.28.0 + Unreleased，2026-10-28）的 README、skill.json 与安装器源码更新。nacos-config 尚未发布到 npm，已发布包以对应版本为准。</footer>
   </main>
 </div>
 

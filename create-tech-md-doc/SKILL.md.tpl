@@ -46,7 +46,7 @@ description: "Generate a Markdown technical design doc (技术方案) from the d
 
 | 事实 | 来源 |
 |---|---|
-| 需求背景 | 有 PRD 时取 `prd_context`；无 PRD 写「待补充」 |
+| 需求背景 | 优先引用同分支 `latest.requirement` 的目标、范围与澄清结论；外部 PRD 用 `prd_context` 并标来源；都没有写「待补充」 |
 | 影响范围 | 各层命中的模块 / 包名；代码图谱可用时补上 `cg.mjs impact --diff <main>...<dev>` 的受影响入口与模块（见 `<skills>/code-graph/SKILL.md`） |
 | 详细方案 | Service 变更；有 PRD 时补业务语义并标注来源 |
 | 接口 / 消息协议 / 字段变更 | 接口与消息层、DTO / VO |

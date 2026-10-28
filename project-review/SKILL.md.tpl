@@ -6,6 +6,7 @@ description: "Review source code (any language; Java/Spring, Go, TypeScript, Pyt
 # Code Review
 
 审代码并输出有证据的发现；用户未要求修复时不改业务代码。进入每步前读取所指 reference 的对应小节，不预先加载全部方法说明。
+配置相关结论需要远程值且已安装 nacos-config 时，按 `<skills>/nacos-config/SKILL.md` 按需只读核对并注明环境与配置来源；不可用时标明「未核对远程配置」，不能据本地默认值推断实际开关状态。
 
 ## 门禁
 

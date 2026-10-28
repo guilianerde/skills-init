@@ -6,7 +6,8 @@
   ],
   "optional": [
     "code-graph",
-    "database-query"
+    "database-query",
+    "nacos-config"
   ],
   "templates": [
     {

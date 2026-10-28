@@ -14,7 +14,7 @@ useLocalDocNexus();
 
 const REPO = fileURLToPath(new URL('..', import.meta.url));
 const IS_WIN = process.platform === 'win32';
-const SKILLS = ['workflow', 'dev', 'project-review', 'database-query', 'md-to-wiki', 'create-tech-md-doc', 'create-release-md-doc', 'code-graph'];
+const SKILLS = ['workflow', 'dev', 'project-review', 'database-query', 'md-to-wiki', 'create-tech-md-doc', 'create-release-md-doc', 'code-graph', 'nacos-config'];
 const PASSWORD = 'p/a&s|s"w\\o\\"rd\\';
 const DB_ANSWERS = `mysql\n127.0.0.1\n3307\nappdb\nroot\n${PASSWORD}\n`;
 const WORK = fs.mkdtempSync(path.join(os.tmpdir(), 'workflow-run-install-'));
@@ -391,12 +391,29 @@ test('.gitignore 只追加缺失的规则，重跑不重复', () => {
   p.write('.gitignore', 'node_modules/\n**/wiki-config.json\n.env');
   ok(p.install(['--envs', 'claude', '--yes', '--skip-db']));
   const lines = p.read('.gitignore').split(/\r?\n/);
-  for (const r of ['**/database-query/config.json', '**/wiki-config.json', '/workflow-run/tmp/', 'node_modules/', '.env']) {
+  for (const r of ['**/database-query/config.json', '**/nacos-config/config.json', '**/nacos-config/node_modules/', '**/wiki-config.json', '/workflow-run/tmp/', 'node_modules/', '.env']) {
     assert.equal(lines.filter((l) => l === r).length, 1, r);
   }
   const after = p.read('.gitignore');
   ok(p.install(['--envs', 'claude', '--yes', '--skip-db']));
   assert.equal(p.read('.gitignore'), after);
+});
+
+test('nacos-config 可单独安装，重装保留连接；凭据与依赖不提交', () => {
+  const p = project('nacos-only');
+  const flags = ['--envs', 'codex', '--yes', '--skip-db', '--skills', 'nacos-config'];
+  ok(p.install(flags));
+  assert.deepEqual(Object.keys(p.json('.agents/skills/.workflow-run.json').skills), ['nacos-config']);
+  assert.ok(p.isFile('.agents/skills/nacos-config/scripts/config.mjs'));
+  assert.ok(!p.exists('.agents/skills/nacos-config/config.json'));
+  const config = '{"connections":{"test":{"server_addr":"test:8848","password_env":"NACOS_PASSWORD"}}}\n';
+  p.write('.agents/skills/nacos-config/config.json', config);
+  ok(p.install(flags));
+  assert.equal(p.read('.agents/skills/nacos-config/config.json'), config);
+  spawnSync('git', ['init', '-q'], { cwd: p.P });
+  for (const f of ['config.json', 'node_modules/yaml/package.json']) {
+    assert.equal(spawnSync('git', ['check-ignore', '-q', `.agents/skills/nacos-config/${f}`], { cwd: p.P }).status, 0, f);
+  }
 });
 
 test('--skills 子集：自动带上 requires 依赖；不装 database-query 时不问数据库；之后补装合并清单', () => {

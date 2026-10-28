@@ -10,7 +10,7 @@
 //   node .agents/skills/workflow/scripts/template.mjs draft <模板> [--from <样例.md | ->] [--force]
 //   node .agents/skills/workflow/scripts/template.mjs check <模板> [--file <草稿>]
 //   node .agents/skills/workflow/scripts/template.mjs save  <模板> [--file <草稿>]
-// <模板>：tech | release | plan | delivery | review | checklist，或 <skill>[/<模板文件名>]（如 create-tech-md-doc/template.md）
+// <模板>：requirement | tech | release | plan | delivery | review | checklist，或 <skill>[/<模板文件名>]（如 create-tech-md-doc/template.md）
 // draft：把当前生效的模板复制成草稿；还没有模板（或 --from）时按样例抽骨架（make-template.mjs）。草稿已存在时不覆盖，--force 重来
 // check：草稿本身的格式问题、与当前模板相比的章节变化、拿最近几份已生成文档按新旧模板各跑一次 lint-doc 看影响
 // save：check 无错误后给出写入知识库的 capture 指引（写入后重新运行 resolve.mjs template 确认生效）
@@ -25,6 +25,7 @@ import { skeleton } from './make-template.mjs';
 import { collect } from './artifacts.mjs';
 
 const ALIASES = {
+  requirement: ['dev', 'requirement-template.md'],
   tech: ['create-tech-md-doc', 'template.md'],
   release: ['create-release-md-doc', 'template.md'],
   plan: ['dev', 'plan-template.md'],
@@ -33,7 +34,7 @@ const ALIASES = {
   checklist: ['project-review', 'checklist.md'],
 };
 // 模板 → 用它生成的产物种类（artifacts.mjs 的 KINDS），用来找已生成的文档试跑
-const PRODUCES = { 'create-tech-md-doc/template.md': 'tech', 'create-release-md-doc/template.md': 'release', 'dev/plan-template.md': 'plan', 'dev/delivery-template.md': 'delivery', 'project-review/report.md': 'review' };
+const PRODUCES = { 'create-tech-md-doc/template.md': 'tech', 'create-release-md-doc/template.md': 'release', 'dev/requirement-template.md': 'requirement', 'dev/plan-template.md': 'plan', 'dev/delivery-template.md': 'delivery', 'project-review/report.md': 'review' };
 const SAMPLE_DOCS = 5;
 
 const rel = (root, p) => path.relative(root, p).split(path.sep).join('/');

@@ -1,0 +1,9 @@
+{
+  "name": "nacos-config",
+  "order": 9,
+  "requires": [],
+  "optional": [],
+  "userFiles": {
+    "config.json": null
+  }
+}

@@ -18,6 +18,6 @@
 完整流程按 `<skills>/workflow/references/execution.md`「验证证据」，在执行前 snapshot，执行后 save validation；只有代码快照仍一致，结果才能登记。feature 完成 F6 后进入 F7，bug 完成 B4 后进入 B5。快速通道不调用运行命令，下面的构建、测试与验收验证仍执行。
 
 - 按验收标准补充或更新单元测试 / 集成测试，测试放在项目既有测试目录、沿用既有测试框架。
-- **验收项对应到证据**：F1 / F3 的每条验收标准写明靠哪个测试或手动操作验证、结果如何；没有测试也没法操作的标「未验证」并写原因。交付说明「验证」节的表格按这个填，快速通道在对话里列同样的对应。
+- **验收项对应到证据**：以 requirement.md 的 AC 编号为准，写明靠哪个测试或手动操作验证、结果如何；没有测试也没法操作的标「未验证」并写原因。交付说明「验证」节的表格按这个填，快速通道用对话中确认的验收项。
 - 先跑相关测试（`profile.test_single`，或代码图谱的 `impact` 选出的测试），修到通过；最后跑一次 `profile.test` 全量（之后又改了代码就再跑）。有 `profile.lint` 时一并运行。全量里出现、基线没跑到的失败，先看失败的测试是否碰到本次改动的代码，确认无关的按已有失败记录并写明依据。按本轮 CodeGraph 通道分析相关测试；script 模式取自 `node <skills>/code-graph/scripts/cg.mjs impact --base <main_branch>` 输出的 `tests`；`impact` 的 `entry_points`、`sql`、`config_keys` 写进交付说明（受影响的接口 / 消费者 / 定时任务、表、配置）。改动碰到 SQL、实体或 DDL 时运行 `node <skills>/workflow/scripts/tables.mjs --base <main_branch>`，对其中的表再核对一次实际表结构（见 `<skills>/workflow/references/tables.md`），结果写进交付说明的 SQL 节。
 - 如实报告结果：失败就给出失败输出并继续修；环境跑不了（缺依赖、缺中间件）就明确写「未验证」以及用户该如何验证。**不得声称未运行的测试已通过。**

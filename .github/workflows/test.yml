@@ -19,6 +19,8 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: 22
+      - name: Install test dependencies
+        run: npm install --ignore-scripts --no-package-lock
       - name: Run node tests
         run: node --test "tests/*.mjs"
 
@@ -34,5 +36,7 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: ${{ matrix.node }}
+      - name: Install test dependencies
+        run: npm install --ignore-scripts --no-package-lock
       - name: Run node tests
         run: node --test "tests/*.mjs"

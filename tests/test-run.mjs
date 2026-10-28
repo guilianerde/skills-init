@@ -51,8 +51,8 @@ test('运行保存在同一 meta.json；sync / which / 重新 bind 均保留上�
   assert.equal(meta.runs[run.id].steps.F4.status, 'completed');
   assert.ok(meta.runs[run.id].steps.F4.completed_at);
   assert.deepEqual(meta.extension, { keep: true });
-  assert.equal(meta.artifacts.length, 1);
-  assert.deepEqual(fs.readdirSync(path.dirname(f.file)).sort(), ['meta.json', 'plan.md']);
+  assert.equal(meta.artifacts.length, 2);
+  assert.deepEqual(fs.readdirSync(path.dirname(f.file)).sort(), ['meta.json', 'plan.md', 'requirement.md']);
 });
 
 test('等待修复 / 交付时不因报告存在而自动前进；修复回退重置后续完成标记并保留历史', (t) => {
@@ -137,13 +137,13 @@ test('无运行的读取不创建目录；只有 meta 状态也能在 view 中�
   const data = viewData(f.root);
   assert.equal(data.requirements.length, 1);
   assert.equal(data.requirements[0].artifacts.length, 0);
-  assert.equal(data.requirements[0].runs[0].stage, 'F4');
+  assert.equal(data.requirements[0].runs[0].stage, 'F3');
   const all = spawnSync(process.execPath, [path.join(REPO, 'workflow/scripts/artifacts.mjs'), '--root', f.root, '--all'], { encoding: 'utf8' });
   assert.equal(all.status, 0, all.stderr);
   assert.equal(JSON.parse(all.stdout).branches[0].execution.current.branch, BRANCH);
   const html = renderHtml(data);
   const embedded = JSON.parse(/<script id="data" type="application\/json">([\s\S]*?)<\/script>/.exec(html)[1]);
-  assert.equal(embedded.requirements[0].runs[0].steps.F3.status, 'completed');
+  assert.equal(embedded.requirements[0].runs[0].steps.F3.status, 'in_progress');
   const nodes = new Map();
   const document = {
     documentElement: { dataset: {} },
@@ -153,7 +153,7 @@ test('无运行的读取不创建目录；只有 meta 状态也能在 view 中�
   };
   vm.runInNewContext(/<script>([\s\S]*?)<\/script>/.exec(html)[1], { document, localStorage: { getItem: () => null }, history: { replaceState() {} }, location: { hash: '' } });
   assert.match(nodes.get('#main').innerHTML, /流程运行状态/);
-  assert.match(nodes.get('#main').innerHTML, /F3：已完成/);
+  assert.match(nodes.get('#main').innerHTML, /F3：进行中/);
   assert.match(nodes.get('#doc').innerHTML, /尚未生成文档/);
 });
 
@@ -362,7 +362,7 @@ test('CLI 在安装后的 skills 中支持 start / show / save / cancel，并以
   assert.equal(started.status, 0, started.stderr);
   let run = JSON.parse(started.stdout).run;
   const input = path.join(f.root, 'checkpoint.json');
-  fs.writeFileSync(input, JSON.stringify({ stage: 'F4', steps: completed(['Step0', 'F1', 'F2', 'F3']), context: { summary: '从对话补入前置进度' } }));
+  fs.writeFileSync(input, JSON.stringify({ stage: 'F3', steps: completed(['Step0', 'F1', 'F2']), context: { summary: '从对话补入前置进度' } }));
   const saved = cli('save', '--id', run.id, '--expect-revision', String(run.revision), '--input', input);
   assert.equal(saved.status, 0, saved.stderr);
   run = JSON.parse(saved.stdout).run;
