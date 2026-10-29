@@ -8,7 +8,7 @@ import { updateMeta } from './meta-store.mjs';
 import { loadWorkspace } from './workspace-read.mjs';
 import { readProfile } from './project.mjs';
 import { isDev, coreSteps, applyDevEvidence, assertReview, assertDelivery, receipt } from './run-gates.mjs';
-import { codeSnapshot } from './code-snapshot.mjs';
+import { codeSnapshot, snapshotReader } from './code-snapshot.mjs';
 
 export const FLOWS = {
   feature: ['Step0', 'F1', 'F2', 'F3', 'F4', 'F5', 'F6', 'F7', 'F8'],
@@ -160,17 +160,18 @@ export function changeRun(root, { branch, id, revision, input = {}, action = 'sa
       run.history.push({ at, stage: run.stage, status: 'cancelled', reason: input.reason });
     } else {
       applyCheckpoint(run, input, at, action !== 'complete');
-      applyDevEvidence(root, req, run, input, at);
+      const getSnapshot = snapshotReader(root, run);
+      applyDevEvidence(root, req, run, input, at, undefined, getSnapshot);
       if (action === 'complete') {
         const steps = FLOWS[run.kind];
         if (run.status !== 'running' || run.stage !== steps.at(-1) || !steps.every((s) => done(run.steps[s].status)) || run.steps[steps.at(-1)].status !== 'completed') throw new Error('还有未完成步骤、待用户决定或阻塞，不能标记已完成');
         if (['feature', 'bug'].includes(run.kind)) {
           const required = coreSteps(run);
-          assertDelivery(root, req, run);
+          assertDelivery(root, req, run, undefined, getSnapshot);
           receipt(root, req, run, 'delivery');
           if (required.some((s) => run.steps[s].status !== 'completed') || run.decision?.action !== 'deliver' || !run.decision.confirmed) throw new Error('完整 dev 流程必须完成方案、实现、验证、审查和交付，且用户已选择交付');
         }
-        if (run.kind === 'review') assertReview(root, req, run);
+        if (run.kind === 'review') assertReview(root, req, run, undefined, getSnapshot);
         const files = { feature: ['requirement.md', 'plan.md', 'review.md', 'delivery.md'], bug: ['requirement.md', 'plan.md', 'review.md', 'delivery.md'], review: ['review.md'], tech: ['tech-doc.md'], release: ['release-doc.md'] };
         for (const name of files[run.kind] ?? []) {
           const file = path.join(req.abs, name);

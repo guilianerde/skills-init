@@ -48,8 +48,14 @@ export function codeSnapshot(root, run) {
   return { ...snapshot, digest: hash(JSON.stringify({ ...snapshot, entries })) };
 }
 
-export function assertSnapshot(root, run, snapshot) {
-  const current = codeSnapshot(root, run);
+// 只在同一轮同步校验内复用；新的操作和发布阶段各自创建 reader。
+export function snapshotReader(root, run) {
+  let current;
+  return () => current ??= codeSnapshot(root, run);
+}
+
+export function assertSnapshot(root, run, snapshot, getSnapshot = snapshotReader(root, run)) {
+  const current = getSnapshot();
   if (!snapshot?.digest || snapshot.digest !== current.digest) throw new Error('代码或基线已变化，原验证／审查证据已失效；重新生成快照、验证并审查');
   return current;
 }

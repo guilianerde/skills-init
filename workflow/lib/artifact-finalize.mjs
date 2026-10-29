@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { FILES, parseBranch } from './artifact-model.mjs';
-import { hash, assertWorkingBranch } from './code-snapshot.mjs';
+import { hash, assertWorkingBranch, snapshotReader } from './code-snapshot.mjs';
 import { layout } from './project.mjs';
 import { readRun, assertRunVersion, applyCheckpoint } from './runs.mjs';
 import { isDev, coreSteps, applyDevEvidence, assertRequirement, assertPlanBasis, assertReview, assertDelivery, reviewEvidence } from './run-gates.mjs';
@@ -34,11 +34,12 @@ export function resumeFinalization(root, { branch, id }) {
     const current = fileHash(file);
     if (current !== p.before && current !== p.hash) throw new Error('正式产物在收尾中断后被其他操作修改，请先核对并恢复；不会覆盖');
     // 中断期间代码／报告也可能变化：发布前重新检查本轮门禁。
-    applyDevEvidence(root, req, p.run, p.checkpoint, p.run.updated_at, { [p.kind]: fs.readFileSync(staged, 'utf8') });
+    const getSnapshot = snapshotReader(root, p.run);
+    applyDevEvidence(root, req, p.run, p.checkpoint, p.run.updated_at, { [p.kind]: fs.readFileSync(staged, 'utf8') }, getSnapshot);
     if (p.kind === 'plan') assertPlanBasis(root, req, p.run, { plan: fs.readFileSync(staged, 'utf8') });
     if (p.kind === 'review' || (isDev(p.run) && p.kind === 'delivery')) {
-      if (p.kind === 'review') assertReview(root, req, p.run, { review: fs.readFileSync(staged, 'utf8') });
-      else assertDelivery(root, req, p.run);
+      if (p.kind === 'review') assertReview(root, req, p.run, { review: fs.readFileSync(staged, 'utf8') }, getSnapshot);
+      else assertDelivery(root, req, p.run, undefined, getSnapshot);
     }
     if (current !== p.hash) {
       if (p.previous) {
@@ -115,6 +116,7 @@ export function finalizeArtifact(root, { branch, id, revision, kind, text, input
     if (!lint?.ok) throw new Error(`草稿自检失败：${lint?.errors?.join('；') || '模板不可用'}`);
     const at = new Date().toISOString();
     const run = structuredClone(current);
+    const getSnapshot = snapshotReader(root, run);
     // 文档收尾只能登记当前步骤，不能在一次落盘中跳到下游或替用户作确认。
     if (Object.keys(input).some((k) => !['steps', 'status', 'waiting_for', 'reason', 'context'].includes(k))) throw new Error('收尾 checkpoint 只接受 steps / status / waiting_for / reason / context；阶段和用户选择用 run.mjs save');
     const expectedStep = isDev(run) ? (kind === 'requirement' ? (run.kind === 'feature' ? 'F3' : 'B3') : kind === 'plan' ? (run.kind === 'feature' ? 'F4' : 'B4') : kind === 'review' ? (run.kind === 'feature' ? 'F7' : 'B5') : (run.kind === 'feature' ? 'F8' : 'B5')) : ({ review: 'R7', tech: 'T4', release: 'L4' })[run.kind];
@@ -124,7 +126,7 @@ export function finalizeArtifact(root, { branch, id, revision, kind, text, input
       requirement = assertRequirement(root, req, run);
       if (run.steps[run.kind === 'feature' ? 'F3' : 'B3'].status !== 'completed') throw new Error('需求文档尚未完成，不能收尾方案');
     }
-    if (isDev(run) && kind === 'delivery') assertDelivery(root, req, run);
+    if (isDev(run) && kind === 'delivery') assertDelivery(root, req, run, undefined, getSnapshot);
     if ((fs.existsSync(file) ? wikiRecord(fs.readFileSync(file, 'utf8')) : null) !== existingWiki) throw new Error('wiki 发布记录在收尾期间变化，请重新读取后重试');
     const before = fileHash(file);
     const oldVersion = meta.versions?.[kind] ?? 1;
@@ -139,10 +141,10 @@ export function finalizeArtifact(root, { branch, id, revision, kind, text, input
     }
     applyCheckpoint(run, input, at, false);
     if (kind === 'review') {
-      run.review = reviewEvidence(root, req, run, packet, result, { review: text });
+      run.review = reviewEvidence(root, req, run, packet, result, { review: text }, getSnapshot);
       run.decision = null;
     }
-    applyDevEvidence(root, req, run, input, at, { [kind]: text });
+    applyDevEvidence(root, req, run, input, at, { [kind]: text }, getSnapshot);
     run.history.at(-1).artifact = { kind, hash: digest, version };
     run.revision++; run.updated_at = at; run.last_finalization = key;
     const op = randomUUID();

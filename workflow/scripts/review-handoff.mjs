@@ -6,7 +6,7 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { readRun } from '../lib/runs.mjs';
 import { readProfile } from '../lib/project.mjs';
-import { codeSnapshot, assertSnapshot, hash } from '../lib/code-snapshot.mjs';
+import { snapshotReader, assertSnapshot, hash } from '../lib/code-snapshot.mjs';
 import { isDev, assertValidation, reviewInputs } from '../lib/run-gates.mjs';
 import { scope } from './review-scope.mjs';
 
@@ -14,12 +14,13 @@ export function handoff(root, { branch, id, depth = '标准', capabilities = nul
   const { req, run } = readRun(root, branch, id);
   if (!['feature', 'bug', 'review'].includes(run.kind) || ['completed', 'cancelled'].includes(run.status)) throw new Error('只有进行中的开发／审查运行可生成交接材料');
   if (req.meta.pending_finalization) throw new Error('先恢复待完成的产物收尾');
+  const getSnapshot = snapshotReader(root, run);
   if (isDev(run)) {
     if (run.stage !== (run.kind === 'feature' ? 'F7' : 'B5')) throw new Error('请先完成验证并进入审查阶段');
-    assertValidation(root, req, run);
+    assertValidation(root, req, run, undefined, getSnapshot);
   }
   if (!['快审', '标准', '深审'].includes(depth)) throw new Error('审查深度须为快审 / 标准 / 深审');
-  const snapshot = codeSnapshot(root, run);
+  const snapshot = getSnapshot();
   const reviewScope = scope(root, { base: run.scope?.base ?? 'main', exclude: run.scope?.exclude ?? [] });
   if (!reviewScope.ok) throw new Error(reviewScope.error);
   assertSnapshot(root, run, snapshot);

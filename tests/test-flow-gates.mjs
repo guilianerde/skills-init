@@ -2,10 +2,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { spawnSync } from 'node:child_process';
+import childProcess, { spawnSync } from 'node:child_process';
+import { syncBuiltinESMExports } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { BRANCH, flowFixture } from './helpers/run-flow.mjs';
-import { codeSnapshot } from '../workflow/lib/code-snapshot.mjs';
+import { codeSnapshot, snapshotReader, assertSnapshot } from '../workflow/lib/code-snapshot.mjs';
 import { finalizeArtifact, resumeFinalization, abortFinalization } from '../workflow/lib/artifact-finalize.mjs';
 import { runState } from '../workflow/lib/runs.mjs';
 import { sync, which, nextPath } from '../workflow/lib/requirements.mjs';
@@ -20,6 +21,57 @@ function reviewed(f, findings = []) {
   let run = f.implement(f.plan(f.start())); changeCode(f);
   return f.review(f.verify(run), findings);
 }
+
+test('快照按需读取并在本轮复用；每份证据仍校验，新一轮读取最新代码', (t) => {
+  const f = flowFixture(t); const run = f.start();
+  const snapshot = codeSnapshot(f.root, run);
+  const read = fs.readFileSync; let reads = 0;
+  fs.readFileSync = (file, ...args) => {
+    if (file === path.join(f.root, 'app.js')) reads++;
+    return read(file, ...args);
+  };
+  try {
+    const getSnapshot = snapshotReader(f.root, run);
+    assert.equal(reads, 0);
+    assertSnapshot(f.root, run, snapshot, getSnapshot);
+    assertSnapshot(f.root, run, snapshot, getSnapshot);
+    assert.throws(() => assertSnapshot(f.root, run, { ...snapshot, digest: 'stale' }, getSnapshot), /已变化/);
+    assert.equal(reads, 1);
+    changeCode(f);
+    assert.throws(() => assertSnapshot(f.root, run, snapshot, snapshotReader(f.root, run)), /已变化/);
+    assert.equal(reads, 2);
+  } finally { fs.readFileSync = read; }
+});
+
+test('审查交接与收尾共扫描四次；保存和完成在各自校验阶段复用快照', (t) => {
+  const f = flowFixture(t); let run = f.verify(f.implement(f.plan(f.start())));
+  const spawn = childProcess.spawnSync; let scans = 0;
+  childProcess.spawnSync = (cmd, args, options) => {
+    if (cmd === 'git' && args[0] === 'ls-files' && args.includes('--cached')) scans++;
+    return spawn(cmd, args, options);
+  };
+  syncBuiltinESMExports();
+  try {
+    const packet = handoff(f.root, { branch: BRANCH, id: run.id });
+    assert.equal(scans, 2, '交接前后各扫描一次');
+    const result = { run_id: run.id, code: packet.snapshot.digest, inputs: packet.inputs, findings: [],
+      coverage: { reviewed: packet.scope.review.map((f) => f.path), uncovered: [] } };
+    run = f.finalize(run, 'review', done('F7'), { packet, result });
+    assert.equal(scans, 4, '收尾准备和发布阶段各扫描一次');
+    scans = 0;
+    run = f.save(run, { stage: 'F8', decision: { action: 'deliver', confirmed: true } });
+    assert.equal(scans, 1);
+    scans = 0;
+    run = f.finalize(run, 'delivery', done('F8'));
+    assert.equal(scans, 2);
+    scans = 0;
+    assert.equal(f.save(run, done('F8'), 'complete').status, 'completed');
+    assert.equal(scans, 1);
+  } finally {
+    childProcess.spawnSync = spawn;
+    syncBuiltinESMExports();
+  }
+});
 
 test('关键门禁拒绝跳过方案、未确认进入实现、未验证进入审查和未选择进入交付；失败不写状态', (t) => {
   const f = flowFixture(t); let run = f.start();
