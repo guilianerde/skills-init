@@ -30,8 +30,8 @@ node <skills>/workflow/scripts/run.mjs cancel --id <运行id> --expect-revision 
 
 | kind | 步骤 | 首次创建时机 |
 |---|---|---|
-| `feature` | Step0、F1～F8 | F3 收尾确定不走快速通道并 bind 后，先写 requirement.md |
-| `bug` | Step0、B1～B5 | B3 收尾确定不走快速通道并 bind 后，先写 requirement.md |
+| `feature` | Step0、F1～F8 | 需要业务清单时在 F2 初判规模、选择完整流程并 bind，先发布 clarification.md；无需清单时在 F3 收尾 requirement.md 前创建 |
+| `bug` | Step0、B1～B5 | B3 首次落盘前初判规模、选择完整流程并 bind；有清单先写 clarification.md，否则先写 requirement.md |
 | `review` | R1～R7（project-review 第 1～7 步） | 独立审查需要落盘且绑定需求后；dev 内部审查不另开运行 |
 | `tech` | T0～T4（技术方案 Step 0～4） | 确定需求和分支、绑定后 |
 | `release` | L0～L4（上线方案 Step 0～4） | 确定需求和分支、绑定后 |
@@ -39,11 +39,11 @@ node <skills>/workflow/scripts/run.mjs cancel --id <运行id> --expect-revision 
 
 “已完成”表示**本次运行范围已交付**，不是整个需求已经上线。dev 完成后，用户选择的技术方案、上线方案、wiki 发布是同一个 meta.json 中的新运行，不把已完成的 dev 改回未完成。提交、推送和知识沉淀仍按既有授权规则处理，不因 completed 自动执行；这些可选后续动作不阻止已完成的技能交付标记完成。
 
-关键门禁、代码快照、自动审查交接和正式文档收尾见 [execution.md](execution.md)。完整流程从需求文档开始记录；方案绑定需求 hash／版本，方案确认绑定方案版本，验证和审查绑定代码快照，交付选择绑定本轮报告。
+关键门禁、代码快照、自动审查交接和正式文档收尾见 [execution.md](execution.md)。完整流程从首个业务场景清单或需求文档开始记录；清单在 F2 / B3 逐轮更新并保存 waiting_user；业务明确并完成调研后，feature 进入 F3 技术澄清，再收尾需求。方案绑定需求 hash／版本，方案确认绑定方案版本，验证和审查绑定代码快照，交付选择绑定本轮报告。
 
 ## 写 checkpoint
 
-完整 dev 开始记录前已经完成的前置步骤，要把对话中确认的摘要补入第一份 checkpoint；没有实际完成的步骤不能补成 completed。例如 F3 收尾准备写需求文档时：
+完整 dev 开始记录前已经完成的前置步骤要补入第一份 checkpoint，不能提前标完成。首次发布业务清单时 stage 为 F2，只补记 Step0、F1，F2 保持 in_progress；下面示例是无需清单、F3 准备收尾需求文档时：
 
 ```json
 {
@@ -83,7 +83,7 @@ F3 / B3 只能在需求文档 finalize 后完成；requirement.md 是需求事�
 
 前面的 F4～F6 必须已按实际进度保存，不能为凑齐示例而直接标完成。bug 的 B5 同时包含审查与交付，报告完成等待选择时 B5 仍为 in_progress，最后交付才标完成。
 
-- 用户选修复：save `stage: F5`、`status: running`、`decision: {"action":"fix","confirmed":true}`；bug 回 B4。回到前面的阶段会自动重置该阶段及后续的完成标记、清除旧交付选择，旧 checkpoint 保留在 history；修复、验证和复审后再次等待选择。需求变化需回 F3，规模变化同时写 size。
+- 用户选修复：save `stage: F5`、`status: running`、`decision: {"action":"fix","confirmed":true}`；bug 回 B4。回到前面的阶段会自动重置该阶段及后续的完成标记、清除旧交付选择，旧 checkpoint 保留在 history；修复、验证和复审后再次等待选择。业务场景变化先回 F2 更新清单，再到 F3 重新收尾需求；仅技术约束变化回 F3，规模变化同时写 size。
 - 用户明确选交付：按 execution.md 核对本轮证据，save `stage: F8`、`status: running`、`decision: {"action":"deliver","confirmed":true}`；bug 留在 B5。只记录用户实际确认的选择，遗留风险写 context。
 - 等方案确认：`status: waiting_user`，waiting_for 说明待确认方案；方案已写不代表用户已同意。
 - 环境等阻塞：`status: blocked`、reason 说明原因，保留步骤与 remaining；解除后 save running。

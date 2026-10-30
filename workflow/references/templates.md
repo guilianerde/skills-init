@@ -1,6 +1,6 @@
 # 模板来源（文档类 skill 共用）
 
-技术方案、上线方案、方案、审查清单的模板由脚本判定，各 skill 不自行查找：
+澄清清单、需求、技术方案、上线方案、方案、审查清单的模板由脚本判定，各 skill 不自行查找：
 
 ```
 node <skills>/workflow/scripts/resolve.mjs template <skill> <文件名>
@@ -21,7 +21,7 @@ DocNexus 是必装组件，知识库 `workflow-run/docnexus/library/templates/<s
 
 ## 修改模板（/workflow template）
 
-用户要改某份模板（「技术方案模板加一节回滚」「上线方案去掉灰度那节」「审查报告的严重问题表加一列」），或要新建、按样例重做模板时，用 `template.mjs` 一路走完，不要直接编辑生效中的模板文件。`<模板>` 写别名 `requirement` / `tech` / `release` / `plan` / `delivery` / `review` / `checklist`，或 `<skill>/<文件名>`；没说哪份时先 `template.mjs list` 列出来问。
+用户要改某份模板（「技术方案模板加一节回滚」「上线方案去掉灰度那节」「审查报告的严重问题表加一列」），或要新建、按样例重做模板时，用 `template.mjs` 一路走完，不要直接编辑生效中的模板文件。`<模板>` 写别名 `clarification` / `requirement` / `tech` / `release` / `plan` / `delivery` / `review` / `checklist`，或 `<skill>/<文件名>`；没说哪份时先 `template.mjs list` 列出来问。
 
 1. **起草稿**：`node <skills>/workflow/scripts/template.mjs draft <模板>`，把当前生效的模板复制到 `workflow-run/tmp/template-draft/<skill>/<文件名>`（输出的 `draft`）。草稿已存在会沿用（上次没改完）；要从当前模板重来加 `--force`。
    - 退出码 2、`need_sample: true`：还没有这份模板，按下面「创建模板」第 1 步向用户要样例，再运行 `draft <模板> --from <样例文件>`（从 stdin 读用 `--from -`）。用户要「按这份文档重做模板」时同样用 `--from`。

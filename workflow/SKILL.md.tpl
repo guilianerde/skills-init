@@ -20,7 +20,7 @@ description: "Entry point for project workflow commands: /workflow, project prof
 /workflow profile         # 填写或更新项目画像
 /workflow report          # 本地效果报告（审查发现与修复率、需求澄清、沉淀与复用、各分支链路）
 /workflow view            # 项目文档视图：按需求浏览方案、交付、审查、技术 / 上线方案（本地静态页面）
-/workflow template [<模板>] [怎么改]   # 修改 / 创建文档模板：requirement、tech、release、plan、delivery、review、checklist
+/workflow template [<模板>] [怎么改]   # 修改 / 创建文档模板：clarification、requirement、tech、release、plan、delivery、review、checklist
 ```
 
 ## 能力地图（路由）

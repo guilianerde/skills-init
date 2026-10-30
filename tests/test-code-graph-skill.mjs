@@ -1,5 +1,5 @@
 // code-graph/scripts/cg.mjs：用假的 CodeGraph 库（CODEGRAPH_LIB）验证 diff → 改动符号 → 入口 / 测试 / 表 / 配置，
-// 以及只扫源码的 mq / jobs / tables。真实库的验证见 README「code-graph」一节（CI 不装 300MB 的平台包）
+// 以及只扫源码的 mq / jobs / tables。真实库的验证见 docs/integrations.md「CodeGraph」一节（CI 不装 300MB 的平台包）
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';

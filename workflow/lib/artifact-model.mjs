@@ -1,8 +1,8 @@
 // 正式需求产物的统一纯模型；不扫描目录、不修改状态。
 import { sections, section, tableRows, listItems, meta, isEmpty } from './document-model.mjs';
 
-export const FILES = { requirement: 'requirement', plan: 'plan', delivery: 'delivery', review: 'review', tech: 'tech-doc', release: 'release-doc' };
-export const LABELS = { requirement: '需求文档', plan: '方案', delivery: '交付说明', review: '审查报告', tech: '技术方案', release: '上线方案' };
+export const FILES = { clarification: 'clarification', requirement: 'requirement', plan: 'plan', delivery: 'delivery', review: 'review', tech: 'tech-doc', release: 'release-doc' };
+export const LABELS = { clarification: '澄清清单', requirement: '需求文档', plan: '方案', delivery: '交付说明', review: '审查报告', tech: '技术方案', release: '上线方案' };
 export const KINDS = Object.keys(FILES).map((kind) => ({ kind, label: LABELS[kind] }));
 
 // 文件名 → { kind, version }；不是需求目录里的产物返回 null

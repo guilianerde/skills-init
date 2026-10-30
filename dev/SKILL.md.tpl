@@ -20,7 +20,8 @@ description: "Explicitly requested dev workflow for feature development or bug f
 - 开工先运行 `node <skills>/workflow/scripts/resolve.mjs status`；DocNexus 必装，不可用先修复。可选增强复用 `<skills>/workflow/references/capabilities.md` 的本轮快照。
 - 先确定工作分支、已有改动的归属与需求名；切分支重新查询绑定，不替用户丢弃已有改动。
 - 规模由 agent 判定并说明，不询问规模确认；M / L 的需求理解和方案须用户确认后再实现，权限 / 资金至少按 M。
-- S 快速通道须用户明确同意，且 ≤3 文件、无配置 / SQL / 对外接口 / 表结构 / 权限 / 资金变更，且没有已确认的业务决定；具体资格见 F4。
+- F2 先落偏业务场景的 clarification.md，供用户找产品核对；逐轮更新原问题状态、追加新问题和反馈。业务明确并完成现状调研后，再进入 F3 澄清技术约束；最终需求确认后进入 F4。
+- S 快速通道须用户明确同意，且 ≤3 文件、无配置 / SQL / 对外接口 / 表结构 / 权限 / 资金变更，且没有 F2 / F3 已确认的业务决定、本次未发布正式清单且未创建完整流程运行；已有清单或运行沿用完整流程，具体资格见 F4。
 - 快速通道仍编译、测试、当前会话审查，但不 bind、不建运行、不落需求 / 方案 / 审查 / 交付文档；超限或用户要求落盘先停，回 F3（bug 回 B3）补需求文档，再进入方案。
 - 完整流程每轮审查落 `review.md`，交报告后等待明确选择修复或交付；选择交付前不创建或更新 `delivery.md`。
 - 修复后必须验证、复审并再次等选择；严重遗留风险须说明并取得明确接受，不能把一般的“交付”当作接受风险。
@@ -34,7 +35,7 @@ description: "Explicitly requested dev workflow for feature development or bug f
 ## 完整流程的运行状态
 
 确定工作分支后先 `run.mjs show`；恢复时核对 context、代码与证据，不能把“继续”当作交付选择。
-非快速通道在 F3 / B3 收尾、首次落盘需求文档前 bind，再 `run.mjs start --kind feature|bug --size <规模> --input <checkpoint.json>`，补记真实完成的前置步骤；首个文档为 `requirement.md`。
+非快速通道首次落盘前 bind、start 并补记真实完成的前置步骤。需要业务清单时从 F2 创建（仅补记 Step0、F1）；无需清单时在 F3 收尾需求文档前创建。bug 从 B3 创建。清单每轮发布、等待时保存 waiting_user；业务与技术约束均明确后才收尾 requirement.md 并完成 F3 / B3。
 每步完成、等待、阻塞和结束会话前 save；修复回 F5 / B4，交付进 F8 / B5。具体协议读 `<skills>/workflow/references/runs.md` 与 [execution.md](../workflow/references/execution.md)。
 交付、自检、摘要与反馈处理后，末步标 completed，再 `run.mjs complete`，保存 completed（已完成）和 completed_at；已完成运行不覆盖。
 
@@ -44,14 +45,14 @@ description: "Explicitly requested dev workflow for feature development or bug f
 
 读 [planning.md 的 F1](references/planning.md)；运行 `node <skills>/workflow/scripts/knowledge.mjs dev --match <模块> --query "<需求>"`，按需拉 PRD，形成需求要点、验收标准与未定决定。
 
-### F2 — 现状调研
+### F2 — 业务场景核对与现状调研
 
-读 [planning.md 的 F2](references/planning.md)；按本轮能力沿调用链读代码，涉及表时用 `tables.mjs --files <文件>` 定位；事实与证据进入方案依据。
+先读 [clarify.md 的 F2](references/clarify.md)，在 F3 前按业务场景模板发布正式 clarification.md，供产品核对角色、操作、业务规则、异常、范围和验收；多轮更新与反馈都留在同一清单，等待时停在 F2。再按 [planning.md 的 F2](references/planning.md) 完成代码与数据调研，业务明确且调研结束后进入 F3。
 涉及远程参数或开关且已安装 nacos-config 时，按 `<skills>/nacos-config/SKILL.md` 按需读取并标明来源；无法读取时注明「未核对远程配置」，不把代码默认值当成远程实际值。
 
-### F3 — 需求澄清
+### F3 — 需求澄清（偏技术约束）
 
-读 [clarify.md](references/clarify.md) 与 [planning.md 的 F3](references/planning.md)；事实自己查、决定交用户。澄清后按 F4 标准判定规模与快速通道；完整流程用 `artifact.mjs finalize --kind requirement` 收尾 `requirement.md`，独立保存目标、范围、验收与决定。实现中新决定先回本步更新需求文档。
+读 [clarify.md 的 F3](references/clarify.md) 与 [planning.md 的 F3](references/planning.md)；基于已确认业务场景，查清可行性、接口兼容、数据与一致性、权限、依赖及验证条件。事实自己查，需用户取舍的技术约束给推荐并等答复；详细设计留到 F4。发现新业务问题回 F2 更新清单找产品确认。全部明确后，完整流程 finalize requirement.md、完成 F3，再进 F4。
 
 ### F4 — 方案（落盘只看是否快速通道，写法按规模）
 
@@ -104,4 +105,4 @@ description: "Explicitly requested dev workflow for feature development or bug f
 
 - 不直接写库、不改凭据文件；SQL 只生成脚本。安装新依赖、提交、推送、改写历史、删除分支须有用户授权。
 - 不改无关代码；现有代码结论引用真实文件和行号，测试没跑不能说通过。
-- 用户改变需求回 F3，只澄清变化部分并更新验收标准。
+- 用户改变业务场景回 F2 更新清单，技术约束变化回 F3，只核对变化部分并更新验收标准。

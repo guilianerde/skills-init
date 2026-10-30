@@ -77,7 +77,7 @@ test('sync：meta.json 汇总产物、最新版本、wiki 与 DocNexus；内容�
   put(`${dir}/tech-doc.md`, doc('技术', b, '<!-- md-to-wiki: pageId=42 version=3 url=https://wiki/x -->\n'));
   put(`${dir}/notes.md`, '随手记\n');
   const m = sync(root, dir);
-  assert.deepEqual(m.latest, { requirement: null, plan: null, delivery: 'delivery.md', review: 'review_v2.md', tech: 'tech-doc.md', release: null });
+  assert.deepEqual(m.latest, { clarification: null, requirement: null, plan: null, delivery: 'delivery.md', review: 'review_v2.md', tech: 'tech-doc.md', release: null });
   assert.equal(m.artifacts.length, 4, 'notes.md 不是产物');
   assert.deepEqual(m.artifacts.find((a) => a.kind === 'tech').wiki, { pageId: '42', version: 3, url: 'https://wiki/x', at: null });
   assert.deepEqual(m.artifacts.find((a) => a.kind === 'delivery').docnexus, ['docnexus/library/dev/order.md']);

@@ -11,11 +11,12 @@ import { updateMeta } from './meta-store.mjs';
 import { OLD_DIR, indexArtifacts } from './requirements.mjs';
 
 export const ARTIFACT_TEMPLATES = {
+  clarification: ['dev', 'clarification-template.md'],
   requirement: ['dev', 'requirement-template.md'],
   plan: ['dev', 'plan-template.md'], review: ['project-review', 'report.md'], delivery: ['dev', 'delivery-template.md'],
   tech: ['create-tech-md-doc', 'template.md'], release: ['create-release-md-doc', 'template.md'],
 };
-const allowed = { feature: ['requirement', 'plan', 'review', 'delivery'], bug: ['requirement', 'plan', 'review', 'delivery'], review: ['review'], tech: ['tech'], release: ['release'] };
+const allowed = { feature: ['clarification', 'requirement', 'plan', 'review', 'delivery'], bug: ['clarification', 'requirement', 'plan', 'review', 'delivery'], review: ['review'], tech: ['tech'], release: ['release'] };
 const relative = (root, file) => path.relative(root, file).split(path.sep).join('/');
 const fileHash = (file) => fs.existsSync(file) ? hash(fs.readFileSync(file)) : null;
 
@@ -119,8 +120,9 @@ export function finalizeArtifact(root, { branch, id, revision, kind, text, input
     const getSnapshot = snapshotReader(root, run);
     // 文档收尾只能登记当前步骤，不能在一次落盘中跳到下游或替用户作确认。
     if (Object.keys(input).some((k) => !['steps', 'status', 'waiting_for', 'reason', 'context'].includes(k))) throw new Error('收尾 checkpoint 只接受 steps / status / waiting_for / reason / context；阶段和用户选择用 run.mjs save');
-    const expectedStep = isDev(run) ? (kind === 'requirement' ? (run.kind === 'feature' ? 'F3' : 'B3') : kind === 'plan' ? (run.kind === 'feature' ? 'F4' : 'B4') : kind === 'review' ? (run.kind === 'feature' ? 'F7' : 'B5') : (run.kind === 'feature' ? 'F8' : 'B5')) : ({ review: 'R7', tech: 'T4', release: 'L4' })[run.kind];
+    const expectedStep = isDev(run) ? (kind === 'clarification' ? (run.kind === 'feature' ? 'F2' : 'B3') : kind === 'requirement' ? (run.kind === 'feature' ? 'F3' : 'B3') : kind === 'plan' ? (run.kind === 'feature' ? 'F4' : 'B4') : kind === 'review' ? (run.kind === 'feature' ? 'F7' : 'B5') : (run.kind === 'feature' ? 'F8' : 'B5')) : ({ review: 'R7', tech: 'T4', release: 'L4' })[run.kind];
     if (run.stage !== expectedStep || Object.keys(input.steps ?? {}).some((s) => s !== expectedStep)) throw new Error(`产物应在 ${expectedStep} 收尾，只能更新该步骤`);
+    if (kind === 'clarification' && (run.steps[expectedStep].status === 'completed' || input.steps?.[expectedStep]?.status === 'completed')) throw new Error('清单发布不能代替阶段完成；保持 F2 / B3 进行中，核对后按阶段规则继续');
     let requirement = null;
     if (kind === 'plan') {
       requirement = assertRequirement(root, req, run);
@@ -134,10 +136,15 @@ export function finalizeArtifact(root, { branch, id, revision, kind, text, input
     const previous = before !== null && before !== digest ? relative(root, path.join(root, OLD_DIR, path.relative(path.join(root, 'workflow-run/docs/requirements'), req.abs), `${FILES[kind]}_v${oldVersion}.md`)) : null;
     run.artifacts = { ...(run.artifacts ?? {}), [kind]: { hash: digest, version, path: relative(root, file), previous, lint, at,
       ...(requirement ? { requirement: { hash: requirement.hash, version: requirement.version } } : {}) } };
-    if ((kind === 'plan' && (current.artifacts?.plan?.hash !== digest || current.artifacts?.plan?.requirement?.hash !== requirement.hash))
+    const clarificationChanged = kind === 'clarification' && current.artifacts?.clarification?.hash !== digest;
+    if (clarificationChanged || (kind === 'plan' && (current.artifacts?.plan?.hash !== digest || current.artifacts?.plan?.requirement?.hash !== requirement.hash))
       || (kind === 'requirement' && current.artifacts?.requirement?.hash !== digest)) {
       run.plan_approval = null; run.implementation = null; run.validation = null; run.review = null; run.decision = null;
-      if (kind === 'requirement') for (const step of coreSteps(run).slice(1)) run.steps[step] = { status: 'pending' };
+      if (clarificationChanged) {
+        // 保留正式文件与历史版本，只撤销本轮凭据，要求重新收尾需求和方案。
+        delete run.artifacts.requirement; delete run.artifacts.plan;
+        for (const step of coreSteps(run)) if (step !== expectedStep) run.steps[step] = { status: 'pending' };
+      } else if (kind === 'requirement') for (const step of coreSteps(run).slice(1)) run.steps[step] = { status: 'pending' };
     }
     applyCheckpoint(run, input, at, false);
     if (kind === 'review') {

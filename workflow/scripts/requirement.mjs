@@ -15,7 +15,7 @@
 // 用法（在项目根执行；--root 可指定项目根；--branch 缺省为当前 git 分支）：
 //   requirement.mjs which [--branch b]                 # 当前分支绑定的需求；没绑定时给出建议名、最近的需求（文档仓库模式还列出其他项目的需求）
 //   requirement.mjs bind [--name <需求名>] [--branch b] [--base m]   # 绑定（没有就新建）；不给 --name 按分支名生成
-//   requirement.mjs path <plan|delivery|review|tech|release> [--branch b]   # 本次落盘的文件路径（文件名固定；已有时上一版复制到
+//   requirement.mjs path <clarification|requirement|plan|delivery|review|tech|release> [--branch b]   # 本次落盘的文件路径（文件名固定；已有时上一版复制到
 //                                                     # workflow-run/tmp/old-artifacts/<种类>_v<N>.md，输出 previous）
 //   requirement.mjs sync [<需求目录或其中的文件> | --all]  # 按目录里的文件重建 meta.json；指定了目录 / 文件时确认新版本号、输出归档了哪些上一版；
 //                                                     # 文档仓库模式下带上提交提示
@@ -41,7 +41,7 @@ function currentBranch(root) {
 }
 
 // ------------------------------------------------------------------ CLI
-const USAGE = '用法: requirement.mjs which | bind [--name <需求名>] | path <plan|delivery|review|tech|release> | sync [<目录|文件> | --all] | pending | list | config [--project <名>] [--commit-prompt on|off] [--local]  （通用：--root <项目根> --branch <分支>）';
+const USAGE = '用法: requirement.mjs which | bind [--name <需求名>] | path <clarification|requirement|plan|delivery|review|tech|release> | sync [<目录|文件> | --all] | pending | list | config [--project <名>] [--commit-prompt on|off] [--local]  （通用：--root <项目根> --branch <分支>）';
 
 function main(argv) {
   let root = process.cwd();

@@ -1,6 +1,6 @@
 {
   "name": "@rowansenne/workflow-run",
-  "version": "0.29.1",
+  "version": "0.30.0",
   "description": "项目级 Agent Skills 一键初始化：workflow / dev / project-review / code-graph / database-query / nacos-config / md-to-wiki / 需求文档与技术上线方案生成",
   "keywords": [
     "agent-skills",
@@ -32,12 +32,14 @@
     "create-release-md-doc",
     "code-graph",
     "nacos-config",
+    "docs",
     "README.md",
     "CHANGELOG.md"
   ],
   "scripts": {
     "test": "node --test \"tests/*.mjs\"",
-    "eval:triggers": "node scripts/eval-triggers.mjs"
+    "eval:triggers": "node scripts/eval-triggers.mjs",
+    "test:package": "node --test tests/test-package.mjs"
   },
   "devDependencies": {
     "yaml": "^2.8.1"

@@ -46,5 +46,5 @@
 产物按需求归档在 `workflow-run/docs/requirements/<需求名>/<项目名>/`，规则见 `<skills>/workflow/references/requirements.md`：
 
 - **需求名**：Step 0 已运行 `requirement.mjs which` 并问定名字。第一次落盘前运行 `requirement.mjs bind --name "<需求名>"`（用户明确同意按分支名生成时不带 `--name`）；S 快速通道不 bind、不落盘。缺陷修复同样处理（可以选择挂到原需求下）。
-- **正式写入**：按 `<skills>/workflow/references/execution.md`，需求、方案、审查、交付都先写 tmp 草稿，再用 `artifact.mjs finalize --kind requirement|plan|review|delivery` 完成自检、旧版归档、索引与运行证据登记。缺陷修复在 B4 的方案草稿中保留原文并追加修复方案，不另建正式文件。
+- **正式写入**：按 `<skills>/workflow/references/execution.md`，澄清清单、需求、方案、审查、交付都先写 tmp 草稿，再用 `artifact.mjs finalize --kind clarification|requirement|plan|review|delivery` 完成自检、旧版归档、索引与运行证据登记。缺陷修复在 B4 的方案草稿中保留原文并追加修复方案，不另建正式文件。
 - 使用输出的 path / cite 引用；previous 非空时告知上一版归档位置，不能替用户删除。中断先 `artifact.mjs resume --id <id>`，不能继续 sync / save 覆盖待办。独立文档仓库在交付完成后运行 pending，按 requirements.md 提示提交。已完成交付的 wiki／DocNexus 元信息更新仍显式 sync。

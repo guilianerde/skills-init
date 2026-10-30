@@ -50,8 +50,8 @@ test('未接入 DocNexus：只用默认模板，项目文件不生效；技术�
   assert.match(r.out.message, /没有安装/);
   const s0 = resolve('status').out;
   assert.deepEqual(s0.templates_to_create, []);
-  // 未接入时 7 份模板一律报 need_docnexus（包内模板不再作为默认来源兜底）
-  assert.equal(s0.templates.filter((t) => t.need_docnexus).length, 7);
+  // 未接入时 8 份模板一律报 need_docnexus（包内模板不再作为默认来源兜底）
+  assert.equal(s0.templates.filter((t) => t.need_docnexus).length, 8);
   assert.deepEqual([...new Set(s0.templates.filter((t) => t.need_docnexus).map((t) => t.skill))].sort(),
     ['create-release-md-doc', 'create-tech-md-doc', 'dev', 'project-review']);
   put('workflow-run/templates/create-tech-md-doc/template.md', '# 团队模板');
@@ -87,6 +87,12 @@ test('已接入 DocNexus：只用知识库，缺失退出 2 并给出导入来�
   const s = resolve('status').out;
   assert.equal(s.docnexus.ok, true);
   assert.ok(s.docnexus.missing_templates.includes('workflow-run/docnexus/library/templates/dev/delivery-template.md'));
+  const clarification = 'workflow-run/docnexus/library/templates/dev/clarification-template.md';
+  assert.ok(s.docnexus.missing_templates.includes(clarification));
+  put(clarification, fs.readFileSync(path.join(REPO, 'dev/references/clarification-template.md'), 'utf8'));
+  r = resolve('template', 'dev', 'clarification-template.md');
+  assert.equal(r.status, 0, r.stderr);
+  assert.deepEqual([r.out.source, r.out.path], ['docnexus', clarification]);
   assert.ok(!s.docnexus.missing_templates.includes('workflow-run/docnexus/library/templates/dev/plan-template.md'));
   // 没有默认版本的模板不算「缺失待导入」，而是待创建；创建位置是知识库
   assert.ok(!s.docnexus.missing_templates.includes('workflow-run/docnexus/library/templates/create-tech-md-doc/template.md'));
@@ -115,7 +121,7 @@ test('画像空字段与能力探测不输出凭据', () => {
   assert.equal(s.profile.ok, true);
   assert.equal(s.wiki.ok, false);
   assert.equal(s.docnexus.ok, false);
-  assert.equal(s.templates.length, 7);
+  assert.equal(s.templates.length, 8);
   fs.rmSync(root, { recursive: true, force: true });
 });
 

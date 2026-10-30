@@ -24,7 +24,7 @@ export function main(argv) {
     else if (action === 'abort') out = abortFinalization(root, { branch, id: opts.id });
     else if (action === 'finalize') {
       const [skill, template] = ARTIFACT_TEMPLATES[opts.kind] ?? [];
-      if (!skill || !opts.draft) throw new Error('finalize 需要 --kind requirement|plan|review|delivery|tech|release 和 --draft <草稿.md>');
+      if (!skill || !opts.draft) throw new Error('finalize 需要 --kind clarification|requirement|plan|review|delivery|tech|release 和 --draft <草稿.md>');
       const resolved = resolveTemplate(root, skill, template);
       if (!resolved.ok) throw new Error(resolved.hint ?? JSON.stringify(resolved));
       const source = fs.readFileSync(path.resolve(root, resolved.path), 'utf8');

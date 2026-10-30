@@ -39,6 +39,12 @@
           "对比分支"
         ]
       }
+    },
+    {
+      "id": "clarification-template.md",
+      "src": "references/clarification-template.md",
+      "title": "业务场景待确认清单模板",
+      "summary": "F2 / B3 在技术澄清前供产品核对的正式业务场景清单，与需求文档同目录，按版本记录答复、新增问题及 PRD 调整建议，需求明确后再收尾需求文档。"
     }
   ],
   "shared": [

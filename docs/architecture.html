@@ -193,7 +193,7 @@ footer { margin-top: 40px; font-size: 13px; color: var(--muted); }
 
 <header class="hero">
   <div>
-    <div class="eyebrow">@rowansenne/workflow-run · 0.29.0 · 2026-10-28</div>
+    <div class="eyebrow">@rowansenne/workflow-run · 0.30.0 · 2026-10-30</div>
     <h1>让 AI 编程代理按团队的规矩干活</h1>
     <p class="lede">一套装进项目里的 Agent Skills：从需求澄清、开发、测试、自审到技术方案和上线方案，每一步怎么做、做到什么程度、哪些事必须先问人，都写成团队共享的规则和脚本，随代码一起提交。</p>
     <div class="facts">
@@ -322,7 +322,7 @@ footer { margin-top: 40px; font-size: 13px; color: var(--muted); }
           <div class="cell">workflow-run/docs/requirements/ <span>需求产物 + meta.json（分支、运行状态、版本）</span></div>
           <div class="cell">workflow-run/docnexus/ <span>团队知识库</span></div>
           <div class="cell">workflow-run/feedback/ <span>运行反馈</span></div>
-          <div class="cell">workflow-run/other/ <span>聊天顺手产物，不进需求</span></div>
+          <div class="cell">workflow-run/other/ <span>聊天辅助产物，不进正式需求统计</span></div>
           <div class="cell">workflow-run/tmp/ <span>写锁与临时文件，git 忽略</span></div>
         </div>
       </div>
@@ -376,18 +376,24 @@ footer { margin-top: 40px; font-size: 13px; color: var(--muted); }
     <ol>
       <li><span class="code">Step 0</span><div class="name">前置检查</div><div class="what">读画像，先确定工作分支，再问清需求名（给不出就不开始）与工作区里已有的改动归谁，跑一次基线</div></li>
       <li><span class="code">F1</span><div class="name">理解需求</div><div class="what">拉 PRD，召回以往的约定和坑，列初版验收标准</div></li>
-      <li><span class="code">F2</span><div class="name">现状调研</div><div class="what">沿调用链读代码，只读查实际表结构</div></li>
-      <li class="gate"><span class="code">F3</span><div class="name">需求澄清</div><div class="what">分轮澄清；M / L 确认理解一致；判通道后完整流程先生成需求文档<br><span class="art">requirement.md</span></div></li>
-      <li class="gate"><span class="code">F4</span><div class="name">方案</div><div class="what">引用需求版本，只写实现设计、实施和验证计划（S / M 简版）<br><span class="art">plan.md</span></div></li>
+      <li class="gate"><span class="code">F2</span><div class="name">业务核对与调研</div><div class="what">先落业务场景清单，与产品逐轮核对；明确后结合场景调研代码与数据<br><span class="art">clarification.md</span></div></li>
+      <li class="gate"><span class="code">F3</span><div class="name">需求澄清</div><div class="what">基于已确认场景澄清可行性、接口兼容、数据与权限等技术约束；确认理解一致后收尾需求文档<br><span class="art">requirement.md</span></div></li>
+      <li class="gate"><span class="code">F4</span><div class="name">方案</div><div class="what">需求明确后引用需求版本，写实现设计、实施和验证计划（S / M 简版）；M / L 确认方案后实现<br><span class="art">plan.md</span></div></li>
       <li><span class="code">F5</span><div class="name">实现</div><div class="what">贴合现有写法，不顺手重构；SQL 只写脚本不执行</div></li>
       <li><span class="code">F6</span><div class="name">验证</div><div class="what">先相关测试再全量；完整流程绑定执行前代码快照，验收项逐条对应到证据</div></li>
       <li class="gate"><span class="code">F7</span><div class="name">审查</div><div class="what">完整流程自动生成交接材料，优先独立子 agent 审查；返回草稿与结构化结果，由主 agent 收尾 review.md，再等用户选择修复或交付<br><span class="art">review.md</span></div></li>
       <li class="gate"><span class="code">F8</span><div class="name">交付</div><div class="what">用户选择交付后才生成交付说明；提交、PR 先问，沉淀有值得记的内容才问<br><span class="art">delivery.md</span></div></li>
     </ol>
   </div>
-  <div class="legend"><span><i></i>需要人确认的节点</span><span><b>产物落盘</b>：F3 <code>requirement.md</code> → F4 <code>plan.md</code> → F7 <code>review.md</code> → F8 <code>delivery.md</code>（选择交付后）；S 快速通道不落任何产物</span><span>缺陷修复走 B1 收集现象 → B2 复现 → B3 定位根因并生成 <code>requirement.md</code> → B4 追加 <code>plan.md</code> → B5 审查与交付（<code>review.md</code> / <code>delivery.md</code>）</span></div>
+  <div class="legend"><span><i></i>需要人确认的节点</span><span><b>正式产物落盘</b>：F2 <code>clarification.md</code>（业务核对）→ F3 <code>requirement.md</code> → F4 <code>plan.md</code> → F7 <code>review.md</code> → F8 <code>delivery.md</code>（选择交付后）；S 快速通道不落任何产物</span><span>缺陷修复走 B1 收集现象 → B2 复现 → B3 定位根因并生成 <code>requirement.md</code> → B4 追加 <code>plan.md</code> → B5 审查与交付（<code>review.md</code> / <code>delivery.md</code>）</span></div>
+  <div class="callout">
+    <b>F3 前先核对业务场景，再澄清技术约束</b>
+    <p>输出待确认清单 → 用户与产品核对、完善 PRD → 带回答复或新版 PRD → 更新原清单并追加新问题。每轮保留 Q 编号与已确认项，汇总「已确认 / 仍待确认 / 本轮新增」和 PRD 调整建议；仍有未定业务项就留在 F2，继续这个循环。</p>
+    <p>业务场景明确后，完成 F2 现状调研，再进入 F3 核对系统能力、接口、数据、兼容性等技术约束；技术限制改变业务场景时回 F2 找产品确认。业务与技术均明确后，收尾 <code>requirement.md</code>、进入 F4 写实现方案。没有业务待确认项且用户未要求清单时可省清单，沿用快速通道判定。</p>
+    <span class="sub">清单按 <code>clarification-template.md</code> 生成，经 finalize 发布到同一需求目录；每轮归档旧版，等待时保存 waiting_user，新会话恢复同一运行继续。清单发布不代表 F2 调研或 F3 技术澄清已完成；清单关注角色、操作场景、业务规则、范围和验收。</span>
+  </div>
   <div class="sizes">
-    <div class="size"><div class="s">S · 快速通道</div><p>≤3 个文件，不碰接口、表、配置、权限、资金。走不走由用户选：同意则编译、测试照常，审查在当前会话做；不绑定需求、不落产物文件（连方案也不写），一次对话交付并注明「未询问」。</p></div>
+    <div class="size"><div class="s">S · 快速通道</div><p>≤3 个文件，不碰接口、表、配置、权限、资金，无 F2 / F3 已确认的业务决定，本次未发布正式清单且未创建完整运行。已有清单或运行继续完整流程；符合资格时走不走由用户选：同意则编译、测试照常，审查在当前会话做；不绑定需求、不落产物文件（连方案也不写），一次对话交付并注明「未询问」。</p></div>
     <div class="size"><div class="s">M</div><p>改接口、配置项、少量字段，或涉及权限、资金。先确认需求理解，再确认落盘的简要方案。</p></div>
     <div class="size"><div class="s">L</div><p>新模块、跨服务、数据迁移。写完整方案文档落盘，确认后再写代码，之后可生成正式技术方案。</p></div>
   </div>
@@ -456,13 +462,13 @@ footer { margin-top: 40px; font-size: 13px; color: var(--muted); }
     <table>
       <thead><tr><th>代理里输入</th><th>做什么</th></tr></thead>
       <tbody>
-        <tr><td>/dev &lt;需求描述&gt;</td><td>功能开发全流程：确定工作分支 → 定需求名 → 澄清 → 方案 → 实现 → 测试 → 独立子 agent 审查与报告（无则当前会话自查）→ 用户选择修复或交付（完整交付才生成交付说明）</td></tr>
+        <tr><td>/dev &lt;需求描述&gt;</td><td>功能开发全流程：确定工作分支 → 定需求名 → F2 业务场景清单与产品核对（多轮更新）→ F3 技术澄清 → 需求明确 → 方案 → 实现 → 测试 → 独立子 agent 审查与报告（无则当前会话自查）→ 用户选择修复或交付（完整交付才生成交付说明）</td></tr>
         <tr><td>/dev --bug &lt;现象&gt;</td><td>缺陷修复全流程：复现 → 定位根因 → 最小修复 → 验证 → 审查报告 → 用户选择修复或交付</td></tr>
         <tr><td>/workflow</td><td>按明确请求路由独立能力；dev 须有显式流程授权。普通修改或提交不进入 dev；不带请求时输出能力地图和状态</td></tr>
         <tr><td>/workflow profile</td><td>填写或更新项目画像（主分支、构建测试命令、toolchain）</td></tr>
         <tr><td>/workflow status</td><td>开工快照：DocNexus 必装门槛、CodeGraph 通道、数据库与 wiki 配置</td></tr>
         <tr><td>读取测试环境 Nacos 的 order.yaml，查看 order.timeout</td><td>进入 nacos-config：定位本地连接，选择环境和 Data ID，再只读获取脱敏结果</td></tr>
-        <tr><td>/workflow template &lt;模板&gt; [怎么改]</td><td>修改或创建文档模板：requirement、tech、release、plan、delivery、review、checklist</td></tr>
+        <tr><td>/workflow template &lt;模板&gt; [怎么改]</td><td>修改或创建文档模板：clarification、requirement、tech、release、plan、delivery、review、checklist</td></tr>
         <tr><td>/create-tech-md-doc &lt;dev分支&gt; &lt;主分支&gt;</td><td>从分支 diff 按团队模板生成技术方案</td></tr>
         <tr><td>/create-release-md-doc &lt;dev分支&gt; &lt;主分支&gt;</td><td>生成上线方案，自动引用同分支的技术方案和交付说明</td></tr>
         <tr><td>/workflow report</td><td>效果报告：审查发现与修复率、需求澄清、DocNexus 沉淀与复用</td></tr>
@@ -552,12 +558,12 @@ footer { margin-top: 40px; font-size: 13px; color: var(--muted); }
   <div class="tree"><pre>node .agents/skills/nacos-config/scripts/config.mjs inspect
 node .agents/skills/nacos-config/scripts/config.mjs get --file src/main/resources/bootstrap.yml --file src/main/resources/application-test.yml --data-id order-test.yaml --key order.timeout</pre></div>
   <p class="sub" style="margin-top:12px">支持 JSON / YAML / properties；首次解析 YAML 若缺依赖，在该 skill 目录运行 npm 安装。默认使用 Nacos 1.x / 2.x 的兼容 API，也可显式选择 2.x API 或 3.x Client API。<code>/workflow status</code> 与 <code>doctor</code> 均不测试 Nacos 远端连通性；doctor 会检查本机连接文件的忽略规则。</p>
-  <div class="callout">本页对应 0.29.0：新增独立 nacos-config 与需求文档，dev 工作流仅在用户显式要求时启动。</div>
+  <div class="callout">本页对应 0.30.0，包含 F2 业务核对与 F3 技术澄清流程；dev 工作流仅在用户显式要求时启动。</div>
 </section>
 
 <section>
   <div class="kicker">产物与知识</div>
-  <h2>一个需求的所有文档放在一起，好的经验会回到下一次开发</h2>
+  <h2>正式文档按需求归档，好的经验会回到下一次开发</h2>
   <div class="two">
     <div>
       <div class="tree" aria-label="需求目录结构">
@@ -565,6 +571,7 @@ node .agents/skills/nacos-config/scripts/config.mjs get --file src/main/resource
 └── 订单导出/                <span class="c"># 需求名由你定</span>
     └── order-service/       <span class="c"># 项目名，跨服务各占一层</span>
         ├── meta.json        <span class="c"># 分支、运行状态、版本、wiki、沉淀记录</span>
+        ├── clarification.md <span class="c"># 业务场景清单（F2 / B3，多轮反馈、版本归档）</span>
         ├── requirement.md   <span class="c"># 需求文档（F3 / B3；目标、范围、AC 验收与澄清决定）</span>
         ├── plan.md          <span class="c"># 方案（F4；非快速通道都写。缺陷修复在 B4 追加「修复方案」节）</span>
         ├── delivery.md      <span class="c"># 交付说明（F8 / B5，选择交付后）</span>
@@ -573,6 +580,7 @@ node .agents/skills/nacos-config/scripts/config.mjs get --file src/main/resource
         └── release-doc.md   <span class="c"># 上线方案（create-release-md-doc）</span></pre>
       </div>
       <p class="sub" style="margin-top:12px;font-size:14px">可以随代码提交，也可以把 <code>workflow-run/</code> 整个换成团队的独立文档仓库，多个服务共用，目录结构不变。<code>npx @rowansenne/workflow-run view</code> 生成本地页面按需求浏览。</p>
+      <p class="sub" style="margin-top:12px;font-size:14px">业务场景清单与需求文档是两个独立正式产物。需要清单时，在 F2 / B3 初判规模、选择完整流程并 bind、start；每轮从草稿 finalize 为 <code>clarification.md</code>，更新原问题答复和状态、追加新问题与反馈记录，保留编号并归档旧版，纳入视图、统计与 PR 引用。F3 / B3 完成技术澄清后，<code>requirement.md</code> 引用清单及版本，汇总有效业务决定与技术约束。</p>
     </div>
     <div class="loop">
       <div class="step"><div class="dot">1</div><div><b>开工前召回</b><p>dev 和审查先查 DocNexus 里以往的开发约定、技术方案和反复出现的审查问题。</p></div></div>

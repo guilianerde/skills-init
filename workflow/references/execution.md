@@ -4,13 +4,19 @@
 
 ## 需求、方案与实现门禁
 
-澄清后先按 F4 标准判定规模与通道；完整流程首次创建运行在 F3 / B3 收尾，bind 后先生成独立需求文档。快速通道仍不 bind。`scope` 保存审查基线和明确排除范围，缺省取需求 base／画像 main_branch 与 review.exclude：
+需要清单时，在 F2 / B3 初判规模、选择完整流程并 bind、start，先发布业务场景清单；无需清单时，澄清后判规模与通道，完整流程在收尾需求文档前 bind、start。快速通道仍不 bind。scope 保存审查基线和明确排除范围，缺省取需求 base／画像 main_branch 与 review.exclude：
 
 ```json
 {"scope":{"base":"main","exclude":["unrelated/**"]}}
 ```
 
-完整流程的文档先写草稿，再统一收尾；不要直接覆盖正式文件后用 sync 代替收尾。模板仍由调用方用 `resolve.mjs template <skill> <id>` 读取：
+完整流程的文档先写草稿，再统一收尾；不要直接覆盖正式文件后用 sync 代替收尾。模板仍由调用方用 `resolve.mjs template <skill> <id>` 读取。清单用 dev 的 clarification-template.md，每轮复制到 tmp 修改后发布：
+
+```sh
+node <skills>/workflow/scripts/artifact.mjs finalize --id <id> --expect-revision <revision> --kind clarification --draft workflow-run/tmp/clarification.md --input workflow-run/tmp/checkpoint.json
+```
+
+等待业务反馈的 checkpoint 可写 `{"status":"waiting_user","waiting_for":"产品核对业务场景清单","steps":{"F2":{"status":"in_progress"}}}`（bug 改为 B3），context 记录清单引用和待反馈事项。clarification 仅在 F2 / B3 发布，不能借发布清单将该阶段标 completed；业务项解决后发布「业务已明确」的清单，完成 F2 调研，另行 save F2 completed、stage F3。F3 澄清技术约束；发现新业务问题回 F2 更新清单。业务与技术约束均明确后，在 F3 / B3 收尾需求文档：
 
 ```sh
 node <skills>/workflow/scripts/artifact.mjs finalize --id <id> --expect-revision <revision> --kind requirement --draft workflow-run/tmp/requirement.md --input workflow-run/tmp/checkpoint.json
@@ -32,6 +38,8 @@ M / L 取得用户实际确认后，用 save 记录 `approval: {"confirmed":true
 - bug：在 B4 save `{"status":"running","approval":{"confirmed":true},"implement":true}`；之后才改代码。
 
 未收尾方案、M / L 未确认、核心步骤 skipped 都会被拒绝。程序校验确认记录与版本，不能替代 agent 核实用户是否真的授权。
+
+业务清单内容变化时撤销本轮 requirement / plan 凭据，清除旧方案确认、实现、验证、审查与交付选择，并重置后续步骤；正式文件和历史版本保留供查阅，相同清单内容重新发布不触发该失效处理。即便需求和方案正文不变，也必须分别重新 finalize，M / L 重新取得方案确认。
 
 需求变化回 F3（bug 回 B3）重新澄清并 finalize requirement；程序清除旧方案确认、实现、验证、审查和交付选择，旧方案不能作为新需求的依据。即使方案正文不变，也要在 F4 / B4 重新收尾以绑定新需求版本；M / L 重新取得方案确认。只改实现方式则仅更新 plan，不改 requirement。手动改需求正文而未收尾也会使后续证据校验失败。
 

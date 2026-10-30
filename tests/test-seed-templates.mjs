@@ -1,5 +1,5 @@
 // --seed-templates 单元测试：用一个假的 docnexus CLI 记录调用，验证导入顺序、模板原样写入、已存在不覆盖。
-// 真实 DocNexus 的端到端验证需要安装 npm 包，见 README「DocNexus 模板」一节的手动步骤。
+// 真实 DocNexus 的端到端验证需要安装 npm 包，见 docs/team-guide.md「自定义模板」一节的手动步骤。
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';

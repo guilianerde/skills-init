@@ -10,7 +10,7 @@ import { buildReport } from '../workflow/scripts/report.mjs';
 import { buildDescription } from '../workflow/scripts/pr-desc.mjs';
 import { handoff } from '../workflow/scripts/review-handoff.mjs';
 
-test('需求文档是首个正式产物；未收尾不能进入方案，不能伪造完成或跳过澄清', (t) => {
+test('无需清单时需求文档是首个正式产物；未收尾不能进入方案，不能伪造完成或跳过澄清', (t) => {
   const f = flowFixture(t); let run = f.start();
   const before = fs.readFileSync(f.file, 'utf8');
   assert.throws(() => f.save(run, { stage: 'F4' }), /requirement.md/);

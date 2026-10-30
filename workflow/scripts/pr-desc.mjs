@@ -25,7 +25,7 @@ export function buildDescription(root, branch, base, workspace = loadWorkspace(r
   const view = branchView(root, branch, workspace);
   const texts = new Map(workspace.artifacts.map((a) => [a.path, a.text]));
   const read = (a) => a ? texts.get(a.path) : null;
-  const { requirement, delivery, review, plan, tech, release } = view.latest;
+  const { clarification, requirement, delivery, review, plan, tech, release } = view.latest;
   const L = [];
   const add = (title, body) => { if (body) L.push(`## ${title}`, '', body, ''); };
 
@@ -57,7 +57,7 @@ export function buildDescription(root, branch, base, workspace = loadWorkspace(r
     add('影响面', keep(section(s, '影响面')));
   }
 
-  const docs = [['需求文档', requirement], ['方案', plan], ['交付说明', delivery], ['审查报告', review], ['技术方案', tech], ['上线方案', release]]
+  const docs = [['澄清清单', clarification], ['需求文档', requirement], ['方案', plan], ['交付说明', delivery], ['审查报告', review], ['技术方案', tech], ['上线方案', release]]
     
     .filter(([, a]) => a).map(([label, a]) => `- ${label}：\`${a.cite ?? a.path}\`${a.wiki?.url ? `（wiki：${a.wiki.url}）` : a.wiki ? `（wiki pageId ${a.wiki.pageId}）` : ''}`);
   add('相关文档', docs.length ? docs.join('\n') : null);

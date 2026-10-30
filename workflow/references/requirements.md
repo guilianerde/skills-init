@@ -7,6 +7,7 @@
 ```
 workflow-run/docs/requirements/<需求名>/<项目名>/
 ├── meta.json          # 运行记录 runs（阶段、步骤完成标记、等待决定、上下文、完成时间）及 需求名、绑定的分支、各产物（种类、版本、日期、wiki 发布记录、DocNexus 沉淀）
+├── clarification.md   # 业务场景清单（F2 / B3，多轮场景核对、产品答复与追加问题）
 ├── requirement.md     # 需求文档（F3 / B3 收尾；目标、范围、AC 验收与澄清决定）
 ├── plan.md            # 方案（dev，非快速通道都写；S / M 简版；缺陷修复追加修复方案节）
 ├── delivery.md        # 交付说明（dev，完整流程审查后用户选择交付才生成；S 快速通道不落盘）
@@ -43,7 +44,7 @@ node <skills>/workflow/scripts/requirement.mjs which
 
 一个需求可以绑定多个分支（`bind` 在其他分支上用同一个名字即可）。
 
-完整开发 / 修复的首个文档为 F3 / B3 收尾的 requirement.md，绑定和 start 在此时发生；plan.md 随后记录实现设计与需求版本。需求、方案各自版本化，已有历史文档不自动改写。S 快速通道始终不绑定、不落盘；退出快速通道先补需求文档再补方案。
+完整开发需要清单时，在 F2 首次落盘前 bind、start，先发布同目录的业务场景清单 clarification.md，逐轮 finalize、归档，纳入文档视图和统计；等待产品反馈时 F2 保持进行中、运行为 waiting_user。业务明确且现状调研完成后进入 F3 技术澄清，最终收尾 requirement.md 并引用清单 cite 与版本。无需清单时，完整流程在 F3 收尾需求前 bind、start；bug 在 B3 内先业务核对、后技术澄清。各产物独立版本化；S 快速通道不绑定、不落盘，需要正式清单即走完整流程。
 
 ## 运行状态
 
@@ -51,7 +52,7 @@ node <skills>/workflow/scripts/requirement.mjs which
 
 ## 落盘
 
-正式产物先写 `workflow-run/tmp/` 草稿，统一按 [execution.md](execution.md) 用 `artifact.mjs finalize --id <运行id> --expect-revision <revision> --kind <requirement|plan|delivery|review|tech|release> --draft <草稿>` 收尾。命令校验当前步骤、分支与知识模板，归档旧版、发布文件、更新索引／版本并登记运行证据；requirement 在 F3 / B3，plan 在 F4 / B4，方案记录依据的需求版本；review 还须 packet 与结构化 result，delivery 须本轮有效交付选择。不要直接覆盖正式文件后只 sync。
+正式产物先写 `workflow-run/tmp/` 草稿，统一按 [execution.md](execution.md) 用 `artifact.mjs finalize --id <运行id> --expect-revision <revision> --kind <clarification|requirement|plan|delivery|review|tech|release> --draft <草稿>` 收尾。命令校验阶段、分支与知识模板，归档旧版、更新索引／版本并登记证据；clarification 在 F2 / B3，发布不能代替阶段完成；requirement 在 F3 / B3；plan 在 F4 / B4，并绑定需求版本；review 还须 packet 与结构化 result，delivery 须有效交付选择。不要直接覆盖正式文件后只 sync。
 
 - 输出 path（相对项目根）、cite（跨文档引用）、previous（上一版归档）、version 和 run。文件名固定，目录只留最新版；文档仓库模式的 cite 为「文档仓库名:仓库内路径」。
 - 旧版归档在 `workflow-run/tmp/old-artifacts/<需求>/<项目>/<种类>_v<N>.md`，不提交；告诉用户归档了什么，不替用户删除。相同命令重试不重复升级版本或状态。
