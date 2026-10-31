@@ -1,6 +1,6 @@
 {
   "name": "@rowansenne/workflow-run",
-  "version": "0.30.0",
+  "version": "0.31.0",
   "description": "项目级 Agent Skills 一键初始化：workflow / dev / project-review / code-graph / database-query / nacos-config / md-to-wiki / 需求文档与技术上线方案生成",
   "keywords": [
     "agent-skills",

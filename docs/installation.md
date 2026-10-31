@@ -7,7 +7,7 @@
 需要 **Node.js >= 22.13** 与 npm（DocNexus 为必装组件）。只用 npx 安装，在项目根执行（以当前目录为项目根；Windows 要在管理员终端里运行）。推荐全量安装：
 
 ```
-npx @rowansenne/workflow-run --with-codegraph
+npx @rowansenne/workflow-run@latest --with-codegraph
 ```
 
 按提示：选择环境（编号多选，回车 = 全部）→ 确认 / 填写数据库连接 → 自动生成。安装时自动接入 DocNexus 文档库（开发约定与审查问题的沉淀和召回、团队定制的文档模板），`--with-codegraph` 接入 CodeGraph 代码图谱（改动影响到的接口、MQ、定时任务和测试）；不需要 CodeGraph 就去掉 `--with-codegraph`。装完后在 agent 里运行 `/workflow profile` 填写项目画像。
@@ -16,35 +16,60 @@ npx @rowansenne/workflow-run --with-codegraph
 
 整体架构、dev 主线流程、独立能力调用、数据归属与知识闭环见 [docs/architecture.html](architecture.html)（下载后用浏览器打开）。
 
-非交互示例（bash、zsh、PowerShell 写法一样）：
+非交互示例（bash、zsh、PowerShell 写法一样；环境列表加引号）：
 
+```bash
+# 已有数据库连接配置时，安装全部代理环境
+npx @rowansenne/workflow-run@latest --envs all --yes --with-codegraph
+
+# 跳过数据库配置，安装 Codex 与 Qwen
+npx @rowansenne/workflow-run@latest --envs "codex,qwen" --skip-db --yes --with-codegraph
+
+# 全部代理环境分别拷贝，不使用软链接
+npx @rowansenne/workflow-run@latest --envs all --skip-db --yes --copy
+
+# 只安装 Claude 环境，DocNexus 自动接入
+npx @rowansenne/workflow-run@latest --envs claude --skip-db --yes
 ```
-npx @rowansenne/workflow-run --envs all --yes --with-docnexus --with-codegraph              # 用现有数据库配置，装全部环境
-npx @rowansenne/workflow-run --envs codex,qwen --skip-db --with-docnexus --with-codegraph   # 跳过数据库
-npx @rowansenne/workflow-run --envs all --skip-db --copy --with-docnexus --with-codegraph   # 不用软链接，各环境独立拷贝
-npx @rowansenne/workflow-run --envs claude --skip-db                                        # 全部 skills + 必装 DocNexus，不接 CodeGraph
-npx @rowansenne/workflow-run uninstall                                                      # 按安装清单卸载
-```
+
+`--with-docnexus` 表示强制更新 DocNexus，首次安装时无需额外指定；默认缺失即安装，已安装则复用。未跳过数据库配置且本机没有已有连接时，`--yes` 会报错，应改用交互安装或加 `--skip-db`。
 
 ### 子命令
 
-| 命令 | 作用 |
-| --- | --- |
-| `init`（默认，可省略） | 安装或重装 |
-| `upgrade` | 读安装清单里记录的环境与模式，非交互升级到当前版本：保留数据库配置等用户配置，skills 文件一律更新为新版（手改过的先备份到 `workflow-run/tmp/upgrade-backup/`）。加 `--with-docnexus` 时把 DocNexus 包也升到最新版（`@latest`），刷新 skill 链接与 `CLAUDE.md` / `AGENTS.md` 段落，并导入新增的文档模板（只新增，不改动已有模板）；不加则复用已安装的 DocNexus，缺失时自动补装，并导入新增模板 |
-| `doctor` | 自检：已装版本与当前包对比、手改 / 缺失的文件、软链接是否断开、项目画像、DocNexus 模板是否齐全、各数据库连接能否只读 `SELECT 1`（`--offline` 跳过）、`.gitignore` 是否忽略了凭据。有错误时退出码 1 |
-| `uninstall` | 等价于 `--uninstall` |
-| `report` | 本地效果报告：只读统计 `workflow-run/docs/requirements/` 下的产物（`--since YYYY-MM-DD`、`--all-branches`、`--json`），见 [工作流与命令](workflows.md) |
-| `feedback` | 运行反馈汇总：dev / project-review 每次运行记录到 `workflow-run/feedback/<用户>.jsonl` 的过程数据（`--json`），见 [工作流与命令](workflows.md) |
-| `view` | 项目文档视图：按需求浏览方案、交付说明、审查记录（含复审修复情况）、技术 / 上线方案，生成本地静态页面（`--out <文件>`、`--open`） |
-| `docs-repo <仓库地址>` | 改用团队文档仓库：`workflow-run/` 是空的就克隆，已有内容就原地接上远端（目录结构相同，文件不用挪）、代码仓库忽略它、配置本项目的项目名（`--project`，默认 git 远端仓库名）、接上仓库里的 DocNexus；不带地址显示当前状态，见 [团队共享与产物](team-guide.md) |
-| `seed-templates` | 只把默认文档模板导入 DocNexus，不重装 skills。`--update` 把导入后未改动的模板更新为新版；`--diff` 只读打印团队改过的模板与新默认模板的差异，供手动合并 |
+以下命令在业务项目根的终端执行。示例使用 `@latest`，确保获取最新发布包；路径、日期、仓库地址与项目名按实际情况替换。
 
+| 命令 | 可复制示例 | 作用 |
+| --- | --- | --- |
+| `init`（默认） | `npx @rowansenne/workflow-run@latest init --envs codex --yes --skip-db` | 安装或重装；首次安装段落已给出省略 init 的写法 |
+| `upgrade` | `npx @rowansenne/workflow-run@latest upgrade` | 按安装清单升级 skills，保留用户配置，手改的 skill 文件先备份；自动补入新增模板 |
+| `doctor` | `npx @rowansenne/workflow-run@latest doctor --offline` | 本地自检；去掉 --offline 时另测数据库连通性 |
+| `uninstall` | `npx @rowansenne/workflow-run@latest uninstall` | 按安装清单卸载，保留用户产物并备份用户配置 |
+| `seed-templates` | `npx @rowansenne/workflow-run@latest seed-templates` | 补导入缺失的默认模板，不覆盖已有模板 |
+| `report` | `npx @rowansenne/workflow-run@latest report --since 2026-10-01 --all-branches --json` | 统计指定日期起、工作区及所有本地分支中的产物 |
+| `feedback` | `npx @rowansenne/workflow-run@latest feedback --json` | 汇总运行反馈 |
+| `view` | `npx @rowansenne/workflow-run@latest view --open` | 生成并打开本地文档视图 |
+| `docs-repo` | `npx @rowansenne/workflow-run@latest docs-repo git@git.example.com:team/team-docs.git --project order-service` | 接入团队文档仓库；省略仓库地址时显示当前状态 |
+
+常用附加参数：
+
+```bash
+# 更新 DocNexus 依赖；旧布局清理行为先看外部能力集成文档
+npx @rowansenne/workflow-run@latest upgrade --with-docnexus
+
+# 更新未定制的旧默认模板；定制模板仅查看差异后手动合并
+npx @rowansenne/workflow-run@latest seed-templates --update
+npx @rowansenne/workflow-run@latest seed-templates --diff
+
+# 指定文档视图输出路径；从其他目录操作项目
+npx @rowansenne/workflow-run@latest view --out workflow-run/tmp/docs.html
+npx @rowansenne/workflow-run@latest doctor --offline --project-root ../order-service
+
+# 查看全部参数或当前包版本
+npx @rowansenne/workflow-run@latest --help
+npx @rowansenne/workflow-run@latest --version
 ```
-npx @rowansenne/workflow-run upgrade      # 拿最新版升级
-npx @rowansenne/workflow-run doctor --offline
-npx @rowansenne/workflow-run docs-repo git@git.example.com:team/team-docs.git
-```
+
+升级 DocNexus 的旧布局清理说明见[外部能力集成](integrations.md#破坏性更新旧布局强制清理)。
 
 ## 安装路径与启用方式
 

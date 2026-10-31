@@ -56,7 +56,7 @@ description: "Explicitly requested dev workflow for feature development or bug f
 
 ### F4 — 方案（落盘只看是否快速通道，写法按规模）
 
-读 [planning.md 的 F4](references/planning.md)，复用 F3 已选通道；完整流程基于已收尾需求用 `artifact.mjs finalize --kind plan` 收尾 `plan.md`。方案引用需求文档及版本，只写实现设计、实施与验证计划；S / M 简版、L 完整版，M / L 确认后记录 approval，再进入实现。
+读 [planning.md 的 F4](references/planning.md)，复用 F3 已选通道；完整流程基于已收尾需求用 `artifact.mjs finalize --kind plan` 收尾 `plan.md`。方案引用需求文档及版本，只写实现设计、实施与验证计划；涉及 HTTP 接口或接口行为变化时列出接口、AC、测试场景及命令 / 环境。S / M 简版、L 完整版，M / L 确认后记录 approval，再进入实现。
 
 ### F5 — 实现
 
@@ -64,7 +64,7 @@ description: "Explicitly requested dev workflow for feature development or bug f
 
 ### F6 — 验证
 
-读 [implementation.md 的 F6](references/implementation.md)；完整流程执行前用 `run.mjs snapshot --id <id>` 取快照、执行后 save validation；两种通道都执行相关测试、`profile.test` 与 lint，记录“验收项 → 测试或操作 → 结果”，已有失败与未验证项如实保留。
+读 [implementation.md 的 F6](references/implementation.md)；HTTP 接口或接口行为有变化时，沿用既有框架补充并执行接口层测试，覆盖正常请求、适用的参数错误和权限场景，断言状态码与响应。完整流程执行前用 `run.mjs snapshot --id <id>` 取快照、执行后 save validation；两种通道都执行相关测试、`profile.test` 与 lint，记录“验收项 → 测试或操作 → 结果”，已有失败与未验证项如实保留；缺接口测试环境时附可执行请求与预期结果。
 
 ### F7 — 审查、报告与用户选择
 

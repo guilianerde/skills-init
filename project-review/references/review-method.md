@@ -27,6 +27,8 @@
 
 每个文件只看 `review-scope.mjs` 给它的 `sections`（清单小节号，按文件类型和改动内容定），一批文件用 `node <skills>/workflow/scripts/review-scope.mjs rules <文件…>`（带上和第 1 步一样的 `--diff` / `--base`）打印这些小节的原文和画像 `review.rules` 里匹配到的项目规则，按它检查；整个改动再过一次 `overall_sections`（9 影响面、13 测试）。深审读整份清单（`node <skills>/workflow/scripts/resolve.mjs template project-review checklist.md` 取 `path`），包括风格。对每个发现给出 文件、**问题所在的原代码片段**（从文件里照原样复制，第 6 步靠它定位行号）、问题描述、严重级别、修改建议。
 
+审查深度包含测试维度时，HTTP 接口或接口行为有变化的，在第 13 节核对接口测试与实际执行证据；有方案时对照其验证计划，检查正常请求、参数错误及适用的权限场景，以及状态码与响应断言。不能用仅调用 Service 的单元测试代替接口层验证。环境跑不了的列为未验证，说明缺少的覆盖与实际风险，不写成接口测试已通过。
+
 ## 第 5 步 — 影响面分析
 
 改动是否影响其他调用方/模块。按本轮 CodeGraph 通道分析（script 模式运行 `node <skills>/code-graph/scripts/cg.mjs impact --diff <基线>...<dev>`；未提交改动用 `--base <基线>`）：列出受影响的接口、MQ 消费者、定时任务、测试、表和配置 key，报告「影响面」按入口归纳并带文件:行号。Spring 注入、AOP、MyBatis XML、MQ topic、配置 key 图谱看不到，照常 grep（见 `<skills>/workflow/references/codegraph.md`）。查不到调用方的符号不能当作安全，要明说"未确认"。

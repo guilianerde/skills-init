@@ -193,7 +193,7 @@ footer { margin-top: 40px; font-size: 13px; color: var(--muted); }
 
 <header class="hero">
   <div>
-    <div class="eyebrow">@rowansenne/workflow-run · 0.30.0 · 2026-10-30</div>
+    <div class="eyebrow">@rowansenne/workflow-run · 0.31.0 · 2026-10-31</div>
     <h1>让 AI 编程代理按团队的规矩干活</h1>
     <p class="lede">一套装进项目里的 Agent Skills：从需求澄清、开发、测试、自审到技术方案和上线方案，每一步怎么做、做到什么程度、哪些事必须先问人，都写成团队共享的规则和脚本，随代码一起提交。</p>
     <div class="facts">
@@ -204,7 +204,7 @@ footer { margin-top: 40px; font-size: 13px; color: var(--muted); }
     </div>
   </div>
   <div class="term" aria-label="安装示例">
-<pre><span class="p">$ </span>npx @rowansenne/workflow-run --with-docnexus --with-codegraph
+<pre><span class="p">$ </span>npx @rowansenne/workflow-run@latest --with-codegraph
 <span class="dim">? 选择环境（回车 = 全部）</span>
 <span class="ok">✔</span> .agents/skills/  <span class="dim">单一来源</span>
 <span class="ok">✔</span> .claude/skills/ → 软链接
@@ -334,7 +334,7 @@ footer { margin-top: 40px; font-size: 13px; color: var(--muted); }
       <p>共享核心不反向依赖命令脚本、纯模型不做 I/O——这条边界写进了测试，违反会直接跑挂。安装器自己的环境探测也用 <code>lib/project</code>，不另写一份。</p>
       <p>升级只换分发文件；项目画像、数据库、wiki 和 Nacos 本机配置保留不动，手改过的文件先备份。默认单一来源 + 相对软链接，也支持 <code>--copy</code>。</p>
       <p>DocNexus 在安装环节必装，哪怕只选 Nacos；Nacos 读取脚本没有 workflow / DocNexus 运行依赖。DocNexus 自带 skills 不计入本包的 9 个。</p>
-      <p><code>npx @rowansenne/workflow-run doctor</code> 检查链接、画像、凭据是否被忽略、数据库能否只读连上。</p>
+      <p><code>npx @rowansenne/workflow-run@latest doctor</code> 检查链接、画像、凭据是否被忽略、数据库能否只读连上。</p>
     </aside>
   </div>
 </section>
@@ -378,9 +378,9 @@ footer { margin-top: 40px; font-size: 13px; color: var(--muted); }
       <li><span class="code">F1</span><div class="name">理解需求</div><div class="what">拉 PRD，召回以往的约定和坑，列初版验收标准</div></li>
       <li class="gate"><span class="code">F2</span><div class="name">业务核对与调研</div><div class="what">先落业务场景清单，与产品逐轮核对；明确后结合场景调研代码与数据<br><span class="art">clarification.md</span></div></li>
       <li class="gate"><span class="code">F3</span><div class="name">需求澄清</div><div class="what">基于已确认场景澄清可行性、接口兼容、数据与权限等技术约束；确认理解一致后收尾需求文档<br><span class="art">requirement.md</span></div></li>
-      <li class="gate"><span class="code">F4</span><div class="name">方案</div><div class="what">需求明确后引用需求版本，写实现设计、实施和验证计划（S / M 简版）；M / L 确认方案后实现<br><span class="art">plan.md</span></div></li>
+      <li class="gate"><span class="code">F4</span><div class="name">方案</div><div class="what">需求明确后引用需求版本，写实现设计、实施和验证计划（S / M 简版）；涉及 HTTP 改动时列接口验证场景，M / L 确认后实现<br><span class="art">plan.md</span></div></li>
       <li><span class="code">F5</span><div class="name">实现</div><div class="what">贴合现有写法，不顺手重构；SQL 只写脚本不执行</div></li>
-      <li><span class="code">F6</span><div class="name">验证</div><div class="what">先相关测试再全量；完整流程绑定执行前代码快照，验收项逐条对应到证据</div></li>
+      <li><span class="code">F6</span><div class="name">验证</div><div class="what">先相关测试再全量；HTTP 接口改动补接口层测试，覆盖正常、适用的参数错误与权限场景；绑定执行前快照，按 AC 记录结果，缺环境写未验证</div></li>
       <li class="gate"><span class="code">F7</span><div class="name">审查</div><div class="what">完整流程自动生成交接材料，优先独立子 agent 审查；返回草稿与结构化结果，由主 agent 收尾 review.md，再等用户选择修复或交付<br><span class="art">review.md</span></div></li>
       <li class="gate"><span class="code">F8</span><div class="name">交付</div><div class="what">用户选择交付后才生成交付说明；提交、PR 先问，沉淀有值得记的内容才问<br><span class="art">delivery.md</span></div></li>
     </ol>
@@ -456,46 +456,61 @@ footer { margin-top: 40px; font-size: 13px; color: var(--muted); }
   <div class="kicker">常用命令</div>
   <h2>日常就两类输入：代理里说需求，终端里管安装</h2>
   <div class="prose">
-    <p>开发、审查、出文档在装好 skills 的代理会话里完成；安装、升级、自检在项目根的终端执行，命令前缀统一是 <code>npx @rowansenne/workflow-run</code>，下表写全。</p>
+    <p>开发、审查、出文档在代理对话中输入；安装、升级、自检在业务项目根的终端执行。以下示例与 README 和专题文档一致，分支、路径、连接、日期和页面 ID 按项目替换。</p>
   </div>
   <div class="tbl">
     <table>
-      <thead><tr><th>代理里输入</th><th>做什么</th></tr></thead>
+      <thead><tr><th>代理对话示例</th><th>用途</th></tr></thead>
       <tbody>
-        <tr><td>/dev &lt;需求描述&gt;</td><td>功能开发全流程：确定工作分支 → 定需求名 → F2 业务场景清单与产品核对（多轮更新）→ F3 技术澄清 → 需求明确 → 方案 → 实现 → 测试 → 独立子 agent 审查与报告（无则当前会话自查）→ 用户选择修复或交付（完整交付才生成交付说明）</td></tr>
-        <tr><td>/dev --bug &lt;现象&gt;</td><td>缺陷修复全流程：复现 → 定位根因 → 最小修复 → 验证 → 审查报告 → 用户选择修复或交付</td></tr>
-        <tr><td>/workflow</td><td>按明确请求路由独立能力；dev 须有显式流程授权。普通修改或提交不进入 dev；不带请求时输出能力地图和状态</td></tr>
-        <tr><td>/workflow profile</td><td>填写或更新项目画像（主分支、构建测试命令、toolchain）</td></tr>
-        <tr><td>/workflow status</td><td>开工快照：DocNexus 必装门槛、CodeGraph 通道、数据库与 wiki 配置</td></tr>
-        <tr><td>读取测试环境 Nacos 的 order.yaml，查看 order.timeout</td><td>进入 nacos-config：定位本地连接，选择环境和 Data ID，再只读获取脱敏结果</td></tr>
-        <tr><td>/workflow template &lt;模板&gt; [怎么改]</td><td>修改或创建文档模板：clarification、requirement、tech、release、plan、delivery、review、checklist</td></tr>
-        <tr><td>/create-tech-md-doc &lt;dev分支&gt; &lt;主分支&gt;</td><td>从分支 diff 按团队模板生成技术方案</td></tr>
-        <tr><td>/create-release-md-doc &lt;dev分支&gt; &lt;主分支&gt;</td><td>生成上线方案，自动引用同分支的技术方案和交付说明</td></tr>
-        <tr><td>/workflow report</td><td>效果报告：审查发现与修复率、需求澄清、DocNexus 沉淀与复用</td></tr>
-        <tr><td>/workflow view</td><td>按需求浏览全部产物的本地页面（加 --open 直接打开）</td></tr>
-        <tr><td>/md-to-wiki &lt;md&gt; [pageId]</td><td>发布到 Confluence；发布过的文档省略 pageId 直接更新</td></tr>
+        <tr><td><code>/workflow</code></td><td>查看能力地图</td></tr>
+        <tr><td><code>/workflow profile</code></td><td>初始化项目画像</td></tr>
+        <tr><td><code>/workflow status</code></td><td>检查能力与当前流程进度</td></tr>
+        <tr><td><code>/workflow resume</code></td><td>续接当前分支流程（有多个运行时可追加运行 ID）</td></tr>
+        <tr><td><code>/workflow report</code></td><td>查看效果报告</td></tr>
+        <tr><td><code>/workflow view</code></td><td>浏览需求产物</td></tr>
+        <tr><td><code>/workflow template clarification 增加场景优先级</code></td><td>修改业务场景清单模板</td></tr>
+        <tr><td><code>/workflow template plan 补充 HTTP 接口验证场景</code></td><td>修改实现方案模板</td></tr>
+        <tr><td><code>/dev 订单导出支持按渠道筛选</code></td><td>功能开发</td></tr>
+        <tr><td><code>/dev --bug 导出订单时重复返回数据</code></td><td>缺陷修复</td></tr>
+        <tr><td><code>用 project-review 审查当前分支相对 main 的改动</code></td><td>分支审查</td></tr>
+        <tr><td><code>用 project-review 快审当前未提交的改动</code></td><td>工作区快审</td></tr>
+        <tr><td><code>/create-tech-md-doc feature/order-export main --prd 123456</code></td><td>技术方案</td></tr>
+        <tr><td><code>/create-release-md-doc feature/order-export main</code></td><td>上线方案（自动查找同分支已有技术方案）</td></tr>
+        <tr><td><code>/md-to-wiki &quot;技术方案.md&quot; 123456 --validate-only</code></td><td>wiki 校验</td></tr>
+        <tr><td><code>/md-to-wiki &quot;技术方案.md&quot; 123456</code></td><td>wiki 发布（需要已配置 wiki 和已有目标页面）</td></tr>
+        <tr><td><code>用 database-query 查询 test 连接：SELECT id, status FROM orders LIMIT 10</code></td><td>只读查库</td></tr>
+        <tr><td><code>用 code-graph 查看 OrderService.exportOrders 从哪些接口或任务进入</code></td><td>调用入口分析</td></tr>
+        <tr><td><code>用 nacos-config 读取测试环境 order-test.yaml 中的 order.timeout</code></td><td>Nacos 参数查询</td></tr>
       </tbody>
     </table>
   </div>
-  <p class="sub" style="margin-top:10px">project-review 和 database-query 没有斜杠命令：直接说「审一下这次改动」「查一下 order 表有哪些索引」就会触发。</p>
+  <p class="sub" style="margin-top:10px">没有固定参数格式的能力直接用自然语言指定 skill 和目标。模板别名：<code>clarification</code>、<code>requirement</code>、<code>plan</code>、<code>delivery</code>、<code>review</code>、<code>checklist</code>、<code>tech</code>、<code>release</code>。技术 / 上线方案须提供两个分支；wiki 发布须已配置连接并有目标页面。</p>
   <div class="tbl">
     <table>
-      <thead><tr><th>终端里执行（项目根）</th><th>做什么</th></tr></thead>
+      <thead><tr><th>终端命令示例（业务项目根）</th><th>用途</th></tr></thead>
       <tbody>
-        <tr><td>npx @rowansenne/workflow-run init --with-docnexus --with-codegraph</td><td>首次安装 / 重装；<code>--skills dev</code> 只装子集，<code>--copy</code> 不建软链接</td></tr>
-        <tr><td>npx @rowansenne/workflow-run upgrade</td><td>升级到当前版本：用户配置保留，手改过的文件先备份</td></tr>
-        <tr><td>npx @rowansenne/workflow-run doctor</td><td>自检：版本、软链接、项目画像、DocNexus 模板、数据库连通、.gitignore</td></tr>
-        <tr><td>npx @rowansenne/workflow-run seed-templates</td><td>把自带的文档模板导入 DocNexus（已有的不覆盖）</td></tr>
-        <tr><td>npx @rowansenne/workflow-run view --open</td><td>生成并打开项目文档视图（同 /workflow view）</td></tr>
-        <tr><td>npx @rowansenne/workflow-run docnexus view</td><td>打开 DocNexus 知识库的本地只读浏览页面（前台常驻，Ctrl+C 停止）</td></tr>
-        <tr><td>npx @rowansenne/workflow-run report --since 2026-10-01</td><td>效果报告（同 /workflow report），只读统计产物</td></tr>
-        <tr><td>npx @rowansenne/workflow-run feedback --json</td><td>运行反馈汇总：提问轮数、跳过的步骤、读不懂的规则，精简 skill 的依据</td></tr>
-        <tr><td>npx @rowansenne/workflow-run docs-repo &lt;仓库地址&gt;</td><td>改用团队独立文档仓库；不带地址显示当前状态</td></tr>
-        <tr><td>npx @rowansenne/workflow-run uninstall</td><td>按安装清单卸载，用户配置备份到 workflow-run/tmp/</td></tr>
+        <tr><td><code>npx @rowansenne/workflow-run@latest init --envs codex --yes --skip-db</code></td><td>安装或重装；首次安装段落已给出省略 init 的写法</td></tr>
+        <tr><td><code>npx @rowansenne/workflow-run@latest upgrade</code></td><td>按安装清单升级 skills，保留用户配置，手改的 skill 文件先备份；自动补入新增模板</td></tr>
+        <tr><td><code>npx @rowansenne/workflow-run@latest doctor --offline</code></td><td>本地自检；去掉 --offline 时另测数据库连通性</td></tr>
+        <tr><td><code>npx @rowansenne/workflow-run@latest uninstall</code></td><td>按安装清单卸载，保留用户产物并备份用户配置</td></tr>
+        <tr><td><code>npx @rowansenne/workflow-run@latest seed-templates</code></td><td>补导入缺失的默认模板，不覆盖已有模板</td></tr>
+        <tr><td><code>npx @rowansenne/workflow-run@latest report --since 2026-10-01 --all-branches --json</code></td><td>统计指定日期起、工作区及所有本地分支中的产物</td></tr>
+        <tr><td><code>npx @rowansenne/workflow-run@latest feedback --json</code></td><td>汇总运行反馈</td></tr>
+        <tr><td><code>npx @rowansenne/workflow-run@latest view --open</code></td><td>生成并打开本地文档视图</td></tr>
+        <tr><td><code>npx @rowansenne/workflow-run@latest docs-repo git@git.example.com:team/team-docs.git --project order-service</code></td><td>接入团队文档仓库；省略仓库地址时显示当前状态</td></tr>
+        <tr><td><code>npx @rowansenne/workflow-run@latest --with-codegraph</code></td><td>交互选择代理环境、配置数据库，并接入可选 CodeGraph；DocNexus 自动安装，无需额外指定 --with-docnexus</td></tr>
+        <tr><td><code>npx @rowansenne/workflow-run@latest upgrade --with-docnexus</code></td><td>额外更新 DocNexus 依赖；更新前阅读旧布局清理说明</td></tr>
+        <tr><td><code>npx @rowansenne/workflow-run@latest seed-templates --update</code></td><td>补入模板，并更新未定制的旧默认模板</td></tr>
+        <tr><td><code>npx @rowansenne/workflow-run@latest seed-templates --diff</code></td><td>只读查看团队定制模板与新默认模板的差异，供手动合并</td></tr>
+        <tr><td><code>npx @rowansenne/workflow-run@latest view --out workflow-run/tmp/docs.html</code></td><td>指定文档视图输出路径</td></tr>
+        <tr><td><code>node .agents/skills/workflow/scripts/docnexus.mjs view</code></td><td>打开知识库的本地只读浏览服务，Ctrl+C 停止</td></tr>
+        <tr><td><code>npx @rowansenne/workflow-run@latest --help</code></td><td>查看全部命令和参数</td></tr>
+        <tr><td><code>npx @rowansenne/workflow-run@latest --version</code></td><td>查看当前包版本</td></tr>
       </tbody>
     </table>
   </div>
-  <p class="sub" style="margin-top:10px">skill 内部还有一批脚本命令（<code>resolve.mjs</code>、<code>requirement.mjs</code>、<code>review-scope.mjs</code>、<code>template.mjs</code>、<code>locate.mjs</code>、<code>tables.mjs</code>、<code>knowledge.mjs</code> 等），由各流程自动调用，不用记。</p>
+  <p class="sub" style="margin-top:10px">非交互安装要同时指定 <code>--envs</code> 和 <code>--yes</code>；没有数据库连接时加 <code>--skip-db</code>。<code>--with-docnexus</code> 用于强制更新 DocNexus，默认缺失即安装。安装参数见 <a href="installation.md#子命令">安装与升级</a>，代理示例见 <a href="workflows.md#代理命令示例">工作流与命令</a>；DocNexus 更新前先读 <a href="integrations.md#破坏性更新旧布局强制清理">旧布局清理说明</a>。</p>
+  <p class="sub" style="margin-top:10px">skill 内部还有 <code>resolve.mjs</code>、<code>requirement.mjs</code>、<code>review-scope.mjs</code>、<code>template.mjs</code>、<code>locate.mjs</code> 等脚本，由各流程调用，详见 <a href="workflows.md#脚本化的规则">脚本说明</a>。</p>
 </section>
 
 <section>
@@ -528,7 +543,7 @@ footer { margin-top: 40px; font-size: 13px; color: var(--muted); }
         <li><strong>只读是默认</strong>：<code>readonly</code> 为 true 或缺省都按只读处理，写语句在会话层直接拦截；只有显式 <code>"readonly": false</code> 的连接才允许写，而且要你点名用那个连接。</li>
         <li><strong>密码不进对话</strong>：按 <code>password_env</code> 指向的环境变量 → <code>DB_PASSWORD</code> → <code>password</code> 字段的顺序取，推荐用环境变量。</li>
         <li><code>mask_columns</code>（顶层或单连接，正则数组）追加脱敏列；手机号、证件号、银行卡等默认已打码。</li>
-        <li><code>npx @rowansenne/workflow-run doctor</code> 会试连一次验证配置（<code>--offline</code> 跳过连通性测试）。</li>
+        <li><code>npx @rowansenne/workflow-run@latest doctor</code> 会试连一次验证配置（<code>--offline</code> 跳过连通性测试）。</li>
       </ul>
     </div>
     <div>
@@ -558,7 +573,7 @@ footer { margin-top: 40px; font-size: 13px; color: var(--muted); }
   <div class="tree"><pre>node .agents/skills/nacos-config/scripts/config.mjs inspect
 node .agents/skills/nacos-config/scripts/config.mjs get --file src/main/resources/bootstrap.yml --file src/main/resources/application-test.yml --data-id order-test.yaml --key order.timeout</pre></div>
   <p class="sub" style="margin-top:12px">支持 JSON / YAML / properties；首次解析 YAML 若缺依赖，在该 skill 目录运行 npm 安装。默认使用 Nacos 1.x / 2.x 的兼容 API，也可显式选择 2.x API 或 3.x Client API。<code>/workflow status</code> 与 <code>doctor</code> 均不测试 Nacos 远端连通性；doctor 会检查本机连接文件的忽略规则。</p>
-  <div class="callout">本页对应 0.30.0，包含 F2 业务核对与 F3 技术澄清流程；dev 工作流仅在用户显式要求时启动。</div>
+  <div class="callout">本页对应 0.31.0，包含 HTTP 接口验证规则、F2 业务核对与 F3 技术澄清流程；dev 工作流仅在用户显式要求时启动。</div>
 </section>
 
 <section>
@@ -579,7 +594,7 @@ node .agents/skills/nacos-config/scripts/config.mjs get --file src/main/resource
         ├── tech-doc.md      <span class="c"># 技术方案（create-tech-md-doc）</span>
         └── release-doc.md   <span class="c"># 上线方案（create-release-md-doc）</span></pre>
       </div>
-      <p class="sub" style="margin-top:12px;font-size:14px">可以随代码提交，也可以把 <code>workflow-run/</code> 整个换成团队的独立文档仓库，多个服务共用，目录结构不变。<code>npx @rowansenne/workflow-run view</code> 生成本地页面按需求浏览。</p>
+      <p class="sub" style="margin-top:12px;font-size:14px">可以随代码提交，也可以把 <code>workflow-run/</code> 整个换成团队的独立文档仓库，多个服务共用，目录结构不变。<code>npx @rowansenne/workflow-run@latest view</code> 生成本地页面按需求浏览。</p>
       <p class="sub" style="margin-top:12px;font-size:14px">业务场景清单与需求文档是两个独立正式产物。需要清单时，在 F2 / B3 初判规模、选择完整流程并 bind、start；每轮从草稿 finalize 为 <code>clarification.md</code>，更新原问题答复和状态、追加新问题与反馈记录，保留编号并归档旧版，纳入视图、统计与 PR 引用。F3 / B3 完成技术澄清后，<code>requirement.md</code> 引用清单及版本，汇总有效业务决定与技术约束。</p>
     </div>
     <div class="loop">
@@ -588,7 +603,7 @@ node .agents/skills/nacos-config/scripts/config.mjs get --file src/main/resource
       <div class="step"><div class="dot">3</div><div><b>交付时沉淀</b><p>交付里有值得记的内容才问：已确认的决定、新约定、缺陷根因；没有就跳过，元信息行写「无需沉淀」。同主题的更新原文，不重复新建。</p></div></div>
       <div class="step"><div class="dot">4</div><div><b>下次被召回</b><p>审查沉淀的问题模式，会在下一次 dev 开工时被列出来。</p></div></div>
       <div class="callout">写入知识库每次都要你同意；没有值得沉淀的内容时不问。DocNexus 是必装组件，不可用时先修复，不降级。</div>
-      <p class="sub" style="margin-top:12px;font-size:14px">想直接翻知识库：在项目根运行 <code>npx @rowansenne/workflow-run docnexus view</code>，会起一个本地只读的文档浏览服务并打印访问地址，<code>Ctrl+C</code> 停止。加 <code>--port 8080</code> 可指定端口，不加则随机。</p>
+      <p class="sub" style="margin-top:12px;font-size:14px">想直接翻知识库：在项目根运行 <code>node .agents/skills/workflow/scripts/docnexus.mjs view</code>，会起一个本地只读的文档浏览服务并打印访问地址，<code>Ctrl+C</code> 停止。加 <code>--port 8080</code> 可指定端口，不加则随机。</p>
     </div>
   </div>
 </section>
@@ -598,7 +613,7 @@ node .agents/skills/nacos-config/scripts/config.mjs get --file src/main/resource
   <h2>skill 自己也按数据迭代</h2>
   <div class="prose">
     <p>dev 和 project-review 每跑完一次，静默记一行过程数据到 <code>workflow-run/feedback/&lt;用户&gt;.jsonl</code>：提问了几轮、用户纠正过几次理解、跳过了哪些步骤、哪条规则读不懂或做不到。只记过程，不记代码和业务名词，也不额外打扰用户。</p>
-    <p>团队用两三周后，<code>npx @rowansenne/workflow-run feedback</code> 按 skill 和章节汇总，据此精简或修正规则、发新版本；各项目升级时清掉旧版本的记录，从新版本重新收集。结果类数据（审查发现、修复率、沉淀率）则由 <code>npx @rowansenne/workflow-run report</code> 命令从产物里统计。</p>
+    <p>团队用两三周后，<code>npx @rowansenne/workflow-run@latest feedback</code> 按 skill 和章节汇总，据此精简或修正规则、发新版本；各项目升级时清掉旧版本的记录，从新版本重新收集。结果类数据（审查发现、修复率、沉淀率）则由 <code>npx @rowansenne/workflow-run@latest report</code> 命令从产物里统计。</p>
   </div>
 </section>
 
@@ -608,7 +623,7 @@ node .agents/skills/nacos-config/scripts/config.mjs get --file src/main/resource
     <p>推荐全量安装，同时接入 DocNexus 文档库和 CodeGraph 代码图谱，需要 Node.js 22.13 及以上。装完运行 <code>/workflow profile</code> 填项目画像，再用 <code>/dev</code> 提一个小需求。分步说明见 <a href="full-install.html">图文教程</a>。</p>
   </div>
   <div class="term">
-<pre id="cmd"><span class="p">$ </span>npx @rowansenne/workflow-run --with-docnexus --with-codegraph</pre>
+<pre id="cmd"><span class="p">$ </span>npx @rowansenne/workflow-run@latest --with-codegraph</pre>
     <button class="copy" id="copy-btn" type="button">复制命令</button>
   </div>
 </div>
@@ -618,7 +633,7 @@ node .agents/skills/nacos-config/scripts/config.mjs get --file src/main/resource
 <script>
 document.getElementById('copy-btn').addEventListener('click', (e) => {
   const btn = e.currentTarget;
-  const text = 'npx @rowansenne/workflow-run --with-docnexus --with-codegraph';
+  const text = 'npx @rowansenne/workflow-run@latest --with-codegraph';
   const done = () => { btn.textContent = '已复制'; setTimeout(() => { btn.textContent = '复制命令'; }, 1600); };
   const fallback = () => { const r = document.createRange(); r.selectNodeContents(document.getElementById('cmd')); const s = getSelection(); s.removeAllRanges(); s.addRange(r); btn.textContent = '已选中，按 ⌘C / Ctrl+C 复制'; };
   try { navigator.clipboard.writeText(text).then(done, fallback); } catch { fallback(); }

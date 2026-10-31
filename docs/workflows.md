@@ -2,6 +2,34 @@
 
 [返回首页](../README.md) · [安装与升级](installation.md) · [外部能力集成](integrations.md) · [团队共享、产物与模板](team-guide.md) · [维护、测试与发布](development.md)
 
+## 代理命令示例
+
+下列内容在代理对话中输入，不是在终端执行。分支、路径、连接、表名和页面 ID 按项目替换；没有固定参数格式的能力使用自然语言指定 skill 和目标。
+
+| 目的 | 示例 |
+| --- | --- |
+| 查看能力地图 | `/workflow` |
+| 初始化项目画像 | `/workflow profile` |
+| 检查能力与当前流程进度 | `/workflow status` |
+| 续接当前分支流程 | `/workflow resume`（有多个运行时可追加运行 ID） |
+| 查看效果报告 | `/workflow report` |
+| 浏览需求产物 | `/workflow view` |
+| 修改业务场景清单模板 | `/workflow template clarification 增加场景优先级` |
+| 修改实现方案模板 | `/workflow template plan 补充 HTTP 接口验证场景` |
+| 功能开发 | `/dev 订单导出支持按渠道筛选` |
+| 缺陷修复 | `/dev --bug 导出订单时重复返回数据` |
+| 分支审查 | `用 project-review 审查当前分支相对 main 的改动` |
+| 工作区快审 | `用 project-review 快审当前未提交的改动` |
+| 技术方案 | `/create-tech-md-doc feature/order-export main --prd 123456` |
+| 上线方案 | `/create-release-md-doc feature/order-export main`（自动查找同分支已有技术方案） |
+| wiki 校验 | `/md-to-wiki "技术方案.md" 123456 --validate-only` |
+| wiki 发布 | `/md-to-wiki "技术方案.md" 123456`（需要已配置 wiki 和已有目标页面） |
+| 只读查库 | `用 database-query 查询 test 连接：SELECT id, status FROM orders LIMIT 10` |
+| 调用入口分析 | `用 code-graph 查看 OrderService.exportOrders 从哪些接口或任务进入` |
+| Nacos 参数查询 | `用 nacos-config 读取测试环境 order-test.yaml 中的 order.timeout` |
+
+模板别名：`clarification`、`requirement`、`plan`、`delivery`、`review`、`checklist`、`tech`、`release`。技术 / 上线方案命令必须提供开发分支和基线分支；PRD 使用 pageId 或 URL，wiki 发布使用已有页面的 pageId 或含 pageId 的 URL。
+
 ## workflow：入口与项目画像
 
 ```
@@ -91,6 +119,7 @@ Codex 原生元数据 `dev/agents/openai.yaml` 设置 `policy.allow_implicit_inv
 * **S 规模快速通道**：已发布本次正式清单或创建完整流程运行时继续完整流程，规模降为 S 也不切换。规模判定不询问用户；S 规模且不涉及配置、SQL / DDL、对外接口、表结构，也没有 F2 / F3 已确认或仍待澄清的业务决定，且本次未发布正式清单、未创建完整流程运行时，**问用户是否走快速通道**，问完等本轮答复——明确同意才走：编译、测试照常，审查在当前会话按标准清单做，**不绑定需求、不落任何产物文件**（方案 / `review.md` / 交付说明都不写；运行反馈照常记一行），对话里一次交付并注明「DocNexus：未询问（快速通道不问沉淀）」；拒绝或未明确同意就按完整流程落盘交付。实现中碰到上述任何一项或改动超过 3 个文件，先停下后续实现、重新评估规模，绑定需求并先回 F3（缺陷 B3）补需求文档，再到 F4 / B4 补方案、自检；M / L 确认方案后再继续实现、验证、审查与交付选择。缺陷修复同样适用（根因仍须在对话里写清楚）。
 * **缺陷修复**：收集现象 → 用失败测试复现 → 用证据定位根因 → **判定规模并告知（S 规模问是否走快速通道；M / L 确认根因与修复方式后再改）** → 完整流程先生成描述现象、期望与验收的 `requirement.md`，再把根因与修复方式追加到 `plan.md`，同步更新文档头的修复分支与日期（不另建文件）→ 最小修复让测试转绿 → 审查并落盘报告（无子 agent 时当前会话自查）→ 用户选择修复或交付（修复后验证与复审；交付必须写明根因）。
 * 审查优先用独立子 agent（期间不继续改被审代码，子 agent 只审查、写报告，不直接修复）；没有子 agent 时降级为当前会话自查并把「审查者」写成当前 agent，不阻塞、也不跳过审查。遗留严重问题须说明风险并由用户明确接受，不能把选择交付写成审查通过。
+* **HTTP 接口验证**：新增 / 修改接口或接口行为时，F4 在方案列出方法 / 路径、AC 和场景，F6 沿用既有框架编写或更新并执行接口层测试，F7 标准 / 深审检查覆盖与执行证据。至少测正常请求、适用的参数错误和未登录 / 无权限场景，断言状态码与关键响应；纯内部重构且接口行为不变、已有覆盖充分时运行现有用例即可。缺环境时记录未验证、原因及可执行请求和预期结果，不将单元测试通过视为 HTTP 接口测试通过。缺陷修复 B4 / B5 沿用相同规则。
 * 守则：不写库、不改凭据、不擅自 commit / push、不装新依赖；测试没跑就写「未验证」。
 * DocNexus 是必装组件，缺失或查询失败时先修复；wiki、CodeGraph、数据库为可选增强，所有 Skill 共用开工能力快照与失败处理规则（`workflow/references/capabilities.md`）。
 
