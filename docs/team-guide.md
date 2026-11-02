@@ -161,6 +161,7 @@ npx @rowansenne/workflow-run seed-templates --diff               # 团队改过�
 ```
 
 * 只导入 DocNexus 里还没有的、有默认版本的模板（技术方案、上线方案不在内），已有的不覆盖；项目已接入但缺模板时，安装结束会列出缺哪几份。
+* 若已有 DocNexus 记录对应的文件缺失，会列出缺失文件路径和记录 ID，并停止本轮模板导入／更新，供用户核对文件位置；不自动恢复文件、不修改记录。
 * 之后模板随知识库更新：直接编辑 `workflow-run/docnexus/library/templates/...` 后在业务项目根执行 `./.docnexus/node_modules/.bin/docnexus document sync --id <id>` 采纳；或者在生成文档后，skill 发现你做了结构性调整时会提议同步回模板（你确认后才写入）。每次变更都记录在 DocNexus 的 timeline 里，可追溯。
 * 模板里的 `{{...}}` 是给 agent 的填写提示，DocNexus 原样保存；不要写成单独一行的 `{{fact:...}}`（那是 DocNexus 的事实引用语法）。
 * 以前放在 `workflow-run/templates/` 下的项目模板：接入 DocNexus 后，缺模板时 skill 会把它作为 `import_from` 提议导入知识库；导入后删除这些文件。

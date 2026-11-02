@@ -53,6 +53,9 @@ if (cmd === '--help') {
   fs.copyFileSync(path.join(dir, 'document.md'), target);
   const id = prev ? prev.id : 'doc_' + Object.keys(reg).length;
   reg[id] = { id, file_path: file, record_version: 'v' + Date.now() + Math.random(), metadata: JSON.parse(fs.readFileSync(path.join(dir, 'metadata.json'), 'utf8')) };
+  const recordDir = path.join('workflow-run/docnexus/records', id);
+  fs.mkdirSync(recordDir, { recursive: true });
+  fs.writeFileSync(path.join(recordDir, 'record.json'), JSON.stringify({ id, file_path: file }));
   save();
   console.log(JSON.stringify({ operation: prev ? 'replaced' : 'created' }));
 } else if (cmd === 'document' && sub === 'query') {
@@ -112,6 +115,64 @@ test('未接入 DocNexus 时报错', () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'seed-none-'));
   assert.throws(() => seedTemplates(root, REPO, quiet), /未检测到新版 DocNexus/);
   fs.rmSync(root, { recursive: true, force: true });
+});
+
+test('已登记文件缺失时列出全部路径与记录，不恢复文件或写入知识库', { skip }, (t) => {
+  const root = project(); t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  seedTemplates(root, REPO, quiet);
+  const missing = TEMPLATES.filter((x) => ['plan-template.md', 'delivery-template.md', 'checklist.md', 'report.md'].includes(x.id));
+  const registry = fs.readFileSync(path.join(root, 'registry.json'), 'utf8');
+  for (const item of missing) fs.unlinkSync(path.join(root, 'workflow-run/docnexus/library', item.file));
+  fs.writeFileSync(path.join(root, 'calls.log'), '');
+  const warnings = [];
+  const result = seedTemplates(root, REPO, { ...quiet, warn: (message) => warnings.push(message) });
+  assert.deepEqual(result.failed.map((x) => x.file).sort(), missing.map((x) => x.file).sort());
+  assert.deepEqual(result.seeded, []);
+  assert.deepEqual(result.records, {});
+  for (const item of missing) {
+    const file = path.join(root, 'workflow-run/docnexus/library', item.file);
+    const record = Object.values(JSON.parse(registry)).find((x) => x.file_path === item.file);
+    assert.ok(warnings.some((x) => x.includes(file) && x.includes(record.id)), item.file);
+    assert.equal(fs.existsSync(file), false);
+  }
+  assert.equal(fs.readFileSync(path.join(root, 'registry.json'), 'utf8'), registry);
+  assert.equal(fs.readFileSync(path.join(root, 'calls.log'), 'utf8'), '');
+});
+
+test('CLI 缺文件时停止新增与 --update；用户补回文件后正常导入更新', { skip }, (t) => {
+  const root = project(); t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const cli = (...args) => spawnSync(process.execPath, [path.join(REPO, 'bin/workflow-run.mjs'), '--project-root', root, ...args], { cwd: root, encoding: 'utf8' });
+  const installed = cli('--envs', 'codex', '--skip-db', '--yes');
+  assert.equal(installed.status, 0, installed.stderr);
+  const missing = TEMPLATES.find((x) => x.id === 'plan-template.md');
+  const added = TEMPLATES.at(-1);
+  const outdated = TEMPLATES[0];
+  const reg = JSON.parse(fs.readFileSync(path.join(root, 'registry.json'), 'utf8'));
+  const removed = Object.values(reg).find((x) => x.file_path === added.file);
+  delete reg[removed.id];
+  fs.writeFileSync(path.join(root, 'registry.json'), JSON.stringify(reg));
+  fs.rmSync(path.join(root, 'workflow-run/docnexus/records', removed.id), { recursive: true });
+  for (const item of [missing, added]) fs.unlinkSync(path.join(root, 'workflow-run/docnexus/library', item.file));
+  const old = '# 旧默认模板\n';
+  const oldFile = path.join(root, 'workflow-run/docnexus/library', outdated.file);
+  fs.writeFileSync(oldFile, old);
+  const manifestFile = path.join(root, '.agents/skills/.workflow-run.json');
+  const manifest = JSON.parse(fs.readFileSync(manifestFile, 'utf8'));
+  manifest.templates[outdated.file] = { version: 'old', sha256: crypto.createHash('sha256').update(old).digest('hex') };
+  fs.writeFileSync(manifestFile, JSON.stringify(manifest));
+  fs.writeFileSync(path.join(root, 'calls.log'), '');
+  const failed = cli('seed-templates', '--update');
+  assert.equal(failed.status, 1);
+  assert.ok(failed.stderr.includes(path.join(root, 'workflow-run/docnexus/library', missing.file)));
+  assert.equal(fs.existsSync(path.join(root, 'workflow-run/docnexus/library', missing.file)), false);
+  assert.equal(fs.existsSync(path.join(root, 'workflow-run/docnexus/library', added.file)), false);
+  assert.equal(fs.readFileSync(oldFile, 'utf8'), old);
+  assert.equal(fs.readFileSync(path.join(root, 'calls.log'), 'utf8'), '');
+
+  fs.writeFileSync(path.join(root, 'workflow-run/docnexus/library', missing.file), fs.readFileSync(path.join(REPO, missing.src)));
+  const resumed = cli('seed-templates', '--update');
+  assert.equal(resumed.status, 0, resumed.stderr);
+  for (const item of [added, outdated]) assert.equal(fs.readFileSync(path.join(root, 'workflow-run/docnexus/library', item.file), 'utf8'), fs.readFileSync(path.join(REPO, item.src), 'utf8'));
 });
 
 test('导入记录与状态：current / outdated / customized / edited / untracked / missing', { skip }, () => {
@@ -187,6 +248,8 @@ test('CLI：upgrade 自动导入新增的模板（只新增）；seed-templates 
   // 模拟「旧版本装的项目」：知识库里还没有新模板；清单是团队在旧默认基础上改过的
   fs.rmSync(path.join(root, 'workflow-run/docnexus/library', added.file));
   const reg = JSON.parse(fs.readFileSync(path.join(root, 'registry.json'), 'utf8'));
+  const removed = Object.values(reg).find((d) => d.file_path === added.file);
+  fs.rmSync(path.join(root, 'workflow-run/docnexus/records', removed.id), { recursive: true });
   fs.writeFileSync(path.join(root, 'registry.json'), JSON.stringify(Object.fromEntries(Object.entries(reg).filter(([, d]) => d.file_path !== added.file))));
   delete m.templates[added.file];
   const oldDefault = '# 旧版清单\n## 1. 正确性\n';

@@ -80,7 +80,21 @@ const pick = (skills) => (skills ? TEMPLATES.filter((t) => skills.includes(t.ski
 export function seedTemplates(root, tplDir, { ok = console.log, warn = console.error, version = '', skills, quietSkip = false } = {}) {
   requireDocNexus(root);
   const result = { seeded: [], skipped: [], failed: [], records: {} };
-  for (const t of pick(skills)) {
+  const templates = pick(skills);
+  // DocNexus 写入会校验所有已登记正文；缺文件时只报告，不自动恢复或继续写入。
+  if (templates.some((t) => !fs.existsSync(libFile(root, t)))) {
+    const dir = path.join(docnexusWorkspace(root), 'records');
+    for (const entry of fs.existsSync(dir) ? fs.readdirSync(dir, { withFileTypes: true }) : []) {
+      if (!entry.isDirectory()) continue;
+      const record = JSON.parse(fs.readFileSync(path.join(dir, entry.name, 'record.json'), 'utf8'));
+      const file = path.join(docnexusWorkspace(root), 'library', record.file_path);
+      if (fs.existsSync(file)) continue;
+      const error = `缺少 DocNexus 已登记文件：${file}（记录：${record.id}）；请核对文件位置后重试`;
+      result.failed.push({ file: record.file_path, error }); warn(error);
+    }
+    if (result.failed.length) return result;
+  }
+  for (const t of templates) {
     if (fs.existsSync(libFile(root, t))) {
       result.skipped.push(t.file);
       if (!quietSkip) ok(`DocNexus 中已有 ${t.file}，保留不覆盖`);

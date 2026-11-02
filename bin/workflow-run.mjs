@@ -170,7 +170,7 @@ async function main() {
       const r = seedTemplates(o.root, TPL_DIR, { ok, warn, version: PKG.version, skills: installedSkills(o.root) });
       saveTemplateRecords(o.root, r.records);
       let failed = r.failed.length;
-      if (o.update) {
+      if (o.update && !failed) {
         step('更新导入后未改动的模板（--update）');
         const u = updateTemplates(o.root, TPL_DIR, templateRecords(o.root), { ok, warn, version: PKG.version, skills: installedSkills(o.root) });
         saveTemplateRecords(o.root, u.records);
