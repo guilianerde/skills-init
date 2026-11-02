@@ -1,6 +1,6 @@
 # PRD 增强（--prd）
 
-拉取步骤、wiki 可用性判断与通用 `prd_context` 字段见 `references/prd-fetch.md`。任一步失败都回退纯 diff 流程，元信息写「PRD 增强已跳过」。
+拉取步骤、wiki 可用性判断与通用 `prd_context` 字段见 `references/prd-fetch.md`。任一步失败都回退纯 diff 流程，文件头隐藏元信息的「PRD 参考」写「PRD 增强已跳过」。
 
 技术方案不需要额外字段，通用 `prd_context` 用于模板里的需求背景与数据链路类章节。
 

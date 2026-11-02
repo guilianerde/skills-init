@@ -10,7 +10,7 @@ node md-to-wiki.mjs --check <html>      # 只做良构校验
 只用 Node 内置能力，不依赖第三方库，也不调用 wiki API：
 
 1. 自带 Markdown 解析：ATX 标题、段落（单换行转 `<br/>`）、引用、有序 / 无序列表（可嵌套、任务列表）、GFM 表格（含对齐）、分隔线、行内代码 / 粗体 / 斜体 / 删除线 / 链接 / 图片 / 自动链接；
-2. 围栏代码块转 `<ac:structured-macro ac:name="code">` 宏，代码放进 `<![CDATA[...]]>`；
+2. 围栏代码块转 `<ac:structured-macro ac:name="code">` 宏，代码放进 `<![CDATA[...]]>`；信息串支持语言、`title="标题"`，或两者组合（如 `java title="示例"`），分别写入代码宏的 `language` / `title` 参数；
 3. 原始 HTML 一律转义成文本，HTML 注释直接丢弃，保证输出良构；
 4. 可选 banner：`--banner` 文件，或把正文第一个引用块移进 `<ac:structured-macro ac:name="info">`；
 5. 写出文件后自动做良构校验，不良构时退出码为 1 并给出行号。

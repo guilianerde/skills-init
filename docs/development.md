@@ -4,7 +4,7 @@
 
 ## 当前架构
 
-本文对应 0.31.0（2026-10-31），包括 F2 业务场景清单、F3 技术澄清、HTTP 接口验证、需求与方案证据失效规则，以及锁定依赖和发布包验证。
+本文对应 0.32.0（2026-11-02），包括技术方案隐藏元信息、带标题代码宏、F2 业务场景清单、F3 技术澄清、HTTP 接口验证、需求与方案证据失效规则，以及锁定依赖和发布包验证。
 
 安装分发与任务运行分开。运行时由宿主代理读取 skill 规则、调用脚本；workflow-run 本身不启动常驻 Agent 服务。
 
@@ -143,7 +143,7 @@ workflow-run（安装器仓库）/
   "requires": ["workflow"],
   "optional": ["md-to-wiki", "create-release-md-doc"],
   "shared": ["diff-collection-common.md", "prd-fetch.md"],
-  "templates": [{ "id": "template.md", "src": "template.md", "title": "技术方案模板", "summary": "...", "lint": { "requiredMeta": ["模板来源"] } }],
+  "templates": [{ "id": "template.md", "title": "技术方案模板", "summary": "...", "lint": { "requiredMeta": [] } }],
   "docnexus": { "category": "tech-design", "reason": "create-tech-md-doc skill 从技术方案中沉淀的决策、约定与风险", "readFrom": ["create-tech-md-doc", "dev"] }
 }
 ```

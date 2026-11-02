@@ -45,6 +45,19 @@ test('代码块里的 # 和 > 不被当成标题或引用', () => {
   assert.doesNotMatch(h, /<h1>|<blockquote>/);
 });
 
+test('代码宏保留仅标题、语言加标题；标题转义，CDATA 仍正确拆分', () => {
+  for (const fence of ['```', '~~~']) {
+    const h = convert(`${fence} title="数仓 <评审> & 字段"\ndb_name：\n]]>\n${fence}`);
+    assert.match(h, /<ac:parameter ac:name="title">数仓 &lt;评审&gt; &amp; 字段<\/ac:parameter>/);
+    assert.doesNotMatch(h, /ac:name="language"/);
+    assert.match(h, /\]\]\]\]><!\[CDATA\[>/);
+    wellFormed(h);
+  }
+  const h = convert('```java title="示例"\nclass Demo {}\n```');
+  assert.match(h, /<ac:parameter ac:name="language">java<\/ac:parameter><ac:parameter ac:name="title">示例<\/ac:parameter>/);
+  wellFormed(h);
+});
+
 test('表格含对齐、管道转义与缺失单元格', () => {
   const h = convert('| 名 | 值 | 说明 |\n|:---|---:|:-:|\n| a | 1 | x \\| y |\n| b | 2 |');
   assert.match(h, /<th style="text-align: left">名<\/th>/);

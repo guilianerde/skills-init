@@ -41,7 +41,7 @@ function inline(text) {
 
 // ---------------------------------------------------------------- 块级
 const RE = {
-  fence: /^ {0,3}(`{3,}|~{3,})\s*([\w+#.-]*).*$/,
+  fence: /^ {0,3}(`{3,}|~{3,})\s*(.*)$/,
   heading: /^ {0,3}(#{1,6})\s+(.*?)\s*#*\s*$/,
   hr: /^ {0,3}([-*_])(\s*\1){2,}\s*$/,
   quote: /^ {0,3}>\s?/,
@@ -57,9 +57,17 @@ const splitRow = (l) => {
   return t.split(/(?<!\\)\|/).map((c) => c.trim().replace(/\\\|/g, '|'));
 };
 
-function codeMacro(lang, code) {
+// 支持 java、title="标题" 和 java title="标题"；其他围栏属性不作为语言。
+function parseFenceInfo(info) {
+  const lang = info.trim().match(/^([\w+#.-]+)(?=\s|$)/)?.[1] ?? '';
+  const title = info.match(/(?:^|\s)title="([^"]*)"/)?.[1] ?? '';
+  return { lang, title };
+}
+
+function codeMacro(lang, title, code) {
   const body = code.replace(/]]>/g, ']]]]><![CDATA[>');
-  const p = lang ? `<ac:parameter ac:name="language">${esc(lang)}</ac:parameter>` : '';
+  const p = (lang ? `<ac:parameter ac:name="language">${esc(lang)}</ac:parameter>` : '')
+    + (title ? `<ac:parameter ac:name="title">${esc(title)}</ac:parameter>` : '');
   return `<ac:structured-macro ac:name="code" ac:schema-version="1">${p}<ac:plain-text-body><![CDATA[${body}]]></ac:plain-text-body></ac:structured-macro>`;
 }
 
@@ -74,11 +82,11 @@ function blocks(lines) {
 
     let m;
     if ((m = line.match(RE.fence))) { // 围栏代码块
-      const fence = m[1]; const lang = m[2]; const body = [];
+      const fence = m[1]; const { lang, title } = parseFenceInfo(m[2]); const body = [];
       i++;
       while (i < lines.length && !new RegExp(`^ {0,3}${fence[0]}{${fence.length},}\\s*$`).test(lines[i])) body.push(lines[i++]);
       i++;
-      out.push(codeMacro(lang, body.join('\n') + (body.length ? '\n' : '')));
+      out.push(codeMacro(lang, title, body.join('\n') + (body.length ? '\n' : '')));
       continue;
     }
     if ((m = line.match(RE.heading))) { out.push(`<h${m[1].length}>${inline(m[2])}</h${m[1].length}>`); i++; continue; }

@@ -56,7 +56,7 @@
 2. 运行 `feedback` 汇总（或直接拿 `workflow-run/feedback/` 下的文件），按「常被跳过的步骤」「读不懂的规则」「提问太多」精简 SKILL.md，发新版本；
 3. 各项目 `upgrade` 时清掉本项目旧版本的记录（git 历史里仍可找回），从新版本重新收集，回到第 1 步。
 
-字段与记录规则见 `workflow/references/feedback.md`。
+记录中的版本是生成记录时项目内已安装的 skill 版本；用新版 npx 执行汇总不会升级项目 skills 或改写旧记录。可选 CodeGraph 不可用但已用 diff / 代码搜索完成分析时，不记为跳过；实际漏做的分析和规则冲突仍如实记录。字段与记录规则见 `workflow/references/feedback.md`。
 
 **PR / MR 描述**：`node <skills>/workflow/scripts/pr-desc.mjs [--branch b] [--base main] [--out 文件]` 把本分支的交付说明（做了什么、已确认的决定、改动、验证、配置 / SQL）、审查报告（结论、CRITICAL / HIGH、影响面）和相关文档路径汇总成描述；没有交付说明时退回用提交记录和改动文件列表。dev 交付后要提 PR 时会调用它；创建 PR 要你同意。
 
@@ -123,6 +123,8 @@ Codex 原生元数据 `dev/agents/openai.yaml` 设置 `policy.allow_implicit_inv
 * 守则：不写库、不改凭据、不擅自 commit / push、不装新依赖；测试没跑就写「未验证」。
 * DocNexus 是必装组件，缺失或查询失败时先修复；wiki、CodeGraph、数据库为可选增强，所有 Skill 共用开工能力快照与失败处理规则（`workflow/references/capabilities.md`）。
 
+技术方案正文按 DocNexus 生效模板生成，保留说明文字和带标题代码块，不重复添加 Wiki 页面标题。生成时间、对比分支、diff 概览、PRD 参考和模板来源放在文件头的 `<!-- workflow-run: … -->` 隐藏注释中，兼容正式落盘、分支查询和日期统计，Wiki 转换时不展示；旧文档的可见元信息仍可读取。事实自检显式传 `--facts --diff <main>...<dev>`，不再强制正文出现自动化元信息引用块。团队章节编号和组件内容只在模板中维护。
+
 ## 脚本化的规则
 
 能写成确定规则的判断都放在脚本里，SKILL.md 只说明什么时候调用，不再让 agent 按文字描述自己判断：
@@ -139,11 +141,11 @@ Codex 原生元数据 `dev/agents/openai.yaml` 设置 `policy.allow_implicit_inv
 | `workflow/lib/capabilities.mjs` | 集中探测必装 DocNexus 与可选增强；供 resolve status 输出本轮能力快照 |
 | `workflow/scripts/resolve.mjs status` | `/workflow status` 的能力探测（不输出任何凭据） |
 | `workflow/scripts/resolve.mjs infer-profile` | 按固定规则从构建文件、Makefile、依赖与配置文件、git 推断项目画像草稿，每个字段附依据；不写文件 |
-| `workflow/scripts/lint-doc.mjs <文档> --skill <skill> [--facts]` | 对照当前生效的模板检查生成的文档：必填章节、残留 `{{...}}` 占位符、元信息行为错误；缺普通章节、顺序不一致为警告；列出待填写位置。`--facts` 再核对正文里的类名、文件、接口、表名：在对比分支的 diff 和代码里都找不到的记为警告（防编造） |
+| `workflow/scripts/lint-doc.mjs <文档> --skill <skill> [--facts --diff <main>...<dev>]` | 对照当前生效的模板检查必填章节、残留占位符和该 skill 要求的元信息；缺普通章节、顺序不一致为警告；列出待填写位置。技术方案不强制可见元信息，事实核对显式指定三点范围；正文里的类名、文件、接口、表名在 diff 和代码里都找不到时给出警告 |
 | `workflow/scripts/requirement.mjs which / bind / path / sync / pending / list / config` | 产物按需求归档（`workflow-run/docs/requirements/<需求>/<项目>/`，两种模式结构相同）：查当前分支绑定的需求（没绑定时给出按分支名生成的建议名）、绑定需求名、给出本次落盘路径（不覆盖，带上一版的 wiki 记录）、重建 `meta.json`、列出所有需求；`config` 设置产物位置（文档仓库、项目名、提交提示），`pending` 看文档仓库里还没提交的产物 |
 | `workflow/scripts/view.mjs [--out f] [--open]` | 项目文档视图（`/workflow view`、`npx @rowansenne/workflow-run view`）：读需求目录里的产物，生成单个 HTML，按需求列出各阶段、审查记录（各级别数量、复核、与上次对比）、交付记录、沉淀到的知识文档，正文直接渲染；顶部「知识文档」列出每篇知识文档来自哪个需求、哪份产物；数据内嵌，只读、不联网，默认写到 `workflow-run/tmp/view/index.html` |
 | `workflow/scripts/run.mjs show / start / save / complete / cancel` | 需求 meta.json 中的分支运行记录：恢复、checkpoint、已完成状态与时间、等待用户、修复回退、revision 冲突检查 |
-| `workflow/scripts/artifacts.mjs [--branch b \| --all]` | 按分支汇总 `workflow-run/docs/requirements/` 下的方案、交付说明、审查报告、技术方案、上线方案及其 wiki 发布记录，给出下一步建议；分支取自文档元信息行，不另存记录。上线方案没传 `--tech` 时据此自动引用同分支的技术方案；project-review 据此对照本分支方案、识别复审 |
+| `workflow/scripts/artifacts.mjs [--branch b \| --all]` | 按分支汇总 `workflow-run/docs/requirements/` 下的方案、交付说明、审查报告、技术方案、上线方案及其 wiki 发布记录，给出下一步建议；分支取自文件头元信息（兼容技术方案的隐藏注释与旧可见行）。上线方案没传 `--tech` 时据此自动引用同分支的技术方案；project-review 据此对照本分支方案、识别复审 |
 | `workflow/scripts/report.mjs [--since d] [--all-branches] [--json]` | 本地效果报告（`/workflow report`、`npx @rowansenne/workflow-run report`）：审查发现与修复率、复核率、需求澄清、沉淀率、知识引用、各分支链路 |
 | `workflow/scripts/feedback.mjs add … / summary [--json]` | 运行反馈：dev / project-review 交付后追加一行过程记录到 `workflow-run/feedback/<用户>.jsonl`；`summary` 按 skill 汇总，跳过的步骤和不清楚的规则按 SKILL.md 章节归类（`npx @rowansenne/workflow-run feedback`）；`init` / `upgrade` 装了新版本时清掉本项目旧版本的记录 |
 | `workflow/scripts/review-scope.mjs [--diff b...h \| --base b] [--exclude a,b]` / `rules <文件…>` | 审查范围：由脚本决定审哪些文件、跳过哪些（删除、二进制、敏感文件、依赖目录、生成文件、文档、本工具产物，各带原因）、每个文件的风险级别和分批，以及按文件类型和改动内容该看审查清单的哪几节；`--base` 含未提交和未跟踪的新文件。`rules` 打印这些小节的原文和画像 `review.rules` 里匹配的项目规则。project-review 第 1、3、4 步与 dev 自审使用 |

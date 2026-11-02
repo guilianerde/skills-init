@@ -15,6 +15,7 @@ export function parseFile(name) {
 }
 
 const head = (text, n = 20) => text.split(/\r?\n/).slice(0, n).join('\n');
+// 兼容旧的可见元信息行，以及文件头 workflow-run 注释里的同格式分支。
 export function parseBranch(text) {
   const m = head(text).match(/(?:对比)?分支[：:]\s*`?([^`\s｜|←，,）)]+)`?/);
   return m && !/^[{<]/.test(m[1]) ? m[1] : null;
@@ -29,8 +30,12 @@ export function parseDocnexus(text) {
   const v = /DocNexus[：:]\s*([^｜\n]*)/.exec(head(text))?.[1]?.trim();
   return v && /docnexus\/library\//.test(v) ? v.split(/[、,，]\s*/).map((s) => s.trim()).filter(Boolean) : null;
 }
-// 文档头里的日期（跳过第一行的 md-to-wiki 发布记录等 HTML 注释，那里的 at= 是发布时间）
-export const headerDate = (text) => /(\d{4}-\d{2}-\d{2})/.exec(head(text.replace(/<!--[\s\S]*?-->/g, ''), 8))?.[1] ?? null;
+// 优先取隐藏生成时间；旧正文日期仍可读，md-to-wiki 的 at= 不作为文档日期。
+export function headerDate(text) {
+  const hidden = /<!-- workflow-run:\s*\n([\s\S]*?)-->/.exec(head(text))?.[1];
+  return /生成时间[：:]\s*(\d{4}-\d{2}-\d{2})/.exec(hidden ?? '')?.[1]
+    ?? /(\d{4}-\d{2}-\d{2})/.exec(head(text.replace(/<!--[\s\S]*?-->/g, ''), 8))?.[1] ?? null;
+}
 
 const LEVELS = ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'];
 

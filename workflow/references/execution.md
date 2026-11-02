@@ -104,6 +104,8 @@ finalize 先用知识库当前模板 lint 精确的草稿内容，再校验运�
 
 正式文档先写 tmp 草稿；不要先调用 `requirement.mjs path` 归档再直接覆盖，否则绕过收尾的中断保护。tech / release 分别在 T4 / L4 用 kind tech / release 收尾，使用各自的知识模板；wiki／沉淀后只更新发布或知识元信息仍可显式 sync。
 
+技术方案将生成时间、对比分支、diff 概览、PRD 参考和模板来源放在文件头的 `<!-- workflow-run: … -->` 多行注释中（格式见 create-tech-md-doc，整个块在前 20 行内），不要求正文显示元信息引用块。分支校验仍读取注释中的 `对比分支：`，索引日期读取其中的 `生成时间：`；旧文档的可见元信息继续兼容。注释随正式文件一起归档并参与 hash 校验，Wiki 转换时移除；`meta.json` 仍按现有逻辑记录绑定、索引和运行，不自动接收全部注释字段。
+
 两个文件无法一次原子提交，待办保存在同一个 meta.json 的 pending_finalization，草稿副本在 tmp/finalize/。中断期间其他元信息写入会被拒绝，show 的 next 提示恢复：
 
 ```sh

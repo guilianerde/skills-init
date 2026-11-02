@@ -98,7 +98,8 @@ test('CLI：技术方案没有模板时退出 2，项目模板不生效；已接
   assert.equal(r.status, 1, '原样的骨架报错');
   const out = JSON.parse(r.stdout);
   assert.equal(out.source, 'docnexus');
-  assert.ok(out.errors.some((e) => e.includes('模板来源')));
+  assert.ok(out.errors.some((e) => e.includes('占位符')));
+  assert.ok(!out.errors.some((e) => e.includes('缺少元信息行')), '技术方案不再强制可见元信息');
   fs.rmSync(root, { recursive: true, force: true });
 });
 
