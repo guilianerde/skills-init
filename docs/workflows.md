@@ -21,7 +21,7 @@
 | 分支审查 | `用 project-review 审查当前分支相对 main 的改动` |
 | 工作区快审 | `用 project-review 快审当前未提交的改动` |
 | 技术方案 | `/create-tech-md-doc feature/order-export main --prd 123456` |
-| 上线方案 | `/create-release-md-doc feature/order-export main`（自动查找同分支已有技术方案） |
+| 上线方案 | `/create-release-md-doc feature/order-export main`（自动查找同需求、同分支的技术方案） |
 | wiki 校验 | `/md-to-wiki "技术方案.md" 123456 --validate-only` |
 | wiki 发布 | `/md-to-wiki "技术方案.md" 123456`（需要已配置 wiki 和已有目标页面） |
 | 只读查库 | `用 database-query 查询 test 连接：SELECT id, status FROM orders LIMIT 10` |
@@ -125,6 +125,8 @@ Codex 原生元数据 `dev/agents/openai.yaml` 设置 `policy.allow_implicit_inv
 
 技术方案正文按 DocNexus 生效模板生成，保留说明文字和带标题代码块，不重复添加 Wiki 页面标题。生成时间、对比分支、diff 概览、PRD 参考和模板来源放在文件头的 `<!-- workflow-run: … -->` 隐藏注释中，兼容正式落盘、分支查询和日期统计，Wiki 转换时不展示；旧文档的可见元信息仍可读取。事实自检显式传 `--facts --diff <main>...<dev>`，不再强制正文出现自动化元信息引用块。团队章节编号和组件内容只在模板中维护。
 
+技术方案和上线方案优先引用同需求、同分支最近完成的 dev 运行所登记的文档版本。技术方案侧重需求、设计取舍和交付结果，上线方案侧重配置、SQL、回归场景和遗留风险。实现和部署变更以本次 diff 和代码核实，dev 验证结果用于制定上线回归清单。没有已完成的 dev 运行时仍可基于 diff 和可用文档生成。
+
 ## 脚本化的规则
 
 能写成确定规则的判断都放在脚本里，SKILL.md 只说明什么时候调用，不再让 agent 按文字描述自己判断：
@@ -145,7 +147,8 @@ Codex 原生元数据 `dev/agents/openai.yaml` 设置 `policy.allow_implicit_inv
 | `workflow/scripts/requirement.mjs which / bind / path / sync / pending / list / config` | 产物按需求归档（`workflow-run/docs/requirements/<需求>/<项目>/`，两种模式结构相同）：查当前分支绑定的需求（没绑定时给出按分支名生成的建议名）、绑定需求名、给出本次落盘路径（不覆盖，带上一版的 wiki 记录）、重建 `meta.json`、列出所有需求；`config` 设置产物位置（文档仓库、项目名、提交提示），`pending` 看文档仓库里还没提交的产物 |
 | `workflow/scripts/view.mjs [--out f] [--open]` | 项目文档视图（`/workflow view`、`npx @rowansenne/workflow-run view`）：读需求目录里的产物，生成单个 HTML，按需求列出各阶段、审查记录（各级别数量、复核、与上次对比）、交付记录、沉淀到的知识文档，正文直接渲染；顶部「知识文档」列出每篇知识文档来自哪个需求、哪份产物；数据内嵌，只读、不联网，默认写到 `workflow-run/tmp/view/index.html` |
 | `workflow/scripts/run.mjs show / start / save / complete / cancel` | 需求 meta.json 中的分支运行记录：恢复、checkpoint、已完成状态与时间、等待用户、修复回退、revision 冲突检查 |
-| `workflow/scripts/artifacts.mjs [--branch b \| --all]` | 按分支汇总 `workflow-run/docs/requirements/` 下的方案、交付说明、审查报告、技术方案、上线方案及其 wiki 发布记录，给出下一步建议；分支取自文件头元信息（兼容技术方案的隐藏注释与旧可见行）。上线方案没传 `--tech` 时据此自动引用同分支的技术方案；project-review 据此对照本分支方案、识别复审 |
+| `workflow/scripts/artifacts.mjs [--branch b \| --all]` | 按分支汇总 `workflow-run/docs/requirements/` 下的方案、交付说明、审查报告、技术方案、上线方案及其 wiki 发布记录，给出下一步建议；分支取自文件头元信息（兼容技术方案的隐藏注释与旧可见行）。project-review 据此对照本分支方案、识别复审 |
+| `workflow/scripts/document-sources.mjs --branch b --id <文档运行id>` | 为技术方案和上线方案查询同一需求、分支和最近已完成 dev 运行的产物版本；上线方案同时查找可关联的技术方案 |
 | `workflow/scripts/report.mjs [--since d] [--all-branches] [--json]` | 本地效果报告（`/workflow report`、`npx @rowansenne/workflow-run report`）：审查发现与修复率、复核率、需求澄清、沉淀率、知识引用、各分支链路 |
 | `workflow/scripts/feedback.mjs add … / summary [--json]` | 运行反馈：dev / project-review 交付后追加一行过程记录到 `workflow-run/feedback/<用户>.jsonl`；`summary` 按 skill 汇总，跳过的步骤和不清楚的规则按 SKILL.md 章节归类（`npx @rowansenne/workflow-run feedback`）；`init` / `upgrade` 装了新版本时清掉本项目旧版本的记录 |
 | `workflow/scripts/review-scope.mjs [--diff b...h \| --base b] [--exclude a,b]` / `rules <文件…>` | 审查范围：由脚本决定审哪些文件、跳过哪些（删除、二进制、敏感文件、依赖目录、生成文件、文档、本工具产物，各带原因）、每个文件的风险级别和分批，以及按文件类型和改动内容该看审查清单的哪几节；`--base` 含未提交和未跟踪的新文件。`rules` 打印这些小节的原文和画像 `review.rules` 里匹配的项目规则。project-review 第 1、3、4 步与 dev 自审使用 |

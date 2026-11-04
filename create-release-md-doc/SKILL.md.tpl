@@ -17,7 +17,7 @@ description: "Generate a Markdown release/deployment plan (上线方案) from th
 
 - 两个分支都必填；用户只给一个时问另一个，不要默认 `master`。`--prd` / `--tech` 不能替代分支参数。
 - `<mainBranch>` 用户没给但 `workflow/profile.json` 有 `main_branch` 时，可提出用它作为基线并请用户确认。
-- `--tech <path>`：已生成的技术方案 md，复用其接口表 / 服务表 / DDL / 表名。没传时运行 `node <skills>/workflow/scripts/artifacts.mjs --branch <devBranch>`，`latest.tech` 非空就自动引用这份（元数据行写「<path>（按分支自动关联）」，并在交付时告诉用户；用户说不用就按无技术方案处理）。同一份输出里 `latest.delivery`（dev 的交付说明）非空时也读它：「配置清单」「SQL 脚本（未执行）」「未验证项」分别并入配置下发、上线 SQL 与上线后验证，和 diff 不一致时以 diff 为准并在交付时指出；元数据行「交付说明引用」写它的路径。
+- `--tech <path>`：显式指定技术方案 Markdown，复用经核对的接口表 / 服务表 / DDL / 表名。没传时按 Step 2 查找同需求、同分支的技术方案，有匹配项就在引用中标注「自动关联」。用户说不用就跳过技术方案；dev 产物仍独立查询。
 - `--prd`：Confluence PRD 的 pageId 或 URL，依赖 wiki 连接（见 Step 1）。
 
 ## Workflow
@@ -37,8 +37,9 @@ description: "Generate a Markdown release/deployment plan (上线方案) from th
 
 ### Step 2 — 采集 diff 并抽取事实
 
-按 `references/diff-collection.md` 执行：有技术方案（`--tech` 或自动关联）时先解析它复用其事实；其余层用三点 `<main>...<dev>` 分层采集。只写 diff 中可见的事实，看不到写「待补充」。有 `prd_context` 时做 PRD 对齐校验。
-同分支有 `latest.requirement` 时，引用其目标、范围和 AC 验收作为上线回归依据，标明文档路径与版本；部署、SQL 与配置变更仍以 diff / 交付说明核实，不把需求计划当成已实现事实。
+先读 `<skills>/workflow/references/document-sources.md`。优先读查询返回的 `delivery.md` 和 `requirement.md`，用交付配置、SQL、未验证项及需求 AC 制定发布和回归清单；需要核对遗留风险、覆盖缺口时读 `review.md`，需要了解已落地的发布顺序、兼容或迁移约束时读 `plan.md`。
+
+按 `references/diff-collection.md` 用三点 `<main>...<dev>` 分层采集本次变更。技术方案（`--tech` 或自动关联）提供候选事实，按本次 diff 和相关代码逐项核对；无法核实的写「待补充」。有 `prd_context` 时做 PRD 对齐校验。
 
 ### Step 3 — 选模板并填充
 
@@ -49,11 +50,11 @@ description: "Generate a Markdown release/deployment plan (上线方案) from th
 | 事实 | 来源 |
 |---|---|
 | 上线服务 / 改动范围 | git remote + 项目结构 + 改动范围 + `profile.deploy` |
-| 中间件上线（DDL / 配置 / 依赖） | DDL、实体、配置、构建文件；数据评审类章节仅 `profile.data_review` 为 true 时输出 |
+| 中间件上线（DDL / 配置 / 依赖） | DDL、实体、配置、构建文件；对照交付的配置清单和未执行 SQL，按需补方案里已落实的迁移约束；数据评审类章节仅 `profile.data_review` 为 true 时输出 |
 | 灰度方案 | 有 PRD 时取 `prd_context.grayRelease`；否则写「待人工补充」 |
-| 上线后验证 | 接口层 / `tech_context`；有 PRD 时追加业务场景；代码图谱可用时用 `cg.mjs impact --diff <main>...<dev>` 的 `entry_points` 补全要回归的接口 / 消费者 / 定时任务，`sql` / `config_keys` 对照中间件上线（见 `<skills>/code-graph/SKILL.md`） |
+| 上线后验证 | 接口层 / 经核对的 `tech_context`、需求 AC、交付未验证项、审查覆盖缺口；有 PRD 时追加业务场景；代码图谱可用时用 `cg.mjs impact --diff <main>...<dev>` 的 `entry_points` 补全要回归的接口 / 消费者 / 定时任务，`sql` / `config_keys` 对照中间件上线（见 `<skills>/code-graph/SKILL.md`） |
 | 监控 | 变更类名 / 方法名 + 定时任务 + topic |
-| 回滚 / 止损 | DDL / 配置 / 服务回滚推断；有 PRD 时追加对齐缺口 |
+| 回滚 / 止损 | DDL / 配置 / 服务回滚推断，按需纳入方案中的兼容约束和交付时仍存在的审查风险；有 PRD 时追加对齐缺口 |
 
 - 灰度、回滚策略属于推断内容，必须标「待人工确认」，不要写成已确定的方案。
 - 文档开头写元信息：
@@ -64,9 +65,9 @@ description: "Generate a Markdown release/deployment plan (上线方案) from th
 > diff 概览：<files> files changed, <ins> insertions(+), <del> deletions(-)
 > PRD 参考：<pageId 或 URL 或「无」/「PRD 增强已跳过」>
 > 模板来源：<DocNexus / 项目文件>
-> 技术方案引用：<path 或「无」>
-> 交付说明引用：<path 或「无」>
-> 待补充章节：<diff、PRD、技术方案都给不出内容的章节，没有写「无」>
+> 技术方案引用：<path、版本（如有）或「无」>
+> 交付说明引用：<path、版本或「无」>
+> 待补充章节：<已有取材来源都给不出内容的章节，没有写「无」>
 > ⚠️ 灰度 / 回滚策略基于 diff 推断，需人工校对后补充。
 ```
 
@@ -75,7 +76,7 @@ description: "Generate a Markdown release/deployment plan (上线方案) from th
 - 正式收尾：Step 4 进入 L4，先写 `workflow-run/tmp/release-doc.md` 草稿，再用 `node <skills>/workflow/scripts/artifact.mjs finalize --id <运行id> --expect-revision <revision> --kind release --draft <草稿> --branch <dev分支>` 自检、归档旧版、发布并更新索引／运行证据；使用返回的 path / cite，规则见 `<skills>/workflow/references/execution.md`。
 - 收尾输出 previous 非空时告诉用户上一版的归档位置，不能替用户删除；中断先 `artifact.mjs resume --id <运行id>`。独立文档仓库的提交提示用 `requirement.mjs pending`，按 requirements.md 处理；后续 wiki／沉淀元信息仍可显式 sync。
 - 收尾前对草稿运行 `node <skills>/workflow/scripts/lint-doc.mjs <草稿> --skill create-release-md-doc --facts` 自检（`--facts` 按元信息行的对比分支核对正文里的类名、文件、接口、表名）：有「错误」先修正再交付（缺必填章节、残留 `{{...}}` 占位符、缺元信息行）；「警告」按实际情况处理，其中「在 diff 和代码里都找不到」的名字逐个核实：确属编造就改成 diff 里的真实名字或写「待补充」，是外部系统 / 配置中心的名字就保留；「提示」里的待填写位置在交付摘要中告诉用户。
-- 再把路径和摘要告诉用户。
+- 再把路径和摘要告诉用户，按取材规则列出实际引用的 dev 产物及版本。
 
 ### Step 5 — 后续（都需要用户同意）
 

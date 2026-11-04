@@ -36,7 +36,9 @@ description: "Generate a Markdown technical design doc (技术方案) from the d
 
 ### Step 2 — 分层采集 diff 并抽取事实
 
-按 `references/diff-collection.md` 执行：用三点 `<main>...<dev>`，先 `--name-only` 分层列文件，再读具体 diff；只写 diff 中可见的事实，看不到写「待补充」。有 `prd_context` 时做 PRD 对齐校验（同见 `references/prd.md`）。
+先读 `<skills>/workflow/references/document-sources.md`，查询同需求、同分支已完成 dev 的产物版本。默认读返回的 `requirement.md`、`delivery.md`、`plan.md`；需要核对遗留风险、覆盖缺口时读 `review.md`，需要追溯需求文档未展开的已确认业务决策时读 `clarification.md`。
+
+按 `references/diff-collection.md` 执行：用三点 `<main>...<dev>`，先 `--name-only` 分层列文件，再读具体 diff；实现事实以 diff 和相关代码为准，无法核实的写「待补充」。有 `prd_context` 时做 PRD 对齐校验（同见 `references/prd.md`）。
 
 CodeGraph 是可选增强；未安装时用 diff 精读和代码搜索完成影响面分析，属于正常降级，不记为跳过 Step 2。确有未完成的分析才记录跳过项与原因。
 
@@ -48,14 +50,15 @@ CodeGraph 是可选增强；未安装时用 diff 精读和代码搜索完成影�
 
 | 事实 | 来源 |
 |---|---|
-| 需求背景 | 优先引用同分支 `latest.requirement` 的目标、范围与澄清结论；外部 PRD 用 `prd_context` 并标来源；都没有写「待补充」 |
+| 需求背景 | 优先引用查询返回的需求文档的目标、范围与已确认决定，按需用已确认的业务澄清补充；外部 PRD 用 `prd_context` 并标来源；都没有写「待补充」 |
 | 影响范围 | 各层命中的模块 / 包名；代码图谱可用时补上 `cg.mjs impact --diff <main>...<dev>` 的受影响入口与模块（见 `<skills>/code-graph/SKILL.md`） |
-| 详细方案 | Service 变更；有 PRD 时补业务语义并标注来源 |
+| 详细方案 | Service 变更；用 `plan.md` 补已落地的设计理由、技术取舍和兼容策略，用 `delivery.md` 补最终结果或缺陷根因；有 PRD 时补业务语义并标注来源 |
 | 接口 / 消息协议 / 字段变更 | 接口与消息层、DTO / VO |
 | 涉及服务 | git remote + 项目结构 + `profile.deploy` |
-| 中间件变更（DB / 配置 / 依赖 / 定时任务） | SQL、实体、配置、构建文件、定时任务；代码图谱可用时对照 `impact` 的 `sql` / `config_keys` |
+| 中间件变更（DB / 配置 / 依赖 / 定时任务） | SQL、实体、配置、构建文件、定时任务；对照交付的配置与 SQL 清单；代码图谱可用时对照 `impact` 的 `sql` / `config_keys` |
 | 数据链路 / 数据评审 | 有 PRD 且提及表名，或 `profile.data_review` 为 true 时；`prd_context.tables` / diff 推断 |
-| 兼容问题与方案、PRD 对齐缺口 | diff 推断 + PRD 对齐缺口（见 `references/prd.md`） |
+| 验收、验证与遗留风险 | 需求文档的 AC、交付的验证与未验证项；结合最终交付按需核对审查报告里的遗留风险和未覆盖场景 |
+| 兼容问题与方案、PRD 对齐缺口 | diff 推断 + 已落实的方案约束 + PRD 对齐缺口（见 `references/prd.md`） |
 
 - 正文遵循团队生效模板，不写「自动生成 / 对比分支 / diff 概览 / PRD 参考 / 模板来源」引用块；模板中与 Wiki 页面标题重复的独立文档标题不输出到正文，保留有业务含义的章节标题。
 - 保留模板里的说明文字、表格和带标题代码块（围栏信息串用 `title="标题"`，可与语言组合）；具体章节编号、说明内容和标题由模板决定，不在通用 skill 中写死。
@@ -76,7 +79,7 @@ PRD 参考：<pageId 或 URL 或「无」/「PRD 增强已跳过」>
 - 正式收尾：Step 4 进入 T4，先写 `workflow-run/tmp/tech-doc.md` 草稿，再用 `node <skills>/workflow/scripts/artifact.mjs finalize --id <运行id> --expect-revision <revision> --kind tech --draft <草稿> --branch <dev分支>` 自检、归档旧版、发布并更新索引／运行证据；使用返回的 path / cite，规则见 `<skills>/workflow/references/execution.md`。
 - 收尾输出 previous 非空时告诉用户上一版的归档位置，不能替用户删除；中断先 `artifact.mjs resume --id <运行id>`。独立文档仓库的提交提示用 `requirement.mjs pending`，按 requirements.md 处理；后续 wiki／沉淀元信息仍可显式 sync。
 - 收尾前对草稿运行 `node <skills>/workflow/scripts/lint-doc.mjs <草稿> --skill create-tech-md-doc --facts --diff <main>...<dev>` 自检，显式按三点范围核对正文里的类名、文件、接口、表名。有「错误」先修正再交付（缺必填章节、残留 `{{...}}` 占位符）；不再强制可见元信息行，但隐藏分支仍须与运行一致。「警告」按实际情况处理，其中「在 diff 和代码里都找不到」的名字逐个核实：确属编造就改成 diff 里的真实名字或写「待补充」，是外部系统 / 配置中心的名字就保留；「提示」里的待填写位置在交付摘要中告诉用户。
-- 再把路径和摘要告诉用户。
+- 再把路径和摘要告诉用户，按取材规则列出实际引用的 dev 产物及版本。
 
 ### Step 5 — 后续（都需要用户同意）
 

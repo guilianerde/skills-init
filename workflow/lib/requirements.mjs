@@ -19,7 +19,7 @@ const skipDir = (d) => !d.isDirectory() || d.name.startsWith('.');
 // path 时把当前版复制到 workflow-run/tmp/old-artifacts/<需求目录（相对 requirements/）>/<种类>_v<N>.md（不提交），
 // 写完 sync <path> 时新版内容和这份副本不同才算新版本（versions 加一）；没写就放弃的话版本号不变
 export const OLD_DIR = `${TMP_DIR}/old-artifacts`;
-const archivePath = (root, dirAbs, kind, v) => path.join(root, OLD_DIR, path.relative(path.join(root, REQ_DIR), dirAbs), `${FILES[kind]}_v${v}.md`);
+export const archivePath = (root, dirAbs, kind, v) => path.join(root, OLD_DIR, path.relative(path.join(root, REQ_DIR), dirAbs), `${FILES[kind]}_v${v}.md`);
 const versionsOf = (dirAbs) => readJson(path.join(dirAbs, 'meta.json'))?.versions ?? {};
 
 export function indexArtifacts(dir, versions = {}) {
