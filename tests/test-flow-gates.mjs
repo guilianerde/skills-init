@@ -11,6 +11,7 @@ import { finalizeArtifact, resumeFinalization, abortFinalization } from '../work
 import { runState } from '../workflow/lib/runs.mjs';
 import { sync, which, nextPath } from '../workflow/lib/requirements.mjs';
 import { handoff } from '../workflow/scripts/review-handoff.mjs';
+import { templateParts } from '../workflow/lib/template-parts.mjs';
 import { useLocalDocNexus } from './helpers/docnexus-pkg.mjs';
 
 useLocalDocNexus();
@@ -304,7 +305,7 @@ test('安装后的新 CLI 使用知识模板检查草稿，并生成审查交接
   const reqDraft = path.join(f.root, 'workflow-run/tmp/requirement.md');
   fs.mkdirSync(path.dirname(reqDraft), { recursive: true });
   const reqTemplate = fs.readFileSync(path.join(REPO, 'dev/references/requirement-template.md'), 'utf8');
-  fs.writeFileSync(reqDraft, reqTemplate.replace(/\{\{([^}]+)\}\}/g, (_, key) => key === 'dev分支' ? BRANCH : key === 'YYYY-MM-DD' ? '2026-10-28' : key === 'S / M / L' ? 'M' : '已确认'));
+  fs.writeFileSync(reqDraft, templateParts(reqTemplate).content.replace(/\{\{([^}]+)\}\}/g, (_, key) => key === 'dev分支' ? BRANCH : key === 'YYYY-MM-DD' ? '2026-10-28' : key === 'S / M / L' ? 'M' : '已确认'));
   const reqInput = path.join(f.root, 'workflow-run/tmp/requirement-checkpoint.json');
   fs.writeFileSync(reqInput, JSON.stringify(done('F3')));
   const reqResult = spawnSync(process.execPath, [path.join(scripts, 'artifact.mjs'), 'finalize', '--id', run.id, '--expect-revision', String(run.revision), '--kind', 'requirement', '--draft', reqDraft, '--input', reqInput], { cwd: f.root, encoding: 'utf8' });

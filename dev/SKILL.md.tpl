@@ -18,6 +18,7 @@ description: "Explicitly requested dev workflow for feature development or bug f
 ## 门禁
 
 - 开工先运行 `node <skills>/workflow/scripts/resolve.mjs status`；DocNexus 必装，不可用先修复。可选增强复用 `<skills>/workflow/references/capabilities.md` 的本轮快照。
+- 生成澄清清单、需求、方案和交付说明时，按 `<skills>/workflow/references/templates.md`「文档模板的两部分」读取生效模板。遵守要求区，只用内容区生成正文。无标记的模板沿用旧格式，边界有误时先修复。
 - 先确定工作分支、已有改动的归属与需求名；切分支重新查询绑定，不替用户丢弃已有改动。
 - 规模由 agent 判定并说明，不询问规模确认；M / L 的需求理解和方案须用户确认后再实现，权限 / 资金至少按 M。
 - F2 先落偏业务场景的 clarification.md，供用户找产品核对；逐轮更新原问题状态、追加新问题和反馈。业务明确并完成现状调研后，再进入 F3 澄清技术约束；最终需求确认后进入 F4。

@@ -7,6 +7,8 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { checkFormat, compare } from '../workflow/scripts/template.mjs';
+import { lint } from '../workflow/scripts/lint-doc.mjs';
+import { RULES_MARKER, CONTENT_MARKER } from '../workflow/lib/template-parts.mjs';
 import { useLocalDocNexus, resetDocNexus } from './helpers/docnexus-pkg.mjs';
 
 // 必装组件 DocNexus 用本地夹具接入：不依赖 npm registry，也不写用户的 ~/.npm。
@@ -42,6 +44,21 @@ test('compare：按归一化标题比对，改编号不算变化；列出增删�
   assert.deepEqual(c.removed, []);
   assert.deepEqual(c.marks, ['3. 接口（如有）：普通 → 如有']);
   assert.equal(c.reordered, true);
+});
+
+test('两部分模板：要求不计作文档章节，错误边界阻止检查通过，旧模板仍可使用', () => {
+  const old = '# 标题\n## 背景 *\n';
+  const split = `${RULES_MARKER}\n## 审核要求 *\n不得编造\n${CONTENT_MARKER}\n${old}`;
+  assert.deepEqual(lint('# 标题\n## 背景\n', split).errors, []);
+  assert.match(lint(split, split).errors.join('\n'), /正文残留模板分区标记/);
+  assert.deepEqual(compare(old, split).added, []);
+  assert.deepEqual(checkFormat(split).required, ['背景']);
+  assert.ok(lint('# 标题\n## 背景\n', `${RULES_MARKER}\n${old}`).errors.length);
+  assert.ok(checkFormat(`${CONTENT_MARKER}\n${RULES_MARKER}\n${old}`).errors.length);
+  assert.deepEqual(lint('# 标题\n## 背景\n', old).errors, []);
+  const example = `\n\`\`\`markdown\n${RULES_MARKER}\n${CONTENT_MARKER}\n\`\`\`\n`;
+  assert.deepEqual(lint('# 标题\n## 背景\n', old + example).errors, []);
+  assert.deepEqual(lint('# 标题\n## 背景\n', split + example).errors, []);
 });
 
 const connect = (root) => {
@@ -81,6 +98,8 @@ test('已接入 DocNexus、没有模板时 draft 要样例；--from 抽骨架 �
   assert.equal(r.code, 0, r.err);
   assert.deepEqual([r.out.from, r.out.expected], ['sample', 'workflow-run/docnexus/library/templates/create-tech-md-doc/template.md']);
   assert.ok(!fs.readFileSync(draftFile('create-tech-md-doc'), 'utf8').includes('/order/export'));
+  const draftText = fs.readFileSync(draftFile('create-tech-md-doc'), 'utf8');
+  assert.ok(draftText.startsWith(`${RULES_MARKER}\n\n${CONTENT_MARKER}\n`));
   r = run('check', 'tech');
   assert.equal(r.code, 0);
   assert.equal(r.out.changes, null, '还没有当前模板');
@@ -88,6 +107,10 @@ test('已接入 DocNexus、没有模板时 draft 要样例；--from 抽骨架 �
   assert.equal(r.code, 2, JSON.stringify(r.out));
   assert.match(r.out.hint, /--category doc-template/);
   assert.ok(!fs.existsSync(libFile(root, 'create-tech-md-doc')), '不直接写知识库');
+  assert.equal(run('draft', 'requirement', '--from', 'sample.md').code, 0);
+  assert.ok(fs.readFileSync(draftFile('dev', 'requirement-template.md'), 'utf8').startsWith(RULES_MARKER));
+  assert.equal(run('draft', 'checklist', '--from', 'sample.md').code, 0);
+  assert.ok(fs.readFileSync(draftFile('project-review', 'checklist.md'), 'utf8').startsWith('# '));
   fs.rmSync(root, { recursive: true, force: true });
 });
 

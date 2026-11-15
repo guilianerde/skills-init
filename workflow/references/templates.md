@@ -1,6 +1,6 @@
 # 模板来源（文档类 skill 共用）
 
-澄清清单、需求、技术方案、上线方案、方案、审查清单的模板由脚本判定，各 skill 不自行查找：
+澄清清单、需求、方案、交付说明、技术方案、上线方案、审查报告与审查清单的模板由脚本判定，各 skill 不自行查找：
 
 ```
 node <skills>/workflow/scripts/resolve.mjs template <skill> <文件名>
@@ -18,6 +18,24 @@ DocNexus 是必装组件，知识库 `workflow-run/docnexus/library/templates/<s
 - `stale_project_file` 非空：提示这是已不生效的旧文件，确认已导入知识库后再删除。
 
 `resolve.mjs templates` 列出所有登记模板；登记表在各 Skill 的 `skill.json`。安装和升级自动补入内置模板。
+
+## 文档模板的两部分
+
+澄清清单、需求、方案、交付说明、技术方案、上线方案与审查报告使用同一个文件，按顺序放两个独立行标记。代码审查清单沿用检查项格式。
+
+```markdown
+<!-- workflow-run:template-rules -->
+这里写团队对文档的要求和规定，例如内容依据、编写约束和审核要求。
+
+<!-- workflow-run:template-content -->
+# 【技术方案】{{文档标题}}
+## 需求背景 *
+{{填写说明}}
+```
+
+生成时读取要求区并遵守其中规则，正文只按内容区的标题、说明、表格和代码块填充。只针对某一节或某列的填写提示留在原处。模板承载团队写作要求，技能中的流程和校验规则仍按技能执行。没有已确认的要求时可留空。
+
+要求标记放在首个非空行，两个标记必须各出现一次且顺序正确。边界有误时先修复。章节校验和变更比较只看正文骨架，生成者需另外核对自然语言要求。无标记的旧模板继续按原格式使用。需要迁移时，在草稿中移动已有规则并核对正文结构。已导入且未被团队修改的默认模板可用 `seed-templates --update` 更新，团队定制版可用 `seed-templates --diff` 对比。
 
 ## 修改模板（/workflow template）
 
@@ -41,7 +59,7 @@ DocNexus 是必装组件，知识库 `workflow-run/docnexus/library/templates/<s
 1. **要样例**：停下来告诉用户还没有这份模板，请用户给一份团队现有的同类文档：本地 Markdown 路径，或 wiki 页面的 pageId / URL。
    - wiki 页面：运行 `node <skills>/md-to-wiki/scripts/upload.mjs get <pageId> --text`，取输出的 `text` 作样例（需要 wiki 已配置，沿用开工 wiki 通道；无通道时请用户导出成 Markdown 或直接贴出内容）。
    - 用户手头没有样例：请用户列出要哪些章节、每节写什么，按同样的格式整理成模板。不要自己编一份「通用模板」。
-2. **抽骨架**：把样例存到临时文件（如 `workflow-run/tmp/template-sample.md`），运行 `node <skills>/workflow/scripts/template.mjs draft <模板> --from <样例文件>`（内部用 `make-template.mjs` 抽骨架，结果写进草稿，之后按「修改模板」第 2–4 步完善、校验、保存）。它保留标题层级和表格列，正文换成 `{{...}}` 填写提示，丢掉标题前的元信息块（元信息由生成文档的 skill 自己写）。
+2. **抽骨架**：把样例存到临时文件（如 `workflow-run/tmp/template-sample.md`），运行 `node <skills>/workflow/scripts/template.mjs draft <模板> --from <样例文件>`（内部用 `make-template.mjs` 抽骨架，之后按「修改模板」第 2–4 步完善、校验、保存）。它保留标题层级和表格列，正文换成 `{{...}}` 填写提示，丢掉标题前的元信息块（元信息由生成文档的 skill 自己写）。文档模板草稿会自动加入两部分标记，要求区初始为空，根据团队确认的规则补充。
 3. **完善**：在骨架上改：
    - 把每节的 `{{...}}` 改成具体的填写说明（这一节写什么、从哪类事实来，例如「受影响的接口、模块，带文件路径」），不要把样例里的具体业务内容留在模板里；
    - 必填章节在标题末尾加 ` *`，可选章节在标题里加「（如有）」：`lint-doc.mjs` 靠这两个标记检查生成的文档；

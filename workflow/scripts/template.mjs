@@ -23,6 +23,7 @@ import { resolveTemplate, skillMeta } from './resolve.mjs';
 import { headings, lint } from './lint-doc.mjs';
 import { skeleton } from './make-template.mjs';
 import { collect } from './artifacts.mjs';
+import { templateParts, RULES_MARKER, CONTENT_MARKER } from '../lib/template-parts.mjs';
 
 const ALIASES = {
   clarification: ['dev', 'clarification-template.md'],
@@ -58,20 +59,23 @@ const draftPath = (root, { skill, id }) => path.join(root, 'workflow-run', 'tmp'
 export function checkFormat(text) {
   const errors = [];
   const warnings = [];
-  const hs = headings(text);
+  const parts = templateParts(text);
+  if (parts.error) errors.push(parts.error);
+  const hs = headings(parts.content);
   if (!hs.length) errors.push('没有任何章节标题（# / ## ...）');
-  const lines = text.replace(/\r/g, '').split('\n');
+  const lines = parts.content.replace(/\r/g, '').split('\n');
+  const { offset = 0 } = parts;
   const first = lines.findIndex((l) => /^#{1,6}\s/.test(l));
   if (lines.slice(0, first < 0 ? lines.length : first).some((l) => /^\s*>/.test(l))) warnings.push('标题前有引用块：元信息由生成文档的 skill 自己写，模板里不需要');
   lines.forEach((l, i) => {
-    if ((l.match(/\{\{/g) || []).length !== (l.match(/\}\}/g) || []).length) errors.push(`第 ${i + 1} 行 {{ }} 不成对：${l.trim().slice(0, 60)}`);
-    if (/^\s*\{\{\s*fact:/.test(l)) errors.push(`第 ${i + 1} 行是 DocNexus 的事实引用语法 {{fact:...}}，模板里写填写说明即可`);
+    if ((l.match(/\{\{/g) || []).length !== (l.match(/\}\}/g) || []).length) errors.push(`第 ${i + 1 + offset} 行 {{ }} 不成对：${l.trim().slice(0, 60)}`);
+    if (/^\s*\{\{\s*fact:/.test(l)) errors.push(`第 ${i + 1 + offset} 行是 DocNexus 的事实引用语法 {{fact:...}}，模板里写填写说明即可`);
   });
   const seen = new Map();
   for (const h of hs.filter((x) => x.level >= 2 && x.key)) {
     const k = `${h.level}:${h.key}`;
     if (seen.has(k)) warnings.push(`章节「${h.text}」与第 ${seen.get(k)} 行重名，lint-doc 只认第一个`);
-    else seen.set(k, h.line);
+    else seen.set(k, h.line + offset);
   }
   if (hs.length && !hs.some((h) => h.required)) warnings.push('没有标记必填章节（标题末尾加 *）：lint-doc 不会因为缺章节报错');
   return { errors, warnings, headings: hs.length, required: hs.filter((h) => h.required).map((h) => h.text.replace(/\s*\*+\s*$/, '')), optional: hs.filter((h) => h.optional).map((h) => h.text) };
@@ -79,7 +83,7 @@ export function checkFormat(text) {
 
 // 与当前模板相比的章节变化（按归一化后的标题比对，改编号不算变化）
 export function compare(oldText, newText) {
-  const pick = (t) => headings(t).filter((h) => h.level >= 2 && h.key && !h.placeholder);
+  const pick = (t) => headings(templateParts(t).content).filter((h) => h.level >= 2 && h.key && !h.placeholder);
   const a = pick(oldText);
   const b = pick(newText);
   const ak = new Map(a.map((h) => [h.key, h]));
@@ -131,7 +135,8 @@ export function draft(root, t, { from = null, force = false, stdin = () => fs.re
     if (sample == null) return { code: 1, out: { ok: false, ...base, message: `读不到样例：${from}` } };
     const sk = skeleton(sample);
     if (!sk.headings) return { code: 1, out: { ok: false, ...base, message: '样例里没有任何标题，无法抽取结构；请换一份带章节标题的样例' } };
-    [content, origin] = [sk.template, 'sample'];
+    const split = Object.hasOwn(PRODUCES, `${t.skill}/${t.id}`);
+    [content, origin] = [split ? `${RULES_MARKER}\n\n${CONTENT_MARKER}\n${sk.template}` : sk.template, 'sample'];
   } else if (text != null) {
     [content, origin] = [text, r.source];
   } else if (r.import_from && read(path.join(root, r.import_from)) != null) {

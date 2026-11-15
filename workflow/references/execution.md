@@ -10,7 +10,7 @@
 {"scope":{"base":"main","exclude":["unrelated/**"]}}
 ```
 
-完整流程的文档先写草稿，再统一收尾；不要直接覆盖正式文件后用 sync 代替收尾。模板仍由调用方用 `resolve.mjs template <skill> <id>` 读取。清单用 dev 的 clarification-template.md，每轮复制到 tmp 修改后发布：
+完整流程的文档先写草稿，再统一收尾；不要直接覆盖正式文件后用 sync 代替收尾。模板由调用方用 `resolve.mjs template <skill> <id>` 读取，按 [templates.md](templates.md) 的「文档模板的两部分」填充正文。首次生成清单时用 dev 的 clarification-template.md，后续各轮把上一版正式清单复制到 tmp 更新，再发布：
 
 ```sh
 node <skills>/workflow/scripts/artifact.mjs finalize --id <id> --expect-revision <revision> --kind clarification --draft workflow-run/tmp/clarification.md --input workflow-run/tmp/checkpoint.json

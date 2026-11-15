@@ -18,6 +18,7 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { resolveTemplate, skillMeta } from './resolve.mjs';
 import { proseLines, headings } from '../lib/document-model.mjs';
+import { templateParts, RULES_MARKER, CONTENT_MARKER } from '../lib/template-parts.mjs';
 export { headings, headingKey } from '../lib/document-model.mjs';
 
 const TODO = /待填写|待补充|待人工确认/;
@@ -26,7 +27,9 @@ export function lint(doc, template, { requiredMeta = [] } = {}) {
   const errors = [];
   const warnings = [];
   const todos = [];
-  const tpl = headings(template).filter((h) => !h.placeholder && h.key);
+  const parts = templateParts(template);
+  if (parts.error) errors.push(parts.error);
+  const tpl = headings(parts.content).filter((h) => !h.placeholder && h.key);
   const got = headings(doc);
   const gotKeys = got.map((h) => h.key);
 
@@ -42,6 +45,9 @@ export function lint(doc, template, { requiredMeta = [] } = {}) {
   if (firstDiff >= 0) warnings.push(`章节顺序与模板不一致（从「${order[firstDiff]}」开始）`);
 
   const lines = doc.replace(/\r/g, '').split('\n');
+  if (proseLines(doc).some(({ text }) => [RULES_MARKER, CONTENT_MARKER].includes(text.trim()))) {
+    errors.push('正文残留模板分区标记，请只填充模板内容区');
+  }
   lines.forEach((text, i) => {
     if (/\{\{[^}]*\}\}/.test(text)) errors.push(`第 ${i + 1} 行残留模板占位符：${text.trim().slice(0, 60)}`);
     if (/<在此填写[^>]*>/.test(text)) errors.push(`第 ${i + 1} 行未替换：${text.trim().slice(0, 60)}`);

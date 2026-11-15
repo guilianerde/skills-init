@@ -44,6 +44,7 @@ description: "Generate a Markdown release/deployment plan (上线方案) from th
 ### Step 3 — 选模板并填充
 
 - 模板：在项目根运行 `node <skills>/workflow/scripts/resolve.mjs template create-release-md-doc template.md`（`<skills>` 是本 skill 所在的 skills 目录，如 `.agents/skills`），读输出的 `path`，并把 `source` 写进元数据行。模板缺失统一按 `workflow/references/templates.md` 创建或导入。
+  - 按 `workflow/references/templates.md`「文档模板的两部分」读取文档要求和正文骨架。遵守要求，只按正文骨架生成文档。无标记的旧模板沿用原有处理，边界有误时先修复模板。
   - 用户要修改、重新生成或换一份上线方案模板时，按 `<skills>/workflow/references/templates.md`「修改模板」用 `template.mjs` 处理（模板别名 `release`；按样例重做用 `draft release --from <样例>`），保存写入 DocNexus 知识库。
 - 填充：模板的章节和编号因团队而异，**按章节含义**放事实，不按编号。下表是事实的来源，放进模板里含义对应的章节；模板里没有对应章节的事实不擅自加章节，在交付摘要里列出「模板中没有位置的事实」；模板有、但 diff 和 PRD 都给不出内容的章节写「待补充」。
 
