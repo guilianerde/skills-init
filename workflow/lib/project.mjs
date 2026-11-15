@@ -142,7 +142,7 @@ export function expandPath(v, vars = {}, env = process.env) {
   const look = (n) => (vars[n] !== undefined && vars[n] !== '' ? vars[n] : (env[n] ?? ''));
   const home = look('HOME') || look('USERPROFILE') || '';
   let s = v;
-  if (s === '~' || s.startsWith('~/') || s.startsWith('~\\')) s = home ? home + s.slice(1) : s;
+  if (s === '~' || s.startsWith('~/') || s.startsWith('~\\')) s = home ? path.join(home, s.slice(2)) : s;
   const missing = [];
   for (const m of v.matchAll(VAR_RE)) { const n = m[1] ?? m[2] ?? m[3]; if (!look(n)) missing.push(n); }
   const resolved = s.replace(VAR_RE, (m, a, b, c) => look(a ?? b ?? c)).replace(/[\\/]+$/, '');
