@@ -79,7 +79,7 @@ test('F3 前在 F2 发布业务清单；多轮更新归档并展示，业务明�
   assert.throws(() => f.save(run, { stage: 'F4' }), /requirement.md/);
   assert.throws(() => finalizeArtifact(f.root, { branch: BRANCH, id: run.id, revision: run.revision, kind: 'clarification',
     text: checklist(), input: { steps: { F2: { status: 'completed' } } } }, () => ({ ok: true })), /清单发布不能代替阶段完成/);
-  assert.throws(() => f.requirement(run), /F3 收尾/);
+  assert.throws(() => f.finalize(run, 'requirement', {}, { packet: null }), /F3 收尾/);
 
   const second = publish(checklist().replace('轮次：1', '轮次：2').replace('状态：待产品反馈', '状态：业务已明确')
     .replace('| 未答复 | 待确认 |', '| 用户转述产品答复：排除已取消订单 | 已确认 |')

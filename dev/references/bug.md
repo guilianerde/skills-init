@@ -18,12 +18,12 @@
 - 区分根因与症状：只在出错表象处加判空 / try-catch 不算修复，除非能说明那里就是根因。
 - 检查同一根因是否在其他调用方同样存在。
 - 预期业务行为还需产品确认时，按 clarify.md 的清单规则在 B3 初判规模、bind、start，逐轮发布同目录的 clarification.md 并保存等待反馈；需求明确后沿用该运行收尾需求文档。
-- 根因与修复目标明确后，按 F4 的标准判定规模与快速通道；完整流程在 B3 收尾前 bind、start，按需求模板将现象、期望、范围、验收与澄清决定写成 requirement.md，用 `artifact.mjs finalize --kind requirement` 并标 B3 completed，再进 B4。根因证据作事实依据，修复方式留在 plan.md；已有文档先核对后在草稿更新，不自动覆盖原需求。
+- 根因与修复目标明确后，按 F4 的标准判定规模与快速通道；完整流程在 B3 收尾前 bind、start，按需求模板将现象、期望、范围、验收与澄清决定写成草稿，按 `clarify.md` 的 F3 审查适用草稿并完成需求理解确认，用 `artifact.mjs finalize --kind requirement` 收尾并标 B3 completed，再进 B4。根因证据作事实依据，修复方式留在 plan.md；已有文档先核对后在草稿更新，不自动覆盖原需求。
 
 ### B4 — 修复与验证
 
 - 复用 B3 收尾时按 F4 标准判定的规模和通道，不重复询问；范围变化时重新判定。快速通道退出时先回 B3 补需求文档，再补方案。
-- **完整流程先把修复方案追加进 `plan.md`**：沿用 B3 已绑定的需求与 bug 运行；已有方案先复制到 tmp 草稿，保留正文，在末尾留空行后追加「修复方案」节（根因结论与修复方式），更新文档头为当前修复分支、本次日期以及 requirement.md 的 cite / 版本。没有方案则按模板创建草稿，只填适用节。用 `artifact.mjs finalize --kind plan` 自检、归档旧版、发布并更新索引，不直接覆盖正式文件；输出的 previous 用于历史对照。运行 `artifacts.mjs --branch <当前修复分支>` 确认 latest.plan。M / L 取得用户确认后记录 approval，再 save implement: true；S 省 approval，仍须 implement。具体 JSON 和证据协议见 `<skills>/workflow/references/execution.md`。规模变化时说明依据、按新规模继续。
+- **完整流程先把修复方案追加进 `plan.md`**：沿用 B3 已绑定的需求与 bug 运行；已有方案先复制到 tmp 草稿，保留正文，在末尾留空行后追加「修复方案」节（根因结论与修复方式），更新文档头为当前修复分支、本次日期以及 requirement.md 的 cite / 版本。没有方案则按模板创建草稿，只填适用节。按 `<skills>/workflow/references/execution.md` 的「需求与方案审查」完成适用审查，再用 `artifact.mjs finalize --kind plan` 自检、归档旧版、发布并更新索引，不直接覆盖正式文件；输出的 previous 用于历史对照。运行 `artifacts.mjs --branch <当前修复分支>` 确认 latest.plan。M / L 取得用户确认后记录 approval，再 save implement: true；S 省 approval，仍须 implement。具体 JSON 和证据协议见 `<skills>/workflow/references/execution.md`。规模变化时说明依据、按新规模继续。
 - 做能消除根因的**最小改动**；B2 的测试由红变绿，相关已有测试保持通过（运行方式同 F6）。
 - 如果历史脏数据需要修正，写成 SQL 脚本交给用户，不直接执行。
 

@@ -223,11 +223,75 @@ test('草稿自检、分支或 revision 失败不覆盖正式文件、不推进�
   assert.equal(fs.readFileSync(path.join(f.root, f.req.dir, 'plan.md'), 'utf8'), f.text('plan.md'));
 });
 
+for (const kind of ['feature', 'bug']) test(`${kind}：两份文档须先审查，改需求后相同的方案草稿也须复审`, (t) => {
+  const f = flowFixture(t);
+  const reqStage = kind === 'feature' ? 'F3' : 'B3';
+  const planStage = kind === 'feature' ? 'F4' : 'B4';
+  let run = f.start(BRANCH, kind, kind === 'feature' ? 'M' : 'L');
+  const reqText = f.text('requirement.md');
+  const reqReview = f.reviewDraft(run, 'requirement', reqText);
+  assert.throws(() => f.finalize(run, 'requirement', done(reqStage), { packet: null }), /需要文档审查/);
+  assert.throws(() => f.save(run, { stage: planStage }), /requirement.md/);
+  const blocker = { location: 'AC-1', evidence: '缺少预期响应', impact: '无法验收', blocking: true };
+  assert.throws(() => f.finalize(run, 'requirement', done(reqStage), {
+    ...reqReview, result: { ...reqReview.result, findings: [blocker] },
+  }), /仍有阻塞项/);
+  assert.throws(() => f.finalize(run, 'requirement', done(reqStage), { ...reqReview, text: reqText + '变更' }), /不对应本轮草稿/);
+  run = f.finalize(run, 'requirement', done(reqStage), reqReview);
+  assert.equal(run.artifacts.requirement.document_review.mode, 'independent');
+  run = f.save(run, { stage: planStage });
+  const planReview = f.reviewDraft(run, 'plan', f.text('plan.md'));
+  assert.equal(planReview.packet.basis.text, reqText);
+  assert.throws(() => f.finalize(run, 'plan', {}, {
+    ...planReview, packet: { ...planReview.packet, basis: { ...planReview.packet.basis, text: '过时的需求内容' } },
+  }), /不对应本轮草稿或其依据/);
+  assert.throws(() => f.finalize(run, 'plan', {}, { packet: null }), /需要文档审查/);
+  assert.throws(() => f.implement(run), /尚未完成|plan.md/);
+  run = f.save(run, { stage: reqStage });
+  run = f.finalize(run, 'requirement', done(reqStage), { text: reqText + '新增 AC-2\n' });
+  run = f.save(run, { stage: planStage });
+  assert.throws(() => f.finalize(run, 'plan', {}, planReview), /不对应本轮草稿或其依据/);
+  run = f.plan(run);
+  assert.equal(run.artifacts.plan.document_review.mode, 'independent');
+  assert.equal(f.verify(f.implement(run)).stage, kind === 'feature' ? 'F7' : 'B5');
+});
+
+test('自查降级必须记录用户同意，S 和升级前的 M 运行仍可按原流程收尾', (t) => {
+  const f = flowFixture(t);
+  let run = f.start();
+  const { packet, result } = f.reviewDraft(run, 'requirement', f.text('requirement.md'));
+  const self = { ...result, mode: 'self', reviewer: '当前 agent' };
+  assert.throws(() => f.finalize(run, 'requirement', done('F3'), { packet, result: self }), /自查降级须有用户明确同意/);
+  run = f.finalize(run, 'requirement', done('F3'), {
+    packet, result: { ...self, fallback: { confirmed: true, reason: '客户端不支持子 agent' } },
+  });
+  assert.equal(run.artifacts.requirement.document_review.mode, 'self');
+  assert.equal(run.artifacts.requirement.document_review.fallback.confirmed, true);
+  f.save(run, { reason: '开始兼容性测试' }, 'cancel');
+
+  for (const size of ['S', 'M']) {
+    run = f.start(BRANCH, 'feature', size);
+    if (size === 'M') {
+      const meta = JSON.parse(fs.readFileSync(f.file, 'utf8'));
+      delete meta.runs[run.id].document_review_policy;
+      fs.writeFileSync(f.file, JSON.stringify(meta));
+      run = f.start();
+      assert.equal(run.document_review_policy, undefined);
+    }
+    run = f.plan(run);
+    assert.equal(run.artifacts.requirement.document_review, undefined);
+    assert.equal(run.artifacts.plan.document_review, undefined);
+    assert.equal(f.implement(run).stage, 'F5');
+    f.save(runState(f.root, BRANCH).current, { reason: '结束兼容性测试' }, 'cancel');
+  }
+});
+
 test('同一方案更新只升一次版本并保留旧正文与 wiki 页面；重试不重复归档', (t) => {
   const f = flowFixture(t); let run = f.plan(f.start());
   const wiki = '<!-- md-to-wiki: pageId=42 -->';
   fs.writeFileSync(path.join(f.root, f.req.dir, 'plan.md'), `${wiki}\n${f.text('plan.md')}`);
   const opts = { branch: BRANCH, id: run.id, revision: run.revision, kind: 'plan', text: f.text('plan.md') + '\n新版正文' };
+  Object.assign(opts, f.reviewDraft(run, 'plan', opts.text));
   const updated = finalizeArtifact(f.root, opts, () => ({ ok: true, warnings: ['示例提醒'], todos: [] }));
   assert.equal(updated.version, 2);
   assert.equal(fs.readFileSync(path.join(f.root, f.req.dir, 'plan.md'), 'utf8'), `${wiki}\n${opts.text}`);
@@ -308,7 +372,19 @@ test('安装后的新 CLI 使用知识模板检查草稿，并生成审查交接
   fs.writeFileSync(reqDraft, templateParts(reqTemplate).content.replace(/\{\{([^}]+)\}\}/g, (_, key) => key === 'dev分支' ? BRANCH : key === 'YYYY-MM-DD' ? '2026-10-28' : key === 'S / M / L' ? 'M' : '已确认'));
   const reqInput = path.join(f.root, 'workflow-run/tmp/requirement-checkpoint.json');
   fs.writeFileSync(reqInput, JSON.stringify(done('F3')));
-  const reqResult = spawnSync(process.execPath, [path.join(scripts, 'artifact.mjs'), 'finalize', '--id', run.id, '--expect-revision', String(run.revision), '--kind', 'requirement', '--draft', reqDraft, '--input', reqInput], { cwd: f.root, encoding: 'utf8' });
+  const reviewArgs = (kind, draft) => {
+    const handoff = spawnSync(process.execPath, [path.join(scripts, 'review-handoff.mjs'), '--id', run.id, '--kind', kind, '--draft', draft], { cwd: f.root, encoding: 'utf8' });
+    assert.equal(handoff.status, 0, handoff.stderr);
+    const { path: packetPath, packet } = JSON.parse(handoff.stdout);
+    assert.equal(packet.draft.text, fs.readFileSync(draft, 'utf8'));
+    const result = path.join(f.root, 'workflow-run/tmp/document-review.json');
+    fs.writeFileSync(result, JSON.stringify({ ...packet.result_schema, reviewer: 'test-reviewer', summary: '审查通过', findings: [] }));
+    return ['--packet', packetPath, '--result', result];
+  };
+  const reqArgs = ['finalize', '--id', run.id, '--expect-revision', String(run.revision), '--kind', 'requirement', '--draft', reqDraft, '--input', reqInput];
+  const missing = spawnSync(process.execPath, [path.join(scripts, 'artifact.mjs'), ...reqArgs], { cwd: f.root, encoding: 'utf8' });
+  assert.equal(missing.status, 1); assert.match(missing.stderr, /需要文档审查/);
+  const reqResult = spawnSync(process.execPath, [path.join(scripts, 'artifact.mjs'), ...reqArgs, ...reviewArgs('requirement', reqDraft)], { cwd: f.root, encoding: 'utf8' });
   assert.equal(reqResult.status, 0, reqResult.stderr);
   run = JSON.parse(reqResult.stdout).run;
   assert.equal(run.steps.F3.status, 'completed');
@@ -320,7 +396,7 @@ test('安装后的新 CLI 使用知识模板检查草稿，并生成审查交接
   const bad = spawnSync(process.execPath, [path.join(scripts, 'artifact.mjs'), ...args], { cwd: f.root, encoding: 'utf8' });
   assert.equal(bad.status, 1); assert.match(bad.stderr, /草稿自检失败/);
   fs.writeFileSync(draft, f.text('plan.md'));
-  const good = spawnSync(process.execPath, [path.join(scripts, 'artifact.mjs'), ...args], { cwd: f.root, encoding: 'utf8' });
+  const good = spawnSync(process.execPath, [path.join(scripts, 'artifact.mjs'), ...args, ...reviewArgs('plan', draft)], { cwd: f.root, encoding: 'utf8' });
   assert.equal(good.status, 0, good.stderr); run = JSON.parse(good.stdout).run;
   run = f.save(run, done('F4')); run = f.verify(f.implement(run));
   const packet = spawnSync(process.execPath, [path.join(scripts, 'review-handoff.mjs'), '--id', run.id], { cwd: f.root, encoding: 'utf8' });

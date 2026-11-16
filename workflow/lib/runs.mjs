@@ -125,7 +125,8 @@ export function startRun(root, { branch, kind = 'feature', size = null, input = 
     selected = applyCheckpoint({ id, kind, size, branch, revision: 1, status: 'running', stage: FLOWS[kind][0],
       created_at: at, updated_at: at, completed_at: null, steps: Object.fromEntries(FLOWS[kind].map((s) => [s, { status: 'pending' }])),
       scope: { base: meta.base || profile?.main_branch || 'main', exclude: Array.isArray(profile?.review?.exclude) ? profile.review.exclude.filter((v) => typeof v === 'string') : [] },
-      artifacts: {}, context: {}, waiting_for: null, reason: null, decision: null, history: [] }, input, at);
+      artifacts: {}, context: {}, waiting_for: null, reason: null, decision: null, history: [],
+      ...(['feature', 'bug'].includes(kind) ? { document_review_policy: 1 } : {}) }, input, at);
     applyDevEvidence(root, req, selected, input, at);
     return { ...meta, runs: { ...runs, [id]: selected }, updated: at };
   }, { root });

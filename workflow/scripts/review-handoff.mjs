@@ -6,8 +6,10 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { readRun } from '../lib/runs.mjs';
 import { readProfile } from '../lib/project.mjs';
-import { snapshotReader, assertSnapshot, hash } from '../lib/code-snapshot.mjs';
-import { isDev, assertValidation, reviewInputs } from '../lib/run-gates.mjs';
+import { snapshotReader, assertSnapshot, assertWorkingBranch, hash } from '../lib/code-snapshot.mjs';
+import { isDev, assertValidation, reviewInputs, documentReviewBasis } from '../lib/run-gates.mjs';
+import { documentReviewStage, documentReviewInputs, requiresDocumentReview } from '../lib/document-review.mjs';
+import { artifactDraft } from '../lib/artifact-finalize.mjs';
 import { scope } from './review-scope.mjs';
 
 export function handoff(root, { branch, id, depth = '标准', capabilities = null }) {
@@ -38,19 +40,48 @@ export function handoff(root, { branch, id, depth = '标准', capabilities = nul
   };
 }
 
+export function documentHandoff(root, { branch, id, kind, text }) {
+  const { req, run } = readRun(root, branch, id);
+  if (!requiresDocumentReview(run, kind) || ['completed', 'cancelled'].includes(run.status)) throw new Error('只有需要文档审查的进行中运行可生成此交接');
+  if (run.stage !== documentReviewStage(run, kind)) throw new Error(`请在 ${documentReviewStage(run, kind)} 阶段生成文档审查交接`);
+  if (req.meta.pending_finalization) throw new Error('先恢复待完成的产物收尾');
+  assertWorkingBranch(root, run);
+  const basis = documentReviewBasis(root, req, run, kind);
+  const basisText = basis ? fs.readFileSync(path.resolve(root, basis.path), 'utf8') : null;
+  if (basis && hash(basisText) !== basis.hash) throw new Error('文档审查依据在交接期间变化，请重新收尾后再试');
+  const draft = artifactDraft(req, kind, text);
+  const draftHash = hash(draft.text);
+  const inputs = documentReviewInputs(run, kind, draftHash, basis);
+  return {
+    run_id: id, revision: run.revision, project_root: path.resolve(root), branch, kind, inputs,
+    draft: { text: draft.text, hash: draftHash },
+    basis: basis ? { path: basis.path, hash: basis.hash, version: basis.version, text: basisText } : null,
+    result_schema: { run_id: id, inputs, mode: 'independent', reviewer: '实际子 agent 标识', summary: '审查结论与已复核修订',
+      findings: [{ location: '章节或验收编号', evidence: '依据及来源', impact: '实际影响', blocking: false }] },
+  };
+}
+
 export function main(argv) {
   try {
     const args = [...argv]; const opts = {};
     while (args.length) {
       const key = args.shift();
-      if (!['--root', '--branch', '--id', '--depth', '--capabilities'].includes(key) || !args.length) throw new Error(`未知或缺少值的参数：${key}`);
+      if (!['--root', '--branch', '--id', '--depth', '--capabilities', '--kind', '--draft'].includes(key) || !args.length) throw new Error(`未知或缺少值的参数：${key}`);
       opts[key.slice(2)] = args.shift();
     }
     const root = path.resolve(opts.root ?? '.');
     const branch = opts.branch ?? spawnSync('git', ['symbolic-ref', '--short', 'HEAD'], { cwd: root, encoding: 'utf8' }).stdout?.trim();
-    const capabilities = opts.capabilities ? JSON.parse(fs.readFileSync(path.resolve(root, opts.capabilities), 'utf8')) : null;
-    const packet = handoff(root, { branch, id: opts.id, depth: opts.depth, capabilities });
-    const file = path.join(root, 'workflow-run/tmp/review', packet.run_id, 'handoff.json');
+    let packet;
+    let fileName = 'handoff.json';
+    if (opts.kind || opts.draft) {
+      if (!['requirement', 'plan'].includes(opts.kind) || !opts.draft || opts.depth || opts.capabilities) throw new Error('文档审查使用 --kind requirement|plan --draft <草稿.md>');
+      packet = documentHandoff(root, { branch, id: opts.id, kind: opts.kind, text: fs.readFileSync(path.resolve(root, opts.draft), 'utf8') });
+      fileName = `${packet.kind}-${packet.inputs}.json`;
+    } else {
+      const capabilities = opts.capabilities ? JSON.parse(fs.readFileSync(path.resolve(root, opts.capabilities), 'utf8')) : null;
+      packet = handoff(root, { branch, id: opts.id, depth: opts.depth, capabilities });
+    }
+    const file = path.join(root, 'workflow-run/tmp/review', packet.run_id, fileName);
     fs.mkdirSync(path.dirname(file), { recursive: true });
     fs.writeFileSync(file, `${JSON.stringify(packet, null, 2)}\n`);
     console.log(JSON.stringify({ ok: true, path: path.relative(root, file).split(path.sep).join('/'), packet }, null, 2)); return 0;

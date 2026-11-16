@@ -7,7 +7,8 @@ import { bind } from '../../workflow/lib/requirements.mjs';
 import { startRun, changeRun } from '../../workflow/lib/runs.mjs';
 import { codeSnapshot } from '../../workflow/lib/code-snapshot.mjs';
 import { finalizeArtifact } from '../../workflow/lib/artifact-finalize.mjs';
-import { handoff } from '../../workflow/scripts/review-handoff.mjs';
+import { documentHandoff, handoff } from '../../workflow/scripts/review-handoff.mjs';
+import { requiresDocumentReview } from '../../workflow/lib/document-review.mjs';
 
 export const BRANCH = 'feature/order';
 export function flowFixture(t) {
@@ -29,8 +30,15 @@ export function flowFixture(t) {
       steps: Object.fromEntries((kind === 'feature' ? ['Step0', 'F1', 'F2'] : ['Step0', 'B1', 'B2']).map((s) => [s, { status: 'completed' }])),
       context: { summary: '需求与验收已确认', decisions: ['使用分页'], acceptance: ['返回分页结果'] } } : {} }).run;
   const save = (run, input, action = 'save') => changeRun(root, { branch: run.branch, id: run.id, revision: run.revision, input, action }).run;
-  const finalize = (run, kind, input = {}, extra = {}) => finalizeArtifact(root, { branch: run.branch, id: run.id, revision: run.revision,
-    kind, text: text(({ requirement: 'requirement.md', plan: 'plan.md', review: 'review.md', delivery: 'delivery.md' })[kind], run.branch), input, ...extra }, () => ({ ok: true })).run;
+  const reviewDraft = (run, kind, draft) => {
+    const packet = documentHandoff(root, { branch: run.branch, id: run.id, kind, text: draft });
+    return { packet, result: { run_id: run.id, inputs: packet.inputs, mode: 'independent', reviewer: 'test-reviewer', summary: '审查通过', findings: [] } };
+  };
+  const finalize = (run, kind, input = {}, extra = {}) => {
+    const draft = extra.text ?? text(`${kind}.md`, run.branch);
+    const evidence = requiresDocumentReview(run, kind) && !Object.hasOwn(extra, 'packet') ? reviewDraft(run, kind, draft) : {};
+    return finalizeArtifact(root, { branch: run.branch, id: run.id, revision: run.revision, kind, text: draft, input, ...evidence, ...extra }, () => ({ ok: true })).run;
+  };
   const requirement = (run) => finalize(run, 'requirement', { steps: { [run.kind === 'feature' ? 'F3' : 'B3']: { status: 'completed' } } });
   const plan = (run) => {
     if (!run.artifacts.requirement) run = requirement(run);
@@ -51,5 +59,5 @@ export function flowFixture(t) {
     return finalize(run, 'review', run.kind === 'feature' ? { steps: { F7: { status: 'completed' } } } : {}, { packet, result });
   };
   const ready = (kind = 'feature', findings = []) => review(verify(implement(plan(start(BRANCH, kind)))), findings);
-  return { root, req, file, text, put, start, save, finalize, requirement, plan, implement, verify, review, ready, git };
+  return { root, req, file, text, put, start, save, finalize, reviewDraft, requirement, plan, implement, verify, review, ready, git };
 }

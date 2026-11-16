@@ -79,7 +79,9 @@ test('方案收尾中断后恢复仍核对需求正文，不能发布依据已�
     return rename(from, to);
   };
   try {
-    assert.throws(() => finalizeArtifact(f.root, { branch: BRANCH, id: run.id, revision: run.revision, kind: 'plan', text: f.text('plan.md') }, () => ({ ok: true })), /模拟中断/);
+    const text = f.text('plan.md');
+    assert.throws(() => finalizeArtifact(f.root, { branch: BRANCH, id: run.id, revision: run.revision, kind: 'plan', text,
+      ...f.reviewDraft(run, 'plan', text) }, () => ({ ok: true })), /模拟中断/);
   } finally { fs.renameSync = rename; }
   const file = path.join(f.root, f.req.dir, 'requirement.md');
   fs.appendFileSync(file, '\n变更');

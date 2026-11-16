@@ -6,7 +6,8 @@ import { FILES, parseBranch } from './artifact-model.mjs';
 import { hash, assertWorkingBranch, snapshotReader } from './code-snapshot.mjs';
 import { layout } from './project.mjs';
 import { readRun, assertRunVersion, applyCheckpoint } from './runs.mjs';
-import { isDev, coreSteps, applyDevEvidence, assertRequirement, assertPlanBasis, assertReview, assertDelivery, reviewEvidence } from './run-gates.mjs';
+import { isDev, coreSteps, applyDevEvidence, assertRequirement, assertPlanBasis, assertReview, assertDelivery, reviewEvidence, documentReviewBasis } from './run-gates.mjs';
+import { documentReviewEvidence, requiresDocumentReview } from './document-review.mjs';
 import { updateMeta } from './meta-store.mjs';
 import { OLD_DIR, indexArtifacts } from './requirements.mjs';
 
@@ -19,6 +20,15 @@ export const ARTIFACT_TEMPLATES = {
 const allowed = { feature: ['clarification', 'requirement', 'plan', 'review', 'delivery'], bug: ['clarification', 'requirement', 'plan', 'review', 'delivery'], review: ['review'], tech: ['tech'], release: ['release'] };
 const relative = (root, file) => path.relative(root, file).split(path.sep).join('/');
 const fileHash = (file) => fs.existsSync(file) ? hash(fs.readFileSync(file)) : null;
+const wikiRecord = (s) => /^<!-- md-to-wiki: [^\n]*-->/.exec(s)?.[0] ?? null;
+
+export function artifactDraft(req, kind, text) {
+  const file = path.join(req.abs, `${FILES[kind]}.md`);
+  const existingWiki = fs.existsSync(file) ? wikiRecord(fs.readFileSync(file, 'utf8')) : null;
+  const draftWiki = wikiRecord(text);
+  if (existingWiki && draftWiki && existingWiki !== draftWiki) throw new Error('新版必须保留原 wiki 页面记录；页面变更由 wiki 发布流程处理');
+  return { text: existingWiki && !draftWiki ? `${existingWiki}\n${text}` : text, existingWiki };
+}
 
 export function resumeFinalization(root, { branch, id }) {
   const { req } = readRun(root, branch, id);
@@ -36,10 +46,12 @@ export function resumeFinalization(root, { branch, id }) {
     if (current !== p.before && current !== p.hash) throw new Error('正式产物在收尾中断后被其他操作修改，请先核对并恢复；不会覆盖');
     // 中断期间代码／报告也可能变化：发布前重新检查本轮门禁。
     const getSnapshot = snapshotReader(root, p.run);
-    applyDevEvidence(root, req, p.run, p.checkpoint, p.run.updated_at, { [p.kind]: fs.readFileSync(staged, 'utf8') }, getSnapshot);
-    if (p.kind === 'plan') assertPlanBasis(root, req, p.run, { plan: fs.readFileSync(staged, 'utf8') });
+    const contents = { [p.kind]: fs.readFileSync(staged, 'utf8') };
+    applyDevEvidence(root, req, p.run, p.checkpoint, p.run.updated_at, contents, getSnapshot);
+    if (p.kind === 'requirement') assertRequirement(root, req, p.run, contents);
+    if (p.kind === 'plan') assertPlanBasis(root, req, p.run, contents);
     if (p.kind === 'review' || (isDev(p.run) && p.kind === 'delivery')) {
-      if (p.kind === 'review') assertReview(root, req, p.run, { review: fs.readFileSync(staged, 'utf8') }, getSnapshot);
+      if (p.kind === 'review') assertReview(root, req, p.run, contents, getSnapshot);
       else assertDelivery(root, req, p.run, undefined, getSnapshot);
     }
     if (current !== p.hash) {
@@ -91,11 +103,9 @@ export function finalizeArtifact(root, { branch, id, revision, kind, text, input
   if (!FILES[kind] || typeof text !== 'string') throw new Error('需要有效的产物 kind 和草稿正文');
   const { req } = readRun(root, branch, id);
   const file = path.join(req.abs, `${FILES[kind]}.md`);
-  const wikiRecord = (s) => /^<!-- md-to-wiki: [^\n]*-->/.exec(s)?.[0] ?? null;
-  const existingWiki = fs.existsSync(file) ? wikiRecord(fs.readFileSync(file, 'utf8')) : null;
-  const draftWiki = wikiRecord(text);
-  if (existingWiki && draftWiki && existingWiki !== draftWiki) throw new Error('新版必须保留原 wiki 页面记录；页面变更由 wiki 发布流程处理');
-  if (existingWiki && !draftWiki) text = `${existingWiki}\n${text}`;
+  const draft = artifactDraft(req, kind, text);
+  const { existingWiki } = draft;
+  text = draft.text;
   const digest = hash(text);
   const key = hash(JSON.stringify({ id, revision, kind, digest, input, packet, result }));
   let repeated = null;
@@ -128,6 +138,9 @@ export function finalizeArtifact(root, { branch, id, revision, kind, text, input
       requirement = assertRequirement(root, req, run);
       if (run.steps[run.kind === 'feature' ? 'F3' : 'B3'].status !== 'completed') throw new Error('需求文档尚未完成，不能收尾方案');
     }
+    const documentReview = requiresDocumentReview(run, kind)
+      ? documentReviewEvidence(run, kind, digest, kind === 'plan' ? requirement : documentReviewBasis(root, req, run, kind), packet, result, at)
+      : null;
     if (isDev(run) && kind === 'delivery') assertDelivery(root, req, run, undefined, getSnapshot);
     if ((fs.existsSync(file) ? wikiRecord(fs.readFileSync(file, 'utf8')) : null) !== existingWiki) throw new Error('wiki 发布记录在收尾期间变化，请重新读取后重试');
     const before = fileHash(file);
@@ -135,6 +148,7 @@ export function finalizeArtifact(root, { branch, id, revision, kind, text, input
     const version = before === null ? 1 : oldVersion + (before === digest ? 0 : 1);
     const previous = before !== null && before !== digest ? relative(root, path.join(root, OLD_DIR, path.relative(path.join(root, 'workflow-run/docs/requirements'), req.abs), `${FILES[kind]}_v${oldVersion}.md`)) : null;
     run.artifacts = { ...(run.artifacts ?? {}), [kind]: { hash: digest, version, path: relative(root, file), previous, lint, at,
+      ...(documentReview ? { document_review: documentReview } : {}),
       ...(requirement ? { requirement: { hash: requirement.hash, version: requirement.version } } : {}) } };
     const clarificationChanged = kind === 'clarification' && current.artifacts?.clarification?.hash !== digest;
     if (clarificationChanged || (kind === 'plan' && (current.artifacts?.plan?.hash !== digest || current.artifacts?.plan?.requirement?.hash !== requirement.hash))
@@ -158,7 +172,7 @@ export function finalizeArtifact(root, { branch, id, revision, kind, text, input
     const staged = path.join(root, 'workflow-run/tmp/finalize', `${op}.md`);
     fs.mkdirSync(path.dirname(staged), { recursive: true });
     fs.writeFileSync(staged, text, { flag: 'wx' });
-    return { ...meta, pending_finalization: { id: op, key, run_id: id, revision, kind, before, hash: digest, version, previous, staged: relative(root, staged), run, packet, checkpoint: input } };
+    return { ...meta, pending_finalization: { id: op, key, run_id: id, revision, kind, before, hash: digest, version, previous, staged: relative(root, staged), run, packet: kind === 'review' ? packet : null, checkpoint: input } };
   }, { root, allowFinalization: true });
   if (repeated) return repeated;
   return resumeFinalization(root, { branch, id });

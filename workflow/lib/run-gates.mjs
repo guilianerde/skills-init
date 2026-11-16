@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { FILES, parseBranch } from './artifact-model.mjs';
 import { hash, assertSnapshot, assertWorkingBranch, snapshotReader } from './code-snapshot.mjs';
+import { assertDocumentReview, requiresDocumentReview } from './document-review.mjs';
 
 export const isDev = (run) => ['feature', 'bug'].includes(run.kind);
 export const coreSteps = (run) => run.kind === 'feature' ? ['F3', 'F4', 'F5', 'F6', 'F7', 'F8'] : ['B3', 'B4', 'B5'];
@@ -15,14 +16,24 @@ export function receipt(root, req, run, kind, contents = {}) {
   return record;
 }
 
+export function documentReviewBasis(root, req, run, kind) {
+  if (kind === 'plan') return assertRequirement(root, req, run);
+  return run.artifacts?.clarification ? receipt(root, req, run, 'clarification') : null;
+}
+
 export function assertRequirement(root, req, run, contents) {
-  return receipt(root, req, run, 'requirement', contents);
+  const requirement = receipt(root, req, run, 'requirement', contents);
+  if (requiresDocumentReview(run, 'requirement')) {
+    assertDocumentReview(run, 'requirement', requirement, documentReviewBasis(root, req, run, 'requirement'));
+  }
+  return requirement;
 }
 
 export function assertPlanBasis(root, req, run, contents) {
   const requirement = assertRequirement(root, req, run, contents);
   const plan = receipt(root, req, run, 'plan', contents);
   if (plan.requirement?.hash !== requirement.hash || plan.requirement.version !== requirement.version) throw new Error('方案依据的需求版本已变化，请根据当前 requirement.md 重新收尾方案');
+  assertDocumentReview(run, 'plan', plan, requirement);
   return plan;
 }
 
@@ -101,7 +112,7 @@ export function applyDevEvidence(root, req, run, patch, at, contents = {}, getSn
     if (run.steps[requirementStep].status !== 'completed') throw new Error('需求文档尚未完成，不能进入方案／修复阶段');
   }
   if (run.kind === 'feature') {
-    if (completed('F4')) receipt(root, req, run, 'plan', contents);
+    if (completed('F4')) assertPlanBasis(root, req, run, contents);
     if (patch.stage === 'F6' || completed('F5')) {
       const plan = assertPlan(root, req, run, contents);
       if (run.implementation?.plan !== plan.hash) throw new Error('尚未通过方案门禁进入实现');

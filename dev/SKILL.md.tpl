@@ -21,6 +21,7 @@ description: "Explicitly requested dev workflow for feature development or bug f
 - 生成澄清清单、需求、方案和交付说明时，按 `<skills>/workflow/references/templates.md`「文档模板的两部分」读取生效模板。遵守要求区，只用内容区生成正文。无标记的模板沿用旧格式，边界有误时先修复。
 - 先确定工作分支、已有改动的归属与需求名；切分支重新查询绑定，不替用户丢弃已有改动。
 - 规模由 agent 判定并说明，不询问规模确认；M / L 的需求理解和方案须用户确认后再实现，权限 / 资金至少按 M。
+- 新建 M / L 完整运行（`document_review_policy: 1`）的需求与方案草稿在各自收尾前须经独立子 agent 审查。按 [execution.md 的文档审查](../workflow/references/execution.md#需求与方案审查) 交接；子 agent 不可用时等用户决定是否允许本次自查。S 和升级前已有运行沿用原门禁。
 - F2 先落偏业务场景的 clarification.md，供用户找产品核对；逐轮更新原问题状态、追加新问题和反馈。业务明确并完成现状调研后，再进入 F3 澄清技术约束；最终需求确认后进入 F4。
 - S 快速通道须用户明确同意，且 ≤3 文件、无配置 / SQL / 对外接口 / 表结构 / 权限 / 资金变更，且没有 F2 / F3 已确认的业务决定、本次未发布正式清单且未创建完整流程运行；已有清单或运行沿用完整流程，具体资格见 F4。
 - 快速通道仍编译、测试、当前会话审查，但不 bind、不建运行、不落需求 / 方案 / 审查 / 交付文档；超限或用户要求落盘先停，回 F3（bug 回 B3）补需求文档，再进入方案。
@@ -53,11 +54,11 @@ description: "Explicitly requested dev workflow for feature development or bug f
 
 ### F3 — 需求澄清（偏技术约束）
 
-读 [clarify.md 的 F3](references/clarify.md) 与 [planning.md 的 F3](references/planning.md)；基于已确认业务场景，查清可行性、接口兼容、数据与一致性、权限、依赖及验证条件。事实自己查，需用户取舍的技术约束给推荐并等答复；详细设计留到 F4。发现新业务问题回 F2 更新清单找产品确认。全部明确后，完整流程 finalize requirement.md、完成 F3，再进 F4。
+读 [clarify.md 的 F3](references/clarify.md) 与 [planning.md 的 F3](references/planning.md)；基于已确认业务场景，查清可行性、接口兼容、数据与一致性、权限、依赖及验证条件。事实自己查，需用户取舍的技术约束给推荐并等答复；详细设计留到 F4。发现新业务问题回 F2 更新清单找产品确认。全部明确后，完整流程按文档门禁审查需求草稿，再确认、收尾 requirement.md、完成 F3，进入 F4。
 
 ### F4 — 方案（落盘只看是否快速通道，写法按规模）
 
-读 [planning.md 的 F4](references/planning.md)，复用 F3 已选通道；完整流程基于已收尾需求用 `artifact.mjs finalize --kind plan` 收尾 `plan.md`。方案引用需求文档及版本，只写实现设计、实施与验证计划；涉及 HTTP 接口或接口行为变化时列出接口、AC、测试场景及命令 / 环境。S / M 简版、L 完整版，M / L 确认后记录 approval，再进入实现。
+读 [planning.md 的 F4](references/planning.md)，复用 F3 已选通道；完整流程基于已收尾需求起草方案，按文档门禁审查草稿，再用 `artifact.mjs finalize --kind plan` 收尾 `plan.md`。方案引用需求文档及版本，只写实现设计、实施与验证计划；涉及 HTTP 接口或接口行为变化时列出接口、AC、测试场景及命令 / 环境。S / M 简版、L 完整版，M / L 确认后记录 approval，再进入实现。
 
 ### F5 — 实现
 
@@ -87,11 +88,11 @@ description: "Explicitly requested dev workflow for feature development or bug f
 
 ### B3 — 定位根因
 
-读 [bug.md 的 B3](references/bug.md)；定位根因、形成证据并查同类风险。收尾时判定通道，完整流程先生成独立 requirement.md、完成 B3，再进入修复方案。
+读 [bug.md 的 B3](references/bug.md)；定位根因、形成证据并查同类风险。收尾时判定通道，完整流程按文档门禁审查需求草稿并收尾 requirement.md、完成 B3，再进入修复方案。
 
 ### B4 — 修复与验证
 
-先读 [bug.md 的 B4](references/bug.md) 和 planning.md 的 F4；完整流程在原方案草稿追加修复方案、更新文档头，用 `artifact.mjs finalize --kind plan` 收尾；M / L 确认后记录 approval、implement 再修复，复现测试由红变绿。
+先读 [bug.md 的 B4](references/bug.md) 和 planning.md 的 F4；完整流程在原方案草稿追加修复方案、更新文档头，按文档门禁审查后用 `artifact.mjs finalize --kind plan` 收尾；M / L 确认后记录 approval、implement 再修复，复现测试由红变绿。
 
 ### B5 — 审查与交付
 

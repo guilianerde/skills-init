@@ -26,7 +26,7 @@
 | 只有一两个技术取舍 | 给推荐和依据，能一轮确认就一轮结束 |
 | M / L 规模，或用户要求先把需求问清楚 | 逐轮确认约束，汇总需求、AC、不做什么与决定，等用户确认理解一致再进 F4 |
 
-**F3 的正式产物**：业务与技术约束均明确后，沿用已有绑定和运行、复核规模；没有清单时，完整流程在此 bind、start（stage F3，仅补记实际完成的 Step0、F1、F2）。用 `resolve.mjs template dev requirement-template.md` 读取模板，将目标、范围、AC、当前有效业务决定与必要技术约束写成草稿，在依据中引用业务清单 cite 与版本。通过 `artifact.mjs finalize --kind requirement` 收尾 requirement.md 并将 F3 标 completed，再进入 F4。不因清单发布或产品给了业务答复就跳过技术澄清。
+**F3 的正式产物**：业务与技术约束均明确后，沿用已有绑定和运行、复核规模；没有清单时，完整流程在此 bind、start（stage F3，仅补记实际完成的 Step0、F1、F2）。用 `resolve.mjs template dev requirement-template.md` 读取模板，将目标、范围、AC、当前有效业务决定与必要技术约束写成草稿，在依据中引用业务清单 cite 与版本。按 `clarify.md` 的 F3 审查草稿、确认后，通过 `artifact.mjs finalize --kind requirement` 收尾 requirement.md 并将 F3 标 completed，再进入 F4。不因清单发布或产品给了业务答复就跳过技术澄清。
 
 requirement.md 是需求事实来源，context 只保存续接摘要。业务变化先回 F2 更新清单、复核现状，再到 F3 更新需求文档；仅技术约束变化回 F3；只调整实现设计则更新 F4 的方案。需求重新收尾后，更新依赖它的方案并重新确认 / 验证。历史需求不自动从旧 plan.md 拆出正文；恢复旧运行时先核实并补齐需求文档。
 
@@ -46,6 +46,6 @@ requirement.md 是需求事实来源，context 只保存续接摘要。业务变
 
 **S 规模快速通道（问用户）**：本次已发布正式清单或已创建完整流程运行时，直接沿用完整流程，不再询问快速通道；后续规模降为 S 也不切换。判定为 S 规模，且改动**不涉及**配置项、SQL / DDL、对外接口（HTTP 接口签名、MQ 消息体、对外 DTO）、表结构、权限、资金，也没有 F2 / F3 中确认过的业务决定，且本次尚未发布正式清单、尚未创建完整流程运行时，**明确询问用户是否走快速通道**：说明走快速通道时 F5～F6 照常（编译、测试都不省），审查按 F7 的快速通道说明在当前会话做，但**不绑定需求、不落任何产物文件**——方案、`review.md`、交付说明都不写（运行反馈仍照常记一行），F8 在对话里一次交付并注明 DocNexus「未询问」。**问完等本轮答复再继续：明确同意才走快速通道；拒绝或答复没有明确同意，就按完整流程落盘交付（F3 需求 → F4 方案 → F7 审查 → F8 交付）。** 实现中一旦碰到上面任何一项、改动超过 3 个文件，或用户要求落盘 → 退出快速通道：先停下后续实现，重新评估并说明规模，按 Artifact Location 绑定需求，先回 F3（缺陷回 B3）补写并 finalize requirement.md，再到 F4 / B4 补方案；M / L 等用户确认方案后再继续，S 按简版方案推进。之后回 F5 完成实现、F6 验证、F7 审查并生成 `review.md`，交报告后等待用户选择交付，不从绑定直接跳到审查或交付。快速通道只省落盘与沉淀询问，不省审查。
 
-**方案一律落盘（走快速通道除外）**：S / M / L 都写方案文档，规模只决定详细程度和确认方式。方案模板：在项目根运行 `node <skills>/workflow/scripts/resolve.mjs template dev plan-template.md`，读输出的 `path`。方案草稿通过 `<skills>/workflow/references/execution.md` 的 `artifact.mjs finalize --kind plan` 自检、归档并登记 F4；M / L 等用户确认并 save approval 后再进入 F5，S 无需 approval（方案按简版写）。尚未创建本次完整流程运行、且符合快速通道全部条件的 S，按上文询问一次；已经发布清单或创建运行的 S 直接落简版方案，不重复询问快速通道。
+**方案一律落盘（走快速通道除外）**：S / M / L 都写方案文档，规模只决定详细程度和确认方式。方案模板：在项目根运行 `node <skills>/workflow/scripts/resolve.mjs template dev plan-template.md`，读输出的 `path`。草稿按 `<skills>/workflow/references/execution.md` 的「需求与方案审查」完成适用审查，再用 `artifact.mjs finalize --kind plan` 自检、归档并登记 F4；M / L 等用户确认并 save approval 后再进入 F5，S 无需 approval（方案按简版写）。尚未创建本次完整流程运行、且符合快速通道全部条件的 S，按上文询问一次；已经发布清单或创建运行的 S 直接落简版方案，不重复询问快速通道。
 
 **HTTP 接口验证计划**：涉及新增 / 修改 HTTP 接口，或参数校验、鉴权、状态码、响应结构及接口业务行为变化时，在验证计划列出方法、路径、关联 AC 与待测场景：正常请求、参数错误（有入参约束时），以及适用的未登录 / 无权限场景。沿用现有框架，明确已有用例如何复用、哪些需要补充、执行命令和环境；F6 按计划编写并执行。纯内部重构且接口行为不变、已有覆盖充分时只列现有测试，不另建重复用例。缺陷修复在 B4 使用相同规则。
