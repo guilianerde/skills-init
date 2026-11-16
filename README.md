@@ -56,3 +56,5 @@ npx @rowansenne/workflow-run@latest seed-templates --update # 补入模板并更
 [安装与升级](docs/installation.md) · [工作流与命令](docs/workflows.md) · [外部能力集成](docs/integrations.md) · [团队指南](docs/team-guide.md) · [维护与发布](docs/development.md) · [更新记录](CHANGELOG.md)
 
 [架构图解](docs/architecture.html) · [分步安装教程](docs/full-install.html)
+
+架构演进方案（待实施）：[整体开发目标](docs/workflow-control-roadmap.md) · [第一阶段：公共核心与 Skills 接入](docs/workflow-core-phase-one.md)
