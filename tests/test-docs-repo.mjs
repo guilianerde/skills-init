@@ -61,7 +61,7 @@ test('文档仓库克隆到 workflow-run/：先要项目名（只配一次），
   let r = p.req('which');
   assert.equal(r.code, 2);
   assert.deepEqual([r.out.mode, r.out.need_project, r.out.suggested_project], ['repo', true, 'order-service']);
-  assert.equal(p.req('path', 'delivery').code, 2);
+  assert.equal(p.req('path', 'delivery').code, 1, '旧 path 入口已删除');
 
   p.req('config', '--project', 'order-service');
   const profile = JSON.parse(fs.readFileSync(path.join(p.root, '.agents/skills/workflow/profile.json'), 'utf8'));
@@ -71,12 +71,14 @@ test('文档仓库克隆到 workflow-run/：先要项目名（只配一次），
 
   r = p.req('bind', '--name', '订单导出支持按渠道筛选');
   assert.equal(r.out.dir, 'workflow-run/docs/requirements/订单导出支持按渠道筛选/order-service');
-  r = p.req('path', 'delivery').out;
-  assert.equal(r.path, 'workflow-run/docs/requirements/订单导出支持按渠道筛选/order-service/delivery.md');
-  assert.equal(r.cite, 'team-docs:docs/requirements/订单导出支持按渠道筛选/order-service/delivery.md');
-  p.put(r.path, doc('交付', 'feature/order-export'));
-  const meta = JSON.parse(fs.readFileSync(path.join(p.docs, 'docs/requirements/订单导出支持按渠道筛选/order-service/meta.json'), 'utf8'));
+  const file = 'workflow-run/docs/requirements/订单导出支持按渠道筛选/order-service/delivery.md';
+  p.put(file, doc('交付', 'feature/order-export'));
+  const metaFile = path.join(p.docs, 'docs/requirements/订单导出支持按渠道筛选/order-service/meta.json');
+  const meta = JSON.parse(fs.readFileSync(metaFile, 'utf8'));
   assert.equal(meta.project, 'order-service');
+  meta.versions = { delivery: 1 };
+  fs.writeFileSync(metaFile, `${JSON.stringify(meta, null, 2)}\n`);
+  assert.equal(p.req('reindex').code, 0);
   assert.equal(p.run('resolve.mjs', 'status').out.artifacts.mode, 'repo');
 
   // 升级后代码仓库忽略整个 workflow-run/
@@ -86,29 +88,31 @@ test('文档仓库克隆到 workflow-run/：先要项目名（只配一次），
   fs.rmSync(ws, { recursive: true, force: true });
 });
 
-test('写完提示提交：sync 输出 commit（文件、建议信息、命令），提交后清空；个人可用 --local 关闭提示', () => {
+test('写完提示提交：pending 输出文件、建议信息和命令，提交后清空；个人可用 --local 关闭提示', () => {
   const { ws, project } = workspace();
   const p = project('order-service', 'feature/order-export', { clone: true });
   p.req('config', '--project', 'order-service');
   p.req('bind', '--name', '订单导出');
-  const { path: f } = p.req('path', 'review').out;
+  const f = 'workflow-run/docs/requirements/订单导出/order-service/review.md';
   p.put(f, doc('审查', 'feature/order-export'));
-  let s = p.req('sync', f).out;
-  assert.deepEqual(s.commit.files.sort(), ['docs/requirements/订单导出/order-service/meta.json', 'docs/requirements/订单导出/order-service/review.md']);
-  assert.equal(s.commit.suggested_message, 'docs(订单导出): order-service 审查报告');
-  assert.equal(s.commit.commands.length, 2);
-  for (const c of s.commit.commands) assert.equal(spawnSync('sh', ['-c', c.replace('git -C', `git ${G.join(' ')} -C`)], { cwd: p.root }).status, 0, c);
+  const metaFile = path.join(p.docs, 'docs/requirements/订单导出/order-service/meta.json');
+  const meta = JSON.parse(fs.readFileSync(metaFile, 'utf8'));
+  meta.versions = { review: 1 };
+  fs.writeFileSync(metaFile, `${JSON.stringify(meta, null, 2)}\n`);
+  assert.equal(p.req('reindex').code, 0);
+  let s = p.req('pending').out;
+  assert.deepEqual(s.files.sort(), ['docs/requirements/订单导出/order-service/meta.json', 'docs/requirements/订单导出/order-service/review.md']);
+  assert.equal(s.suggested_message, 'docs(订单导出): order-service 审查报告');
+  assert.equal(s.commands.length, 2);
+  for (const c of s.commands) assert.equal(spawnSync('sh', ['-c', c.replace('git -C', `git ${G.join(' ')} -C`)], { cwd: p.root }).status, 0, c);
   assert.equal(p.docsGit('log', '-1', '--format=%s').stdout.trim(), 'docs(订单导出): order-service 审查报告');
-  assert.equal(p.req('sync', f).out.commit, null, '提交后没有待提交的');
   assert.deepEqual(p.req('pending').out.files, []);
 
-  p.put(p.req('path', 'review').out.path, doc('复审', 'feature/order-export'));
+  p.put(f, doc('复审', 'feature/order-export'));
+  assert.equal(p.req('reindex').code, 0);
   p.req('config', '--commit-prompt', 'off', '--local');
-  assert.equal(p.req('sync').out.commit, null, '关闭后不提示');
-  // 复审后旧版移到 tmp/old-artifacts/：文档仓库里是新版 + meta.json + 旧版的删除
-  assert.deepEqual(p.req('pending').out.files.sort(), ['docs/requirements/订单导出/order-service/meta.json', 'docs/requirements/订单导出/order-service/review.md'], 'pending 照样能看到');
-  assert.ok(fs.existsSync(path.join(p.docs, 'tmp/old-artifacts/订单导出/order-service/review_v1.md')));
-  assert.equal(p.docsGit('check-ignore', '-q', 'tmp/old-artifacts/订单导出/order-service/review_v1.md').status, 0, '归档的上一版不进文档仓库');
+  assert.equal(p.req('pending').out.commit_prompt, false, '关闭后仍可查询，但不提示提交');
+  assert.deepEqual(p.req('pending').out.files.sort(), ['docs/requirements/订单导出/order-service/review.md'], 'pending 照样能看到正文变化');
   const local = path.join(p.root, '.agents/skills/workflow/profile.local.json');
   assert.deepEqual(JSON.parse(fs.readFileSync(local, 'utf8')).artifacts, { commit_prompt: false });
   assert.equal(spawnSync('git', ['check-ignore', '-q', local], { cwd: p.root }).status, 0, '个人设置不提交');
@@ -121,7 +125,13 @@ test('跨服务需求：其他项目在 which 里看到已有需求（推送后�
   const a = project('order-service', 'feature/order-export', { clone: true });
   a.req('config', '--project', 'order-service');
   a.req('bind', '--name', '订单导出');
-  a.put(a.req('path', 'delivery').out.path, doc('订单服务交付', 'feature/order-export'));
+  const aFile = 'workflow-run/docs/requirements/订单导出/order-service/delivery.md';
+  a.put(aFile, doc('订单服务交付', 'feature/order-export'));
+  const aMetaFile = path.join(a.docs, 'docs/requirements/订单导出/order-service/meta.json');
+  const aMeta = JSON.parse(fs.readFileSync(aMetaFile, 'utf8'));
+  aMeta.versions = { delivery: 1 };
+  fs.writeFileSync(aMetaFile, `${JSON.stringify(aMeta, null, 2)}\n`);
+  assert.equal(a.req('reindex').code, 0);
   a.docsGit('add', '-A'); a.docsGit('commit', '-q', '-m', 'docs'); a.docsGit('push', '-q', 'origin', 'HEAD:main');
 
   const b = project('pay-service', 'feature/export-pay', { clone: true });
@@ -130,7 +140,13 @@ test('跨服务需求：其他项目在 which 里看到已有需求（推送后�
   assert.deepEqual(w.other_projects.map((x) => [x.name, x.projects]), [['订单导出', ['order-service']]]);
   const r = b.req('bind', '--name', '订单导出').out;
   assert.deepEqual([r.dir, r.joined, r.created], ['workflow-run/docs/requirements/订单导出/pay-service', true, true]);
-  b.put(b.req('path', 'delivery').out.path, doc('支付服务交付', 'feature/export-pay'));
+  const bFile = 'workflow-run/docs/requirements/订单导出/pay-service/delivery.md';
+  b.put(bFile, doc('支付服务交付', 'feature/export-pay'));
+  const bMetaFile = path.join(b.docs, 'docs/requirements/订单导出/pay-service/meta.json');
+  const bMeta = JSON.parse(fs.readFileSync(bMetaFile, 'utf8'));
+  bMeta.versions = { delivery: 1 };
+  fs.writeFileSync(bMetaFile, `${JSON.stringify(bMeta, null, 2)}\n`);
+  assert.equal(b.req('reindex').code, 0);
   assert.deepEqual(fs.readdirSync(path.join(b.docs, 'docs/requirements/订单导出')).sort(), ['order-service', 'pay-service']);
 
   const v = b.run('view.mjs', '--out', 'workflow-run/tmp/v.html');

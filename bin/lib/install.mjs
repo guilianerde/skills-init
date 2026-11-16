@@ -5,7 +5,7 @@ import path from 'node:path';
 import { TPL_DIR, PKG, CANON_DIR, INSTALL_BASES, SKILLS, SKILL_LIST, USER_FILES, MANIFEST, ok, warn, fail, readJson, walk, toPosix, sameFile, writeFile, render, sha256, fileHash, readManifest, removeEmptyDirs, lstat, timestamp, removeLink, HOME } from './core.mjs';
 import { writeDbConfig } from './db.mjs';
 import { linkPointsTo } from './uninstall.mjs';
-import { layout, ensureIgnore, homeIsRepo, migrateLayout, IGNORE_LINE, TMP_DIR } from '../../workflow/scripts/requirement.mjs';
+import { layout, ensureIgnore, homeIsRepo, IGNORE_LINE, TMP_DIR } from '../../workflow/scripts/requirement.mjs';
 import { detectEnv } from '../../workflow/lib/project.mjs';
 import { rotate as rotateFeedback, ensureUnionMerge } from '../../workflow/scripts/feedback.mjs';
 
@@ -268,23 +268,23 @@ export function excludeHomeTmp(root) {
 export function setupHome(root) {
   if (ensureIgnore(root)) ok(`.ignore 已加上 ${IGNORE_LINE}（需求产物不参与代码搜索）`);
   excludeHomeTmp(root);
-  const L = layout(root);
-  if (L.mode === 'repo' && !L.ok) warn(`${HOME}/ 是独立的文档仓库，还没配置本项目的项目名：${L.hint}`);
-  reportMigration(migrateLayout(root));
+  try {
+    const L = layout(root);
+    if (L.mode === 'repo' && !L.ok) warn(`${HOME}/ 是独立的文档仓库，还没配置本项目的项目名：${L.hint}`);
+  } catch (error) {
+    if (error.code !== 'PROJECT_CONFIG_AMBIGUOUS') throw error;
+    warn(`${error.message}；安装已完成，但依赖项目配置的核心操作会暂停，直到明确权威 profile 来源（Issue #5）`);
+  }
   // 运行反馈只收当前版本的：装了新版本就清掉本项目旧版本的记录（随 workflow-run/ 提交过的，git 历史里仍可找回）
-  const removed = rotateFeedback(root, PKG.version);
+  let removed = 0;
+  try {
+    removed = rotateFeedback(root, PKG.version);
+  } catch (error) {
+    if (error.code !== 'PROJECT_CONFIG_AMBIGUOUS') throw error;
+    warn('运行反馈轮换已跳过：先解决多个 profile 副本的权威来源（Issue #5）');
+  }
   const attr = ensureUnionMerge(root);
   if (attr?.action === 'added') ok(`${attr.file} 已加上 ${attr.rule}（文档仓库里运行反馈多分支合并时保留两边的记录）`);
   if (attr?.action === 'removed') ok(`${attr.file} 已去掉 ${attr.rule}（随代码提交时不再改代码仓库的 .gitattributes）；改动需要你提交`);
   if (removed) ok(`运行反馈：已清空旧版本的 ${removed} 条记录（${HOME}/feedback/），从这一版重新收集；改动需要你提交`);
-}
-
-// 旧结构（<需求>/ 下直接放文件）迁到 <需求>/<项目名>/ 的结果
-export function reportMigration(r) {
-  if (r.moved.length) {
-    const reqs = [...new Set(r.moved.map((m) => path.posix.dirname(m.from)))];
-    ok(`需求产物已迁到新结构 <需求>/${r.project}/（${reqs.length} 个需求、${r.moved.length} 个文件，被 git 跟踪的用 git mv）：${reqs.join('、')}`);
-    ok(`项目名 ${r.project} 记在 workflow/profile.json；迁移的改动（含 profile.json）需要你提交`);
-  }
-  for (const s of r.skipped) warn(`${s.dir} 没有迁移：${s.reason}。处理后重跑 npx @rowansenne/workflow-run upgrade`);
 }

@@ -9,8 +9,8 @@ import { once } from 'node:events';
 import { fileURLToPath } from 'node:url';
 import { useLocalDocNexus } from './helpers/docnexus-pkg.mjs';
 import vm from 'node:vm';
-import { bind, sync, which } from '../workflow/scripts/requirement.mjs';
-import { startRun, changeRun, runState, FLOWS } from '../workflow/scripts/run.mjs';
+import { bind, reindex, reindexRequirement, which } from '../workflow/scripts/requirement.mjs';
+import { startRun, changeRun, runState, FLOWS } from '../workflow/lib/runs.mjs';
 import { branchView } from '../workflow/scripts/artifacts.mjs';
 import { viewData, renderHtml } from '../workflow/scripts/view.mjs';
 import { readMeta, updateMeta } from '../workflow/scripts/meta-store.mjs';
@@ -37,13 +37,13 @@ function seedLock(lock, pid, old = false) {
   return owner;
 }
 
-test('运行保存在同一 meta.json；sync / which / 重新 bind 均保留上下文、已完成步骤与其他扩展字段', (t) => {
+test('运行保存在同一 meta.json；reindex / which / 重新 bind 均保留上下文、已完成步骤与其他扩展字段', (t) => {
   const f = fixture(t);
   let run = f.plan(f.start());
   run = f.save(run, { approval: { confirmed: true }, stage: 'F5', steps: { F4: { status: 'completed', evidence: ['plan.md 自检通过'] } }, context: { remaining: ['实现分页'] } });
   updateMeta(f.file, (meta) => ({ ...meta, extension: { keep: true } }), { root: f.root });
   f.put('plan.md');
-  sync(f.root, f.req.dir);
+  reindex(f.root, { branch: BRANCH });
   which(f.root, BRANCH);
   bind(f.root, { name: '订单导出', branch: 'fix/order' });
   const meta = JSON.parse(fs.readFileSync(f.file));
@@ -121,7 +121,7 @@ test('步骤 / 等待 / 阻塞校验拒绝不完整状态；不根据 Markdown �
   assert.throws(() => f.save(run, { status: 'completed' }), /complete/);
   for (const status of ['', null, 0]) assert.throws(() => f.save(run, { status }), /状态只支持/);
   for (const name of ['plan.md', 'review.md', 'delivery.md']) f.put(name);
-  sync(f.root, f.req.dir);
+  reindex(f.root, { branch: BRANCH });
   assert.equal(runState(f.root, BRANCH).current.status, 'running');
   assert.equal(runState(f.root, BRANCH).current.steps.F8.status, 'pending');
 });
@@ -197,11 +197,11 @@ test('元信息锁阻止并发覆盖，异常释放锁；损坏 JSON 不会被�
   const original = fs.readFileSync(f.file, 'utf8');
   const lock = lockOf(f.root, f.file);
   seedLock(lock, process.pid);
-  assert.throws(() => sync(f.root, f.req.dir), /正在写入/);
+  assert.throws(() => reindex(f.root, { branch: BRANCH }), /正在写入/);
   assert.equal(fs.readFileSync(f.file, 'utf8'), original);
   fs.rmSync(lock, { recursive: true });
   fs.writeFileSync(f.file, '{invalid');
-  assert.throws(() => sync(f.root, f.req.dir), /不是合法 JSON/);
+  assert.throws(() => reindexRequirement(f.root, f.req.dir), /不是合法 JSON/);
   assert.equal(fs.readFileSync(f.file, 'utf8'), '{invalid');
   assert.equal(fs.existsSync(lock), false);
 });
@@ -210,7 +210,7 @@ test('写锁不落在需求目录：崩溃残留不会随产物提交；陈旧�
   const f = fixture(t);
   const lock = lockOf(f.root, f.file);
   // 正常写入后需求目录只剩 meta.json，锁和临时文件都在 workflow-run/tmp/ 下
-  sync(f.root, f.req.dir);
+  reindex(f.root, { branch: BRANCH });
   assert.deepEqual(fs.readdirSync(path.dirname(f.file)), ['meta.json']);
   assert.ok(lock.startsWith(path.join(f.root, 'workflow-run/tmp/')), lock);
   // 写入进程已死且锁过期 → 清理后继续，不再永久卡死

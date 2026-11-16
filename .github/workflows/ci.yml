@@ -1,0 +1,55 @@
+name: CI
+
+on:
+  push:
+    branches: [main, 'codex/**']
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: ${{ matrix.os }} / Node ${{ matrix.node }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            node: 22
+            scope: full
+          - os: ubuntu-latest
+            node: 24
+            scope: full
+          - os: windows-latest
+            node: 22
+            scope: core
+    env:
+      WORKFLOW_RUN_ADMIN: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - run: npm ci
+      - name: Full test suite
+        if: matrix.scope == 'full'
+        run: npm test
+      - name: Package install test
+        if: matrix.scope == 'full'
+        run: npm run test:package
+      - name: Windows core suite
+        if: matrix.scope == 'core'
+        shell: bash
+        run: >-
+          node --test
+          tests/test-workflow-core.mjs
+          tests/test-workspace-read.mjs
+          tests/test-requirement.mjs
+          tests/test-docs-repo.mjs
+          tests/test-flow-gates.mjs
+          tests/test-review-scope.mjs
+          tests/test-run.mjs
+          tests/test-document-sources.mjs

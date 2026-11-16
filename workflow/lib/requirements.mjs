@@ -13,55 +13,77 @@ const relOf = (root, abs) => path.relative(root, abs).split(path.sep).join('/');
 const toPosix = (p) => p.split(path.sep).join('/');
 const now = () => new Date().toISOString();
 const isDir = (p) => { try { return fs.statSync(p).isDirectory(); } catch { return false; } };
-const skipDir = (d) => !d.isDirectory() || d.name.startsWith('.');
 
 // 同种产物只留最新版，文件名固定（review.md、tech-doc.md …），文档里的引用不会失效。版本号记在 meta.json 的 versions。
-// path 时把当前版复制到 workflow-run/tmp/old-artifacts/<需求目录（相对 requirements/）>/<种类>_v<N>.md（不提交），
-// 写完 sync <path> 时新版内容和这份副本不同才算新版本（versions 加一）；没写就放弃的话版本号不变
 export const OLD_DIR = `${TMP_DIR}/old-artifacts`;
 export const archivePath = (root, dirAbs, kind, v) => path.join(root, OLD_DIR, path.relative(path.join(root, REQ_DIR), dirAbs), `${FILES[kind]}_v${v}.md`);
-const versionsOf = (dirAbs) => readJson(path.join(dirAbs, 'meta.json'))?.versions ?? {};
 
-export function indexArtifacts(dir, versions = {}) {
+export function indexArtifacts(dir, versions = {}, { requireVersion = false } = {}) {
   return fs.readdirSync(dir).map((name) => {
     const p = parseFile(name);
     if (!p) return null;
     const text = fs.readFileSync(path.join(dir, name), 'utf8');
-    return { kind: p.kind, version: name === `${FILES[p.kind]}.md` ? versions[p.kind] ?? 1 : p.version, file: name, branch: parseBranch(text), date: headerDate(text), wiki: parseWiki(text), docnexus: parseDocnexus(text) };
+    const fixed = name === `${FILES[p.kind]}.md`;
+    const registered = !fixed || Object.hasOwn(versions, p.kind);
+    return {
+      kind: p.kind,
+      version: fixed ? (registered ? versions[p.kind] : null) : p.version,
+      file: name,
+      branch: parseBranch(text),
+      date: headerDate(text),
+      wiki: parseWiki(text),
+      docnexus: parseDocnexus(text),
+      ...(requireVersion && !registered ? { registered: false } : {}),
+    };
   }).filter(Boolean).sort((a, b) => Object.keys(FILES).indexOf(a.kind) - Object.keys(FILES).indexOf(b.kind) || a.version - b.version);
 }
 
-// 按目录里的文件重建 meta.json（保留需求名、分支、创建时间）
-// bump：写完新版后（sync <path>）确认新版本——和 path 时归档的上一版副本内容不同就把版本号加一，返回归档了哪些
-export function sync(root, dirRel, { bump = false } = {}) {
+// 只重建派生索引。versions、runs、绑定、批准和证据均保持原值；版本无法确认时标为未登记。
+export function reindexRequirement(root, dirRel) {
   const dir = path.resolve(root, dirRel);
   const f = path.join(dir, 'meta.json');
-  const archived = [];
   const result = updateMeta(f, (old) => {
     const versions = { ...(old.versions ?? {}) };
-    if (bump) {
-      for (const kind of Object.keys(FILES)) {
-        const cur = path.join(dir, `${FILES[kind]}.md`);
-        const v = versions[kind] ?? 1;
-        const arc = archivePath(root, dir, kind, v);
-        if (!fs.existsSync(cur) || !fs.existsSync(arc) || fs.readFileSync(arc).equals(fs.readFileSync(cur))) continue;
-        versions[kind] = v + 1;
-        archived.push({ kind, version: v, file: relOf(root, arc) });
-      }
-    }
-    const artifacts = indexArtifacts(dir, versions);
-    const branches = old.branches ?? []; // 绑定只由 bind 更新；文档头不隐式修改需求归属。
+    const artifacts = indexArtifacts(dir, versions, { requireVersion: true });
     const latest = Object.fromEntries(Object.keys(FILES).map((k) => [k, artifacts.filter((a) => a.kind === k).at(-1)?.file ?? null]));
-    // 内容没变就不写（meta.json 随需求目录提交，避免无谓的改动）；产物有变化才更新 updated
-    const changed = JSON.stringify(old.artifacts ?? null) !== JSON.stringify(artifacts) || JSON.stringify(old.branches ?? null) !== JSON.stringify(branches);
+    const changed = JSON.stringify(old.artifacts ?? null) !== JSON.stringify(artifacts);
     const meta = {
       ...old,
-      name: old.name ?? path.basename(dir), named_by: old.named_by ?? 'user', ...(old.project ? { project: old.project } : {}), branches, base: old.base ?? null,
-      created: old.created ?? now(), updated: changed || !old.updated ? now() : old.updated, latest, ...(Object.keys(versions).length ? { versions } : {}), artifacts,
+      latest,
+      ...(Object.keys(versions).length ? { versions } : {}),
+      artifacts,
+      indexed_at: changed || !old.indexed_at ? now() : old.indexed_at,
     };
     return meta;
   }, { root });
-  return bump ? { ...result, archived } : result;
+  return {
+    ...result,
+    unregistered: result.artifacts.filter((artifact) => artifact.registered === false),
+  };
+}
+
+export function reindex(root, { branch = null, all = false } = {}) {
+  const L = layout(root);
+  const targets = all ? requirements(root, L) : [find(root, branch, L)].filter(Boolean);
+  if (!all && !targets.length) throw new Error('当前分支没有绑定需求');
+  const results = [];
+  for (const target of targets) {
+    try {
+      const meta = reindexRequirement(root, target.dir);
+      results.push({
+        ok: true,
+        dir: target.dir,
+        artifacts: meta.artifacts.length,
+        latest: meta.latest,
+        versions: meta.versions ?? {},
+        unregistered: meta.unregistered.map(({ kind, file }) => ({ kind, file })),
+      });
+    } catch (error) {
+      if (!all) throw error;
+      results.push({ ok: false, dir: target.dir, error: error.message });
+    }
+  }
+  return all ? { ok: results.every((entry) => entry.ok), results } : results[0];
 }
 
 const notReady = (L) => ({ ok: false, mode: L.mode, ...(L.need_project ? { need_project: true, suggested_project: L.suggested_project } : {}), hint: L.hint });
@@ -71,7 +93,7 @@ export function which(root, branch) {
   if (!L.ok) return notReady(L);
   const r = find(root, branch, L);
   const where = L.mode === 'repo' ? { mode: 'repo', repo: L.repo_rel, project: L.project } : { mode: 'project', project: L.project };
-  if (r) return { bound: true, ...where, branch, name: r.name, dir: r.dir, meta: r.meta.pending_finalization ? r.meta : sync(root, r.dir) };
+  if (r) return { bound: true, ...where, branch, name: r.name, dir: r.dir, meta: r.meta };
   const recent = requirements(root, L).sort((a, b) => String(b.updated).localeCompare(String(a.updated))).slice(0, 5).map(({ name, dir, branches, updated }) => ({ name, dir, branches, updated }));
   // 其他项目已有的需求（跨服务需求，本项目可以用同一个名字加入）；文档仓库里常见，随代码提交时一般没有
   const mine = new Set(requirements(root, L).map((x) => x.slug));
@@ -111,29 +133,7 @@ export function bind(root, { name = null, branch, base = null }) {
     return value;
   }, { root });
   const rel = relOf(root, dir);
-  return { ok: true, mode: L.mode, created: !existedHere, joined: !!target && !existedHere, name: meta.name, named_by: meta.named_by, dir: rel, project: L.project, branches: sync(root, rel).branches };
-}
-
-// 本次落盘路径：文件名固定（review.md …），已有时先把当前版复制到 tmp/old-artifacts/<种类>_v<N>.md（previous，复审对照用），
-// 并带上它第一行的 wiki 发布记录；新版直接写到 path（覆盖当前版），写完 sync <path> 确认版本号
-export function nextPath(root, kind, branch) {
-  if (!FILES[kind]) return { code: 1, out: { ok: false, error: `未知产物种类「${kind}」：${Object.keys(FILES).join(' / ')}` } };
-  const L = layout(root);
-  if (!L.ok) return { code: 2, out: notReady(L) };
-  const r = find(root, branch, L);
-  if (!r) return { code: 2, out: { ok: false, ...which(root, branch) } };
-  if (r.meta.pending_finalization) return { code: 1, out: { ok: false, hint: `产物收尾尚未完成，先运行 artifact.mjs resume --id ${r.meta.pending_finalization.run_id}` } };
-  const abs = path.join(r.abs, `${FILES[kind]}.md`);
-  let v = 1; let previous = null; let record = null;
-  if (fs.existsSync(abs)) {
-    const cur = versionsOf(r.abs)[kind] ?? 1;
-    const arc = archivePath(root, r.abs, kind, cur);
-    fs.mkdirSync(path.dirname(arc), { recursive: true });
-    fs.copyFileSync(abs, arc);
-    v = cur + 1; previous = relOf(root, arc);
-    record = /^<!-- md-to-wiki: [^\n]*-->/.exec(fs.readFileSync(abs, 'utf8'))?.[0] ?? null;
-  }
-  return { code: 0, out: { ok: true, mode: L.mode, name: r.name, dir: r.dir, path: relOf(root, abs), cite: L.ref(abs), version: v, previous, wiki_record: record } };
+  return { ok: true, mode: L.mode, created: !existedHere, joined: !!target && !existedHere, name: meta.name, named_by: meta.named_by, dir: rel, project: L.project, branches: meta.branches };
 }
 
 export function list(root) {
@@ -172,53 +172,4 @@ export function pending(root, branch, dirRel = null) {
     commands: files.length ? [`git -C ${JSON.stringify(L.repo_rel)} add -- ${JSON.stringify(inRepo)}`, `git -C ${JSON.stringify(L.repo_rel)} commit -m ${JSON.stringify(message)}`] : [],
     ...(kn.length ? { knowledge_files: kn, knowledge_commands: [`git -C ${JSON.stringify(L.repo_rel)} add -- docnexus`, `git -C ${JSON.stringify(L.repo_rel)} commit -m "knowledge: <沉淀了什么>"`] } : {}),
   };
-}
-
-// ------------------------------------------------------------------ 旧结构迁移
-// 旧版本随代码提交时没有 <项目名>/ 这一层：文件直接放在 docs/requirements/<需求>/ 下。
-// 列出这样的需求目录（目录里直接有文件的；隐藏文件不算）
-export function legacyRequirements(root) {
-  const base = path.join(root, REQ_DIR);
-  if (!isDir(base)) return [];
-  return fs.readdirSync(base, { withFileTypes: true }).filter((d) => !skipDir(d)).map((d) => d.name)
-    .filter((slug) => fs.readdirSync(path.join(base, slug), { withFileTypes: true }).some((e) => e.isFile() && !e.name.startsWith('.')));
-}
-
-// 把旧结构的需求目录挪到 <需求>/<项目名>/：被 git 跟踪的用 git mv（保留历史），其余直接移动；
-// tmp/old-artifacts/<需求>/ 下归档的上一版也一起挪，复审对照还能找到。
-// 目标里已有同名文件时这个需求整个跳过，留给用户处理。项目名没配置时按 layout 自动取的写进 profile.json。
-// 返回 { project, moved: [{ from, to }], skipped: [{ dir, reason }] }
-export function migrateLayout(root) {
-  const L = layout(root);
-  const slugs = legacyRequirements(root);
-  if (!slugs.length) return { project: L.project, moved: [], skipped: [] };
-  if (!L.project) return { project: null, moved: [], skipped: slugs.map((s) => ({ dir: `${REQ_DIR}/${s}`, reason: '还没配置项目名' })) };
-  const repoOf = (abs) => (L.mode === 'repo' ? L.repo : root);
-  const tracked = (abs) => git(repoOf(abs), ['ls-files', '--error-unmatch', '--', path.relative(repoOf(abs), abs)]).status === 0;
-  const moved = []; const skipped = [];
-  const move = (from, to, useGit) => {
-    fs.mkdirSync(path.dirname(to), { recursive: true });
-    const cwd = repoOf(from);
-    if (useGit && tracked(from) && git(cwd, ['mv', '--', path.relative(cwd, from), path.relative(cwd, to)]).status === 0) return;
-    fs.renameSync(from, to);
-  };
-  for (const slug of slugs) {
-    const dir = path.join(L.base, slug);
-    const files = fs.readdirSync(dir, { withFileTypes: true }).filter((e) => e.isFile() && !e.name.startsWith('.')).map((e) => e.name);
-    const target = path.join(dir, L.project);
-    const clash = files.filter((f) => fs.existsSync(path.join(target, f)));
-    if (clash.length) { skipped.push({ dir: relOf(root, dir), reason: `${relOf(root, target)} 里已有 ${clash.join('、')}` }); continue; }
-    for (const f of files) {
-      move(path.join(dir, f), path.join(target, f), true);
-      moved.push({ from: relOf(root, path.join(dir, f)), to: relOf(root, path.join(target, f)) });
-    }
-    const m = readJson(path.join(target, 'meta.json'));
-    if (m && m.project !== L.project) fs.writeFileSync(path.join(target, 'meta.json'), `${JSON.stringify({ ...m, project: L.project }, null, 2)}\n`);
-    const old = path.join(root, OLD_DIR, slug);
-    if (isDir(old)) {
-      for (const e of fs.readdirSync(old, { withFileTypes: true })) if (e.isFile()) move(path.join(old, e.name), path.join(old, L.project, e.name), false);
-    }
-  }
-  if (moved.length && !L.project_configured && fs.existsSync(path.join(profileDir(root), 'profile.json'))) setConfig(root, { project: L.project });
-  return { project: L.project, moved, skipped };
 }

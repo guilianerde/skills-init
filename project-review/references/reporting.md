@@ -19,7 +19,7 @@
 交付报告后先判断本次发现里有没有**特别值得记录**的内容：同类问题再次出现（知识库里已有类似沉淀，或本次多处出现）、新确立的编码约定、容易踩的坑。没有 → 不提沉淀，报告的「DocNexus」元信息行写「无需沉淀」；有 → 明确问用户「要不要启动 DocNexus 流程，把本次审查沉淀到 DocNexus？」，并列出建议沉淀的内容；发起询问时将报告元信息改成「未沉淀」，入库成功后再写知识路径。
    - 用户同意 → 按 DocNexus 入口 skill `docnexus` 的 capture 流程写入；正文只写知识，不写分支、路径；有 facts 时按 `<skills>/workflow/references/docnexus.md`「沉淀的来源」的格式写 provenance；分类用 `node <skills>/workflow/scripts/resolve.mjs category project-review` 的结果作为调用方显式分类封存（见 `<skills>/workflow/references/docnexus.md`「写入 DocNexus 的分类」）。只沉淀问题模式和约定，不沉淀某次审查的逐条清单，也不沉淀「⚠ 待确认」的发现；知识库已有同类沉淀时更新那一篇（带 `--base-version`），不要重复新建。写入成功后把报告的「DocNexus」元信息行改成 `workflow-run/docnexus/library/<path>`（多篇用「、」分隔），并回报给用户。
    - 用户不同意 → 元信息行保持「未沉淀」。
-   - 元信息更新后运行 `requirement.mjs sync <报告路径>`。
+   - 元信息更新后运行 `requirement.mjs reindex`。它只刷新派生索引，不修复正文 hash 或旧审查证据。
 
 ## 第 9 步 — 记录运行反馈（不问用户）
 
@@ -41,7 +41,7 @@
 - 报告先写 tmp 草稿，另写结构化结果（findings、coverage）；按 execution.md 用 `artifact.mjs finalize --kind review --packet <交接JSON> --result <结果JSON>` 收尾，输出 path / cite / previous。dev 内部只交回草稿与结果，不由子 agent 更新 meta。
 - 正式报告同时完整交给用户，内容与落盘文件一致；独立 review 将 R7 标 completed 后 complete，dev 内部由主 agent 保存 waiting_user 等选择。
 - 事实核对仍用 `lint-doc.mjs <草稿> --skill project-review --facts`；错误先修正，无法核实的标待确认。finalize 另校验模板、分支、代码快照与覆盖登记。
-- previous 非空时说明旧版已归档，不能替用户删除；独立文档仓库按 requirements.md 运行 pending 后提示提交，dev 内部延后到 F8。已完成报告的沉淀／wiki 元信息更新仍用 sync。
+- previous 非空时说明旧版已归档，不能替用户删除；独立文档仓库按 requirements.md 运行 pending 后提示提交，dev 内部延后到 F8。已完成报告的沉淀／wiki 元信息更新后用 reindex。
 
 ## 终端命令
 

@@ -46,7 +46,7 @@
 * 知识：交付与审查的 DocNexus 沉淀率（只算真正问过沉淀的，「未询问」「无需沉淀」不计入分母；dev 内部审查不单独询问或重复计入交付沉淀）、正文引用了知识库文档的产物占比；
 * 各分支链路：方案、交付说明、审查报告、技术方案、上线方案齐不齐，哪些文档还没发布到 wiki。
 
-**完整流程状态与续接**：需求目录的 `meta.json` 同时保存绑定、产物索引和按运行 id 区分的 `runs`。每次运行关联分支，记录阶段、逐步完成标记、上下文、待用户决定、阻塞原因、历史与 revision；完成后保存 `status: completed` 和 `completed_at`。`/workflow status` 查看状态，`/workflow resume [运行id]` 核对后继续；`/workflow view` 展示运行与“已完成”，尚未生成 Markdown 的运行也可见。快速通道保持不绑定、不创建运行状态。完整 dev 在首次落盘前初判规模、选择完整流程并开始记录，需要清单时在 F2／B3 先生成业务场景 clarification.md 并等待产品反馈；F3／B3 技术澄清完成后收尾 requirement.md，再进入 F4／B4 的实现方案，补入此前已确认的进度；后续文档／发布用独立运行保留开发的完成记录。脚本用法见 `workflow/references/runs.md`，`sync` 不会清掉状态。
+**完整流程状态与续接**：需求目录的 `meta.json` 同时保存绑定、产物索引和按运行 id 区分的 `runs`。每次运行关联分支，记录阶段、逐步完成标记、上下文、待用户决定、阻塞原因、历史与 revision；完成后保存 `status: completed` 和 `completed_at`。`/workflow status` 查看状态，`/workflow resume [运行id]` 核对后继续；`/workflow view` 展示运行与“已完成”，尚未生成 Markdown 的运行也可见。快速通道保持不绑定、不创建运行状态。完整 dev 在首次落盘前初判规模、选择完整流程并开始记录，需要清单时在 F2／B3 先生成业务场景 clarification.md 并等待产品反馈；F3／B3 技术澄清完成后收尾 requirement.md，再进入 F4／B4 的实现方案，补入此前已确认的进度；后续文档／发布用独立运行保留开发的完成记录。脚本用法见 `workflow/references/runs.md`，`reindex` 不会清掉状态、版本或证据。
 
 **F3 前的业务核对循环**：F1 理解需求后，在 F2 先用 `artifact.mjs finalize --kind clarification` 发布同一需求目录的 `clarification.md`，聚焦角色、正常 / 异常场景、业务规则、范围和业务验收，供你找产品核对与完善 PRD。每轮在同一清单更新答复和状态、追加新问题与反馈记录，保留编号和已确认项，自动归档旧版。业务项未明确时保持 F2 in_progress、运行为 waiting_user；业务明确并完成现状调研后进入 F3，澄清可行性、接口兼容、数据、权限、依赖等技术约束。技术问题改变业务场景时回 F2 更新清单。业务与技术约束均明确后收尾 requirement.md，再进入 F4 写方案。清单是正式产物，纳入视图和统计；没有业务待确认项且用户未要求时可省清单。
 
@@ -144,7 +144,7 @@ Codex 原生元数据 `dev/agents/openai.yaml` 设置 `policy.allow_implicit_inv
 | `workflow/scripts/resolve.mjs status` | `/workflow status` 的能力探测（不输出任何凭据） |
 | `workflow/scripts/resolve.mjs infer-profile` | 按固定规则从构建文件、Makefile、依赖与配置文件、git 推断项目画像草稿，每个字段附依据；不写文件 |
 | `workflow/scripts/lint-doc.mjs <文档> --skill <skill> [--facts --diff <main>...<dev>]` | 对照当前生效的模板检查必填章节、残留占位符和该 skill 要求的元信息；缺普通章节、顺序不一致为警告；列出待填写位置。技术方案不强制可见元信息，事实核对显式指定三点范围；正文里的类名、文件、接口、表名在 diff 和代码里都找不到时给出警告 |
-| `workflow/scripts/requirement.mjs which / bind / path / sync / pending / list / config` | 产物按需求归档（`workflow-run/docs/requirements/<需求>/<项目>/`，两种模式结构相同）：查当前分支绑定的需求（没绑定时给出按分支名生成的建议名）、绑定需求名、给出本次落盘路径（不覆盖，带上一版的 wiki 记录）、重建 `meta.json`、列出所有需求；`config` 设置产物位置（文档仓库、项目名、提交提示），`pending` 看文档仓库里还没提交的产物 |
+| `workflow/scripts/requirement.mjs which / bind / reindex / pending / list / config` | 产物按需求归档（`workflow-run/docs/requirements/<需求>/<项目>/`，两种模式结构相同）：查当前分支绑定的需求（没绑定时给出按分支名生成的建议名）、绑定需求名、只刷新派生索引、列出所有需求；`config` 设置产物位置（文档仓库、项目名、提交提示），`pending` 看文档仓库里还没提交的产物。正式正文只通过 `artifact.mjs finalize` 发布 |
 | `workflow/scripts/view.mjs [--out f] [--open]` | 项目文档视图（`/workflow view`、`npx @rowansenne/workflow-run view`）：读需求目录里的产物，生成单个 HTML，按需求列出各阶段、审查记录（各级别数量、复核、与上次对比）、交付记录、沉淀到的知识文档，正文直接渲染；顶部「知识文档」列出每篇知识文档来自哪个需求、哪份产物；数据内嵌，只读、不联网，默认写到 `workflow-run/tmp/view/index.html` |
 | `workflow/scripts/run.mjs show / start / save / complete / cancel` | 需求 meta.json 中的分支运行记录：恢复、checkpoint、已完成状态与时间、等待用户、修复回退、revision 冲突检查 |
 | `workflow/scripts/artifacts.mjs [--branch b \| --all]` | 按分支汇总 `workflow-run/docs/requirements/` 下的方案、交付说明、审查报告、技术方案、上线方案及其 wiki 发布记录，给出下一步建议；分支取自文件头元信息（兼容技术方案的隐藏注释与旧可见行）。project-review 据此对照本分支方案、识别复审 |

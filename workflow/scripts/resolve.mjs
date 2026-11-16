@@ -98,7 +98,7 @@ export function status(root) {
     // 已安装的 skill（--skills 子集安装时只有一部分），路由前据此判断目标 skill 是否可用
     skills: skillMetas().map((m) => m.name),
     // 本机系统与终端（安装时记录），写命令按它来
-    env: readEnv(),
+    env: readEnv(root),
     profile: { ok: p.complete, empty: p.empty, how: p.complete ? null : '运行 /workflow profile' },
     // 开发环境配置：只在配过时给出（没配不算问题，构建跑不起来时才需要）
     toolchain: p.toolchain.configured
@@ -147,7 +147,7 @@ function main(argv) {
     case 'env':
       // env（默认）：本机系统与终端；--check：核对画像里的开发环境配置在本机是否存在
       if (rest.includes('--check') || rest.includes('--resolve')) { print(checkToolchain(root)); return 0; }
-      print(readEnv()); return 0;
+      print(readEnv(root)); return 0;
   }
   console.error('用法: resolve.mjs [--root <项目根>] template <skill> <文件名> | templates | profile | infer-profile | category <skill> | status | env [--check]');
   return 1;

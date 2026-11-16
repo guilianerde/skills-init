@@ -2,9 +2,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { fileURLToPath } from 'node:url';
 
-const SKILLS_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const INSTALL_BASES = ['.agents/skills', '.claude/skills', '.qwen/skills', '.codebuddy/skills'];
 const git = (cwd, args) => spawnSync('git', args, { cwd, encoding: 'utf8' });
 const readJson = (f) => { try { return JSON.parse(fs.readFileSync(f, 'utf8')); } catch { return null; } };
@@ -32,12 +30,45 @@ export function dirName(name) {
 }
 
 // ------------------------------------------------------------------ 配置与布局
-// 画像所在目录：本脚本所在的 skills 目录；从安装包调用时（安装器）到项目里已安装的 skills 目录找
+const profileError = (message, code, details = {}) => Object.assign(new Error(message), { code, details });
+
+// 项目配置只能来自目标业务项目。规范位置优先；没有规范位置时，只允许一个真实配置目录。
+// 多个不同拷贝会改变基线、产物项目和工具链，不能按目录枚举顺序静默任选。
+export function resolveProfileDir(root) {
+  const candidates = INSTALL_BASES
+    .map((base) => ({ base, dir: path.join(root, base, 'workflow') }))
+    .filter(({ dir }) => fs.existsSync(dir));
+  if (!candidates.length) {
+    return { dir: path.join(root, INSTALL_BASES[0], 'workflow'), source: null, candidates: [] };
+  }
+  const canonical = candidates.find(({ base }) => base === INSTALL_BASES[0]);
+  if (canonical) return { ...canonical, source: canonical.base, candidates };
+
+  const unique = [];
+  const byRealPath = new Map();
+  for (const candidate of candidates) {
+    let real;
+    try {
+      real = fs.realpathSync.native(candidate.dir);
+    } catch {
+      real = path.resolve(candidate.dir);
+    }
+    if (!byRealPath.has(real)) byRealPath.set(real, candidate);
+  }
+  unique.push(...byRealPath.values());
+  if (unique.length > 1) {
+    const paths = unique.map(({ dir }) => path.relative(root, dir).split(path.sep).join('/'));
+    throw profileError(
+      `目标项目存在多个不同的 workflow 配置目录，无法唯一选择：${paths.join('、')}`,
+      'PROJECT_CONFIG_AMBIGUOUS',
+      { paths },
+    );
+  }
+  return { ...unique[0], source: unique[0].base, candidates };
+}
+
 export function profileDir(root) {
-  const own = path.join(SKILLS_DIR, 'workflow');
-  if (fs.existsSync(path.join(own, 'profile.json')) || fs.existsSync(path.join(own, 'profile.local.json'))) return own;
-  for (const b of INSTALL_BASES) { const d = path.join(root, b, 'workflow'); if (fs.existsSync(path.join(d, 'profile.json'))) return d; }
-  return own;
+  return resolveProfileDir(root).dir;
 }
 
 // workflow/profile.json 的 artifacts，profile.local.json（个人设置，不提交）覆盖其上
@@ -126,8 +157,8 @@ export const SHELL_NOTES = {
   powershell: 'Windows PowerShell 5.1：没有 && 和 ||，多条命令用 ; 分开；不要用 2>/dev/null、grep、head 等 Unix 命令',
   pwsh: 'PowerShell 7：支持 &&；不要用 2>/dev/null、grep、head 等 Unix 命令',
 };
-export function readEnv() {
-  const rec = readJson(path.join(SKILLS_DIR, 'workflow', 'profile.local.json'))?.env;
+export function readEnv(root) {
+  const rec = readJson(path.join(profileDir(root), 'profile.local.json'))?.env;
   const env = rec?.os ? { os: rec.os, shell: rec.shell ?? null, source: 'install' } : { os: OS_NAMES[process.platform] ?? process.platform, shell: null, source: 'runtime' };
   const note = SHELL_NOTES[env.shell];
   return { ...env, ...(note ? { note } : {}) };
@@ -153,7 +184,7 @@ export function expandPath(v, vars = {}, env = process.env) {
 // 「没声明」和「显式写空」是两回事：本机写 "" 表示**不使用**团队那个值（用工具自己的默认配置），
 // 所以要按 null / "" 区分来源，不能只看值真不真。
 export function readToolchain(root) {
-  const dir = path.join(SKILLS_DIR, 'workflow');
+  const dir = profileDir(root);
   const team = readJson(path.join(dir, 'profile.json')) ?? {};
   const mine = readJson(path.join(dir, 'profile.local.json')) ?? {};
   const declared = (o) => typeof o === 'string';
@@ -206,13 +237,13 @@ export function checkToolchain(root, { env = process.env } = {}) {
 }
 
 export function readProfile(root) {
-  const f = path.join(SKILLS_DIR, 'workflow', 'profile.json');
+  const f = path.join(profileDir(root), 'profile.json');
   const profile = readJson(f);
   const get = (k) => k.split('.').reduce((o, p) => (o == null ? undefined : o[p]), profile);
   const isEmpty = (v) => v == null || v === '' || (Array.isArray(v) && !v.length);
   const empty = profile ? PROFILE_FIELDS.filter((k) => isEmpty(get(k))) : PROFILE_FIELDS;
   return {
-    path: relOf(root, f), exists: !!profile, profile: profile ?? {}, empty, env: readEnv(), toolchain: readToolchain(root),
+    path: relOf(root, f), exists: !!profile, profile: profile ?? {}, empty, env: readEnv(root), toolchain: readToolchain(root),
     complete: !!profile && PROFILE_REQUIRED.every((k) => !empty.includes(k)),
   };
 }

@@ -33,6 +33,7 @@
     "code-graph",
     "nacos-config",
     "docs",
+    "examples",
     "README.md",
     "CHANGELOG.md"
   ],

@@ -6,7 +6,6 @@ import { spawnSync } from 'node:child_process';
 import { PKG, CANON_DIR, INSTALL_BASES, LINK_ENVS, HOME, SKILLS, step, ok, warn, fail, toPosix, fileHash, readManifest, lstat, findManifests, cmpVersion } from './core.mjs';
 import { reportTemplateStatus, legacyDocNexusPaths } from './docnexus.mjs';
 import { codegraphVersion } from './codegraph.mjs';
-import { legacyRequirements } from '../../workflow/scripts/requirement.mjs';
 
 // upgrade = 用清单里记录的环境与模式非交互重装；数据库配置原样保留
 export function upgradeOptions(o) {
@@ -111,8 +110,6 @@ export function doctor(root, offline) {
     const mode = st.artifacts?.mode === 'repo' ? `独立文档仓库（${HOME}/ 自己是 git 仓库）` : '随项目提交';
     if (st.artifacts && !st.artifacts.ok) meh(`产出目录 ${HOME}/：${mode}，${st.artifacts.how}`);
     else ok(`产出目录 ${HOME}/：${mode}${st.artifacts?.project ? `，本项目的产物在 docs/requirements/<需求>/${st.artifacts.project}/` : ''}`);
-    const legacy = legacyRequirements(root);
-    if (legacy.length) meh(`${legacy.length} 个需求还是旧结构（文件直接放在 docs/requirements/<需求>/ 下）：运行 npx @rowansenne/workflow-run upgrade 迁到 <需求>/<项目名>/`);
     if (st.docnexus.ok) {
       if (!reportTemplateStatus(root, meh)) ok('DocNexus 已接入，文档模板齐全且与默认模板同步（或为团队定制版）');
     } else if (fs.existsSync(path.join(root, '.docnexus', 'project.json'))) bad('DocNexus 配置或运行环境不完整：需要 format 7、output_dir=workflow-run 和 .docnexus/ 下的 CLI，运行 upgrade --with-docnexus 修复');

@@ -73,7 +73,7 @@ export function loadWorkspace(root, { allProjects = false, allBranches = false }
     const found = new Set();
     const index = Array.isArray(req.meta.artifacts) ? req.meta.artifacts.filter((item) => item && typeof item.file === 'string') : [];
     if (req.meta.artifacts !== undefined && (!Array.isArray(req.meta.artifacts) || index.length !== req.meta.artifacts.length)) {
-      diagnostics.push({ code: 'invalid_index', path: `${req.dir}/meta.json`, message: '产物索引结构无效，请显式 sync；运行状态保留' });
+      diagnostics.push({ code: 'invalid_index', path: `${req.dir}/meta.json`, message: '产物索引结构无效，请显式 reindex；运行状态保留' });
     }
     for (const entry of fs.readdirSync(req.abs, { withFileTypes: true })) {
       if (!entry.isFile() || !parseFile(entry.name)) continue;
@@ -84,9 +84,9 @@ export function loadWorkspace(root, { allProjects = false, allBranches = false }
         artifacts.push(a);
         const indexed = index.find((i) => i.file === entry.name);
         if ((Array.isArray(req.meta.artifacts) && !indexed) || (indexed && (indexed.branch !== a.branch || indexed.date !== a.date
-          || JSON.stringify(indexed.wiki) !== JSON.stringify(a.wiki) || indexed.version !== a.version
+          || JSON.stringify(indexed.wiki) !== JSON.stringify(a.wiki) || (indexed.registered !== false && indexed.version !== a.version)
           || JSON.stringify(indexed.docnexus ?? []) !== JSON.stringify(a.knowledge)))) {
-          diagnostics.push({ code: 'stale_index', path: file, message: '文档与已登记索引不一致，请显式 sync' });
+          diagnostics.push({ code: 'stale_index', path: file, message: '文档与已登记索引不一致，请显式 reindex' });
         }
       } catch (e) {
         diagnostics.push({ code: 'unreadable_artifact', path: file, message: e.message });

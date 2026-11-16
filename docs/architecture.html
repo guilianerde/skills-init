@@ -275,7 +275,7 @@ footer { margin-top: 40px; font-size: 13px; color: var(--muted); }
         <div class="tag">命令脚本<small>workflow/scripts · 确定性命令</small></div>
         <div class="cells">
           <div class="cell"><b>resolve.mjs</b><span>模板来源、能力状态</span></div>
-          <div class="cell"><b>requirement.mjs</b><span>需求绑定、产物路径</span></div>
+          <div class="cell"><b>requirement.mjs</b><span>需求绑定与派生索引维护</span></div>
           <div class="cell"><b>run.mjs</b><span>运行状态与恢复</span></div>
           <div class="cell"><b>artifact.mjs</b><span>产物收尾、中断恢复与安全取消</span></div>
           <div class="cell"><b>review-handoff.mjs</b><span>审查交接与结构化结果</span></div>
@@ -296,12 +296,13 @@ footer { margin-top: 40px; font-size: 13px; color: var(--muted); }
           <div class="cell"><b>artifact-model</b><span>产物类型与元信息解析（纯模型，无 I/O）</span></div>
           <div class="cell"><b>requirement-read</b><span>需求目录与元信息读取</span></div>
           <div class="cell"><b>workspace-read</b><span>工作区／Git 统一快照，一次命令读一遍</span></div>
-          <div class="cell"><b>requirements</b><span>绑定、版本、归档、sync</span></div>
+          <div class="cell"><b>requirements</b><span>绑定与派生索引；正式发布由 finalize 负责</span></div>
           <div class="cell"><b>runs</b><span>运行阶段、revision、完成校验</span></div>
           <div class="cell"><b>run-gates</b><span>方案、验证、审查与交付门禁</span></div>
           <div class="cell"><b>code-snapshot</b><span>代码内容摘要与证据有效性</span></div>
           <div class="cell"><b>artifact-finalize</b><span>发布、归档、索引与可恢复收尾</span></div>
           <div class="cell"><b>path-match</b><span>审查与代码证据共用的范围匹配</span></div>
+          <div class="cell"><b>review-scope</b><span>审查范围、跳过规则、风险分类与分批</span></div>
           <div class="cell"><b>meta-store</b><span>写锁与原子替换</span></div>
         </div>
       </div>

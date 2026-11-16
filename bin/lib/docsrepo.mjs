@@ -2,7 +2,6 @@
 //   - workflow-run/ 里没有内容（或只有 tmp/）：直接克隆
 //   - 已有产物、DocNexus 等内容：原地 git init 并接上远端。远端是空仓库时本地内容就是文档仓库的第一批内容；
 //     远端已有内容时检出远端，本地文件和远端同路径冲突就退回原状、列出冲突的文件（不合并）
-//   - 先把旧结构的产物迁到 <需求>/<项目名>/
 //   - 代码仓库 .gitignore 加 /workflow-run/；文档仓库的 .git/info/exclude 加 /tmp/（本机临时文件不进文档仓库）
 //   - 项目名写进 workflow/profile.json 的 artifacts.project（--project，或沿用已有的，默认 git 远端仓库名）
 //   - 文档仓库里有 DocNexus 时接上本项目的链接与段落；还没装依赖时提示
@@ -12,9 +11,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { HOME, step, ok, warn, toPosix, findManifests, docnexusBin } from './core.mjs';
-import { updateGitignore, excludeHomeTmp, reportMigration } from './install.mjs';
+import { updateGitignore, excludeHomeTmp } from './install.mjs';
 import { refreshDocNexusLinks } from './docnexus.mjs';
-import { layout, setConfig, artifactsConfig, suggestProject, migrateLayout } from '../../workflow/scripts/requirement.mjs';
+import { layout, setConfig, artifactsConfig, suggestProject } from '../../workflow/scripts/requirement.mjs';
 
 const git = (cwd, args, opts = {}) => spawnSync('git', args, { cwd, encoding: 'utf8', ...opts });
 
@@ -31,11 +30,10 @@ function show(root) {
   return 0;
 }
 
-// workflow-run/ 里已有内容：原地变成文档仓库。返回是否成功；失败时 workflow-run/ 保持原样（只多了迁移到新结构的产物）
+// workflow-run/ 里已有内容：原地变成文档仓库。返回是否成功。
 function inPlace(root, home, url, project, installed) {
-  // 先定项目名，再把旧结构迁到 <需求>/<项目名>/，这样和文档仓库里其他服务的目录对得上
+  // 先定项目名，未配置时后续初始化以该名字写入 target profile。
   if (project && installed) setConfig(root, { project });
-  reportMigration(migrateLayout(root));
   const remote = git(root, ['ls-remote', '--symref', url]);
   if (remote.status !== 0) { warn(`连不上 ${url}（地址、权限或网络），没有改动`); return false; }
   const heads = remote.stdout.split('\n').filter((l) => /\trefs\/heads\//.test(l)).map((l) => l.split('\t')[1].replace('refs/heads/', ''));

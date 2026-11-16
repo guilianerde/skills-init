@@ -41,7 +41,7 @@ description: "Review source code (any language; Java/Spring, Go, TypeScript, Pyt
 
 7. **输出报告**：先读 [reporting.md 的第 7 步与 Artifact Location](references/reporting.md)。用 `resolve.mjs template project-review report.md` 取模板；正式报告按 execution.md 用 `artifact.mjs finalize --kind review` 收尾为 review.md 后完整交给用户，灵活模式在对话给 findings。
 
-8. **沉淀到 DocNexus**：独立审查交报告后读 [reporting.md 的第 8 步](references/reporting.md)。有值得记录的才询问授权，分类用 `resolve.mjs category project-review`；沉淀结果写报告元信息并 sync。dev 内部不执行。
+8. **沉淀到 DocNexus**：独立审查交报告后读 [reporting.md 的第 8 步](references/reporting.md)。有值得记录的才询问授权，分类用 `resolve.mjs category project-review`；沉淀结果写报告元信息后运行 `requirement.mjs reindex` 刷新派生索引。dev 内部不执行。
 
 9. **记录运行反馈**：读 [reporting.md 的第 9 步](references/reporting.md)，用 `feedback.mjs add --skill project-review` 记录过程；不写业务内容，失败不阻塞交付。dev 内部交主 agent 统一记录。
 

@@ -35,7 +35,7 @@ test('技术和上线方案引用同一已完成 dev 的版本，后续运行更
   assert.equal(after.artifacts.requirement.version, dev.artifacts.requirement.version);
   assert.equal(after.artifacts.delivery.path, initial.artifacts.delivery.path);
 
-  fs.rmSync(path.join(f.root, after.artifacts.requirement.path));
+  fs.unlinkSync(path.join(f.root, after.artifacts.requirement.path));
   fs.appendFileSync(path.join(f.root, after.artifacts.delivery.path), '> DocNexus：无需沉淀\n');
   const missing = query(f.root, tech);
   assert.deepEqual(missing.missing, ['requirement']);

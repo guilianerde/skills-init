@@ -4,6 +4,19 @@
 
 ## [Unreleased]
 
+### 新增
+- 新增 `workflow/core/index.mjs` 内部程序入口，运行状态、需求绑定、索引维护、产物 finalize 和审查交接可由 Skills 脚本与 Node.js 调用方共用。
+- 新增项目级配置隔离：实例绑定明确 root，不读取核心模块所在项目的 profile；多个规范路径之外的配置副本有歧义时明确报错。
+- 审查范围、分类和分批逻辑抽到共享库，审查交接通过核心生成。
+
+### 变更
+- `requirement.mjs which` 改为纯只读；新增 `requirement.mjs reindex`，只刷新派生索引，不提升 versions、不归档、不推进运行或生成证据。
+- `run.mjs` 的操作与导出收口到核心门面；`artifact.mjs finalize` 通过核心和 Skills 文档策略执行。
+
+### 移除
+- 删除 `requirement.mjs path`、`nextPath()`、旧 `sync` 命令及版本 bump 直写链。
+- 删除旧需求目录自动迁移入口；用户工作区中的历史目录和 `old-artifacts/` 不会被自动删除或移动。
+
 ## [0.35.0] - 2026-11-16
 
 ### 新增

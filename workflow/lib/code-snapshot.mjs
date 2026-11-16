@@ -6,6 +6,11 @@ import { createHash } from 'node:crypto';
 import { matchGlob } from './path-match.mjs';
 
 export const hash = (value) => createHash('sha256').update(value).digest('hex');
+// 幂等请求标识只依赖语义，不依赖调用方构造对象时的键顺序。
+export const canonicalJson = (value) => JSON.stringify(value, (_key, nested) => {
+  if (!nested || typeof nested !== 'object' || Array.isArray(nested)) return nested;
+  return Object.fromEntries(Object.keys(nested).sort().map((key) => [key, nested[key]]));
+});
 const INTERNAL = ['workflow-run/**', '.docnexus/**', '.codegraph/**', '.agents/skills/**', '.claude/skills/**', '.qwen/skills/**', '.codebuddy/skills/**'];
 const git = (root, args, encoding = 'utf8') => {
   const r = spawnSync('git', args, { cwd: root, encoding, maxBuffer: 256 * 1024 * 1024 });

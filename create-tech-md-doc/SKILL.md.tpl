@@ -78,7 +78,7 @@ PRD 参考：<pageId 或 URL 或「无」/「PRD 增强已跳过」>
 ### Step 4 — 写文件
 
 - 正式收尾：Step 4 进入 T4，先写 `workflow-run/tmp/tech-doc.md` 草稿，再用 `node <skills>/workflow/scripts/artifact.mjs finalize --id <运行id> --expect-revision <revision> --kind tech --draft <草稿> --branch <dev分支>` 自检、归档旧版、发布并更新索引／运行证据；使用返回的 path / cite，规则见 `<skills>/workflow/references/execution.md`。
-- 收尾输出 previous 非空时告诉用户上一版的归档位置，不能替用户删除；中断先 `artifact.mjs resume --id <运行id>`。独立文档仓库的提交提示用 `requirement.mjs pending`，按 requirements.md 处理；后续 wiki／沉淀元信息仍可显式 sync。
+- 收尾输出 previous 非空时告诉用户上一版的归档位置，不能替用户删除；中断先 `artifact.mjs resume --id <运行id>`。独立文档仓库的提交提示用 `requirement.mjs pending`，按 requirements.md 处理；后续 wiki／沉淀元信息只刷新派生索引时显式运行 `requirement.mjs reindex`。
 - 收尾前对草稿运行 `node <skills>/workflow/scripts/lint-doc.mjs <草稿> --skill create-tech-md-doc --facts --diff <main>...<dev>` 自检，显式按三点范围核对正文里的类名、文件、接口、表名。有「错误」先修正再交付（缺必填章节、残留 `{{...}}` 占位符）；不再强制可见元信息行，但隐藏分支仍须与运行一致。「警告」按实际情况处理，其中「在 diff 和代码里都找不到」的名字逐个核实：确属编造就改成 diff 里的真实名字或写「待补充」，是外部系统 / 配置中心的名字就保留；「提示」里的待填写位置在交付摘要中告诉用户。
 - 再把路径和摘要告诉用户，按取材规则列出实际引用的 dev 产物及版本。
 

@@ -1,6 +1,6 @@
 # 产物按需求归档（dev / project-review / 技术方案 / 上线方案共用）
 
-本约定只适用于工作流的正式需求产物。普通聊天生成的报告、分析、方案、草稿、导出等辅助文件默认放在项目根的 `workflow-run/other/`（可按主题建子目录，需要时创建），即使当前分支已绑定需求，也不调用 `bind / path / sync` 或 `run.mjs`，不写需求 `meta.json`，不进入需求统计和文档视图。单独执行 project-review、技术方案或上线方案等工作流仍按本约定归档。源码、测试、配置和已有文件的维护、工作流指定的临时目录与知识库沿用各自路径；用户明确指定输出路径时以用户为准，不自动搬移已有文件。
+本约定只适用于工作流的正式需求产物。普通聊天生成的报告、分析、方案、草稿、导出等辅助文件默认放在项目根的 `workflow-run/other/`（可按主题建子目录，需要时创建），即使当前分支已绑定需求，也不调用 `bind / reindex`、`run.mjs` 或 `artifact.mjs`，不写需求 `meta.json`，不进入需求统计和文档视图。单独执行 project-review、技术方案或上线方案等工作流仍按本约定归档。源码、测试、配置和已有文件的维护、工作流指定的临时目录与知识库沿用各自路径；用户明确指定输出路径时以用户为准，不自动搬移已有文件。
 
 一个需求的全部产物放在同一个目录，整条链路一眼看全，`/workflow view` 也直接读这里。本工具的产出都在项目根的 `workflow-run/` 里（需求产物、DocNexus 工作区、项目模板、临时文件），不往项目的其他地方写。默认 `workflow-run/` 随代码提交；团队也可以让 `workflow-run/` 成为独立的文档仓库，见最后一节。两种用法的目录结构完全一样（下图），切换时文件不用挪。
 
@@ -48,19 +48,19 @@ node <skills>/workflow/scripts/requirement.mjs which
 
 ## 运行状态
 
-完整流程在本文件的 `runs` 中按运行 id 保存进度，关联分支；同一需求可有多次运行。`status: completed` 和 `completed_at` 是本次运行已完成的明确标记，步骤也单独记录 completed。保存／恢复和各 skill 的记录时机见 `runs.md`；快速通道不创建记录。`sync` 只重建产物索引，保留 runs 和其他扩展字段；重新 bind 也不会清空历史。元信息采用原子写入与短时写锁，状态更新另有 revision 检查。
+完整流程在本文件的 `runs` 中按运行 id 保存进度，关联分支；同一需求可有多次运行。`status: completed` 和 `completed_at` 是本次运行已完成的明确标记，步骤也单独记录 completed。保存／恢复和各 skill 的记录时机见 `runs.md`；快速通道不创建记录。`reindex` 只重建派生索引，不改正文、versions、runs、revision、绑定、批准和证据；`which` 是只读查询，重新 bind 也不会清空历史。元信息采用原子写入与短时写锁，状态更新另有 revision 检查。
 
 ## 落盘
 
-正式产物先写 `workflow-run/tmp/` 草稿，统一按 [execution.md](execution.md) 用 `artifact.mjs finalize --id <运行id> --expect-revision <revision> --kind <clarification|requirement|plan|delivery|review|tech|release> --draft <草稿>` 收尾。命令校验阶段、分支与知识模板，归档旧版、更新索引／版本并登记证据；clarification 在 F2 / B3，发布不能代替阶段完成；requirement 在 F3 / B3；plan 在 F4 / B4，并绑定需求版本；review 还须 packet 与结构化 result，delivery 须有效交付选择。不要直接覆盖正式文件后只 sync。
+正式产物先写 `workflow-run/tmp/` 草稿，统一按 [execution.md](execution.md) 用 `artifact.mjs finalize --id <运行id> --expect-revision <revision> --kind <clarification|requirement|plan|delivery|review|tech|release> --draft <草稿>` 收尾。命令校验阶段、分支与知识模板，归档旧版、更新索引／版本并登记证据；clarification 在 F2 / B3，发布不能代替阶段完成；requirement 在 F3 / B3；plan 在 F4 / B4，并绑定需求版本；review 还须 packet 与结构化 result，delivery 须有效交付选择。不要直接覆盖正式文件后只 reindex。
 
 - 输出 path（相对项目根）、cite（跨文档引用）、previous（上一版归档）、version 和 run。文件名固定，目录只留最新版；文档仓库模式的 cite 为「文档仓库名:仓库内路径」。
 - 旧版归档在 `workflow-run/tmp/old-artifacts/<需求>/<项目>/<种类>_v<N>.md`，不提交；告诉用户归档了什么，不替用户删除。相同命令重试不重复升级版本或状态。
 - 原文第一行的 md-to-wiki 页面记录自动保留，新版仍发布同一页；不能在普通文档收尾中替换页面归属。
-- 文件发布与元信息不能跨文件一次原子提交。待完成收尾保存在同一 meta.json；中断先 `artifact.mjs resume --id <id>`，不能继续 sync / save 越过待办。代码或正文冲突时停止，取消和恢复规则见 execution.md。
-- `requirement.mjs path <种类>` 仍保留为底层旧接口（会预先复制归档），不作为新流程的写入入口。查询已有产物用 artifacts / list，正式写入与 cite 用 finalize 输出。
-- wiki 发布或知识沉淀更新文档元信息后显式 `requirement.mjs sync <path>`。sync 重建索引并保留 runs；需求绑定只由 bind 修改，不根据文档头隐式新增。
-- 文档／索引不一致、元信息损坏或引用缺失进入只读诊断；文件存在不代表运行完成。确认正文后显式 sync，损坏的 meta 先人工核对修复。已有旧运行缺少新证据时回到对应阶段重新收尾／验证，不自动补用户确认。
+- 文件发布与元信息不能跨文件一次原子提交。待完成收尾保存在同一 meta.json；中断先 `artifact.mjs resume --id <id>`，不能继续 reindex / save 越过待办。代码或正文冲突时停止，取消和恢复规则见 execution.md。
+- 旧 `requirement.mjs path` 和 `sync` 写入命令已删除。查询已有产物用 artifacts / list，正式写入与 cite 用 finalize 输出。
+- wiki 发布或知识沉淀更新文档元信息后显式 `requirement.mjs reindex`。它只重建派生索引并保留 runs、versions 和证据；需求绑定只由 bind 修改，不根据文档头隐式新增。
+- 文档／索引不一致、元信息损坏或引用缺失进入只读诊断；文件存在不代表运行完成。确认正文后显式 reindex，损坏的 meta 先人工核对修复。已有旧运行缺少新证据时回到对应阶段重新收尾／验证，不自动补用户确认。
 - 独立文档仓库在允许提示提交的阶段运行 `requirement.mjs pending`，沿用下节规则；dev 内部审查延后到 F8。
 
 ## 独立文档仓库
@@ -81,12 +81,12 @@ npx @rowansenne/workflow-run docs-repo <团队文档仓库地址> [--project <�
 
 ## 文档仓库的提交
 
-文档仓库模式下，产物写在另一个 git 仓库里，不会随代码提交。finalize 后运行 pending（或旧 sync 返回 commit 非空）时：
+文档仓库模式下，产物写在另一个 git 仓库里，不会随代码提交。finalize 或 reindex 后运行 pending 时：
 
 **dev F7 审查例外**：审查环节（独立子 agent 或当前会话自查）拿到 `commit` 信息后不询问、不执行文档提交，先交审查报告、等待用户选择修复或交付。选择交付进入 F8 后（完整流程；S 快速通道不落盘，没有待提交产物），再运行 `requirement.mjs pending` 获取当前待提交内容，按下面步骤询问；修复与复审期间继续延后，不改动 `commit_prompt` 配置。
 
-1. 把 pending 的 `files`（旧 sync 为 commit.files）和 `suggested_message` 给用户看，问要不要提交。
-2. 用户确认后，按 pending 的 `commands`（旧 sync 为 commit.commands） 在文档仓库里提交；推送另外问用户，用户同意后再 `git -C workflow-run push`。
+1. 把 pending 的 `files` 和 `suggested_message` 给用户看，问要不要提交。
+2. 用户确认后，按 pending 的 `commands` 在文档仓库里提交；推送另外问用户，用户同意后再 `git -C workflow-run push`。
 3. 用户不想现在提交就跳过，不再追问；之后随时可以运行 `requirement.mjs pending` 看还有哪些没提交。
 
-不想被提示的人可以关掉：`requirement.mjs config --commit-prompt off --local`。这个设置写在 `workflow/profile.local.json`（个人设置，不提交，只影响自己）；去掉 `--local` 则写进 `profile.json`，对整个团队生效。关掉后 sync 不再输出 `commit`，产物照常写到文档仓库，由自己决定什么时候提交。
+不想被提示的人可以关掉：`requirement.mjs config --commit-prompt off --local`。这个设置写在 `workflow/profile.local.json`（个人设置，不提交，只影响自己）；去掉 `--local` 则写进 `profile.json`，对整个团队生效。关掉后 pending 仍可查询，但不主动提示提交，产物照常写到文档仓库，由自己决定什么时候提交。

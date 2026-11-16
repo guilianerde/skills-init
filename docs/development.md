@@ -64,15 +64,21 @@ workflow-run（安装器仓库）/
 ├── docs/                              # 专题文档与图文教程
 ├── workflow/
 │   ├── SKILL.md.tpl · skill.json
+│   ├── core/                           # 内部程序入口；实现统一由 Skills 脚本和 Node.js 调用方使用
+│   │   ├── index.mjs                   # createWorkflow、操作表、错误契约
+│   │   ├── errors.mjs                  # 稳定错误 code 与领域错误映射
+│   │   └── review-handoff.mjs          # 代码 / 文档审查交接组装
+│   ├── integrations/                   # Skills 模板策略等外围装配，不进入核心依赖
 │   ├── lib/                           # 共享核心；不反向依赖 scripts 命令入口
 │   │   ├── project.mjs                # 布局、画像、环境与配置
 │   │   ├── requirement-read.mjs       # 需求目录与元信息读取
-│   │   ├── requirements.mjs           # 绑定、版本归档与索引同步
+│   │   ├── requirements.mjs           # 需求绑定、派生索引维护
 │   │   ├── runs.mjs                   # 运行状态、阶段与完成校验
 │   │   ├── run-gates.mjs              # 方案、验证、审查与交付门禁
 │   │   ├── code-snapshot.mjs          # 代码内容摘要，绑定验证和审查证据
 │   │   ├── artifact-finalize.mjs      # 可恢复的产物收尾
 │   │   ├── path-match.mjs             # 共享范围匹配
+│   │   ├── review-scope.mjs           # 审查范围、跳过规则、风险分类与分批
 │   │   ├── meta-store.mjs             # 写锁与原子存储
 │   │   ├── document-model.mjs         # 标题、章节、表格等纯文本模型
 │   │   ├── artifact-model.mjs         # 产物类型、元信息、审查与交付解析
@@ -87,8 +93,8 @@ workflow-run（安装器仓库）/
 │   ├── scripts/template.mjs           # 修改 / 创建模板：草稿 → 校验与影响 → 保存
 │   ├── scripts/tables.mjs             # 找出改动涉及的数据库表
 │   ├── scripts/artifact.mjs           # 草稿收尾 / 中断恢复 / 安全取消
-│   ├── scripts/review-handoff.mjs     # 自动生成审查交接与结果结构
-│   ├── scripts/requirement.mjs        # 产物按需求归档：绑定需求名、落盘路径、meta.json
+│   ├── scripts/review-handoff.mjs     # 参数 / 文件 I/O；调用 core reviews.prepare
+│   ├── scripts/requirement.mjs        # 参数 / 输出；调用 core 的 bind / which / reindex
 │   ├── scripts/view.mjs               # 项目文档视图（本地静态页面）
 │   ├── scripts/make-template.mjs      # 从样例文档抽模板骨架
 │   ├── scripts/doc-sections.mjs       # 原解析导出入口，转交 lib/document-model.mjs
@@ -175,7 +181,7 @@ workflow-run（安装器仓库）/
 
 dev 与 project-review 的 SKILL.md 保留门禁、步骤路由、必要命令和结果去向；进入阶段前才读取对应 reference 的小节。dev 的开工、调研方案、实现验证、审查交付和缺陷修复分开加载；审查的方法、复核、报告与后续也分开加载。完整流程的步骤编号、用户选择、运行状态与正式产物规则沿用原协议，必守规则不藏在脚本注释中。
 
-状态查询、文档视图、效果报告和 PR 描述共用 `workflow/lib/workspace-read.mjs` 的单次命令内存快照，正文与元信息采集一次，使用统一解析规则。需求绑定、运行状态和已登记版本来自 `meta.json`；正文、文档头和发布记录来自 Markdown，产物索引由显式 `sync` 重建。`list` 只读，`sync` 不再从文档头隐式增加绑定分支，绑定使用 `bind`。跨项目视图仍展示全部服务，分支查询和效果报告默认当前项目；`--all-branches` 保持同路径工作区优先，Git 中的版本信息从同一引用读取。异常数据通过 diagnostics 报告，可读的正文仍展示，读取不修复或覆盖元信息。边界与数据归属详见 [内部架构](../workflow/references/architecture.md)。
+状态查询、文档视图、效果报告和 PR 描述共用 `workflow/lib/workspace-read.mjs` 的单次命令内存快照，正文与元信息采集一次，使用统一解析规则。需求绑定、运行状态和已登记版本来自 `meta.json`；正文、文档头和发布记录来自 Markdown，派生产物索引由显式 `reindex` 重建。`list` 与 `which` 只读，`reindex` 不修改 versions、runs、revision、批准、证据或正文，绑定使用 `bind`。跨项目视图仍展示全部服务，分支查询和效果报告默认当前项目；`--all-branches` 保持同路径工作区优先，Git 中的版本信息从同一引用读取。异常数据通过 diagnostics 报告，可读的正文仍展示，读取不修复或覆盖元信息。边界与数据归属详见 [内部架构](../workflow/references/architecture.md)。
 
 新增一个 skill 就是新建目录、写 `SKILL.md.tpl` 和 `skill.json`，再加进 `package.json` 的 `files`。`tests/test-skills-meta.mjs` 会检查它们是否一致。
 

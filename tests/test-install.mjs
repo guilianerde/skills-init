@@ -198,7 +198,8 @@ test('安装清单：版本 / 环境 / sha256，用户配置只记存在与否�
   assert.equal(m.skills.workflow.userFiles['profile.json'], true);
   assert.equal(m.skills['database-query'].userFiles['config.json'], false);
   assert.ok(!('profile.json' in m.skills.workflow.files));
-  assert.ok(!p.exists('.claude/skills/.workflow-run.json'));
+  if (SYMLINK_OK) assert.ok(!p.exists('.claude/skills/.workflow-run.json'));
+  else assert.ok(p.exists('.claude/skills/.workflow-run.json'), '无软链接环境下按独立拷贝安装');
   p = project('manifest-copy');
   ok(p.install(['--envs', 'claude,qwen', '--copy', '--yes', '--skip-db']));
   assert.ok(p.isFile('.claude/skills/.workflow-run.json'));
@@ -491,9 +492,10 @@ test('旧包 skills-init 装过的项目：列出改名命令后停下，不做�
   fs.renameSync(p.at('.agents/skills/.skills-init.json'), p.at('.agents/skills/.workflow-run.json'));
   const r = p.install(['upgrade']);
   ok(r);
-  assert.ok(p.exists('workflow-run/docs/requirements/x/legacy/plan.md'), '旧结构迁到 <需求>/<项目名>/（项目名取目录名）');
-  assert.match(r.log, /需求产物已迁到新结构/);
-  assert.equal(p.json('.agents/skills/workflow/profile.json').artifacts.project, 'legacy');
+  assert.ok(p.exists('workflow-run/docs/requirements/x/plan.md'), '新版不自动移动旧结构历史文件');
+  assert.ok(!p.exists('workflow-run/docs/requirements/x/legacy/plan.md'), '不创建迁移后的副本');
+  assert.doesNotMatch(r.log, /需求产物已迁到新结构/);
+  assert.equal(p.json('.agents/skills/workflow/profile.json').artifacts?.project, undefined, '不再自动把项目名写入 profile');
   assert.match(r.log, /旧版残留：CLAUDE\.md/);
   assert.match(r.log, /旧版残留：\.gitignore/);
   assert.ok(p.read('.gitignore').includes('/workflow-run/tmp/'));

@@ -10,7 +10,7 @@
 {"scope":{"base":"main","exclude":["unrelated/**"]}}
 ```
 
-完整流程的文档先写草稿，再统一收尾；不要直接覆盖正式文件后用 sync 代替收尾。模板由调用方用 `resolve.mjs template <skill> <id>` 读取，按 [templates.md](templates.md) 的「文档模板的两部分」填充正文。首次生成清单时用 dev 的 clarification-template.md，后续各轮把上一版正式清单复制到 tmp 更新，再发布：
+完整流程的文档先写草稿，再统一收尾；不要直接覆盖正式文件后用 reindex 代替收尾。模板由调用方用 `resolve.mjs template <skill> <id>` 读取，按 [templates.md](templates.md) 的「文档模板的两部分」填充正文。首次生成清单时用 dev 的 clarification-template.md，后续各轮把上一版正式清单复制到 tmp 更新，再发布：
 
 ```sh
 node <skills>/workflow/scripts/artifact.mjs finalize --id <id> --expect-revision <revision> --kind clarification --draft workflow-run/tmp/clarification.md --input workflow-run/tmp/checkpoint.json
@@ -113,13 +113,13 @@ feature 可在 checkpoint 标 F7 completed；bug 的 B5 此时仍 in_progress。
 
 只有该选择仍有效，才允许 `artifact.mjs finalize --kind delivery --draft ...`。审查后代码／基线变化或报告被修改，旧选择不能继续用；回 F6（bug 回 B4）、验证、复审、再次取得选择。修复回退会清除旧验证、审查与交付选择；方案改变则还须重新确认。
 
-交付摘要和反馈处理后，末步标 completed，再 complete，保存“已完成”与时间。可选提交、发布、知识沉淀仍沿用原授权边界，且在完成标记后处理；若本次运行完成前修改正式正文，需重新收尾，不能只 sync 后用旧收尾凭据 complete。
+交付摘要和反馈处理后，末步标 completed，再 complete，保存“已完成”与时间。可选提交、发布、知识沉淀仍沿用原授权边界，且在完成标记后处理；若本次运行完成前修改正式正文，需重新收尾，不能只 reindex 后用旧收尾凭据 complete。
 
 ## 统一收尾与中断恢复
 
 finalize 先用知识库当前模板 lint 精确的草稿内容，再校验运行 revision、阶段、分支和证据；通过后归档旧版、发布正式文件、更新版本／索引、登记运行证据。checkpoint 只能更新当前产物所属步骤、等待状态和上下文，不能夹带下游阶段或用户确认。输出正式 path、cite、previous、version、lint、run；自检警告和待填写项要告知用户，引用用 cite，归档遵循 requirements.md，不能替用户删除。
 
-正式文档先写 tmp 草稿；不要先调用 `requirement.mjs path` 归档再直接覆盖，否则绕过收尾的中断保护。tech / release 分别在 T4 / L4 用 kind tech / release 收尾，使用各自的知识模板；wiki／沉淀后只更新发布或知识元信息仍可显式 sync。
+正式文档先写 tmp 草稿；旧 `requirement.mjs path` 入口已删除，不能通过直接覆盖正式文件绕过收尾中断保护。tech / release 分别在 T4 / L4 用 kind tech / release 收尾，使用各自的知识模板；wiki／沉淀后只更新发布或知识元信息仍可显式 reindex，但 reindex 不修复正文 hash 或旧证据。
 
 技术方案将生成时间、对比分支、diff 概览、PRD 参考和模板来源放在文件头的 `<!-- workflow-run: … -->` 多行注释中（格式见 create-tech-md-doc，整个块在前 20 行内），不要求正文显示元信息引用块。分支校验仍读取注释中的 `对比分支：`，索引日期读取其中的 `生成时间：`；旧文档的可见元信息继续兼容。注释随正式文件一起归档并参与 hash 校验，Wiki 转换时移除；`meta.json` 仍按现有逻辑记录绑定、索引和运行，不自动接收全部注释字段。
 

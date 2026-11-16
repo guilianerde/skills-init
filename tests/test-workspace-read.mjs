@@ -7,7 +7,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { loadWorkspace, readGitArtifacts } from '../workflow/lib/workspace-read.mjs';
-import { bind, sync, list } from '../workflow/lib/requirements.mjs';
+import { bind, reindexRequirement, list } from '../workflow/lib/requirements.mjs';
 import { startRun, runState } from '../workflow/lib/runs.mjs';
 import { collect, branchView } from '../workflow/scripts/artifacts.mjs';
 import { buildReport } from '../workflow/scripts/report.mjs';
@@ -36,7 +36,7 @@ function fixture(t) {
 test('各查询复用同一次快照：每份正文和元信息只读一次，结果一致且不改运行或索引', (t) => {
   const f = fixture(t);
   const files = ['plan.md', 'review.md', 'delivery.md'].map((name) => f.put(`${f.req.dir}/${name}`, doc(name)));
-  sync(f.root, f.req.dir);
+  reindexRequirement(f.root, f.req.dir);
   const run = startRun(f.root, { branch: BRANCH, kind: 'feature', size: 'M' }).run;
   const before = fs.readFileSync(f.meta, 'utf8');
   const mtime = fs.statSync(f.meta).mtimeMs;
@@ -68,7 +68,7 @@ test('各查询复用同一次快照：每份正文和元信息只读一次，�
   assert.equal(fs.statSync(f.meta).mtimeMs, mtime);
 });
 
-test('list 纯读取；未同步正文能显示，sync 保留 runs、扩展字段和显式分支绑定', (t) => {
+test('list 纯读取；未索引正文也能显示，reindex 保留 runs、扩展字段和显式分支绑定', (t) => {
   const f = fixture(t);
   const run = startRun(f.root, { branch: BRANCH, kind: 'feature', size: 'M' }).run;
   const meta = JSON.parse(fs.readFileSync(f.meta));
@@ -78,20 +78,20 @@ test('list 纯读取；未同步正文能显示，sync 保留 runs、扩展字�
   const before = fs.readFileSync(f.meta, 'utf8');
   assert.equal(list(f.root)[0].artifacts, 1);
   assert.equal(fs.readFileSync(f.meta, 'utf8'), before);
-  const result = sync(f.root, f.req.dir);
+  const result = reindexRequirement(f.root, f.req.dir);
   assert.deepEqual(result.branches, [BRANCH]);
   assert.equal(result.artifacts[0].branch, 'feature/unbound');
   assert.deepEqual(result.runs[run.id], run);
   assert.deepEqual(result.extension, { keep: true });
-  const original = JSON.stringify(result);
-  sync(f.root, f.req.dir);
-  assert.equal(JSON.stringify(JSON.parse(fs.readFileSync(f.meta))), original);
+  const original = fs.readFileSync(f.meta, 'utf8');
+  reindexRequirement(f.root, f.req.dir);
+  assert.equal(fs.readFileSync(f.meta, 'utf8'), original);
 });
 
 test('损坏元信息隔离诊断；正文仍可展示，写入拒绝覆盖，缺失产物有明确提示', (t) => {
   const f = fixture(t);
   f.put(`${f.req.dir}/review.md`, doc('审查'));
-  sync(f.root, f.req.dir);
+  reindexRequirement(f.root, f.req.dir);
   const meta = fs.readFileSync(f.meta, 'utf8');
   fs.writeFileSync(f.meta, '{broken');
   let workspace = loadWorkspace(f.root);
@@ -100,10 +100,10 @@ test('损坏元信息隔离诊断；正文仍可展示，写入拒绝覆盖，�
   assert.equal(workspace.diagnostics[0].code, 'invalid_meta');
   assert.equal(viewData(f.root, workspace).requirements[0].artifacts.length, 1);
   assert.equal(branchView(f.root, BRANCH, workspace).execution.current, null);
-  assert.throws(() => sync(f.root, f.req.dir), /不是合法 JSON/);
+  assert.throws(() => reindexRequirement(f.root, f.req.dir), /不是合法 JSON/);
   assert.equal(fs.readFileSync(f.meta, 'utf8'), '{broken');
   fs.writeFileSync(f.meta, meta);
-  fs.rmSync(path.join(f.root, f.req.dir, 'review.md'));
+  fs.unlinkSync(path.join(f.root, f.req.dir, 'review.md'));
   workspace = loadWorkspace(f.root);
   assert.equal(workspace.diagnostics[0].code, 'missing_artifact');
   assert.equal(workspace.artifacts.length, 0);
@@ -127,11 +127,11 @@ test('跨项目视图共享快照，效果报告仍默认当前项目；other、
   assert.equal(collect(f.root, { allProjects: true, workspace }).length, 2);
 });
 
-test('索引结构损坏不会吞掉正文或有效运行；读取提示异常，显式 sync 可修复索引', (t) => {
+test('索引结构损坏不会吞掉正文或有效运行；读取提示异常，显式 reindex 可修复索引', (t) => {
   const f = fixture(t);
   f.put(`${f.req.dir}/review.md`, doc('审查'));
   const run = startRun(f.root, { branch: BRANCH, kind: 'feature', size: 'M' }).run;
-  sync(f.root, f.req.dir);
+  reindexRequirement(f.root, f.req.dir);
   const meta = JSON.parse(fs.readFileSync(f.meta));
   meta.artifacts = [null];
   fs.writeFileSync(f.meta, JSON.stringify(meta));
@@ -139,7 +139,7 @@ test('索引结构损坏不会吞掉正文或有效运行；读取提示异常�
   assert.ok(workspace.diagnostics.some((d) => d.code === 'invalid_index'));
   assert.equal(workspace.artifacts.length, 1);
   assert.equal(workspace.runs[0].id, run.id);
-  const fixed = sync(f.root, f.req.dir);
+  const fixed = reindexRequirement(f.root, f.req.dir);
   assert.equal(fixed.artifacts[0].file, 'review.md');
   assert.deepEqual(fixed.runs[run.id], run);
   assert.equal(loadWorkspace(f.root).diagnostics.length, 0);
@@ -152,7 +152,7 @@ test('Git 产物读取同一引用的版本；工作区同路径优先，缺失�
   let meta = JSON.parse(fs.readFileSync(f.meta));
   meta.versions = { tech: 7 };
   fs.writeFileSync(f.meta, JSON.stringify(meta));
-  sync(f.root, f.req.dir);
+  reindexRequirement(f.root, f.req.dir);
   f.git('init', '-q', '-b', BRANCH);
   f.git('add', '.');
   f.git('commit', '-qm', 'docs');
@@ -164,7 +164,7 @@ test('Git 产物读取同一引用的版本；工作区同路径优先，缺失�
   assert.equal(workspace.artifacts[0].version, 99);
   assert.equal(workspace.artifacts[0].source, 'worktree');
   assert.equal(readGitArtifacts(f.root, BRANCH)[0].version, 7);
-  fs.rmSync(path.join(f.root, file));
+  fs.unlinkSync(path.join(f.root, file));
   workspace = loadWorkspace(f.root, { allBranches: true });
   assert.equal(workspace.artifacts[0].version, 7);
   assert.equal(workspace.artifacts[0].source, 'git');
@@ -180,6 +180,12 @@ test('共享核心依赖方向：不反向依赖命令脚本，纯模型不依�
     assert.ok(!imports.some((p) => p.includes('/scripts/') || p.includes('/bin/')), file);
     if (['document-model.mjs', 'artifact-model.mjs'].includes(file)) assert.ok(!imports.some((p) => p.startsWith('node:')), file);
     graph.set(file, imports.filter((p) => p.startsWith('./')).map((p) => p.slice(2)));
+  }
+  const core = path.join(REPO, 'workflow/core');
+  for (const file of fs.readdirSync(core).filter((name) => name.endsWith('.mjs'))) {
+    const text = fs.readFileSync(path.join(core, file), 'utf8');
+    const imports = [...text.matchAll(/(?:from|import)\s*['"]([^'"]+)['"]/g)].map((match) => match[1]);
+    assert.ok(!imports.some((value) => value.includes('/scripts/') || value.includes('/bin/') || value.endsWith('SKILL.md')), file);
   }
   const visit = (file, stack = []) => {
     assert.ok(!stack.includes(file), [...stack, file].join(' -> '));

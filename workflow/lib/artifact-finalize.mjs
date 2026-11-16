@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { FILES, parseBranch } from './artifact-model.mjs';
-import { hash, assertWorkingBranch, snapshotReader } from './code-snapshot.mjs';
+import { canonicalJson, hash, assertWorkingBranch, snapshotReader } from './code-snapshot.mjs';
 import { layout } from './project.mjs';
 import { readRun, assertRunVersion, applyCheckpoint } from './runs.mjs';
 import { isDev, coreSteps, applyDevEvidence, assertRequirement, assertPlanBasis, assertReview, assertDelivery, reviewEvidence, documentReviewBasis } from './run-gates.mjs';
@@ -107,7 +107,7 @@ export function finalizeArtifact(root, { branch, id, revision, kind, text, input
   const { existingWiki } = draft;
   text = draft.text;
   const digest = hash(text);
-  const key = hash(JSON.stringify({ id, revision, kind, digest, input, packet, result }));
+  const key = hash(canonicalJson({ id, revision, kind, digest, input, packet, result }));
   let repeated = null;
   updateMeta(path.join(req.abs, 'meta.json'), (meta) => {
     const current = meta.runs[id];

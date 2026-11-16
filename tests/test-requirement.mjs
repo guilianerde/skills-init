@@ -7,7 +7,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { useLocalDocNexus } from './helpers/docnexus-pkg.mjs';
-import { dirName, parseFile, which, bind, nextPath, sync, ensureIgnore, list, legacyRequirements, migrateLayout } from '../workflow/scripts/requirement.mjs';
+import { dirName, parseFile, which, bind, reindex, reindexRequirement, ensureIgnore, list } from '../workflow/scripts/requirement.mjs';
 import { collect, branchView } from '../workflow/scripts/artifacts.mjs';
 
 useLocalDocNexus();
@@ -36,25 +36,16 @@ test('dirName：保留中文，去掉路径与非法字符；parseFile 认出种
   assert.equal(parseFile('notes.md'), null);
 });
 
-test('没绑定时 path 退出码 2 并给出建议名；bind 后给出路径，已有版本不覆盖，带上一版的 wiki 记录', () => {
+test('没绑定时给出建议名；bind 后返回同一需求目录，同名需求可绑定多个分支', () => {
   const { root, put } = repo();
   const b = 'feature/order-export';
   let w = which(root, b);
   assert.equal(w.bound, false);
   assert.equal(w.suggested_name, 'feature-order-export');
-  assert.equal(nextPath(root, 'tech', b).code, 2);
 
   const r = bind(root, { name: '订单导出支持按渠道筛选', branch: b, base: 'main' });
   assert.deepEqual([r.ok, r.created, r.dir, r.named_by], [true, true, 'workflow-run/docs/requirements/订单导出支持按渠道筛选/svc', 'user']);
-  let p = nextPath(root, 'tech', b).out;
-  assert.equal(p.path, `${r.dir}/tech-doc.md`);
-  put(p.path, doc('技术方案', b, '<!-- md-to-wiki: pageId=42 version=3 -->\n'));
-  p = nextPath(root, 'tech', b).out;
-  assert.deepEqual([p.path, p.version], [`${r.dir}/tech-doc.md`, 2], '文件名固定，版本号加一');
-  assert.equal(p.previous, 'workflow-run/tmp/old-artifacts/订单导出支持按渠道筛选/svc/tech-doc_v1.md');
-  assert.equal(fs.readFileSync(path.join(root, p.previous), 'utf8'), fs.readFileSync(path.join(root, p.path), 'utf8'), '上一版先复制一份');
-  assert.equal(p.wiki_record, '<!-- md-to-wiki: pageId=42 version=3 -->');
-  assert.equal(nextPath(root, 'nope', b).code, 1);
+  assert.equal(which(root, b).dir, r.dir);
 
   // 同一个名字在另一个分支上 bind：挂到同一需求
   const r2 = bind(root, { name: '订单导出支持按渠道筛选', branch: 'fix/export-npe' });
@@ -67,7 +58,7 @@ test('没绑定时 path 退出码 2 并给出建议名；bind 后给出路径，
   fs.rmSync(root, { recursive: true, force: true });
 });
 
-test('sync：meta.json 汇总产物、最新版本、wiki 与 DocNexus；内容不变时不重写', () => {
+test('reindex：meta.json 汇总产物、wiki 与 DocNexus；只刷新派生索引', () => {
   const { root, put } = repo();
   const b = 'feature/order-export';
   const { dir } = bind(root, { name: '订单导出', branch: b });
@@ -76,16 +67,18 @@ test('sync：meta.json 汇总产物、最新版本、wiki 与 DocNexus；内容�
   put(`${dir}/review_v2.md`, doc('审查', b));
   put(`${dir}/tech-doc.md`, doc('技术', b, '<!-- md-to-wiki: pageId=42 version=3 url=https://wiki/x -->\n'));
   put(`${dir}/notes.md`, '随手记\n');
-  const m = sync(root, dir);
+  const m = reindexRequirement(root, dir);
   assert.deepEqual(m.latest, { clarification: null, requirement: null, plan: null, delivery: 'delivery.md', review: 'review_v2.md', tech: 'tech-doc.md', release: null });
   assert.equal(m.artifacts.length, 4, 'notes.md 不是产物');
   assert.deepEqual(m.artifacts.find((a) => a.kind === 'tech').wiki, { pageId: '42', version: 3, url: 'https://wiki/x', at: null });
   assert.deepEqual(m.artifacts.find((a) => a.kind === 'delivery').docnexus, ['docnexus/library/dev/order.md']);
   assert.equal(m.artifacts[0].date, '2026-10-15');
+  assert.deepEqual(m.unregistered.map(({ kind }) => kind).sort(), ['delivery', 'review', 'tech']);
+  assert.ok(m.indexed_at);
   const f = path.join(root, dir, 'meta.json');
   const before = fs.readFileSync(f, 'utf8');
   const t = fs.statSync(f).mtimeMs;
-  sync(root, dir);
+  reindexRequirement(root, dir);
   assert.equal(fs.readFileSync(f, 'utf8'), before);
   assert.equal(fs.statSync(f).mtimeMs, t, '没变化不写文件');
   assert.equal(list(root)[0].artifacts, 4);
@@ -119,15 +112,17 @@ test('ensureIgnore：创建或追加一次，不重复', () => {
   fs.rmSync(root, { recursive: true, force: true });
 });
 
-test('CLI：which / bind / path / sync；安装时写 .ignore', () => {
+test('CLI：which / bind / reindex；旧 path / sync 入口已删除并安装 .ignore', () => {
   const { root, put, cli } = repo();
   assert.equal(cli('which').out.bound, false);
-  assert.equal(cli('path', 'delivery').code, 2);
+  assert.equal(cli('path', 'delivery').code, 1);
+  assert.equal(cli('sync').code, 1);
   assert.equal(cli('bind', '--name', '订单导出').code, 0);
-  const p = cli('path', 'delivery').out.path;
+  const p = 'workflow-run/docs/requirements/订单导出/svc/delivery.md';
   put(p, doc('交付', 'feature/order-export'));
-  assert.equal(cli('sync', p).out.artifacts, 1);
-  assert.equal(cli('sync', 'README.md').code, 1);
+  const indexed = cli('reindex').out;
+  assert.equal(indexed.artifacts, 1);
+  assert.deepEqual(indexed.unregistered, [{ kind: 'delivery', file: 'delivery.md' }]);
   assert.equal(cli('bogus').code, 1);
 
   const r = spawnSync(process.execPath, [path.join(REPO, 'bin/workflow-run.mjs'), '--project-root', root, '--envs', 'codex', '--skip-db', '--yes'], { cwd: root, encoding: 'utf8', env: { ...process.env, WORKFLOW_RUN_ADMIN: '1' } });
@@ -142,69 +137,46 @@ test('日期取文档头，跳过第一行 md-to-wiki 发布记录里的 at=（m
   const b = 'feature/order-export';
   const { dir } = bind(root, { name: '订单导出', branch: b });
   put(`${dir}/tech-doc.md`, doc('技术', b, '<!-- md-to-wiki: pageId=42 version=3 at=2026-10-20T08:00:00Z -->\n'));
-  assert.equal(sync(root, dir).artifacts[0].date, '2026-10-15');
+  assert.equal(reindexRequirement(root, dir).artifacts[0].date, '2026-10-15');
   assert.match(collect(root)[0].date, /^2026-10-15#/);
   fs.rmSync(root, { recursive: true, force: true });
 });
 
-test('sync <path>：文件名固定、只留最新版；上一版归档为 <种类>_v<N>.md 并提示；没写新内容不算新版本', () => {
+test('reindex：不提升权威版本、不改运行和证据，未知版本只报告为未登记', () => {
   const { root, put, cli } = repo();
   assert.equal(cli('bind', '--name', '订单导出').code, 0);
   const b = 'feature/order-export';
-  const OLD = 'workflow-run/tmp/old-artifacts/订单导出/svc';
-  const write = (kind, title) => { const p = cli('path', kind).out; put(p.path, doc(title, b)); return p; };
-  let p = write('review', '审查 1');
-  let s = cli('sync', p.path).out;
-  assert.equal(s.archived, undefined, '第一版不归档');
-  assert.deepEqual(s.versions, {});
-  write('tech', '技术方案');
-  p = write('review', '审查 2');
-  assert.deepEqual([p.path, p.version, p.previous], [`${s.dir}/review.md`, 2, `${OLD}/review_v1.md`]);
-  assert.match(fs.readFileSync(path.join(root, p.previous), 'utf8'), /审查 1/, 'previous 是上次报告，复审对照它');
-  s = cli('sync', p.path).out;
-  assert.deepEqual(s.archived.files, [{ kind: 'review', version: 1, file: `${OLD}/review_v1.md` }]);
-  assert.equal(s.archived.dir, OLD);
-  assert.match(s.archived.hint, /不要替用户删/);
-  assert.deepEqual(s.versions, { review: 2 });
-  assert.deepEqual(fs.readdirSync(path.join(root, s.dir)).sort(), ['meta.json', 'review.md', 'tech-doc.md']);
-  assert.equal(cli('sync', p.path).out.archived, undefined, '再 sync 不重复归档');
+  const dir = 'workflow-run/docs/requirements/订单导出/svc';
+  put(`${dir}/review.md`, doc('审查 2', b));
+  const file = path.join(root, dir, 'meta.json');
+  const meta = JSON.parse(fs.readFileSync(file, 'utf8'));
+  meta.versions = { review: 2 };
+  meta.runs = { keep: { id: 'keep', revision: 7, evidence: { digest: 'abc' } } };
+  meta.approval = { confirmed: true };
+  meta.updated = '2026-10-01T00:00:00.000Z';
+  fs.writeFileSync(file, `${JSON.stringify(meta, null, 2)}\n`);
 
-  // 拿了路径却没写：版本号不变，下次照样从 v2 归档
-  cli('path', 'review');
-  s = cli('sync', p.path).out;
-  assert.deepEqual([s.archived, s.versions.review], [undefined, 2]);
-  p = write('review', '审查 3');
-  assert.equal(p.previous, `${OLD}/review_v2.md`);
-  s = cli('sync', p.path).out;
-  assert.deepEqual([s.versions.review, s.archived.files[0].file], [3, `${OLD}/review_v2.md`]);
-  assert.deepEqual(fs.readdirSync(path.join(root, OLD)).sort(), ['review_v1.md', 'review_v2.md']);
-  // 视图与链路读到的是目录里的最新版和它的版本号
-  const v = branchView(root, b);
-  assert.deepEqual([v.latest.review.path, v.latest.review.version], [`${s.dir}/review.md`, 3]);
+  const first = cli('reindex').out;
+  assert.deepEqual(first.versions, { review: 2 });
+  assert.equal(first.artifacts, 1);
+  assert.equal(first.unregistered.length, 0);
+  const indexed = JSON.parse(fs.readFileSync(file, 'utf8'));
+  assert.deepEqual(indexed.runs, meta.runs);
+  assert.deepEqual(indexed.approval, meta.approval);
+  assert.equal(indexed.updated, meta.updated, 'reindex 不覆盖正文更新时间');
+  assert.ok(indexed.indexed_at);
+  assert.equal(fs.existsSync(path.join(root, 'workflow-run/tmp/old-artifacts')), false);
+
+  put(`${dir}/review.md`, doc('审查 3', b).replace('2026-10-15', '2026-10-16'));
+  const second = cli('reindex').out;
+  assert.deepEqual(second.versions, { review: 2 }, 'reindex 不能提升版本');
+  assert.equal(fs.existsSync(path.join(root, 'workflow-run/tmp/old-artifacts')), false, 'reindex 不归档');
+  assert.equal(branchView(root, b).latest.review.version, 2);
   fs.rmSync(root, { recursive: true, force: true });
 });
 
-test('旧结构迁移：<需求>/ 下直接放的文件挪到 <需求>/<项目名>/，被跟踪的用 git mv，归档的上一版一起挪；目标里有同名文件时跳过', () => {
-  const { root, put, git } = repo();
-  const REQ = 'workflow-run/docs/requirements';
-  put(`${REQ}/订单导出/review.md`, doc('审查', 'feature/order-export'));
-  put(`${REQ}/订单导出/meta.json`, JSON.stringify({ name: '订单导出', branches: ['feature/order-export'] }));
-  put('workflow-run/tmp/old-artifacts/订单导出/review_v1.md', '旧版');
-  put(`${REQ}/支付/plan.md`, doc('方案', 'feature/pay'));
-  put(`${REQ}/支付/svc/plan.md`, '已有');
-  put(`${REQ}/新结构/svc/plan.md`, '新');
-  git('add', '-A'); git('commit', '-q', '-m', 'old layout');
-  assert.deepEqual(legacyRequirements(root).sort(), ['支付', '订单导出']);
-
-  const r = migrateLayout(root);
-  assert.equal(r.project, 'svc');
-  assert.deepEqual(r.moved.map((m) => m.to).sort(), [`${REQ}/订单导出/svc/meta.json`, `${REQ}/订单导出/svc/review.md`]);
-  assert.deepEqual(r.skipped.map((x) => x.dir), [`${REQ}/支付`], '目标里已有 plan.md');
-  assert.equal(JSON.parse(fs.readFileSync(path.join(root, REQ, '订单导出/svc/meta.json'), 'utf8')).project, 'svc');
-  assert.ok(fs.existsSync(path.join(root, 'workflow-run/tmp/old-artifacts/订单导出/svc/review_v1.md')), '归档跟着挪');
-  assert.match(git('-c', 'core.quotePath=false', 'status', '--porcelain').stdout, /^R  .*订单导出\/review\.md -> .*订单导出\/svc\/review\.md$/m, 'git mv 保留历史');
-  assert.equal(which(root, 'feature/order-export').dir, `${REQ}/订单导出/svc`, '迁移后照常找到');
-  assert.deepEqual(legacyRequirements(root), ['支付']);
-  assert.deepEqual(migrateLayout(root).moved, [], '再跑不重复');
-  fs.rmSync(path.dirname(root), { recursive: true, force: true });
+test('旧结构迁移入口已删除，不再由新版本自动移动用户历史目录', async () => {
+  const module = await import('../workflow/scripts/requirement.mjs');
+  assert.equal(module.legacyRequirements, undefined);
+  assert.equal(module.migrateLayout, undefined);
 });

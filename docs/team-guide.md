@@ -85,7 +85,7 @@ workflow-run/docs/requirements/<需求名>/<项目名>/
 * **随代码提交和独立文档仓库两种用法的结构完全一样**，切换时文件不用挪。一个需求横跨多个服务时，各服务在同一个需求目录下各占一个 `<项目名>/`。项目名写在 `workflow/profile.json` 的 `artifacts.project`：随代码提交时不用配置，取 git 远端仓库名（没有远端用目录名），第一次落盘时自动写进去；独立文档仓库时由 `docs-repo` 配置。
 * 旧版本随代码提交时没有 `<项目名>/` 这一层；`upgrade` 会把这些需求目录里的文件迁到 `<需求>/<项目名>/`（被 git 跟踪的用 `git mv`，保留历史），结尾列出迁移了哪些需求，改动由你提交。目标里已有同名文件的需求不动，并提示手动处理；`doctor` 也会提示还没迁移的需求。
 * **需求名由你定**：dev 在 Step 0 先确定工作分支，再查询绑定并确认需求名，给不出名字或说不清这次要做什么时不会进入开发流程（默认值按分支名生成；也可以选已有的需求，例如修 bug 的新分支挂到原需求下）。从 `/workflow` 完整链路开始时同样先问（只问名字，第一次落盘时才 `bind`）；S 快速通道也问，但不绑定、不落盘。确定后，同一分支上的各 skill 都写到这个目录，不再问。一个需求可以绑定多个分支。
-* 正式文档先写 tmp 草稿，再用 `artifact.mjs finalize` 自检、归档旧版、发布并更新索引与运行证据，输出 path / cite；文件名固定、目录只留最新版。中断后用 resume 恢复，重复命令不会重复升版本；旧版在 tmp/old-artifacts/，不替用户删除，wiki 页面记录自动沿用。底层 requirement path / sync 仍保留，新的正式流程统一走 finalize。
+* 正式文档先写 tmp 草稿，再用 `artifact.mjs finalize` 自检、归档旧版、发布并更新索引与运行证据，输出 path / cite；文件名固定、目录只留最新版。中断后用 resume 恢复，重复命令不会重复升版本；旧版在 tmp/old-artifacts/，不替用户删除，wiki 页面记录自动沿用。旧 path / sync 写入链已删除；只刷新派生索引时使用 `requirement.mjs reindex`，正文、版本和证据仍由 finalize 管理。
 * 需求目录写在项目根的 `.ignore` 里，ripgrep 和 agent 的代码搜索会跳过它，产物多了不会污染搜索结果（找历史决策用 DocNexus）。git 不受影响，建议随代码提交。
 
 完整 dev 的关键阶段由程序校验：M / L 方案确认绑定具体版本，测试证据和审查报告绑定包含未提交改动的代码快照，交付选择绑定本轮报告。相关代码、基线或报告变化后需重新验证／审查和选择。独立审查交接由脚本从需求事实、范围与验证结果生成；需要产品核对清单时，在首版清单前创建运行、等待反馈时保存状态；快速通道仍不创建运行。协议见 [execution.md](../workflow/references/execution.md)。
@@ -98,7 +98,7 @@ npx @rowansenne/workflow-run docs-repo <团队文档仓库地址> [--project <�
 
 它会：
 - `workflow-run/` 里没有内容（或只有 `tmp/`）时，把文档仓库克隆到这里（`tmp/` 先挪开再放回）；
-- 已有随项目提交的产物、DocNexus 时，原地 `git init` 并接上远端，文件不用挪（旧结构的产物先迁到 `<需求>/<项目名>/`）。远端是空仓库时，本地内容就是文档仓库的第一批内容；远端已有内容时检出远端，本地文件和远端同路径冲突（多半是两边都有 DocNexus 知识库）就退回原状并列出冲突的文件，不合并；代码仓库还跟踪着 `workflow-run/` 时提示 `git rm -r --cached workflow-run`；
+- 已有随项目提交的产物、DocNexus 时，原地 `git init` 并接上远端，文件不用挪。新版不再自动迁移旧结构；用户区里的历史目录保持原样。远端是空仓库时，本地内容就是文档仓库的第一批内容；远端已有内容时检出远端，本地文件和远端同路径冲突（多半是两边都有 DocNexus 知识库）就退回原状并列出冲突的文件，不合并；代码仓库还跟踪着 `workflow-run/` 时提示 `git rm -r --cached workflow-run`；
 - 然后代码仓库的 `.gitignore` 加 `/workflow-run/`，文档仓库的 `.git/info/exclude` 加 `/tmp/`；把项目名写进 `workflow/profile.json`（默认沿用已配置的，其次 git 远端仓库名；`profile.json` 随代码提交，记得提交它）；文档仓库里有 DocNexus 时接上本项目的链接和段落，本机还没装它的依赖时提示运行 `upgrade --with-docnexus`。不带地址运行显示当前状态；只改项目名：`docs-repo --project <项目名>`。
 
 `workflow-run/` 自己是 git 仓库就是这个模式：目录结构不变，各服务在同一个需求目录下各占一个子目录，DocNexus 知识库也在这个仓库里各服务共用。项目名写在 `workflow/profile.json` 的 `artifacts.project`，只配一次（`docs-repo` 会配好；没配时 skill 会问你一次）。文档里引用产物写成「文档仓库名:路径」，各服务、各人的克隆里都一样。

@@ -25,7 +25,7 @@
 完整流程：
 
 1. **落盘交付说明**：模板路径用 `node <skills>/workflow/scripts/resolve.mjs template dev delivery-template.md` 取，先写到 tmp 草稿，按 execution.md 用 `artifact.mjs finalize --kind delivery` 发布（见 Artifact Location）。元信息行的「对比分支」写当前分支和 `profile.main_branch`，`artifacts.mjs`、project-review、上线方案靠它找到这份交付；「参考产物」写 requirement.md 的 cite / 版本、最新方案与审查报告。「审查」节记录报告结论、修复与复审结果、用户选择交付及接受的遗留风险。尚未发起沉淀询问时，元信息先写「未询问」，再按第 5 步更新。小改动每节一两行即可，不适用的节写「无」，但验证结果必须如实。
-2. **自检与收尾**：finalize 内部使用知识库交付模板检查草稿，有错误先修正；成功输出正式路径、cite 和版本。不要直接覆盖正式文件后用 sync 代替。
+2. **自检与收尾**：finalize 内部使用知识库交付模板检查草稿，有错误先修正；成功输出正式路径、cite 和版本。不要直接覆盖正式文件后用 reindex 代替。
 3. **对话里给摘要**：结果、验证（含未验证项）、最新审查报告路径与结论、遗留问题和用户接受的风险、配置 / SQL 有无、交付文件路径；不必把全文贴进对话。
 4. **记录运行反馈**（不问用户）：按 `<skills>/workflow/references/feedback.md` 运行 `node <skills>/workflow/scripts/feedback.mjs add --skill dev --model <模型名> --mode <feature|bug> --size <S|M|L> --fast <yes|no> --rounds <提问轮数> --corrections <用户纠正理解的次数> --acceptance <已验证>/<总数> --baseline-failures <n>`，有跳过的步骤、不清楚或做不到的规则、用户的抱怨时再加 `--skipped` / `--unclear` / `--feedback`。只写过程，不写代码和业务名词；报错就提一句，不影响交付。
 完成上述交付摘要与反馈后，按运行状态协议将 F8（bug 为 B5）标 completed 并 complete。下面的可选后续动作在完成标记后处理。
@@ -39,7 +39,7 @@
      - 有 → 明确问用户「要不要启动 DocNexus 流程，把本次交付沉淀到 DocNexus？」，并列出建议沉淀的条目；发起询问时将交付说明的元信息改成「未沉淀」，成功入库后再写知识路径，避免将已询问但尚未入库算成「未询问」。
        - 用户同意 → 以交付说明为来源，按 DocNexus 入口 skill `docnexus` 的 capture 流程写入；正文只写知识，不写分支、路径；有 facts 时按 `<skills>/workflow/references/docnexus.md`「沉淀的来源」的格式写 provenance；分类用 `node <skills>/workflow/scripts/resolve.mjs category dev` 的结果作为调用方显式分类封存（见 `<skills>/workflow/references/docnexus.md`「写入 DocNexus 的分类」）。只沉淀确认过的事实，不沉淀「未验证」「待确认」的内容；知识库已有同主题的沉淀时更新那一篇（带 `--base-version`），不重复新建。写入成功后把交付说明的「DocNexus」元信息行改成 `workflow-run/docnexus/library/<path>`，并回报给用户。
        - 用户不同意 → 交付说明的元信息行改成「未沉淀」，不再追问。
-     - 元信息更新后运行 `requirement.mjs sync <交付路径>`；F7 内部审查报告的「未询问」不随此结论改变。
+     - 元信息更新后运行 `requirement.mjs reindex`；它不修复正文 hash 或旧交付证据。F7 内部审查报告的「未询问」不随此结论改变。
 
 ## Artifact Location
 
@@ -47,4 +47,4 @@
 
 - **需求名**：Step 0 已运行 `requirement.mjs which` 并问定名字。第一次落盘前运行 `requirement.mjs bind --name "<需求名>"`（用户明确同意按分支名生成时不带 `--name`）；S 快速通道不 bind、不落盘。缺陷修复同样处理（可以选择挂到原需求下）。
 - **正式写入**：按 `<skills>/workflow/references/execution.md`，澄清清单、需求、方案、审查、交付都先写 tmp 草稿，再用 `artifact.mjs finalize --kind clarification|requirement|plan|review|delivery` 完成自检、旧版归档、索引与运行证据登记。缺陷修复在 B4 的方案草稿中保留原文并追加修复方案，不另建正式文件。
-- 使用输出的 path / cite 引用；previous 非空时告知上一版归档位置，不能替用户删除。中断先 `artifact.mjs resume --id <id>`，不能继续 sync / save 覆盖待办。独立文档仓库在交付完成后运行 pending，按 requirements.md 提示提交。已完成交付的 wiki／DocNexus 元信息更新仍显式 sync。
+- 使用输出的 path / cite 引用；previous 非空时告知上一版归档位置，不能替用户删除。中断先 `artifact.mjs resume --id <id>`，不能继续 reindex / save 覆盖待办。独立文档仓库在交付完成后运行 pending，按 requirements.md 提示提交。已完成交付的 wiki／DocNexus 元信息更新使用显式 reindex。
