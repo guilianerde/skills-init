@@ -100,7 +100,7 @@ npx @rowansenne/workflow-run@latest doctor --offline
 
 这里用 `--copy` 在 `.codebuddy/skills/<skill>/` 生成真实目录和 `SKILL.md`，便于排除目录软链接的兼容问题。已有指向 `.agents/skills/` 的本工具链接会先转成独立拷贝，保留已填配置，再更新技能文件；共享来源和 Qwen 等其他环境的链接不变。后续 `upgrade` 沿用最近一次显式安装的环境和模式。只选择 WorkBuddy 时，全新安装不会生成 `.qwen/skills/`。
 
-安装后，将 **同一个业务项目目录**设为 WorkBuddy 任务的工作目录，重新打开项目并新建会话，再尝试 `/workflow status`、`/dev` 或 `/project-review`。`/workflow profile` 等是技能参数，不是额外的独立技能。
+安装后，将 **同一个业务项目目录**设为 WorkBuddy 任务的工作目录，再新建任务。选择安装 `dev` 时，安装器会同时写入 `.codebuddy/commands/dev.md`，在输入框输入 `/` 可找到 `/dev`，也可输入 `/dev --bug <现象>`。已有同名命令原样保留。其他技能可在任务里显式指定，例如「使用 project-review 技能审查当前分支」。
 
 如果仍然不可见，先确认业务项目下确实有 `.codebuddy/skills/workflow/SKILL.md`，并保留安装命令、`doctor --offline` 输出与 WorkBuddy 版本以便排查。项目级配置目录见 [WorkBuddy 官方说明](https://www.codebuddy.cn/docs/workbuddy/From-Beginner-to-Expert-Guide/Function-Description/Project)。
 

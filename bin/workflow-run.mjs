@@ -24,6 +24,7 @@ import { report, installSkills, linkSkills, updateGitignore, setupHome, recordEn
 import { setupCodeGraph } from './lib/codegraph.mjs';
 import { uninstall } from './lib/uninstall.mjs';
 import { writeArtifactContext } from './lib/artifact-context.mjs';
+import { installWorkBuddyDevCommand } from './lib/workbuddy.mjs';
 import { checkNodeForDocNexus, setupDocNexus, refreshDocNexusLinks, cleanupLegacyDocNexus, templateRecords, saveTemplateRecords, reportTemplateStatus, installedSkills, docnexusConnected, printTemplateDiffs } from './lib/docnexus.mjs';
 import { upgradeOptions, doctor } from './lib/doctor.mjs';
 import { docsRepo } from './lib/docsrepo.mjs';
@@ -248,6 +249,8 @@ async function main() {
     saveTemplateRecords(o.root, r.records);
     if (r.failed.length) fail('必需文档模板导入失败，安装未完成。修复后运行 npx @rowansenne/workflow-run seed-templates 重试。');
   } catch (e) { fail(e.message); }
+
+  if (sel.includes('workbuddy') && skills.includes('dev')) installWorkBuddyDevCommand(o.root);
 
   step('安装完成，启用方式');
   console.log('  codex     : 重启 codex 后自动发现项目级 skills（.agents/skills）；也可 /use project-review 手动加载');

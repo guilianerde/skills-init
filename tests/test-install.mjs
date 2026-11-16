@@ -501,15 +501,22 @@ test('旧包 skills-init 装过的项目：列出改名命令后停下，不做�
 
 test('WorkBuddy：.codebuddy/skills 按 skill 软链接到单一来源；交互菜单第 5 项；doctor 检查链接；卸载后 .codebuddy 里别的文件保留', () => {
   const p = project('workbuddy');
+  const devCommand = '.codebuddy/commands/dev.md';
   p.write('.codebuddy/CODEBUDDY.md', '# 团队约定\n');
   ok(p.install(['--envs', 'workbuddy', '--yes', '--skip-db']));
   for (const s of SKILLS) assert.ok(p.isFile(`.agents/skills/${s}/SKILL.md`), s);
   assertLinked(p, '.codebuddy/skills');
+  assert.equal(p.read(devCommand), repoFile('bin/workbuddy/dev.md'));
+  assert.match(p.read(devCommand), /\$ARGUMENTS/);
+  fs.unlinkSync(p.at(devCommand)); // 模拟旧版已安装技能但尚未有命令
+  ok(p.install(['upgrade']));
+  assert.equal(p.read(devCommand), repoFile('bin/workbuddy/dev.md'));
   assert.deepEqual(p.json('.agents/skills/.workflow-run.json').envs, ['workbuddy']);
   const d = p.install(['doctor']);
   if (SYMLINK_OK) assert.match(d.log, /\.codebuddy\/skills 全部指向 \.agents\/skills/);
   ok(p.install(['uninstall']));
   assert.ok(!p.exists('.codebuddy/skills'));
+  assert.ok(!p.exists(devCommand));
   assert.equal(p.read('.codebuddy/CODEBUDDY.md'), '# 团队约定\n');
 
   const q = project('workbuddy-menu');
@@ -544,6 +551,20 @@ test('WorkBuddy 改用 --copy：已有软链接变成真实目录，保留配置
   for (const s of SKILLS) assert.ok(p.isDir(`.codebuddy/skills/${s}`), s);
   assert.equal(p.read('.codebuddy/skills/workflow/profile.json'), '{"main_branch":"release"}\n');
   assertLinked(p, '.qwen/skills');
+});
+
+test('WorkBuddy：只为安装 dev 的项目创建命令，升级与卸载保留团队的同名命令', () => {
+  const p = project('workbuddy-custom-command');
+  const file = '.codebuddy/commands/dev.md';
+  ok(p.install(['--envs', 'workbuddy', '--skills', 'workflow', '--copy', '--skip-db', '--yes']));
+  assert.ok(!p.exists(file));
+  const custom = '---\ndescription: 团队的开发命令\n---\n\n使用团队流程。\n';
+  p.write(file, custom);
+  ok(p.install(['--envs', 'workbuddy', '--skills', 'dev', '--copy', '--skip-db', '--yes']));
+  ok(p.install(['upgrade']));
+  assert.equal(p.read(file), custom);
+  ok(p.install(['uninstall']));
+  assert.equal(p.read(file), custom);
 });
 
 test('WorkBuddy --copy 不替换用户指向其他位置的 skill 链接', { skip: !SYMLINK_OK }, () => {
