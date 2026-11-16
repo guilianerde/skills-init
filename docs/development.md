@@ -181,7 +181,7 @@ workflow-run（安装器仓库）/
 
 dev 与 project-review 的 SKILL.md 保留门禁、步骤路由、必要命令和结果去向；进入阶段前才读取对应 reference 的小节。dev 的开工、调研方案、实现验证、审查交付和缺陷修复分开加载；审查的方法、复核、报告与后续也分开加载。完整流程的步骤编号、用户选择、运行状态与正式产物规则沿用原协议，必守规则不藏在脚本注释中。
 
-状态查询、文档视图、效果报告和 PR 描述共用 `workflow/lib/workspace-read.mjs` 的单次命令内存快照，正文与元信息采集一次，使用统一解析规则。需求绑定、运行状态和已登记版本来自 `meta.json`；正文、文档头和发布记录来自 Markdown，派生产物索引由显式 `reindex` 重建。`list` 与 `which` 只读，`reindex` 不修改 versions、runs、revision、批准、证据或正文，绑定使用 `bind`。跨项目视图仍展示全部服务，分支查询和效果报告默认当前项目；`--all-branches` 保持同路径工作区优先，Git 中的版本信息从同一引用读取。异常数据通过 diagnostics 报告，可读的正文仍展示，读取不修复或覆盖元信息。边界与数据归属详见 [内部架构](../workflow/references/architecture.md)。
+状态查询、文档视图、效果报告和 PR 描述共用 `workflow/lib/workspace-read.mjs` 的单次命令内存快照，正文与元信息采集一次，使用统一解析规则。需求绑定、运行状态和已登记版本来自 `meta.json`；正文、文档头和发布记录来自 Markdown，派生产物索引由显式 `reindex` 重建。`list` 与 `which` 只读，`reindex` 不修改 versions、runs、revision、批准、证据或正文，绑定使用 `bind`。跨项目视图仍展示全部服务，分支查询和效果报告默认当前项目；`--all-branches` 保持同路径工作区优先，Git 中的版本信息从同一引用读取。异常数据通过 diagnostics 报告，可读的正文仍展示，读取不修复或覆盖元信息。边界与数据归属详见 [内部架构](../workflow/references/architecture.md)，程序接口见 [core-api.md](../workflow/references/core-api.md)。
 
 新增一个 skill 就是新建目录、写 `SKILL.md.tpl` 和 `skill.json`，再加进 `package.json` 的 `files`。`tests/test-skills-meta.mjs` 会检查它们是否一致。
 

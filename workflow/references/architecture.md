@@ -2,6 +2,8 @@
 
 本文对应 0.29.0（2026-10-28），包括独立 nacos-config、需求文档与 dev 显式触发规则；实现以代码与各 skill 的 skill.json 为准。
 
+内部程序调用的方法、错误与暂定边界见 [core-api.md](core-api.md)。
+
 ## 安装分发与运行
 
 安装接入在 `bin/`；各 Skill 的 SKILL.md 与 references 定义流程步骤、确认点和调用时机；`workflow/lib/` 承担共享规则与数据读写；`workflow/scripts/` 保留既有命令和导出入口。数据库、代码图谱、wiki、Nacos 的执行与凭据仍在各自能力目录。`shared/` 只分发参考文档，运行共享代码随 workflow 的 lib 一起安装。宿主代理执行规则与命令，workflow-run 不提供常驻的 Agent 调度服务。
