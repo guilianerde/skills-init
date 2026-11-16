@@ -100,18 +100,6 @@ td code { white-space: nowrap; }
 .note.warn b.tag { color: var(--warn); }
 .note p:last-child, .note ul:last-child { margin-bottom: 0; }
 
-/* builder */
-.builder { border: 1px solid var(--line); background: var(--surface); border-radius: 10px; padding: 18px; display: grid; gap: 16px; margin: 14px 0; }
-.row { display: grid; gap: 8px; }
-.row .k { font-size: 13px; color: var(--muted); font-weight: 500; }
-.chips { display: flex; flex-wrap: wrap; gap: 8px; }
-.chip { position: relative; }
-.chip input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
-.chip span { display: inline-block; font-size: 13.5px; padding: 5px 12px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); cursor: pointer; user-select: none; }
-.chip input:checked + span { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); font-weight: 500; }
-.builder .cmd { margin: 0; }
-.builder .hint { font-size: 13px; color: var(--muted); margin: 0; }
-
 /* steps */
 .steps { list-style: none; margin: 14px 0; padding: 0; counter-reset: s; display: grid; gap: 0; }
 .steps > li { counter-increment: s; display: grid; grid-template-columns: 34px minmax(0, 1fr); gap: 14px; padding: 12px 0; border-top: 1px dashed var(--line); margin: 0; }
@@ -152,15 +140,15 @@ footer { margin-top: 56px; padding-top: 18px; border-top: 1px solid var(--line);
     <div class="label">目录</div>
     <ol>
       <li><a href="#prep">1 准备</a></li>
-      <li><a href="#run">2 生成安装命令</a></li>
+      <li><a href="#run">2 安装命令</a></li>
       <li><a href="#flow">3 安装器做了什么</a></li>
       <li><a href="#result">4 装完的目录</a></li>
       <li><a href="#verify">5 验证</a></li>
-      <li><a href="#first">6 第一次使用</a></li>
-      <li><a href="#team">7 团队成员接入</a></li>
-      <li><a href="#docsrepo">8 独立文档仓库</a></li>
-      <li><a href="#upgrade">9 升级与卸载</a></li>
-      <li><a href="#faq">10 常见问题</a></li>
+      <li><a href="#docsrepo">6 独立文档仓库</a></li>
+      <li><a href="#first">7 第一次使用</a></li>
+      <li><a href="#upgrade">8 升级与卸载</a></li>
+      <li><a href="#faq">9 常见问题</a></li>
+      <li><a href="#team">10 随代码提交的团队接入</a></li>
     </ol>
   </nav>
 
@@ -194,31 +182,13 @@ codegraph --version<span class="c">   # 没装也没关系，安装器会装</sp
     </section>
 
     <section id="run">
-      <h2><span class="n">02</span>生成安装命令</h2>
-      <p>选好要装的环境和数据库处理方式，下面的命令会跟着变。命令在 bash、zsh、PowerShell 里写法一样。</p>
-
-      <div class="builder" id="builder">
-        <div class="row">
-          <div class="k">环境（可多选）</div>
-          <div class="chips" id="envs">
-            <label class="chip"><input type="checkbox" id="env-claude" value="claude" checked><span>Claude Code</span></label>
-            <label class="chip"><input type="checkbox" id="env-codex" value="codex" checked><span>Codex CLI</span></label>
-            <label class="chip"><input type="checkbox" id="env-doubao" value="doubao"><span>豆包办公</span></label>
-            <label class="chip"><input type="checkbox" id="env-qwen" value="qwen"><span>Qwen Code</span></label>
-            <label class="chip"><input type="checkbox" id="env-workbuddy" value="workbuddy"><span>WorkBuddy</span></label>
-          </div>
-        </div>
-        <div class="row">
-          <div class="k">数据库连接</div>
-          <div class="chips">
-            <label class="chip"><input type="radio" name="db" id="db-skip" value="skip" checked><span>先跳过</span></label>
-            <label class="chip"><input type="radio" name="db" id="db-existing" value="yes"><span>用已有配置（非交互）</span></label>
-            <label class="chip"><input type="radio" name="db" id="db-ask" value="ask"><span>安装时按提示填写</span></label>
-          </div>
-        </div>
-        <div class="cmd"><pre id="out"></pre><button class="copy" type="button">复制</button></div>
-        <p class="hint" id="hint"></p>
-      </div>
+      <h2><span class="n">02</span>安装命令</h2>
+      <div class="note"><b class="tag">已有独立文档仓库</b>请先按<a href="#docsrepo">独立文档仓库接入步骤</a>克隆文档仓库，再执行项目初始化，避免产生同名文件冲突。</div>
+      <p>在业务项目根目录执行。两条命令都会安装全部环境的 skills，并接入 DocNexus 和 CodeGraph；根据是否需要现在配置数据库选择一条。</p>
+      <h3>全部安装，并按提示配置数据库</h3>
+      <div class="cmd"><pre>npx @rowansenne/workflow-run --envs all --with-docnexus --with-codegraph</pre><button class="copy" type="button">复制</button></div>
+      <h3>全部安装，数据库先跳过</h3>
+      <div class="cmd"><pre>npx @rowansenne/workflow-run --envs all --skip-db --yes --with-docnexus --with-codegraph</pre><button class="copy" type="button">复制</button></div>
 
       <p>直接运行不带参数的 <code>npx @rowansenne/workflow-run</code> 也行，按提示选环境、填数据库，DocNexus 必装且缺失时自动接入；CodeGraph 需要 --with-codegraph，--with-docnexus 用于强制更新 DocNexus：</p>
       <div class="tblwrap"><table>
@@ -232,7 +202,8 @@ codegraph --version<span class="c">   # 没装也没关系，安装器会装</sp
     </section>
 
     <section id="flow">
-      <h2><span class="n">03</span>安装器做了什么</h2>
+      <details>
+      <summary><span class="n">03</span> 安装器做了什么</summary>
       <p>按执行顺序列出。前面的步骤失败会停下；必装组件 DocNexus 或模板导入失败时，安装不算完成；CodeGraph 为可选增强。</p>
       <ol class="steps">
         <li><div><strong>检查 Node ≥ 22.13 和 npm</strong><span class="phase">DocNexus</span><p>不满足就报错退出，此时还没有写任何文件。</p></div></li>
@@ -249,6 +220,7 @@ codegraph --version<span class="c">   # 没装也没关系，安装器会装</sp
         <li><div><strong>导入文档模板到 DocNexus</strong><span class="phase">DocNexus</span><p>包内开发 / 审查模板导入 <code>workflow-run/docnexus/library/templates/&lt;skill&gt;/</code>，已有的不覆盖。独立需求文档也有可导入模板；技术 / 上线方案模板不随包提供，首次按用户样例创建；运行时只从知识库取生效模板。</p></div></li>
       </ol>
       <div class="note warn"><b class="tag">注意</b>CodeGraph 默认上报匿名使用统计（不含代码、路径、符号名），<code>--yes</code> 不会询问。本工具调用 codegraph 时都带 <code>DO_NOT_TRACK=1</code>，但 agent 通过 MCP 使用时不受这个控制。要关闭就运行 <code>codegraph telemetry off</code>。</div>
+      </details>
     </section>
 
     <section id="result">
@@ -299,8 +271,80 @@ codegraph --version<span class="c">   # 没装也没关系，安装器会装</sp
       <p>Nacos 的本地候选用 <code>config.mjs inspect</code> 查看；只有 <code>get</code> 会访问远端。<code>/workflow status</code> 和 doctor 不测试 Nacos 连通性，doctor 只检查其本机连接的忽略规则。</p>
     </section>
 
+    <section id="docsrepo">
+      <h2><span class="n">06</span>独立文档仓库</h2>
+      <h3>新成员加入已有的文档仓库</h3>
+      <p>先向团队获取业务代码和文档仓库的地址，确认有访问权限，并确保团队已提交并推送文档仓库及业务项目的配置。下面以已有的 <code>order-service</code> 为例；将地址和环境选项换成团队实际使用的值。文档仓库已有 DocNexus 时，务必<strong>先接入文档仓库，再初始化本机环境</strong>，避免本地新建的同名知识库与远端冲突。</p>
+      <ol class="steps">
+        <li><div><strong>全局安装命令程序（本机只需一次）</strong><p>团队有指定版本时，将版本号换成团队指定的版本。之后运行命令不会自动更新全局安装的包。</p><div class="cmd"><pre>npm install -g @rowansenne/workflow-run@0.33.0
+workflow-run --version</pre><button class="copy" type="button">复制</button></div></div></li>
+        <li><div><strong>克隆业务代码并接入文档仓库</strong><p>在业务项目根目录执行；文档仓库会克隆到该项目的 <code>workflow-run/</code>，不是全局安装目录。如果本地已有内容，请先检查并保留它们，接入时同路径冲突会停止。</p><div class="cmd"><pre>git clone &lt;业务代码仓库地址&gt;
+cd order-service
+workflow-run docs-repo git@git.example.com:team/team-docs.git</pre><button class="copy" type="button">复制</button></div></div></li>
+        <li><div><strong>初始化这个项目的本机环境</strong><p>全局命令无需在每个项目重新安装，但 DocNexus 本机依赖、所选环境的 skills 链接及可选 CodeGraph 索引仍需在项目中准备。下面跳过数据库配置；需要数据库时去掉 <code>--skip-db</code>，不需要 CodeGraph 时去掉 <code>--with-codegraph</code>。缺少 DocNexus 时安装器会自动安装，无需用 <code>--with-docnexus</code> 强制更新。</p><div class="cmd"><pre>workflow-run --envs claude,codex --skip-db --with-codegraph</pre><button class="copy" type="button">复制</button></div></div></li>
+        <li><div><strong>验证接入</strong><p>状态应显示团队文档仓库地址和本项目名；同一服务的项目名通常已随代码中的 <code>profile.json</code> 提交，不要为每个成员另起项目名。</p><div class="cmd"><pre>workflow-run docs-repo
+workflow-run doctor --offline
+workflow-run view --open</pre><button class="copy" type="button">复制</button></div></div></li>
+      </ol>
+      <p>日常使用前可在确认本地文档改动状态后运行 <code>git -C workflow-run pull</code> 获取团队更新。需求文档位于 <code>workflow-run/docs/requirements/&lt;需求名&gt;/&lt;项目名&gt;/</code>，视图默认生成在 <code>workflow-run/tmp/view/index.html</code>。全局程序需要更新时再手动运行 <code>npm update -g @rowansenne/workflow-run</code>。</p>
+
+      <h3>日常使用</h3>
+      <div class="tblwrap"><table>
+        <tr><th>场景</th><th>做法</th></tr>
+        <tr><td>写完产物</td><td>skill 会列出文档仓库里没提交的文件，并给出建议的提交信息。你确认后它才提交，推送另外问。查看未提交的产物：<code>node .agents/skills/workflow/scripts/requirement.mjs pending</code></td></tr>
+        <tr><td>加入其他服务的需求</td><td>先 <code>git -C workflow-run pull</code>，绑定需求时就能看到别的服务建的需求，用同一个名字绑定</td></tr>
+        <tr><td>引用产物</td><td>写成「文档仓库名:路径」，例如 <code>team-docs:docs/requirements/订单导出/order-service/review.md</code>。在哪个服务、哪个人的克隆里都一样</td></tr>
+        <tr><td>浏览</td><td><code>/workflow view</code> 显示文档仓库里所有项目的需求</td></tr>
+        <tr><td>查看当前状态</td><td><code>npx @rowansenne/workflow-run docs-repo</code>（不带地址），显示仓库地址、引用前缀和本项目的项目名</td></tr>
+        <tr><td>改项目名</td><td><code>npx @rowansenne/workflow-run docs-repo --project &lt;项目名&gt;</code>，然后提交 <code>profile.json</code></td></tr>
+        <tr><td>不想被提示提交</td><td><code>node .agents/skills/workflow/scripts/requirement.mjs config --commit-prompt off --local</code>，只写进个人的 <code>profile.local.json</code></td></tr>
+      </table></div>
+      <details>
+        <summary>了解文档仓库及其他接入方式</summary>
+      <p>默认情况下 <code>workflow-run/</code> 随代码提交。下面两种情况适合换成团队共用的文档仓库：不想让需求产物进代码仓库，或者一个需求横跨多个服务。换了之后 <code>workflow-run/</code> 本身就是文档仓库：</p>
+      <ul>
+        <li>代码仓库的 <code>.gitignore</code> 加上 <code>/workflow-run/</code>，不再管理它。</li>
+        <li>DocNexus 知识库也在文档仓库里，各服务共用。</li>
+        <li>目录结构不变。两种用法下产物都在 <code>workflow-run/docs/requirements/&lt;需求名&gt;/&lt;项目名&gt;/</code>，同一个需求下每个服务占一个子目录。</li>
+      </ul>
+<div class="tree">team-docs/                     <span class="c"># 文档仓库 = 每个服务的 workflow-run/</span>
+├── docs/requirements/
+│   └── 订单导出/
+│       ├── order-service/     <span class="c"># 项目名 = profile.json 的 artifacts.project</span>
+│       └── report-service/
+├── docnexus/                  <span class="c"># 共用知识库与模板</span>
+│   ├── .gitignore             <span class="c"># DocNexus 自带</span>
+│   ├── <span class="ig">node_modules/</span>  <span class="ig">store/</span>  <span class="c"># 每人本机一份</span>
+└── <span class="ig">tmp/</span>                       <span class="c"># 写在 .git/info/exclude，不进文档仓库</span></div>
+      <div class="note"><b class="tag">原地切换</b>因为结构相同，切换只是换一个 git 仓库来跟踪 <code>workflow-run/</code>，文件不用挪。<code>docs-repo</code> 看到 <code>workflow-run/</code> 里已有产物和 DocNexus 时，会原地 <code>git init</code> 并接上远端；里面是空的就直接克隆。接入已有知识库时，按上面的步骤先接入文档仓库。</div>
+
+      <h3>第一次搭建（全团队只做一次）</h3>
+      <p>先在 git 服务器上建一个空仓库，例如 <code>team-docs</code>，然后在第一个服务的项目根执行：</p>
+      <ol class="steps">
+        <li><div><strong>全量安装</strong><p>已经装过的项目跳过这一步。</p><div class="cmd"><pre>npx @rowansenne/workflow-run --envs claude,codex --skip-db --with-docnexus --with-codegraph</pre><button class="copy" type="button">复制</button></div></div></li>
+        <li><div><strong>切到文档仓库</strong><p>远端是空仓库时，<code>workflow-run/</code> 里现有的内容就是文档仓库的第一批内容。安装器同时让代码仓库忽略 <code>workflow-run/</code>，并把项目名写进 <code>workflow/profile.json</code>。不加 <code>--project</code> 时，项目名用 git 远端的仓库名。</p><div class="cmd"><pre>npx @rowansenne/workflow-run docs-repo git@git.example.com:team/team-docs.git --project order-service</pre><button class="copy" type="button">复制</button></div></div></li>
+        <li><div><strong>提交并推送文档仓库</strong><p>依赖和检索库在业务项目根，由 <code>.docnexus/.gitignore</code> 忽略，<code>tmp/</code> 已写进文档仓库的 <code>.git/info/exclude</code>，直接提交即可。</p><div class="cmd"><pre>git -C workflow-run add -A
+git -C workflow-run commit -m "chore: init team docs"
+git -C workflow-run push -u origin main</pre><button class="copy" type="button">复制</button></div></div></li>
+        <li><div><strong>提交代码仓库</strong><p>提交 <code>.gitignore</code>（新增了 <code>/workflow-run/</code>）和带项目名的 <code>profile.json</code>。如果 <code>workflow-run/</code> 之前随代码提交过，先让代码仓库停止跟踪它，文件本身不受影响。</p><div class="cmd"><pre>git rm -r --cached workflow-run<span class="c">   # 之前提交过 workflow-run/ 时才需要</span>
+git add -A &amp;&amp; git commit -m "chore: move workflow-run to team docs repo"</pre><button class="copy" type="button">复制</button></div></div></li>
+      </ol>
+
+      <h3>其他服务接入</h3>
+      <p>其他服务也按上面的顺序先接入文档仓库、再初始化项目。初始化后为该服务配置团队约定的项目名，并将配置提交到该服务的代码仓库：</p>
+      <div class="cmd"><pre>workflow-run docs-repo --project report-service</pre><button class="copy" type="button">复制</button></div>
+
+      <h3>已经用了一段时间，要改用文档仓库</h3>
+      <p>做法和第一次搭建一样，不用手动迁移。旧版本随代码提交时，需求目录下没有项目名这一层，先运行 <code>upgrade</code>，它会把这些文件迁到 <code>&lt;需求名&gt;/&lt;项目名&gt;/</code> 下（被 git 跟踪的用 <code>git mv</code>，保留历史）：</p>
+      <div class="cmd"><pre>npx @rowansenne/workflow-run upgrade<span class="c">   # 旧结构迁到 &lt;需求名&gt;/&lt;项目名&gt;/</span>
+npx @rowansenne/workflow-run docs-repo git@git.example.com:team/team-docs.git --project order-service</pre><button class="copy" type="button">复制</button></div>
+      <p>然后按「第一次搭建」的第 3、4 步提交两个仓库。如果文档仓库里已经有别的服务的内容，各服务的产物在各自的项目子目录下，不会冲突。冲突只会出在 DocNexus：两边都有知识库时，<code>docs-repo</code> 会退回原状，并列出冲突的文件。这时先按 DocNexus 自己的写入流程，把本项目沉淀的内容写进共用知识库，再把本地的 <code>workflow-run/docnexus/</code> 挪走后重跑。</p>
+
+      </details>
+    </section>
+
     <section id="first">
-      <h2><span class="n">06</span>第一次使用</h2>
+      <h2><span class="n">07</span>第一次使用</h2>
       <p>dev 仅在实际调用 <code>/dev</code> / <code>$dev</code>、点选 dev skill，或明确要求 dev / 完整开发工作流时启动。普通分析、改代码、修复、测试和提交 / 推送直接执行，不自动进入开发流程；旧需求目录与运行记录也不代表恢复授权。升级后新建会话加载最新规则。</p>
       <ol class="plain">
         <li><strong>重启 agent</strong>：MCP 配置要重启后才生效。Codex 只在受信任的项目里加载项目级配置，第一次打开时选择信任这个项目。</li>
@@ -326,78 +370,8 @@ node .agents/skills/nacos-config/scripts/config.mjs get --file src/main/resource
       <div class="note"><b class="tag">授权</b>任何写入 DocNexus 的操作都要你同意。没有 <code>.codegraph/</code> 时 skills 不会自己建索引，只在交付或报告里注明「未使用代码图谱」。</div>
     </section>
 
-    <section id="team">
-      <h2><span class="n">07</span>团队成员接入</h2>
-      <p>skills、软链接、项目画像、DocNexus 知识库可随仓库提交；DocNexus 依赖和检索库、CodeGraph CLI 与索引、数据库 / wiki 凭据、Nacos 本机连接与依赖各人在本机准备。所以其他人 clone 之后也要跑一次同样的命令：</p>
-      <div class="cmd"><pre>git clone &lt;仓库地址&gt; &amp;&amp; cd &lt;项目&gt;
-npx @rowansenne/workflow-run --envs claude,codex --skip-db --with-docnexus --with-codegraph</pre><button class="copy" type="button">复制</button></div>
-      <ul>
-        <li>本次为破坏性更新：安装前强制删除旧版 DocNexus 数据和旧重复备份，不迁移、不备份；新版接入后，重跑保留项目画像、表结构和知识库里的模板。<code>docnexus init</code> 可以重复执行，不影响已有记忆。</li>
-        <li>Windows 上 clone 含软链接的仓库前先执行 <code>git config --global core.symlinks true</code>，并用管理员终端。</li>
-        <li>需要查数据库的人去掉 <code>--skip-db</code>，按提示填自己的连接；这个文件已被忽略，不会提交。</li>
-        <li>用了独立文档仓库时，安装顺序不一样，见下一节。</li>
-      </ul>
-    </section>
-
-    <section id="docsrepo">
-      <h2><span class="n">08</span>独立文档仓库</h2>
-      <p>默认情况下 <code>workflow-run/</code> 随代码提交。下面两种情况适合换成团队共用的文档仓库：不想让需求产物进代码仓库，或者一个需求横跨多个服务。换了之后 <code>workflow-run/</code> 本身就是文档仓库：</p>
-      <ul>
-        <li>代码仓库的 <code>.gitignore</code> 加上 <code>/workflow-run/</code>，不再管理它。</li>
-        <li>DocNexus 知识库也在文档仓库里，各服务共用。</li>
-        <li>目录结构不变。两种用法下产物都在 <code>workflow-run/docs/requirements/&lt;需求名&gt;/&lt;项目名&gt;/</code>，同一个需求下每个服务占一个子目录。</li>
-      </ul>
-<div class="tree">team-docs/                     <span class="c"># 文档仓库 = 每个服务的 workflow-run/</span>
-├── docs/requirements/
-│   └── 订单导出/
-│       ├── order-service/     <span class="c"># 项目名 = profile.json 的 artifacts.project</span>
-│       └── report-service/
-├── docnexus/                  <span class="c"># 共用知识库与模板</span>
-│   ├── .gitignore             <span class="c"># DocNexus 自带</span>
-│   ├── <span class="ig">node_modules/</span>  <span class="ig">store/</span>  <span class="c"># 每人本机一份</span>
-└── <span class="ig">tmp/</span>                       <span class="c"># 写在 .git/info/exclude，不进文档仓库</span></div>
-      <div class="note"><b class="tag">原地切换</b>因为结构相同，切换只是换一个 git 仓库来跟踪 <code>workflow-run/</code>，文件不用挪。<code>docs-repo</code> 看到 <code>workflow-run/</code> 里已有产物和 DocNexus 时，会原地 <code>git init</code> 并接上远端；里面是空的就直接克隆。所以先全量安装再切换也可以，不用讲究顺序。</div>
-
-      <h3>第一次搭建（全团队只做一次）</h3>
-      <p>先在 git 服务器上建一个空仓库，例如 <code>team-docs</code>，然后在第一个服务的项目根执行：</p>
-      <ol class="steps">
-        <li><div><strong>全量安装</strong><p>已经装过的项目跳过这一步。</p><div class="cmd"><pre>npx @rowansenne/workflow-run --envs claude,codex --skip-db --with-docnexus --with-codegraph</pre><button class="copy" type="button">复制</button></div></div></li>
-        <li><div><strong>切到文档仓库</strong><p>远端是空仓库时，<code>workflow-run/</code> 里现有的内容就是文档仓库的第一批内容。安装器同时让代码仓库忽略 <code>workflow-run/</code>，并把项目名写进 <code>workflow/profile.json</code>。不加 <code>--project</code> 时，项目名用 git 远端的仓库名。</p><div class="cmd"><pre>npx @rowansenne/workflow-run docs-repo git@git.example.com:team/team-docs.git --project order-service</pre><button class="copy" type="button">复制</button></div></div></li>
-        <li><div><strong>提交并推送文档仓库</strong><p>依赖和检索库在业务项目根，由 <code>.docnexus/.gitignore</code> 忽略，<code>tmp/</code> 已写进文档仓库的 <code>.git/info/exclude</code>，直接提交即可。</p><div class="cmd"><pre>git -C workflow-run add -A
-git -C workflow-run commit -m "chore: init team docs"
-git -C workflow-run push -u origin main</pre><button class="copy" type="button">复制</button></div></div></li>
-        <li><div><strong>提交代码仓库</strong><p>提交 <code>.gitignore</code>（新增了 <code>/workflow-run/</code>）和带项目名的 <code>profile.json</code>。如果 <code>workflow-run/</code> 之前随代码提交过，先让代码仓库停止跟踪它，文件本身不受影响。</p><div class="cmd"><pre>git rm -r --cached workflow-run<span class="c">   # 之前提交过 workflow-run/ 时才需要</span>
-git add -A &amp;&amp; git commit -m "chore: move workflow-run to team docs repo"</pre><button class="copy" type="button">复制</button></div></div></li>
-      </ol>
-
-      <h3>其他服务、其他成员接入</h3>
-      <p>文档仓库里已经有 DocNexus 了，这时要<strong>先克隆、再安装</strong>。如果反过来，安装时会在本地新建一个 DocNexus 工作区，和文档仓库里的同名文件冲突，<code>docs-repo</code> 会停下。</p>
-      <div class="cmd"><pre>npx @rowansenne/workflow-run docs-repo git@git.example.com:team/team-docs.git<span class="c">   # 克隆到 workflow-run/</span>
-npx @rowansenne/workflow-run --envs claude,codex --skip-db --with-docnexus --with-codegraph
-npx @rowansenne/workflow-run docs-repo --project report-service<span class="c">   # 只有新服务需要，给它起名</span></pre><button class="copy" type="button">复制</button></div>
-      <p>同一个服务的其他成员不用第三条命令，项目名已经随代码提交在 <code>profile.json</code> 里。<code>--with-docnexus</code> 在已有的工作区上只装本机依赖，<code>docnexus init</code> 可以重复执行，不影响已有记忆。</p>
-
-      <h3>已经用了一段时间，要改用文档仓库</h3>
-      <p>做法和第一次搭建一样，不用手动迁移。旧版本随代码提交时，需求目录下没有项目名这一层，先运行 <code>upgrade</code>，它会把这些文件迁到 <code>&lt;需求名&gt;/&lt;项目名&gt;/</code> 下（被 git 跟踪的用 <code>git mv</code>，保留历史）：</p>
-      <div class="cmd"><pre>npx @rowansenne/workflow-run upgrade<span class="c">   # 旧结构迁到 &lt;需求名&gt;/&lt;项目名&gt;/</span>
-npx @rowansenne/workflow-run docs-repo git@git.example.com:team/team-docs.git --project order-service</pre><button class="copy" type="button">复制</button></div>
-      <p>然后按「第一次搭建」的第 3、4 步提交两个仓库。如果文档仓库里已经有别的服务的内容，各服务的产物在各自的项目子目录下，不会冲突。冲突只会出在 DocNexus：两边都有知识库时，<code>docs-repo</code> 会退回原状，并列出冲突的文件。这时先按 DocNexus 自己的写入流程，把本项目沉淀的内容写进共用知识库，再把本地的 <code>workflow-run/docnexus/</code> 挪走后重跑。</p>
-
-      <h3>日常使用</h3>
-      <div class="tblwrap"><table>
-        <tr><th>场景</th><th>做法</th></tr>
-        <tr><td>写完产物</td><td>skill 会列出文档仓库里没提交的文件，并给出建议的提交信息。你确认后它才提交，推送另外问。查看未提交的产物：<code>node .agents/skills/workflow/scripts/requirement.mjs pending</code></td></tr>
-        <tr><td>加入其他服务的需求</td><td>先 <code>git -C workflow-run pull</code>，绑定需求时就能看到别的服务建的需求，用同一个名字绑定</td></tr>
-        <tr><td>引用产物</td><td>写成「文档仓库名:路径」，例如 <code>team-docs:docs/requirements/订单导出/order-service/review.md</code>。在哪个服务、哪个人的克隆里都一样</td></tr>
-        <tr><td>浏览</td><td><code>/workflow view</code> 显示文档仓库里所有项目的需求</td></tr>
-        <tr><td>查看当前状态</td><td><code>npx @rowansenne/workflow-run docs-repo</code>（不带地址），显示仓库地址、引用前缀和本项目的项目名</td></tr>
-        <tr><td>改项目名</td><td><code>npx @rowansenne/workflow-run docs-repo --project &lt;项目名&gt;</code>，然后提交 <code>profile.json</code></td></tr>
-        <tr><td>不想被提示提交</td><td><code>node .agents/skills/workflow/scripts/requirement.mjs config --commit-prompt off --local</code>，只写进个人的 <code>profile.local.json</code></td></tr>
-      </table></div>
-    </section>
-
     <section id="upgrade">
-      <h2><span class="n">09</span>升级与卸载</h2>
+      <h2><span class="n">08</span>升级与卸载</h2>
       <h3>升级 workflow-run</h3>
       <div class="cmd"><pre>npx @rowansenne/workflow-run upgrade</pre><button class="copy" type="button">复制</button></div>
       <p>读安装清单里记录的环境，非交互升级 skills；手改过的文件先备份到 <code>workflow-run/tmp/upgrade-backup/</code>。</p>
@@ -417,7 +391,7 @@ codegraph uninstall<span class="c">                      # 移除 agent 配置�
     </section>
 
     <section id="faq">
-      <h2><span class="n">10</span>常见问题</h2>
+      <h2><span class="n">09</span>常见问题</h2>
       <details><summary>退出码是 1，但部分 skills 已落盘</summary><div>DocNexus 接入或必需模板导入失败时安装立即停止，不报告完成；修好输出提示的网络、npm 权限或模板问题后重跑。CodeGraph 是可选增强，接入失败会提示并保留其他已安装能力，随后可带 <code>--with-codegraph</code> 重试。</div></details>
       <details><summary>全局安装 CodeGraph 报权限错误</summary><div>先用你平时的方式全局装好 <code>@colbymchenry/codegraph@1</code>（例如改用 nvm 管理的 Node），确认 <code>codegraph --version</code> 能运行，再重跑带 <code>--with-codegraph</code> 的命令。</div></details>
       <details><summary>codegraph init 失败或太慢</summary><div>安装器会跳过建索引并提示。之后可以在项目根手动执行 <code>codegraph init</code>。索引建好后 agent 使用期间自动增量同步，<code>cg.mjs</code> 发现索引落后于工作区时也会先 <code>codegraph sync</code>。</div></details>
@@ -428,36 +402,27 @@ codegraph uninstall<span class="c">                      # 移除 agent 配置�
       <details><summary>图谱里一个方法「没有调用方」，可以删吗</summary><div>不一定。静态分析看不到 Spring 多实现的选择、AOP、反射和配置驱动的路由，「没有调用方」不等于没人用。</div></details>
     </section>
 
+    <section id="team">
+      <details>
+      <summary><span class="n">10</span> 随代码提交的团队接入</summary>
+      <p>以下适用于文档随代码仓库提交的项目。skills、软链接、项目画像、DocNexus 知识库可随仓库提交；DocNexus 依赖和检索库、CodeGraph CLI 与索引、数据库 / wiki 凭据、Nacos 本机连接与依赖各人在本机准备。所以其他人 clone 之后也要跑一次同样的命令：</p>
+      <div class="cmd"><pre>git clone &lt;仓库地址&gt; &amp;&amp; cd &lt;项目&gt;
+npx @rowansenne/workflow-run --envs claude,codex --skip-db --with-docnexus --with-codegraph</pre><button class="copy" type="button">复制</button></div>
+      <ul>
+        <li>本次为破坏性更新：安装前强制删除旧版 DocNexus 数据和旧重复备份，不迁移、不备份；新版接入后，重跑保留项目画像、表结构和知识库里的模板。<code>docnexus init</code> 可以重复执行，不影响已有记忆。</li>
+        <li>Windows 上 clone 含软链接的仓库前先执行 <code>git config --global core.symlinks true</code>，并用管理员终端。</li>
+        <li>需要查数据库的人去掉 <code>--skip-db</code>，按提示填自己的连接；这个文件已被忽略，不会提交。</li>
+        <li>用了独立文档仓库时，按<a href="#docsrepo">独立文档仓库接入步骤</a>操作。</li>
+      </ul>
+      </details>
+    </section>
+
     <footer>依据 0.29.0（2026-10-28）的 README、skill.json 与安装器源码更新。</footer>
   </main>
 </div>
 
 <script>
 (function () {
-  var out = document.getElementById('out');
-  var hint = document.getElementById('hint');
-  function build() {
-    var envs = Array.prototype.slice.call(document.querySelectorAll('#envs input:checked')).map(function (i) { return i.value; });
-    var db = document.querySelector('input[name="db"]:checked').value;
-    var envArg = envs.length === 5 ? 'all' : envs.join(',');
-    var parts = ['npx @rowansenne/workflow-run'];
-    if (envs.length) parts.push('--envs ' + envArg);
-    if (db === 'skip') parts.push('--skip-db');
-    if (db === 'yes') parts.push('--yes');
-    parts.push('--with-docnexus', '--with-codegraph');
-    out.textContent = parts.join(' ');
-    var notes = [];
-    if (!envs.length) notes.push('没选环境时会交互询问（回车 = 全部）。');
-    if (envs.length && envs.indexOf('claude') < 0 && envs.indexOf('codex') < 0) notes.push('没选 claude / codex：不会写 CodeGraph 的 MCP 配置，skills 直接调用 codegraph CLI。');
-    if (envs.indexOf('qwen') >= 0) notes.push('qwen 的 DocNexus 说明自动写入 QWEN.md。');
-    if (db === 'yes') notes.push('--yes 要求已有数据库配置，找不到会报错退出。');
-    if (db === 'ask') notes.push('安装时会提示填写数据库连接。');
-    hint.textContent = notes.join(' ');
-    hint.hidden = !notes.length;
-  }
-  document.getElementById('builder').addEventListener('change', build);
-  build();
-
   document.querySelectorAll('.copy').forEach(function (btn) {
     btn.addEventListener('click', function () {
       var pre = btn.parentNode.querySelector('pre');

@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>loan-service 接入 workflow-run</title>
+<style>
+:root { color-scheme: light dark; --bg: #f5f7f6; --surface: #fff; --ink: #18221f; --muted: #5b6965; --accent: #0d6b62; --line: #d9e1de; --code: #14201d; --code-ink: #d6e6e1; }
+@media (prefers-color-scheme: dark) { :root { --bg: #101715; --surface: #172220; --ink: #e2ebe8; --muted: #93a6a0; --accent: #5cc4b2; --line: #2a3835; --code: #0a100e; } }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.75 system-ui, -apple-system, "Microsoft YaHei", sans-serif; }
+main { max-width: 760px; margin: auto; padding: 48px 20px 80px; }
+header { border-bottom: 1px solid var(--line); padding-bottom: 22px; }
+.label { color: var(--accent); font: 13px ui-monospace, monospace; }
+h1 { font-size: clamp(28px, 5vw, 40px); line-height: 1.25; margin: 10px 0; }
+h2 { font-size: 21px; margin: 32px 0 8px; }
+p { margin: 8px 0; }
+.muted { color: var(--muted); }
+.note { background: var(--surface); border: 1px solid var(--line); border-left: 3px solid var(--accent); border-radius: 6px; padding: 12px 16px; margin: 16px 0; }
+code, pre { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+code { overflow-wrap: anywhere; }
+.cmd { position: relative; background: var(--code); color: var(--code-ink); border-radius: 8px; margin: 12px 0; }
+pre { margin: 0; padding: 16px 84px 16px 16px; overflow-x: auto; font-size: 14px; line-height: 1.65; }
+button { position: absolute; top: 9px; right: 9px; border: 1px solid #526a63; border-radius: 6px; background: transparent; color: var(--code-ink); padding: 5px 10px; cursor: pointer; }
+button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <div class="label">WORKFLOW-RUN / LOAN-SERVICE</div>
+    <h1>接入已有文档仓库</h1>
+    <p class="muted">适用于 loan-service 已下载到本地、团队独立文档仓库已有数据的情况。已有文档仓库中的项目名为 loan-service。</p>
+  </header>
+  <div class="note">以下步骤假设本地 <code>loan-service/workflow-run/</code> 没有需要保留的数据。把示例路径和仓库地址替换为实际值，并确认有仓库访问权限。</div>
+
+  <section>
+    <h2>1. 接入仓库</h2>
+    <p><strong>安装命令程序</strong></p>
+    <p>本机已经全局安装过 <code>workflow-run</code> 时，跳过安装命令。</p>
+    <div class="cmd"><pre>npm install -g @rowansenne/workflow-run
+workflow-run --version</pre><button type="button">复制</button></div>
+    <p><strong>进入业务项目</strong></p>
+    <p>将路径替换为本机的项目路径。</p>
+    <div class="cmd"><pre>cd /path/to/loan-service</pre><button type="button">复制</button></div>
+    <p><strong>接入已有文档仓库</strong></p>
+    <p>将地址替换为团队的文档仓库地址。仓库会接入到项目下的 <code>workflow-run/</code>。</p>
+    <div class="cmd"><pre>workflow-run docs-repo &lt;文档仓库地址&gt;</pre><button type="button">复制</button></div>
+    <div class="note">如果提示本地文件冲突，先保留并检查这些文件，处理冲突后再重新接入。</div>
+  </section>
+  <section>
+    <h2>2. 项目初始化</h2>
+    <p><strong>初始化项目环境</strong></p>
+    <p>安装所有环境的 skills、接入 CodeGraph，数据库暂时跳过。</p>
+    <div class="cmd"><pre>workflow-run --envs all --skip-db --yes --with-codegraph</pre><button type="button">复制</button></div>
+    <p><strong>检查项目名</strong></p>
+    <div class="cmd"><pre>workflow-run docs-repo</pre><button type="button">复制</button></div>
+    <p>已有文档仓库中的项目名是 <code>loan-service</code>。如果输出的项目名已经是 <code>loan-service</code>，无需修改；如果未配置，执行：</p>
+    <div class="cmd"><pre>workflow-run docs-repo --project loan-service</pre><button type="button">复制</button></div>
+    <p><strong>验证并查看文档</strong></p>
+    <div class="cmd"><pre>workflow-run doctor --offline
+workflow-run view --open</pre><button type="button">复制</button></div>
+  </section>
+  <section>
+    <h2>日常同步团队文档</h2>
+    <p>在项目根目录执行，先检查本地改动，再拉取更新。</p>
+    <div class="cmd"><pre>git -C workflow-run status
+git -C workflow-run pull</pre><button type="button">复制</button></div>
+  </section>
+</main>
+<script>
+document.querySelectorAll('.cmd button').forEach(function (button) {
+  button.addEventListener('click', async function () {
+    try {
+      await navigator.clipboard.writeText(button.parentElement.querySelector('pre').textContent);
+      button.textContent = '已复制';
+    } catch (_) {
+      var range = document.createRange();
+      range.selectNodeContents(button.parentElement.querySelector('pre'));
+      var selection = window.getSelection();
+      selection.removeAllRanges();
+      selection.addRange(range);
+      button.textContent = '已选中';
+    }
+    setTimeout(function () { button.textContent = '复制'; }, 1600);
+  });
+});
+</script>
+</body>
+</html>
