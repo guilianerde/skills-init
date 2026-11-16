@@ -45,6 +45,18 @@ function installConfig(root, value) {
   put(root, '.agents/skills/workflow/profile.json', value);
 }
 
+function runScript(root, inputDir, args, input) {
+  const inputFile = path.join(inputDir, `checkpoint-${Date.now()}-${Math.random().toString(16).slice(2)}.json`);
+  fs.writeFileSync(inputFile, `${JSON.stringify(input, null, 2)}\n`);
+  const result = spawnSync(
+    process.execPath,
+    [path.join(REPO, 'workflow/scripts/run.mjs'), ...args, '--root', root, '--branch', BRANCH, '--input', inputFile],
+    { encoding: 'utf8' },
+  );
+  assert.equal(result.status, 0, result.stderr);
+  return JSON.parse(result.stdout);
+}
+
 const expectCode = (code, fn) => assert.throws(fn, (error) => {
   assert.ok(error instanceof WorkflowError);
   assert.equal(error.code, code);
@@ -246,4 +258,111 @@ test('旧 path / sync / nextPath 与 run 命令导出不再存在', async () => 
   const run = await import('../workflow/scripts/run.mjs');
   for (const name of ['path', 'nextPath', 'sync']) assert.equal(requirements[name], undefined, name);
   for (const name of ['startRun', 'changeRun', 'runState']) assert.equal(run[name], undefined, name);
+});
+
+test('Skills 与内部 API 交替推进同一个完整 feature 运行', (t) => {
+  const f = flowFixture(t);
+  const tmp = path.join(f.root, 'workflow-run/tmp');
+  fs.mkdirSync(tmp, { recursive: true });
+  const workflow = createWorkflow({
+    root: f.root,
+    documentPolicy: { validate: () => ({ ok: true, errors: [], warnings: [] }) },
+  });
+  let run = workflow.runs.start({
+    branch: BRANCH,
+    kind: 'feature',
+    size: 'M',
+    input: {
+      stage: 'F3',
+      steps: Object.fromEntries(['Step0', 'F1', 'F2'].map((step) => [step, { status: 'completed' }])),
+      context: { summary: '双入口', decisions: ['共用核心'], acceptance: ['流程完成'] },
+    },
+  }).run;
+
+  const requirementText = f.text('requirement.md');
+  const requirementReview = f.reviewDraft(run, 'requirement', requirementText);
+  run = workflow.artifacts.finalize({
+    branch: BRANCH,
+    id: run.id,
+    expectedRevision: run.revision,
+    kind: 'requirement',
+    text: requirementText,
+    input: { steps: { F3: { status: 'completed' } } },
+    ...requirementReview,
+  }).run;
+
+  run = runScript(f.root, tmp, ['save', '--id', run.id, '--expect-revision', String(run.revision)], {
+    stage: 'F4',
+  }).run;
+  const planText = f.text('plan.md');
+  const planReview = f.reviewDraft(run, 'plan', planText);
+  run = workflow.artifacts.finalize({
+    branch: BRANCH,
+    id: run.id,
+    expectedRevision: run.revision,
+    kind: 'plan',
+    text: planText,
+    input: { steps: { F4: { status: 'completed' } } },
+    ...planReview,
+  }).run;
+
+  run = runScript(f.root, tmp, ['save', '--id', run.id, '--expect-revision', String(run.revision)], {
+    stage: 'F5',
+    approval: { confirmed: true },
+  }).run;
+  fs.writeFileSync(path.join(f.root, 'app.js'), 'export const value = 2;\n');
+  run = runScript(f.root, tmp, ['save', '--id', run.id, '--expect-revision', String(run.revision)], {
+    steps: { F5: { status: 'completed' } },
+    stage: 'F6',
+  }).run;
+  const snapshot = workflow.snapshots.capture({ branch: BRANCH, id: run.id }).snapshot;
+  run = runScript(f.root, tmp, ['save', '--id', run.id, '--expect-revision', String(run.revision)], {
+    validation: {
+      snapshot,
+      checks: [{ command: 'node --check app.js', result: 'passed' }],
+    },
+    steps: { F6: { status: 'completed' } },
+  }).run;
+  run = runScript(f.root, tmp, ['save', '--id', run.id, '--expect-revision', String(run.revision)], {
+    stage: 'F7',
+  }).run;
+
+  const prepared = workflow.reviews.prepare({ branch: BRANCH, id: run.id, depth: '标准' });
+  const packet = prepared.packet;
+  const reviewResult = {
+    run_id: packet.run_id,
+    code: packet.snapshot.digest,
+    inputs: packet.inputs,
+    findings: [],
+    coverage: {
+      reviewed: packet.scope.review.map((file) => file.path),
+      uncovered: [],
+    },
+  };
+  run = workflow.artifacts.finalize({
+    branch: BRANCH,
+    id: run.id,
+    expectedRevision: run.revision,
+    kind: 'review',
+    text: f.text('review.md'),
+    input: { steps: { F7: { status: 'completed' } } },
+    packet,
+    result: reviewResult,
+  }).run;
+  run = runScript(f.root, tmp, ['save', '--id', run.id, '--expect-revision', String(run.revision)], {
+    stage: 'F8',
+    decision: { action: 'deliver', confirmed: true },
+  }).run;
+  run = workflow.artifacts.finalize({
+    branch: BRANCH,
+    id: run.id,
+    expectedRevision: run.revision,
+    kind: 'delivery',
+    text: f.text('delivery.md'),
+    input: { steps: { F8: { status: 'completed' } } },
+  }).run;
+  run = runScript(f.root, tmp, ['complete', '--id', run.id, '--expect-revision', String(run.revision)], {}).run;
+
+  assert.equal(run.status, 'completed');
+  assert.equal(workflow.runs.get({ branch: BRANCH, id: run.id }).run.status, 'completed');
 });
