@@ -298,7 +298,7 @@ npm run eval:triggers
 - [x] 双入口同一 run 的集成场景及失败路径通过。
 - [ ] 两个 root 的配置隔离、不同入口对同一 root 的配置一致性通过。
 - [x] pending 的 operationId 防误操作与 finalize 成功重放分别验证通过。
-- [ ] path / nextPath / sync bump、旧流程兼容迁移及其生产调用已删除，正式正文发布统一走 finalize。
+- [x] path / nextPath / sync bump、旧流程兼容迁移及其生产调用已删除，正式正文发布统一走 finalize。
 - [ ] bind 与受限 reindex 的写入归属、锁及证据失效测试通过，which 为只读查询。
 - [ ] 安装后的 Skills、包内容、流程测试和触发评估通过。
 - [ ] 数据格式变化及拒绝行为明确；没有旧数据迁移和隐式清理。
