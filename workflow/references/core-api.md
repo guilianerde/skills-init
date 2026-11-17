@@ -130,6 +130,16 @@ workflow.artifacts.resume({
 
 ## 配置来源
 
-项目配置只从目标 root 解析。规范位置 `.agents/skills/workflow/` 优先；其他支持的安装位置只在规范位置不存在时参与解析。多个不同真实配置目录会返回 `PROJECT_CONFIG_AMBIGUOUS`，当前选择机制见 [Issue #5](https://github.com/guilianerde/skills-init/issues/5)。
+项目配置只从目标 root 解析。`workflow-run/profile-source.json` 中的显式选择优先级最高；没有显式选择时，规范位置 `.agents/skills/workflow/` 优先；其他支持的安装位置只在规范位置不存在时参与解析。
+
+`--copy` 多环境安装首次生成的多份 `profile.json` / `profile.local.json` 内容完全相同时，可以自动使用按安装顺序出现的第一份；任一份配置变化后，解析会返回 `PROJECT_CONFIG_AMBIGUOUS`，不会静默改选。显式选择只在目标 root 内受支持的安装目录中生效：
+
+```sh
+node <skills>/workflow/scripts/requirement.mjs config --profile-source claude
+node <skills>/workflow/scripts/requirement.mjs config --profile-source .qwen/skills/workflow
+node <skills>/workflow/scripts/requirement.mjs config --profile-source auto
+```
+
+选择写入 `workflow-run/profile-source.json` 的 `profile_dir`，`auto` 删除该文件并恢复自动解析。来源文件损坏、目录被删除或试图选择 root 外目录时返回 `PROJECT_CONFIG_AMBIGUOUS`，`details.reason` 为 `invalid_source`，同时列出可用来源。
 
 CLI 的 `artifact.mjs resume/abort --id <id>` 会先读取 status 中当前 pending 的 `runRevision` 和 `operationId`，再调用同一核心入口；若读取后 pending 被替换，核心拒绝旧请求，不会自动改绑。

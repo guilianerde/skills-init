@@ -4,6 +4,13 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 
 const INSTALL_BASES = ['.agents/skills', '.claude/skills', '.qwen/skills', '.codebuddy/skills'];
+const INSTALL_ALIASES = {
+  codex: '.agents/skills',
+  doubao: '.agents/skills',
+  claude: '.claude/skills',
+  qwen: '.qwen/skills',
+  workbuddy: '.codebuddy/skills',
+};
 const git = (cwd, args) => spawnSync('git', args, { cwd, encoding: 'utf8' });
 const readJson = (f) => { try { return JSON.parse(fs.readFileSync(f, 'utf8')); } catch { return null; } };
 const toPosix = (p) => p.split(path.sep).join('/');
@@ -14,6 +21,7 @@ export const HOME = 'workflow-run';
 export const REQ_DIR = `${HOME}/docs/requirements`;
 export const TEMPLATES_DIR = `${HOME}/templates`;
 export const TMP_DIR = `${HOME}/tmp`;
+export const PROFILE_SOURCE = `${HOME}/profile-source.json`;
 export const IGNORE_LINE = `${HOME}/docs/`;
 export const homeDir = (root) => path.join(root, HOME);
 // workflow-run/ 自己是 git 仓库（团队文档仓库克隆到这里）= 独立文档仓库模式
@@ -31,18 +39,64 @@ export function dirName(name) {
 
 // ------------------------------------------------------------------ 配置与布局
 const profileError = (message, code, details = {}) => Object.assign(new Error(message), { code, details });
+const candidateDirs = (root) => INSTALL_BASES
+  .map((base) => ({ base, dir: path.join(root, base, 'workflow') }))
+  .filter(({ dir }) => { try { return fs.statSync(dir).isDirectory(); } catch { return false; } });
+const samePath = (a, b) => path.relative(path.resolve(a), path.resolve(b)) === '';
+const profileFiles = (dir) => ['profile.json', 'profile.local.json'].map((name) => {
+  const file = path.join(dir, name);
+  return fs.existsSync(file) ? fs.readFileSync(file) : null;
+});
+// --copy 初次安装的各副本通常完全相同；只有 profile.json / profile.local.json
+// 这两个团队与个人配置都相同时，任选一个才不改变画像语义。
+const equivalentProfiles = (candidates) => {
+  if (candidates.length < 2) return true;
+  const first = profileFiles(candidates[0].dir);
+  return candidates.slice(1).every(({ dir }) => {
+    const current = profileFiles(dir);
+    return current.every((value, index) => (value === null ? first[index] === null : first[index] !== null && value.equals(first[index])));
+  });
+};
+const sourceFile = (root) => path.join(root, PROFILE_SOURCE);
+const PROFILE_SOURCE_HINT = '运行 requirement.mjs config --profile-source <codex|claude|qwen|workbuddy|路径> 明确选择';
+const sourceError = (message, details) => profileError(
+  `${message}；${PROFILE_SOURCE_HINT}`,
+  'PROJECT_CONFIG_AMBIGUOUS',
+  { reason: 'invalid_source', source_file: PROFILE_SOURCE, hint: PROFILE_SOURCE_HINT, ...details },
+);
+const readProfileSource = (root, candidates) => {
+  const file = sourceFile(root);
+  if (!fs.existsSync(file)) return null;
+  let value;
+  try {
+    value = JSON.parse(fs.readFileSync(file, 'utf8'));
+  } catch {
+    throw sourceError(`profile 来源文件不是合法 JSON：${PROFILE_SOURCE}`, { paths: candidates.map(({ base }) => `${base}/workflow`) });
+  }
+  if (!value || typeof value !== 'object' || Array.isArray(value) || typeof value.profile_dir !== 'string' || !value.profile_dir.trim()) {
+    throw sourceError(`profile 来源文件缺少非空 profile_dir：${PROFILE_SOURCE}`, { paths: candidates.map(({ base }) => `${base}/workflow`) });
+  }
+  const configured = candidates.find(({ dir }) => samePath(dir, path.resolve(root, value.profile_dir)));
+  if (!configured) {
+    throw sourceError(`profile 来源不存在或不是受支持的安装目录：${value.profile_dir}`, {
+      profile_dir: value.profile_dir,
+      paths: candidates.map(({ base }) => `${base}/workflow`),
+    });
+  }
+  return { ...configured, selected_by: 'profile-source', source_file: PROFILE_SOURCE };
+};
 
 // 项目配置只能来自目标业务项目。规范位置优先；没有规范位置时，只允许一个真实配置目录。
 // 多个不同拷贝会改变基线、产物项目和工具链，不能按目录枚举顺序静默任选。
 export function resolveProfileDir(root) {
-  const candidates = INSTALL_BASES
-    .map((base) => ({ base, dir: path.join(root, base, 'workflow') }))
-    .filter(({ dir }) => fs.existsSync(dir));
+  const candidates = candidateDirs(root);
+  const configured = readProfileSource(root, candidates);
+  if (configured) return { ...configured, source: configured.base, candidates };
   if (!candidates.length) {
-    return { dir: path.join(root, INSTALL_BASES[0], 'workflow'), source: null, candidates: [] };
+    return { dir: path.join(root, INSTALL_BASES[0], 'workflow'), source: null, selected_by: null, candidates: [] };
   }
   const canonical = candidates.find(({ base }) => base === INSTALL_BASES[0]);
-  if (canonical) return { ...canonical, source: canonical.base, candidates };
+  if (canonical) return { ...canonical, source: canonical.base, selected_by: 'canonical', candidates };
 
   const unique = [];
   const byRealPath = new Map();
@@ -56,15 +110,65 @@ export function resolveProfileDir(root) {
     if (!byRealPath.has(real)) byRealPath.set(real, candidate);
   }
   unique.push(...byRealPath.values());
-  if (unique.length > 1) {
+  if (unique.length > 1 && !equivalentProfiles(unique)) {
     const paths = unique.map(({ dir }) => path.relative(root, dir).split(path.sep).join('/'));
     throw profileError(
-      `目标项目存在多个不同的 workflow 配置目录，无法唯一选择：${paths.join('、')}`,
+      `目标项目存在多个内容不同的 workflow 配置目录，无法唯一选择：${paths.join('、')}；${PROFILE_SOURCE_HINT}`,
       'PROJECT_CONFIG_AMBIGUOUS',
-      { paths },
+      {
+        reason: 'different_profiles',
+        paths,
+        source_file: PROFILE_SOURCE,
+        hint: PROFILE_SOURCE_HINT,
+      },
     );
   }
-  return { ...unique[0], source: unique[0].base, candidates };
+  return {
+    ...unique[0],
+    source: unique[0].base,
+    selected_by: unique.length === 1 ? 'only_candidate' : 'equivalent_profiles',
+    candidates,
+  };
+}
+
+export function profileSources(root) {
+  return candidateDirs(root).map(({ base, dir }) => ({
+    env: Object.entries(INSTALL_ALIASES).find(([, value]) => value === base)?.[0] ?? base,
+    base,
+    dir: relOf(root, dir),
+  }));
+}
+
+// 显式选择只接受目标项目内受支持的安装目录；auto 清除选择并恢复自动解析。
+export function setProfileSource(root, value) {
+  const file = sourceFile(root);
+  const requested = String(value ?? '').trim();
+  if (!requested) throw new Error('profile 来源不能为空');
+  if (['auto', 'default'].includes(requested.toLowerCase())) {
+    if (fs.existsSync(file)) fs.unlinkSync(file);
+    return { ok: true, cleared: true, file: null, candidates: profileSources(root) };
+  }
+  const alias = INSTALL_ALIASES[requested.toLowerCase()];
+  const requestedPath = alias ? path.join(root, alias, 'workflow') : path.resolve(root, requested);
+  const supported = candidateDirs(root).find(({ dir }) => samePath(dir, requestedPath));
+  if (!supported) {
+    throw profileError(
+      `profile 来源不存在或不是受支持的安装目录：${requested}；${PROFILE_SOURCE_HINT}`,
+      'PROJECT_CONFIG_AMBIGUOUS',
+      { reason: 'invalid_source', requested, hint: PROFILE_SOURCE_HINT, paths: profileSources(root).map(({ dir }) => dir), source_file: PROFILE_SOURCE },
+    );
+  }
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  const tmp = `${file}.${process.pid}.tmp`;
+  fs.writeFileSync(tmp, `${JSON.stringify({ profile_dir: relOf(root, supported.dir) }, null, 2)}\n`);
+  fs.renameSync(tmp, file);
+  return {
+    ok: true,
+    cleared: false,
+    file: PROFILE_SOURCE,
+    profile_dir: relOf(root, supported.dir),
+    candidates: profileSources(root),
+  };
 }
 
 export function profileDir(root) {
@@ -73,11 +177,20 @@ export function profileDir(root) {
 
 // workflow/profile.json 的 artifacts，profile.local.json（个人设置，不提交）覆盖其上
 export function artifactsConfig(root) {
-  const dir = profileDir(root);
+  const resolved = resolveProfileDir(root);
+  const dir = resolved.dir;
   const team = readJson(path.join(dir, 'profile.json'))?.artifacts ?? {};
   const mine = readJson(path.join(dir, 'profile.local.json'))?.artifacts ?? {};
   const c = { ...team, ...mine };
-  return { project: c.project ? String(c.project) : '', commit_prompt: c.commit_prompt !== false, profile_dir: dir };
+  return {
+    project: c.project ? String(c.project) : '',
+    commit_prompt: c.commit_prompt !== false,
+    profile_dir: dir,
+    profile_source: {
+      selected_by: resolved.selected_by ?? null,
+      ...(resolved.source_file ? { config: resolved.source_file } : {}),
+    },
+  };
 }
 
 // 产物位置：两种模式都是 workflow-run/docs/requirements/<需求>/<项目>/。

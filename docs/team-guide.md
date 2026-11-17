@@ -13,6 +13,7 @@
 | `.agents/skills/` | skills 单一来源，含安装清单 `.workflow-run.json` |
 | `.claude/skills/`、`.qwen/skills/`、`.codebuddy/skills/` | 指向 `.agents/skills/` 的相对软链接（Windows 上 clone 需 `git config core.symlinks true`） |
 | `.agents/skills/workflow/profile.json` | 项目画像（无凭据），产物目录用的项目名也在这里 |
+| `workflow-run/profile-source.json` | 多环境 `--copy` 且 profile 内容不同时，记录项目选用的 profile 目录；`config --profile-source` 维护 |
 | `.agents/skills/database-query/references/schema.md` | 表结构速查，补齐后提交 |
 | `workflow-run/docs/requirements/` | 需求产物；独立文档仓库模式下提交到文档仓库 |
 | `workflow-run/other/` | 普通聊天生成的报告、方案、草稿、导出等辅助文件（按需创建，可按主题分目录）；不进入需求索引、运行状态、需求统计与文档视图，按需提交 |

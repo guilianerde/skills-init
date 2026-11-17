@@ -273,7 +273,7 @@ export function setupHome(root) {
     if (L.mode === 'repo' && !L.ok) warn(`${HOME}/ 是独立的文档仓库，还没配置本项目的项目名：${L.hint}`);
   } catch (error) {
     if (error.code !== 'PROJECT_CONFIG_AMBIGUOUS') throw error;
-    warn(`${error.message}；安装已完成，但依赖项目配置的核心操作会暂停，直到明确权威 profile 来源（Issue #5）`);
+    warn(`${error.message}；安装已完成，但依赖项目配置的核心操作会暂停，先运行 requirement.mjs config --profile-source <环境|路径> 明确来源`);
   }
   // 运行反馈只收当前版本的：装了新版本就清掉本项目旧版本的记录（随 workflow-run/ 提交过的，git 历史里仍可找回）
   let removed = 0;
@@ -281,7 +281,7 @@ export function setupHome(root) {
     removed = rotateFeedback(root, PKG.version);
   } catch (error) {
     if (error.code !== 'PROJECT_CONFIG_AMBIGUOUS') throw error;
-    warn('运行反馈轮换已跳过：先解决多个 profile 副本的权威来源（Issue #5）');
+    warn('运行反馈轮换已跳过：先运行 requirement.mjs config --profile-source <环境|路径> 明确 profile 来源');
   }
   const attr = ensureUnionMerge(root);
   if (attr?.action === 'added') ok(`${attr.file} 已加上 ${attr.rule}（文档仓库里运行反馈多分支合并时保留两边的记录）`);

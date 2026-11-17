@@ -2,6 +2,26 @@
 
 所有 skill 共用的项目事实，放在本 skill 目录下，**不含任何凭据**，可以提交到 git。缺失的字段一律视为空。
 
+## 多环境安装的配置来源
+
+用 `--copy` 同时安装 Claude、Qwen、WorkBuddy 等环境时，项目根下会有多份 `workflow/` 拷贝。配置解析顺序是：
+
+1. `workflow-run/profile-source.json` 的显式选择；
+2. `.agents/skills/workflow/`；
+3. 唯一存在的其他受支持安装目录；
+4. 多份副本的 `profile.json` 与 `profile.local.json` 完全相同时，按安装顺序选择第一份。
+
+副本内容不同时核心操作会返回 `PROJECT_CONFIG_AMBIGUOUS`，不会按目录扫描顺序静默任选。明确选择来源：
+
+```sh
+node .claude/skills/workflow/scripts/requirement.mjs config --profile-source claude
+node .claude/skills/workflow/scripts/requirement.mjs config --profile-source qwen
+node .claude/skills/workflow/scripts/requirement.mjs config --profile-source .qwen/skills/workflow
+node .claude/skills/workflow/scripts/requirement.mjs config --profile-source auto
+```
+
+选择只接受目标项目内已存在的 `.agents/skills/workflow`、`.claude/skills/workflow`、`.qwen/skills/workflow`、`.codebuddy/skills/workflow`，写入可提交的 `workflow-run/profile-source.json`。`auto` 删除该文件；目录被重装删除后会报来源无效，重新选择即可。团队可提交显式选择，个人若只用另一个环境，也可以运行 `config --profile-source auto` 后重新选择自己的环境。
+
 | 字段 | 含义 | 谁在用 |
 |---|---|---|
 | `main_branch` | 主分支名，diff 基线 | dev、project-review、文档类 |

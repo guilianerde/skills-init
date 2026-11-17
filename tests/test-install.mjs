@@ -150,6 +150,24 @@ test('--copy：各环境独立拷贝；没选 codex / doubao 时不装 .agents',
     assert.equal(parseYaml(p.read(`${d}/dev/agents/openai.yaml`)).policy.allow_implicit_invocation, false);
   }
   assert.ok(!p.exists('.agents/skills'));
+
+  const requirement = p.at('.claude/skills/workflow/scripts/requirement.mjs');
+  const runConfig = (...args) => spawnSync(process.execPath, [requirement, '--root', p.P, 'config', ...args], { encoding: 'utf8' });
+  let result = runConfig();
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(JSON.parse(result.stdout).profile_source.selected_by, 'equivalent_profiles');
+
+  p.write('.qwen/skills/workflow/profile.json', JSON.stringify({ main_branch: 'develop', build: 'make', test: 'make test' }));
+  result = runConfig();
+  assert.equal(result.status, 1);
+  assert.equal(JSON.parse(result.stderr).code, 'PROJECT_CONFIG_AMBIGUOUS');
+
+  result = runConfig('--profile-source', 'qwen');
+  assert.equal(result.status, 0, result.stderr);
+  result = runConfig();
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(JSON.parse(result.stdout).profile_source.selected_by, 'profile-source');
+  assert.equal(p.json('workflow-run/profile-source.json').profile_dir, '.qwen/skills/workflow');
 });
 
 test('--yes 且没有数据库配置：退出码 1，什么也不装', () => {

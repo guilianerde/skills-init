@@ -7,6 +7,7 @@
 ### 新增
 - 新增 `workflow/core/index.mjs` 内部程序入口，运行状态、需求绑定、索引维护、产物 finalize 和审查交接可由 Skills 脚本与 Node.js 调用方共用。
 - 新增项目级配置隔离：实例绑定明确 root，不读取核心模块所在项目的 profile；多个规范路径之外的配置副本有歧义时明确报错。
+- 多环境 `--copy` 安装中内容相同的 profile 副本自动视为等价；内容不同时可用 `requirement.mjs config --profile-source` 写入项目级来源，`auto` 恢复自动判断。
 - 审查范围、分类和分批逻辑抽到共享库，审查交接通过核心生成。
 
 ### 变更

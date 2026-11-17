@@ -144,7 +144,7 @@ Codex 原生元数据 `dev/agents/openai.yaml` 设置 `policy.allow_implicit_inv
 | `workflow/scripts/resolve.mjs status` | `/workflow status` 的能力探测（不输出任何凭据） |
 | `workflow/scripts/resolve.mjs infer-profile` | 按固定规则从构建文件、Makefile、依赖与配置文件、git 推断项目画像草稿，每个字段附依据；不写文件 |
 | `workflow/scripts/lint-doc.mjs <文档> --skill <skill> [--facts --diff <main>...<dev>]` | 对照当前生效的模板检查必填章节、残留占位符和该 skill 要求的元信息；缺普通章节、顺序不一致为警告；列出待填写位置。技术方案不强制可见元信息，事实核对显式指定三点范围；正文里的类名、文件、接口、表名在 diff 和代码里都找不到时给出警告 |
-| `workflow/scripts/requirement.mjs which / bind / reindex / pending / list / config` | 产物按需求归档（`workflow-run/docs/requirements/<需求>/<项目>/`，两种模式结构相同）：查当前分支绑定的需求（没绑定时给出按分支名生成的建议名）、绑定需求名、只刷新派生索引、列出所有需求；`config` 设置产物位置（文档仓库、项目名、提交提示），`pending` 看文档仓库里还没提交的产物。正式正文只通过 `artifact.mjs finalize` 发布 |
+| `workflow/scripts/requirement.mjs which / bind / reindex / pending / list / config` | 产物按需求归档（`workflow-run/docs/requirements/<需求>/<项目>/`，两种模式结构相同）：查当前分支绑定的需求（没绑定时给出按分支名生成的建议名）、绑定需求名、只刷新派生索引、列出所有需求；`config` 设置产物位置（文档仓库、项目名、提交提示、多环境 profile 来源），`pending` 看文档仓库里还没提交的产物。正式正文只通过 `artifact.mjs finalize` 发布 |
 | `workflow/scripts/view.mjs [--out f] [--open]` | 项目文档视图（`/workflow view`、`npx @rowansenne/workflow-run view`）：读需求目录里的产物，生成单个 HTML，按需求列出各阶段、审查记录（各级别数量、复核、与上次对比）、交付记录、沉淀到的知识文档，正文直接渲染；顶部「知识文档」列出每篇知识文档来自哪个需求、哪份产物；数据内嵌，只读、不联网，默认写到 `workflow-run/tmp/view/index.html` |
 | `workflow/scripts/run.mjs show / start / save / complete / cancel` | 需求 meta.json 中的分支运行记录：恢复、checkpoint、已完成状态与时间、等待用户、修复回退、revision 冲突检查 |
 | `workflow/scripts/artifacts.mjs [--branch b \| --all]` | 按分支汇总 `workflow-run/docs/requirements/` 下的方案、交付说明、审查报告、技术方案、上线方案及其 wiki 发布记录，给出下一步建议；分支取自文件头元信息（兼容技术方案的隐藏注释与旧可见行）。project-review 据此对照本分支方案、识别复审 |

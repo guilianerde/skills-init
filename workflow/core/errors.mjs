@@ -29,7 +29,7 @@ export class WorkflowError extends Error {
 }
 
 const rules = [
-  [/项目存在多个不同的 workflow 配置目录/, WORKFLOW_ERROR_CODES.PROJECT_CONFIG_AMBIGUOUS],
+  [/项目存在多个.*workflow 配置目录|profile 来源/, WORKFLOW_ERROR_CODES.PROJECT_CONFIG_AMBIGUOUS],
   [/版本冲突|expect-revision/, WORKFLOW_ERROR_CODES.REVISION_CONFLICT],
   [/找不到运行/, WORKFLOW_ERROR_CODES.RUN_NOT_FOUND],
   [/运行已结束/, WORKFLOW_ERROR_CODES.RUN_TERMINAL],
