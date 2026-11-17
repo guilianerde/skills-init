@@ -1,6 +1,6 @@
 # 第一阶段实施报告：公共核心与 Skills 接入
 
-状态：已实现，待发布。日期：2026-11-17。开发分支：`codex/extract-workflow-core`，验证代码基线：`f270ed2`。
+状态：已实现。真实目标 Claude 模型的 trigger eval 已按 [Issue #8](https://github.com/guilianerde/skills-init/issues/8) 标记为 `deferred` 后续处理。日期：2026-11-17。开发分支：`codex/extract-workflow-core`，验证代码基线：`f270ed2`。
 
 本报告记录第一阶段实际交付、验证边界和后续入口；接口定义见 [Workflow Core 内部接口](../workflow/references/core-api.md)，执行规则见 [执行约定](../workflow/references/execution.md)，原始方案见 [第一阶段方案](workflow-core-phase-one.md)。
 
@@ -28,7 +28,7 @@
 - `eval:triggers` 默认模型当前返回 provider 错误 `InvalidEndpoint.ClosedEndpoint`；评估器已修正为把这种“无工具调用的错误文本”记为 `error` 并返回非零退出码。
 - 切换到 `--model sonnet` 后实际由配置网关映射到 `glm-5.2`，全量 46 条得到 22/46；该模型不会按 Claude 的本项目 Skills 元数据执行自动触发，因此结果不能冒充 Anthropic Claude 的触发验收。评估器同时限制为 `Skill` / `Read` 工具，并在普通探索后继续等待真正的 skill 选择，避免第一工具误判。结果文件会记录请求模型、每次请求的实际模型和 `--require-model` 要求；任一次缺失或不符合目标模型都会返回非零退出码。
 
-真实目标 Claude 模型的触发验收仍由 [Issue #8](https://github.com/guilianerde/skills-init/issues/8) 跟踪；在具备该模型的环境完成 46 条明细前，本阶段保持“已实现，待发布”。
+真实目标 Claude 模型的触发验收仍由 [Issue #8](https://github.com/guilianerde/skills-init/issues/8) 跟踪；该事项已明确标记为后续处理，不阻塞第一阶段交付。
 
 ## 破坏性变化
 

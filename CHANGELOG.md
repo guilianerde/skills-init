@@ -4,6 +4,8 @@
 
 ## [Unreleased]
 
+## [0.36.0] - 2026-11-17
+
 ### 新增
 - 新增 `workflow/core/index.mjs` 内部程序入口，运行状态、需求绑定、索引维护、产物 finalize 和审查交接可由 Skills 脚本与 Node.js 调用方共用。
 - 新增项目级配置隔离：实例绑定明确 root，不读取核心模块所在项目的 profile；多个规范路径之外的配置副本有歧义时明确报错。
@@ -482,7 +484,8 @@
 - 安装器改为单一 Node 实现，`init-skills.sh` / `init-skills.ps1` 只是薄封装。
 - `code-review` 改名为 `project-review`，升级时自动清理旧名。
 
-[Unreleased]: https://github.com/guilianerde/skills-init/compare/v0.26.0...HEAD
+[Unreleased]: https://github.com/guilianerde/skills-init/compare/v0.36.0...HEAD
+[0.36.0]: https://github.com/guilianerde/skills-init/compare/v0.35.0...v0.36.0
 [0.26.0]: https://github.com/guilianerde/skills-init/compare/v0.25.0...v0.26.0
 [0.21.0]: https://github.com/guilianerde/skills-init/compare/v0.20.0...v0.21.0
 [0.20.0]: https://github.com/guilianerde/skills-init/compare/v0.19.0...v0.20.0

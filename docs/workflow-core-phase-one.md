@@ -1,6 +1,6 @@
 # 第一阶段：Skills 与内部程序入口共用核心
 
-状态：已实现，待发布。日期：2026-11-16。实现结果见[第一阶段实施报告](workflow-core-phase-one-report.md)。
+状态：已实现。真实目标 Claude 模型的 trigger eval 已按 [Issue #8](https://github.com/guilianerde/skills-init/issues/8) 标记为 `deferred` 后续处理。日期：2026-11-16。实现结果见[第一阶段实施报告](workflow-core-phase-one-report.md)。
 
 修订：2026-11-17，根据设计质检补齐项目配置隔离、pending 操作身份、finalize 成功重放和非 run 写操作契约；对应验收项已同步更新。
 
@@ -309,7 +309,7 @@ npm run eval:triggers
 - [x] path / nextPath / sync bump、旧流程兼容迁移及其生产调用已删除，正式正文发布统一走 finalize。
 - [x] bind 与受限 reindex 的写入归属、锁及证据失效测试通过，which 为只读查询。
 - [x] 安装后的 Skills、包内容和流程测试通过。
-- [ ] `eval:triggers` 的默认 provider 返回 `InvalidEndpoint.ClosedEndpoint`；可用模型实际被网关映射为 GLM，46 条仅 22 条命中，不能冒充 Anthropic Claude 的触发验收。评估器已能区分 provider 错误、限制只读工具并跟踪后续 `SKILL.md` 选择，发布前仍需在真实目标模型重跑。
+- [ ] `eval:triggers` 在真实 Anthropic Claude 环境的 46 条验收已作为 `deferred` 后续事项保留（#8）；当前网关模型结果不能冒充目标模型。评估器已完成严格模型身份校验，恢复处理条件已写入 Issue。
 - [x] 数据格式变化及拒绝行为明确；没有旧数据迁移和隐式清理。
 - [x] 文档更新区分已实现能力与后续目标，没有强制管控或实测证据的虚假承诺。
 - [x] 实施报告列出变更、验证结果、限制和第二阶段接入点。
