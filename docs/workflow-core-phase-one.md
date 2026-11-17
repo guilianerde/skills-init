@@ -309,7 +309,7 @@ npm run eval:triggers
 - [x] path / nextPath / sync bump、旧流程兼容迁移及其生产调用已删除，正式正文发布统一走 finalize。
 - [x] bind 与受限 reindex 的写入归属、锁及证据失效测试通过，which 为只读查询。
 - [x] 安装后的 Skills、包内容和流程测试通过。
-- [ ] `eval:triggers` 的 Claude provider 当前返回 `InvalidEndpoint.ClosedEndpoint`，保留为发布前外部验证项；评估器已能把该错误与“未触发 skill”区分并失败退出。
+- [ ] `eval:triggers` 的默认 provider 返回 `InvalidEndpoint.ClosedEndpoint`；可用模型实际被网关映射为 GLM，46 条仅 22 条命中，不能冒充 Anthropic Claude 的触发验收。评估器已能区分 provider 错误、限制只读工具并跟踪后续 `SKILL.md` 选择，发布前仍需在真实目标模型重跑。
 - [x] 数据格式变化及拒绝行为明确；没有旧数据迁移和隐式清理。
 - [x] 文档更新区分已实现能力与后续目标，没有强制管控或实测证据的虚假承诺。
 - [x] 实施报告列出变更、验证结果、限制和第二阶段接入点。

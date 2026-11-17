@@ -24,7 +24,8 @@
 - npm 发布包测试：1/1 通过；打包后安装 CLI 与全部 skills，执行安装后的脚本，再卸载并保留用户产物。
 - GitHub CI：Ubuntu Node 22 / 24 跑完整测试与包测试，Windows Node 22 跑共同核心与流程测试。
 - Windows 本机 `test-upload.mjs` 存在 Node/libuv 原生崩溃，作为平台限制未计入本地非 upload 全量；对应改动仍需 Linux CI 证明。
-- `eval:triggers` 的真实 Claude 调用当前返回 provider 错误 `InvalidEndpoint.ClosedEndpoint`；评估器已修正为把这种“无工具调用的错误文本”记为 `error` 并返回非零退出码，不能把未完成评估写成 0% 准确率或成功。
+- `eval:triggers` 默认模型当前返回 provider 错误 `InvalidEndpoint.ClosedEndpoint`；评估器已修正为把这种“无工具调用的错误文本”记为 `error` 并返回非零退出码。
+- 切换到 `--model sonnet` 后实际由配置网关映射到 `glm-5.2`，全量 46 条得到 22/46；该模型不会按 Claude 的本项目 Skills 元数据执行自动触发，因此结果不能冒充 Anthropic Claude 的触发验收。评估器同时限制为 `Skill` / `Read` 工具，并在普通探索后继续等待真正的 skill 选择，避免第一工具误判。
 
 最终提交 SHA、测试数量和 CI 链接在发布前由同一分支的最新运行补齐。
 

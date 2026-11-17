@@ -11,7 +11,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { isApiErrorText } from './eval-trigger-utils.mjs';
+import { classifyTriggerTool, isApiErrorText } from './eval-trigger-utils.mjs';
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const SKILLS = ['workflow', 'dev', 'project-review', 'database-query', 'md-to-wiki', 'create-tech-md-doc', 'create-release-md-doc', 'code-graph', 'nacos-config'];
@@ -34,25 +34,18 @@ const inst = spawnSync(process.execPath, [path.join(REPO, 'bin', 'workflow-run.m
 if (inst.status !== 0) { console.error(inst.stdout, inst.stderr); process.exit(1); }
 
 function classify(toolName, input) {
-  if (toolName === 'Skill') {
-    const m = input.match(/"(?:skill|command|name)"\s*:\s*"([^"]+)"/);
-    const s = m ? m[1].replace(/^\//, '').split(/\s/)[0] : '';
-    return SKILLS.includes(s) ? s : `other:${s}`;
-  }
-  if (toolName === 'Read') {
-    const m = input.match(/skills[\\/]+([^\\/"]+)[\\/]+SKILL\.md/);
-    if (m) return SKILLS.includes(m[1]) ? m[1] : `other:${m[1]}`;
-  }
-  return 'none';
+  return classifyTriggerTool(toolName, input, SKILLS);
 }
 
 function runOne(query) {
   return new Promise((resolve) => {
-    const cmd = ['-p', query, '--output-format', 'stream-json', '--verbose', '--include-partial-messages'];
+    // 只暴露 Skill 和 Read，避免为了判断分流而真的执行项目命令或修改文件。
+    const cmd = ['-p', query, '--output-format', 'stream-json', '--verbose', '--include-partial-messages', '--tools', 'Skill,Read'];
     if (MODEL) cmd.push('--model', MODEL);
     const env = { ...process.env }; delete env.CLAUDECODE;
     const p = spawn('claude', cmd, { cwd: proj, env, stdio: ['ignore', 'pipe', 'ignore'] });
-    let buf = '', tool = null, json = '', text = '', done = false, streamed = false, outcome = null;
+    let buf = '', text = '', done = false, streamed = false, outcome = null;
+    const tools = new Map();
     const finish = (r) => {
       if (done) return;
       done = true; outcome = r; clearTimeout(t); p.kill('SIGKILL');
@@ -71,18 +64,24 @@ function runOne(query) {
         streamed = true;
         const se = ev.event || {};
         if (se.type === 'content_block_start' && se.content_block?.type === 'tool_use') {
-          tool = se.content_block.name; json = '';
-          if (tool !== 'Skill' && tool !== 'Read') return finish('none');
+          const name = se.content_block.name;
+          tools.set(se.index, { name, json: '' });
+          if (name !== 'Skill' && name !== 'Read') return finish('none');
         } else if (se.type === 'content_block_start' && se.content_block?.type === 'text') {
           text = '';
-        } else if (se.type === 'content_block_delta' && tool && se.delta?.type === 'input_json_delta') {
-          json += se.delta.partial_json || '';
-        } else if (se.type === 'content_block_delta' && !tool && se.delta?.type === 'text_delta') {
+        } else if (se.type === 'content_block_delta' && tools.has(se.index) && se.delta?.type === 'input_json_delta') {
+          const tool = tools.get(se.index);
+          tool.json += se.delta.partial_json || '';
+        } else if (se.type === 'content_block_delta' && !tools.has(se.index) && se.delta?.type === 'text_delta') {
           text += se.delta.text || '';
           // 某些 provider 把 API 错误作为普通 assistant 文本返回，result.is_error 仍为 false。
           if (isApiErrorText(text)) return finish('error');
-        } else if (se.type === 'content_block_stop' && tool) {
-          return finish(classify(tool, json));
+        } else if (se.type === 'content_block_stop' && tools.has(se.index)) {
+          const tool = tools.get(se.index);
+          const selected = classify(tool.name, tool.json);
+          tools.delete(se.index);
+          // Read 可能先读 CLAUDE.md 等普通文件；继续观察到 skill 的 SKILL.md 或会话结束。
+          if (selected !== 'none') return finish(selected);
         }
       }
     });
@@ -125,6 +124,7 @@ const out = path.join(REPO, 'tmp', 'evals', `trigger-${Date.now()}.json`);
 fs.mkdirSync(path.dirname(out), { recursive: true });
 fs.writeFileSync(out, JSON.stringify(rows, null, 2));
 console.log(`明细：${path.relative(REPO, out)}`);
+await new Promise((resolve) => setTimeout(resolve, 3000));
 try {
   fs.rmSync(proj, { recursive: true, force: true, maxRetries: 10, retryDelay: 500 });
 } catch (error) {
