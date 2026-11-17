@@ -9,7 +9,7 @@
 1. `workflow-run/profile-source.json` 的显式选择；
 2. `.agents/skills/workflow/`；
 3. 唯一存在的其他受支持安装目录；
-4. 多份副本的 `profile.json` 与 `profile.local.json` 完全相同时，按安装顺序选择第一份。
+4. 多份副本的 `profile.json` 与 `profile.local.json` 完全相同时，按 `.agents` → `.claude` → `.qwen` → `.codebuddy` 固定顺序选择第一份。
 
 副本内容不同时核心操作会返回 `PROJECT_CONFIG_AMBIGUOUS`，不会按目录扫描顺序静默任选。明确选择来源：
 

@@ -132,7 +132,7 @@ workflow.artifacts.resume({
 
 项目配置只从目标 root 解析。`workflow-run/profile-source.json` 中的显式选择优先级最高；没有显式选择时，规范位置 `.agents/skills/workflow/` 优先；其他支持的安装位置只在规范位置不存在时参与解析。
 
-`--copy` 多环境安装首次生成的多份 `profile.json` / `profile.local.json` 内容完全相同时，可以自动使用按安装顺序出现的第一份；任一份配置变化后，解析会返回 `PROJECT_CONFIG_AMBIGUOUS`，不会静默改选。显式选择只在目标 root 内受支持的安装目录中生效：
+`--copy` 多环境安装首次生成的多份 `profile.json` / `profile.local.json` 内容完全相同时，可以自动使用按 `.agents` → `.claude` → `.qwen` → `.codebuddy` 固定顺序出现的第一份；任一份配置变化后，解析会返回 `PROJECT_CONFIG_AMBIGUOUS`，不会静默改选。显式选择只在目标 root 内受支持的安装目录中生效：
 
 ```sh
 node <skills>/workflow/scripts/requirement.mjs config --profile-source claude
