@@ -6,7 +6,7 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { createWorkflow } from '../core/index.mjs';
 import { createSkillDocumentPolicy } from '../integrations/skill-document-policy.mjs';
-import { ARTIFACT_TEMPLATES } from '../lib/artifact-finalize.mjs';
+import { ARTIFACT_TEMPLATES, resumeFinalization, abortFinalization } from '../lib/artifact-finalize.mjs';
 
 export function main(argv) {
   try {
@@ -20,19 +20,9 @@ export function main(argv) {
     const branch = opts.branch ?? spawnSync('git', ['symbolic-ref', '--short', 'HEAD'], { cwd: root, encoding: 'utf8' }).stdout?.trim();
     const read = (p) => p ? JSON.parse(fs.readFileSync(p === '-' ? 0 : path.resolve(root, p), 'utf8')) : undefined;
     const workflow = createWorkflow({ root, documentPolicy: createSkillDocumentPolicy(root) });
-    const pendingRequest = () => {
-      const state = workflow.runs.status({ branch, id: opts.id });
-      if (!state.pending) throw new Error(`没有该运行待处理的产物收尾：${opts.id}`);
-      return {
-        branch,
-        id: opts.id,
-        expectedRevision: state.pending.runRevision,
-        operationId: state.pending.operationId,
-      };
-    };
     let out;
-    if (action === 'resume') out = workflow.artifacts.resume(pendingRequest());
-    else if (action === 'abort') out = workflow.artifacts.abort(pendingRequest());
+    if (action === 'resume') out = resumeFinalization(root, { branch, id: opts.id });
+    else if (action === 'abort') out = abortFinalization(root, { branch, id: opts.id });
     else if (action === 'finalize') {
       if (!ARTIFACT_TEMPLATES[opts.kind] || !opts.draft) throw new Error('finalize 需要 --kind clarification|requirement|plan|review|delivery|tech|release 和 --draft <草稿.md>');
       out = workflow.artifacts.finalize({

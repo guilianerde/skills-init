@@ -12,7 +12,6 @@
 ### 变更
 - `requirement.mjs which` 改为纯只读；新增 `requirement.mjs reindex`，只刷新派生索引，不提升 versions、不归档、不推进运行或生成证据。
 - `run.mjs` 的操作与导出收口到核心门面；`artifact.mjs finalize` 通过核心和 Skills 文档策略执行。
-- 核心 `artifacts.resume/abort` 冻结为 `{ branch, id, expectedRevision, operationId }`：`expectedRevision` 使用 status 的 `runRevision`，pending 基准 revision 由核心核对；旧操作 ID 不能恢复或中止后来创建的事务。`artifact.mjs` 恢复命令自动读取当前待办身份，CLI 用法保持不变。
 
 ### 移除
 - 删除 `requirement.mjs path`、`nextPath()`、旧 `sync` 命令及版本 bump 直写链。

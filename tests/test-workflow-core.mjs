@@ -63,21 +63,6 @@ const expectCode = (code, fn) => assert.throws(fn, (error) => {
   return true;
 });
 
-function interruptFinalization(f, run, kind, input) {
-  const rename = fs.renameSync;
-  let commits = 0;
-  fs.renameSync = (from, to) => {
-    if (to === f.file && ++commits === 2) throw new Error('模拟 pending 中断');
-    return rename(from, to);
-  };
-  try {
-    assert.throws(() => f.finalize(run, kind, input), /模拟 pending 中断/);
-  } finally {
-    fs.renameSync = rename;
-  }
-  return JSON.parse(fs.readFileSync(f.file, 'utf8')).pending_finalization;
-}
-
 test('createWorkflow 要求绝对 root，构造本身不创建目录', (t) => {
   const parent = fs.mkdtempSync(path.join(os.tmpdir(), 'workflow-core-root-'));
   const root = path.join(parent, 'missing');
@@ -253,82 +238,19 @@ test('正式产物通过核心 finalize，缺少 policy 时明确拒绝', (t) =>
   assert.equal(replay.run.revision, finalized.run.revision);
 });
 
-test('resume 以 STATUS.runRevision、operationId 和内部 baseRevision 核对 pending', (t) => {
-  const f = flowFixture(t);
-  const run = f.start();
-  const pending = interruptFinalization(f, run, 'requirement', { steps: { F3: { status: 'completed' } } });
-  const workflow = createWorkflow({ root: f.root });
-  const state = workflow.runs.status({ branch: BRANCH, id: run.id });
-
-  assert.equal(state.current.revision, run.revision, 'current 保留已提交运行快照');
-  assert.equal(state.runRevision, run.revision + 1, 'status.runRevision 是 pending 操作的目标 revision');
-  assert.deepEqual(state.pending, {
-    operationId: pending.id,
-    runId: run.id,
-    kind: 'requirement',
-    baseRevision: run.revision,
-    runRevision: run.revision + 1,
-    id: pending.id,
-  });
-
-  const request = {
-    branch: BRANCH,
-    id: run.id,
-    expectedRevision: state.runRevision,
-    operationId: state.pending.operationId,
-  };
-  expectCode(WORKFLOW_ERROR_CODES.REVISION_CONFLICT, () => workflow.artifacts.resume({
-    ...request,
-    expectedRevision: state.pending.baseRevision,
-  }));
-  expectCode(WORKFLOW_ERROR_CODES.PENDING_OPERATION_MISMATCH, () => workflow.artifacts.resume({
-    ...request,
-    operationId: 'stale-operation',
-  }));
-
-  const resumed = workflow.artifacts.resume(request);
-  assert.equal(resumed.operationId, pending.id);
-  assert.equal(resumed.baseRevision, run.revision);
-  assert.equal(resumed.run.revision, state.runRevision);
-  assert.equal(workflow.runs.status({ branch: BRANCH, id: run.id }).pending, undefined);
-  expectCode(WORKFLOW_ERROR_CODES.PENDING_OPERATION_MISMATCH, () => workflow.artifacts.resume(request));
-});
-
-test('abort 后新 pending 不复用旧 operationId，旧请求不能误处理新事务', (t) => {
-  const f = flowFixture(t);
-  const run = f.start();
-  const first = interruptFinalization(f, run, 'requirement', { steps: { F3: { status: 'completed' } } });
-  const workflow = createWorkflow({ root: f.root });
-  const firstState = workflow.runs.status({ branch: BRANCH, id: run.id });
-  const aborted = workflow.artifacts.abort({
-    branch: BRANCH,
-    id: run.id,
-    expectedRevision: firstState.runRevision,
-    operationId: firstState.pending.operationId,
-  });
-  assert.equal(aborted.aborted, true);
-  assert.equal(aborted.operationId, first.id);
-  assert.equal(workflow.runs.status({ branch: BRANCH, id: run.id }).runRevision, run.revision);
-
-  const second = interruptFinalization(f, run, 'requirement', { steps: { F3: { status: 'completed' } } });
-  const secondState = workflow.runs.status({ branch: BRANCH, id: run.id });
-  assert.notEqual(second.id, first.id);
-  expectCode(WORKFLOW_ERROR_CODES.PENDING_OPERATION_MISMATCH, () => workflow.artifacts.abort({
-    branch: BRANCH,
-    id: run.id,
-    expectedRevision: secondState.runRevision,
-    operationId: first.id,
-  }));
-  assert.equal(JSON.parse(fs.readFileSync(f.file, 'utf8')).pending_finalization.id, second.id);
-  const cli = spawnSync(process.execPath, [
-    path.join(REPO, 'workflow/scripts/artifact.mjs'),
-    'abort',
-    '--root', f.root,
-    '--branch', BRANCH,
-    '--id', run.id,
-  ], { encoding: 'utf8' });
-  assert.equal(cli.status, 0, cli.stderr);
-  assert.equal(JSON.parse(cli.stdout).operationId, second.id);
+test('尚未冻结的 resume 和 abort 以显式占位失败', (t) => {
+  const project = tempProject(t);
+  const workflow = createWorkflow({ root: project.root });
+  for (const operation of [
+    () => workflow.artifacts.resume(),
+    () => workflow.artifacts.abort(),
+  ]) {
+    assert.throws(operation, (error) => {
+      assert.equal(error.code, WORKFLOW_ERROR_CODES.NOT_IMPLEMENTED);
+      assert.equal(error.details.issue, 4);
+      return true;
+    });
+  }
 });
 
 test('旧 path / sync / nextPath 与 run 命令导出不再存在', async () => {
