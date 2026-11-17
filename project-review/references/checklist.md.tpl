@@ -1,6 +1,6 @@
 # Code Review Checklist
 
-按维度逐项检查。每个发现需记录：位置（文件+行号）、描述、严重级别（CRITICAL/HIGH/MEDIUM/LOW）、建议。没有问题时该维度标注"通过"。
+逐维度检查。每条记录位置（文件:行）、描述、严重级别（CRITICAL/HIGH/MEDIUM/LOW）和建议；无问题标“通过”。
 
 ## 1. 正确性与逻辑 bug
 - [ ] 条件判断是否反了 / 漏了分支 / 边界（`==` vs `equals`，数值比较用 `compareTo` 而非 `==`）

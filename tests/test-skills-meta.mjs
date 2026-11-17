@@ -43,6 +43,13 @@ test('模板与用户文件的源路径都存在，模板 id 在 skill 内唯一
   for (const s of skills) assert.equal(new Set(s.templates.map((t) => t.id)).size, s.templates.length, s.name);
 });
 
+test('DocNexus 导入模板不超过 4000 个 Unicode 字符', () => {
+  for (const t of meta.templates.filter((item) => item.src)) {
+    const characters = [...read(t.src)].length;
+    assert.ok(characters <= 4000, `${t.file}：${characters} 个 Unicode 字符`);
+  }
+});
+
 test('package.json files 与 README 覆盖全部 skill', () => {
   const pkg = JSON.parse(read('package.json'));
   const readme = read('README.md');
