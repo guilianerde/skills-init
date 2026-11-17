@@ -6,7 +6,7 @@ import {
   reindex as reindexRequirements,
   which as whichRequirement,
 } from '../lib/requirements.mjs';
-import { abortFinalization, finalizeArtifact, resumeFinalization } from '../lib/artifact-finalize.mjs';
+import { finalizeArtifact } from '../lib/artifact-finalize.mjs';
 import { codeSnapshot } from '../lib/code-snapshot.mjs';
 import { WORKFLOW_ERROR_CODES, WorkflowError, toWorkflowError } from './errors.mjs';
 import {
@@ -49,17 +49,12 @@ const requireInput = (input, name = 'input') => {
   if (!isObject(input)) invalid(`${name} 必须是对象`);
   return input;
 };
-const requireOperationId = (operationId) => {
-  if (typeof operationId !== 'string' || !operationId.trim()) invalid('operationId 必须是非空字符串');
-  return operationId;
-};
-const pendingRequest = (value, name) => {
-  const { branch, id, expectedRevision, operationId } = requireObject(value, name);
-  requireBranch(branch);
-  requireRunId(id);
-  requireRevision(expectedRevision);
-  requireOperationId(operationId);
-  return { branch, id, expectedRevision, operationId };
+const pendingBlocker = (operation) => {
+  throw new WorkflowError(
+    WORKFLOW_ERROR_CODES.NOT_IMPLEMENTED,
+    `${operation} 的核心契约尚待 Issue #4 明确，当前仅完成入口占位`,
+    { details: { issue: 4, operation } },
+  );
 };
 
 function normalizeRoot(root) {
@@ -241,19 +236,11 @@ export function createWorkflow({ root, documentPolicy } = {}) {
         }, (candidate) => documentPolicy.validate({ kind, text: candidate })));
         return { ...finalized, alreadyFinalized: finalized.already_finalized === true };
       },
-      resume(options) {
-        const request = pendingRequest(options, 'artifacts.resume');
-        return invoke(
-          () => resumeFinalization(projectRoot, request),
-          WORKFLOW_ERROR_CODES.PENDING_FINALIZATION,
-        );
+      resume() {
+        pendingBlocker('artifacts.resume');
       },
-      abort(options) {
-        const request = pendingRequest(options, 'artifacts.abort');
-        return invoke(
-          () => abortFinalization(projectRoot, request),
-          WORKFLOW_ERROR_CODES.PENDING_FINALIZATION,
-        );
+      abort() {
+        pendingBlocker('artifacts.abort');
       },
     }),
 

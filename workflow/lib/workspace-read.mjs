@@ -105,16 +105,7 @@ export function loadWorkspace(root, { allProjects = false, allBranches = false }
       }
       const pending = req.meta.pending_finalization;
       runs.push({ ...run, requirement: req.name, dir: req.dir, project: req.project,
-        ...(pending?.run_id === id ? {
-          pending_finalization: {
-            kind: pending.kind,
-            id: pending.id,
-            operationId: pending.id,
-            runId: pending.run_id,
-            baseRevision: pending.revision,
-            runRevision: pending.run?.revision ?? pending.revision + 1,
-          },
-        } : {}) });
+        ...(pending?.run_id === id ? { pending_finalization: { kind: pending.kind, id: pending.id } } : {}) });
     }
   }
   artifacts.sort(byArtifactDate);
