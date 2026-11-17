@@ -12,6 +12,18 @@ export function isApiErrorText(value) {
   }
 }
 
+export function checkActualModels(models, required) {
+  if (!required) return { ok: true, missing: 0, mismatched: [] };
+  const observed = models.filter((model) => typeof model === 'string' && model);
+  const missing = models.length - observed.length;
+  const mismatched = [...new Set(observed.filter((model) => !model.includes(required)))];
+  return {
+    ok: models.length > 0 && missing === 0 && mismatched.length === 0,
+    missing,
+    mismatched,
+  };
+}
+
 export function classifyTriggerTool(toolName, input, skills) {
   if (toolName === 'Skill') {
     const match = input.match(/"(?:skill|command|name)"\s*:\s*"([^"]+)"/);

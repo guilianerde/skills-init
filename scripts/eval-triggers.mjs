@@ -11,7 +11,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { classifyTriggerTool, isApiErrorText } from './eval-trigger-utils.mjs';
+import { checkActualModels, classifyTriggerTool, isApiErrorText } from './eval-trigger-utils.mjs';
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const SKILLS = ['workflow', 'dev', 'project-review', 'database-query', 'md-to-wiki', 'create-tech-md-doc', 'create-release-md-doc', 'code-graph', 'nacos-config'];
@@ -46,11 +46,11 @@ function runOne(query) {
     if (MODEL) cmd.push('--model', MODEL);
     const env = { ...process.env }; delete env.CLAUDECODE;
     const p = spawn('claude', cmd, { cwd: proj, env, stdio: ['ignore', 'pipe', 'ignore'] });
-    let buf = '', text = '', done = false, streamed = false, outcome = null;
+    let buf = '', text = '', model = null, done = false, streamed = false, outcome = null;
     const tools = new Map();
     const finish = (r) => {
       if (done) return;
-      done = true; outcome = r; clearTimeout(t); p.kill('SIGKILL');
+      done = true; outcome = { got: r, model }; clearTimeout(t); p.kill('SIGKILL');
     };
     const t = setTimeout(() => finish('timeout'), TIMEOUT);
     p.stdout.on('data', (d) => {
@@ -60,7 +60,10 @@ function runOne(query) {
         const line = buf.slice(0, i).trim(); buf = buf.slice(i + 1);
         if (!line) continue;
         let ev; try { ev = JSON.parse(line); } catch { continue; }
-        if (ev.type === 'system' && ev.subtype === 'init' && typeof ev.model === 'string' && ev.model) actualModels.add(ev.model);
+        if (ev.type === 'system' && ev.subtype === 'init' && typeof ev.model === 'string' && ev.model) {
+          model = ev.model;
+          actualModels.add(model);
+        }
         // 额度用尽、未登录等调用失败：记为 error，不能当成「没触发 skill」
         if (ev.type === 'result' && (ev.is_error || isApiErrorText(ev.result))) return finish('error');
         if (ev.type !== 'stream_event') continue;
@@ -89,7 +92,7 @@ function runOne(query) {
       }
     });
     p.on('error', () => finish('error'));
-    p.on('close', () => resolve(outcome ?? (streamed ? 'none' : 'error'))); // 一个流事件都没有：进程没正常跑起来
+    p.on('close', () => resolve(outcome ?? { got: streamed ? 'none' : 'error', model })); // 一个流事件都没有：进程没正常跑起来
   });
 }
 
@@ -103,8 +106,9 @@ let next = 0;
 async function worker() {
   while (next < jobs.length) {
     const c = jobs[next++];
-    const got = await runOne(c.query);
-    results.get(c).push(got);
+    const result = await runOne(c.query);
+    results.get(c).push(result);
+    const got = result.got;
     process.stderr.write(got === 'timeout' ? 'T' : got === 'error' ? 'E' : hit(c, got) ? '.' : 'x');
   }
 }
@@ -112,27 +116,44 @@ console.error(`评估 ${cases.length} 条请求 × ${RUNS} 次，并发 ${CONC}�
 await Promise.all(Array.from({ length: CONC }, worker));
 process.stderr.write('\n');
 
-const errors = [...results.values()].flat().filter((g) => g === 'error' || g === 'timeout').length;
+const allResults = [...results.values()].flat();
+const errors = allResults.filter((result) => result.got === 'error' || result.got === 'timeout').length;
+const noRuns = allResults.length === 0;
 let pass = 0, total = 0;
 const rows = [];
 for (const [c, got] of results) {
-  const ok = got.filter((g) => hit(c, g)).length;
+  const ok = got.filter((result) => hit(c, result.got)).length;
   pass += ok; total += got.length;
-  rows.push({ ok: ok === got.length, expect: c.expect.join('|'), got: got.join(','), query: c.query });
+  rows.push({
+    ok: ok === got.length,
+    expect: c.expect.join('|'),
+    got: got.map((result) => result.got).join(','),
+    actual_models: got.map((result) => result.model),
+    query: c.query,
+  });
 }
 for (const r of rows.filter((r) => !r.ok)) console.log(`✗ 期望 ${r.expect}，实际 ${r.got}\n    ${r.query}`);
 console.log(`\n准确率 ${pass}/${total}（${(100 * pass / total).toFixed(0)}%）`);
 if (errors) console.log(`⚠ ${errors} 次调用失败或超时（额度用尽 / 未登录 / 网络），结果不可信，请恢复后重跑`);
+if (noRuns) console.log('⚠ 没有可评估的请求，请检查 --only 等筛选参数');
 console.log(`请求模型：${MODEL || 'CLI 默认'}`);
 console.log(`实际模型：${[...actualModels].join(', ') || '未知'}`);
-const modelMismatch = REQUIRE_MODEL && ![...actualModels].some((model) => model.includes(REQUIRE_MODEL));
-if (modelMismatch) console.log(`⚠ 实际模型不包含要求的 ${REQUIRE_MODEL}，结果不能用于该模型的验收`);
+const modelCheck = checkActualModels(allResults.map((result) => result.model), REQUIRE_MODEL);
+const modelMismatch = !modelCheck.ok;
+if (modelMismatch && !noRuns) {
+  const details = [
+    modelCheck.missing ? `${modelCheck.missing} 次未返回实际模型` : '',
+    modelCheck.mismatched.length ? `不匹配：${modelCheck.mismatched.join(', ')}` : '',
+  ].filter(Boolean);
+  console.log(`⚠ ${details.join('；')}；每次请求都必须确认实际模型包含 ${REQUIRE_MODEL}，结果不能用于该模型的验收`);
+}
 const out = path.join(REPO, 'tmp', 'evals', `trigger-${Date.now()}.json`);
 fs.mkdirSync(path.dirname(out), { recursive: true });
 fs.writeFileSync(out, JSON.stringify({
   requested_model: MODEL || null,
   required_model: REQUIRE_MODEL || null,
   actual_models: [...actualModels],
+  model_check: REQUIRE_MODEL ? { ...modelCheck, runs: allResults.length } : null,
   generated_at: new Date().toISOString(),
   cases: rows,
 }, null, 2));
@@ -143,4 +164,4 @@ try {
 } catch (error) {
   console.error(`⚠ 临时项目清理失败，可手动删除：${proj}（${error.message}）`);
 }
-if (errors || modelMismatch || rows.some((row) => !row.ok)) process.exitCode = 1;
+if (errors || noRuns || modelMismatch || rows.some((row) => !row.ok)) process.exitCode = 1;

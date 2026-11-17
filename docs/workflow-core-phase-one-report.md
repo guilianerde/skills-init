@@ -26,7 +26,7 @@
 - GitHub CI：Ubuntu Node 22 / 24 跑完整测试与包测试，Windows Node 22 跑共同核心与流程测试，全部通过：https://github.com/guilianerde/skills-init/actions/runs/44043905828
 - Windows 本机 `test-upload.mjs` 存在 Node/libuv 原生崩溃，作为平台限制未计入本地非 upload 全量；对应改动仍需 Linux CI 证明。
 - `eval:triggers` 默认模型当前返回 provider 错误 `InvalidEndpoint.ClosedEndpoint`；评估器已修正为把这种“无工具调用的错误文本”记为 `error` 并返回非零退出码。
-- 切换到 `--model sonnet` 后实际由配置网关映射到 `glm-5.2`，全量 46 条得到 22/46；该模型不会按 Claude 的本项目 Skills 元数据执行自动触发，因此结果不能冒充 Anthropic Claude 的触发验收。评估器同时限制为 `Skill` / `Read` 工具，并在普通探索后继续等待真正的 skill 选择，避免第一工具误判。结果文件会记录请求模型、实际模型和 `--require-model` 要求，模型不匹配时返回非零退出码。
+- 切换到 `--model sonnet` 后实际由配置网关映射到 `glm-5.2`，全量 46 条得到 22/46；该模型不会按 Claude 的本项目 Skills 元数据执行自动触发，因此结果不能冒充 Anthropic Claude 的触发验收。评估器同时限制为 `Skill` / `Read` 工具，并在普通探索后继续等待真正的 skill 选择，避免第一工具误判。结果文件会记录请求模型、每次请求的实际模型和 `--require-model` 要求；任一次缺失或不符合目标模型都会返回非零退出码。
 
 真实目标 Claude 模型的触发验收仍由 [Issue #8](https://github.com/guilianerde/skills-init/issues/8) 跟踪；在具备该模型的环境完成 46 条明细前，本阶段保持“已实现，待发布”。
 
