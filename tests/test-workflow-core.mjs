@@ -11,11 +11,16 @@ import {
   WORKFLOW_ERROR_CODES,
   WorkflowError,
 } from '../workflow/core/index.mjs';
+import { finalizeArtifact } from '../workflow/lib/artifact-finalize.mjs';
 import { artifactsConfig, readProfile, setConfig } from '../workflow/lib/project.mjs';
+import { templateParts } from '../workflow/lib/template-parts.mjs';
+import { createSkillDocumentPolicy } from '../workflow/integrations/skill-document-policy.mjs';
+import { useLocalDocNexus } from './helpers/docnexus-pkg.mjs';
 import { BRANCH, flowFixture } from './helpers/run-flow.mjs';
 
 const REPO = fileURLToPath(new URL('..', import.meta.url));
 const branch = 'feature/core';
+useLocalDocNexus();
 
 function tempProject(t, name = 'svc') {
   const parent = fs.mkdtempSync(path.join(os.tmpdir(), 'workflow-core-'));
@@ -55,6 +60,47 @@ function runScript(root, inputDir, args, input) {
   );
   assert.equal(result.status, 0, result.stderr);
   return JSON.parse(result.stdout);
+}
+
+function invokeScript(root, script, args, input = null, expectedStatus = 0) {
+  const extra = [];
+  if (input !== null) {
+    const inputFile = path.join(root, 'workflow-run/tmp', `checkpoint-${Date.now()}-${Math.random().toString(16).slice(2)}.json`);
+    fs.mkdirSync(path.dirname(inputFile), { recursive: true });
+    fs.writeFileSync(inputFile, `${JSON.stringify(input, null, 2)}\n`);
+    extra.push('--input', inputFile);
+  }
+  const result = spawnSync(process.execPath, [
+    script,
+    ...args,
+    '--root', root,
+    '--branch', BRANCH,
+    ...extra,
+  ], { encoding: 'utf8' });
+  assert.equal(result.status, expectedStatus, result.stdout + result.stderr);
+  return result;
+}
+
+function fillTemplate(repoRelative, values = {}) {
+  const source = fs.readFileSync(path.join(REPO, repoRelative), 'utf8');
+  return templateParts(source).content.replace(/\{\{([\s\S]*?)\}\}/g, (_, rawKey) => {
+    const key = rawKey.trim();
+    if (Object.hasOwn(values, key)) return values[key];
+    if (key === 'S / M / L') return 'S';
+    if (key === 'YYYY-MM-DD') return '2026-11-17';
+    if (/^(?:dev分支|当前分支)$/.test(key)) return BRANCH;
+    if (/^(?:基线分支|主分支)$/.test(key)) return 'main';
+    if (/需求来源/.test(key)) return '自动化集成测试';
+    if (/需求文档/.test(key)) return 'requirement.md（v1）';
+    if (/审查方式/.test(key)) return '标准，全量精读，独立复核';
+    if (/审查者/.test(key)) return '独立测试审查者';
+    if (/DocNexus/.test(key)) return '未询问（由 dev 交付统一处理）';
+    if (/级别|文件:行号|触发条件|修改建议|✅/.test(key)) return '无';
+    if (/类型/.test(key)) return '功能开发';
+    if (/规模/.test(key)) return 'S';
+    if (/范围/.test(key)) return '门面集成';
+    return '无';
+  }).replace(/<在此填写[^>]*>/g, '无');
 }
 
 const expectCode = (code, fn) => assert.throws(fn, (error) => {
@@ -331,14 +377,35 @@ test('abort 后新 pending 不复用旧 operationId，旧请求不能误处理�
   assert.equal(JSON.parse(cli.stdout).operationId, second.id);
 });
 
-test('旧 path / sync / nextPath 与 run 命令导出不再存在', async () => {
+test('Skills 入口不再导出可绕过核心的写操作或 run 命令', async () => {
   const requirements = await import('../workflow/scripts/requirement.mjs');
   const run = await import('../workflow/scripts/run.mjs');
-  for (const name of ['path', 'nextPath', 'sync']) assert.equal(requirements[name], undefined, name);
+  for (const name of ['path', 'nextPath', 'sync', 'bind', 'which', 'reindex', 'reindexRequirement']) assert.equal(requirements[name], undefined, name);
   for (const name of ['startRun', 'changeRun', 'runState']) assert.equal(run[name], undefined, name);
 });
 
-test('Skills 与内部 API 交替推进同一个完整 feature 运行', (t) => {
+test('Skills 脚本不得导入或重新导出生命周期写入函数', () => {
+  const lifecycle = new Set(['bind', 'reindex', 'reindexRequirement']);
+  const violations = [];
+  const walk = (dir) => {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const file = path.join(dir, entry.name);
+      if (entry.isDirectory()) { walk(file); continue; }
+      if (!entry.name.endsWith('.mjs')) continue;
+      const text = fs.readFileSync(file, 'utf8');
+      for (const match of text.matchAll(/(?:import|export)\s+\{([\s\S]*?)\}\s+from\s+['"]([^'"]*requirements\.mjs)['"]/g)) {
+        const names = match[1].split(',').map((name) => name.trim().split(/\s+as\s+/)[0]).filter(Boolean);
+        for (const name of names) {
+          if (lifecycle.has(name)) violations.push(`${path.relative(REPO, file)}: ${name}`);
+        }
+      }
+    }
+  };
+  walk(path.join(REPO, 'workflow/scripts'));
+  assert.deepEqual(violations, [], '生命周期写入只能由 workflow/core/index.mjs 门面提供');
+});
+
+test('内部 API 与 run CLI 交替推进同一个 feature 运行（空策略单测）', (t) => {
   const f = flowFixture(t);
   const tmp = path.join(f.root, 'workflow-run/tmp');
   fs.mkdirSync(tmp, { recursive: true });
@@ -443,4 +510,154 @@ test('Skills 与内部 API 交替推进同一个完整 feature 运行', (t) => {
 
   assert.equal(run.status, 'completed');
   assert.equal(workflow.runs.get({ branch: BRANCH, id: run.id }).run.status, 'completed');
+});
+
+test('安装后的 artifact / run Skills 通过真实模板策略推进同一完整 feature 运行', (t) => {
+  const f = flowFixture(t);
+  const install = spawnSync(process.execPath, [
+    path.join(REPO, 'bin/workflow-run.mjs'),
+    '--project-root', f.root,
+    '--envs', 'codex',
+    '--skills', 'dev',
+    '--skip-db',
+    '--yes',
+  ], { encoding: 'utf8', env: { ...process.env, WORKFLOW_RUN_ADMIN: '1' } });
+  assert.equal(install.status, 0, install.stdout + install.stderr);
+
+  const scripts = path.join(f.root, '.agents/skills/workflow/scripts');
+  const runScriptPath = path.join(scripts, 'run.mjs');
+  const artifactScript = path.join(scripts, 'artifact.mjs');
+  const handoffScript = path.join(scripts, 'review-handoff.mjs');
+  const skillRun = (args, input = null, expectedStatus = 0) =>
+    invokeScript(f.root, runScriptPath, args, input, expectedStatus);
+  const artifact = (args, input = null, expectedStatus = 0) =>
+    invokeScript(f.root, artifactScript, args, input, expectedStatus);
+  const writeDraft = (name, repoRelative, values) => {
+    const file = path.join(f.root, 'workflow-run/tmp', name);
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, fillTemplate(repoRelative, values));
+    return file;
+  };
+  const nextRun = (result) => JSON.parse(result.stdout).run;
+
+  let run = nextRun(skillRun([
+    'start', '--kind', 'feature', '--size', 'S',
+  ], {
+    stage: 'F3',
+    steps: Object.fromEntries(['Step0', 'F1', 'F2'].map((step) => [step, { status: 'completed' }])),
+    context: { summary: '真实 Skills 双入口', decisions: ['复用核心门面'], acceptance: ['完整流程完成'] },
+  }));
+  const workflow = createWorkflow({ root: f.root });
+  assert.equal(workflow.runs.get({ branch: BRANCH, id: run.id }).run.revision, run.revision);
+
+  const requirementDraft = writeDraft('real-requirement.md', 'dev/references/requirement-template.md');
+  const requirementArgs = [
+    'finalize', '--id', run.id, '--expect-revision', String(run.revision),
+    '--kind', 'requirement', '--draft', requirementDraft,
+  ];
+  const requirementInput = { steps: { F3: { status: 'completed' } } };
+  const requirementResult = JSON.parse(artifact(requirementArgs, requirementInput).stdout);
+  run = requirementResult.run;
+  assert.equal(requirementResult.version, 1);
+  const replay = JSON.parse(artifact(requirementArgs, requirementInput).stdout);
+  assert.equal(replay.alreadyFinalized, true, '相同 Skills 请求必须命中成功重放');
+  assert.equal(replay.run.revision, run.revision);
+
+  run = nextRun(skillRun([
+    'save', '--id', run.id, '--expect-revision', String(run.revision),
+  ], { stage: 'F4' }));
+  const badPlan = writeDraft('bad-plan.md', 'dev/references/plan-template.md');
+  fs.appendFileSync(badPlan, '\n{{未填写}}\n');
+  const bad = artifact([
+    'finalize', '--id', run.id, '--expect-revision', String(run.revision),
+    '--kind', 'plan', '--draft', badPlan,
+  ], null, 1);
+  assert.match(bad.stderr, /草稿自检失败/);
+  assert.equal(fs.existsSync(path.join(f.root, f.req.dir, 'plan.md')), false);
+
+  const planDraft = writeDraft('real-plan.md', 'dev/references/plan-template.md');
+  const planInput = { steps: { F4: { status: 'completed' } } };
+  const planPolicy = createSkillDocumentPolicy(f.root);
+  const rename = fs.renameSync;
+  let commits = 0;
+  fs.renameSync = (from, to) => {
+    if (to === f.file && ++commits === 2) throw new Error('模拟真实策略 pending 中断');
+    return rename(from, to);
+  };
+  try {
+    assert.throws(() => finalizeArtifact(f.root, {
+      branch: BRANCH,
+      id: run.id,
+      revision: run.revision,
+      kind: 'plan',
+      text: fs.readFileSync(planDraft, 'utf8'),
+      input: planInput,
+    }, (candidate) => planPolicy.validate({ kind: 'plan', text: candidate })), /模拟真实策略 pending 中断/);
+  } finally {
+    fs.renameSync = rename;
+  }
+  const pendingState = workflow.runs.status({ branch: BRANCH, id: run.id });
+  assert.ok(pendingState.pending);
+  const resumed = JSON.parse(artifact([
+    'resume', '--id', run.id,
+  ]).stdout);
+  assert.equal(resumed.operationId, pendingState.pending.operationId);
+  run = resumed.run;
+
+  run = nextRun(skillRun([
+    'save', '--id', run.id, '--expect-revision', String(run.revision),
+  ], { stage: 'F5' }));
+  fs.writeFileSync(path.join(f.root, 'app.js'), 'export const value = 2;\n');
+  run = nextRun(skillRun([
+    'save', '--id', run.id, '--expect-revision', String(run.revision),
+  ], { stage: 'F6', steps: { F5: { status: 'completed' } } }));
+  const snapshot = JSON.parse(skillRun([
+    'snapshot', '--id', run.id,
+  ]).stdout).snapshot;
+  run = nextRun(skillRun([
+    'save', '--id', run.id, '--expect-revision', String(run.revision),
+  ], {
+    validation: { snapshot, checks: [{ command: 'node --check app.js', result: 'passed' }] },
+    steps: { F6: { status: 'completed' } },
+  }));
+  run = nextRun(skillRun([
+    'save', '--id', run.id, '--expect-revision', String(run.revision),
+  ], { stage: 'F7' }));
+
+  const prepared = JSON.parse(invokeScript(f.root, handoffScript, [
+    '--id', run.id, '--depth', '标准',
+  ]).stdout);
+  const resultFile = path.join(f.root, 'workflow-run/tmp/real-review-result.json');
+  const reviewResult = {
+    run_id: prepared.packet.run_id,
+    code: prepared.packet.snapshot.digest,
+    inputs: prepared.packet.inputs,
+    findings: [],
+    coverage: { reviewed: prepared.packet.scope.review.map((file) => file.path), uncovered: [] },
+  };
+  fs.writeFileSync(resultFile, `${JSON.stringify(reviewResult, null, 2)}\n`);
+  const reviewDraft = writeDraft('real-review.md', 'project-review/references/report.md.tpl');
+  run = nextRun(artifact([
+    'finalize', '--id', run.id, '--expect-revision', String(run.revision),
+    '--kind', 'review', '--draft', reviewDraft,
+    '--packet', prepared.path, '--result', resultFile,
+  ], { steps: { F7: { status: 'completed' } } }));
+
+  run = nextRun(skillRun([
+    'save', '--id', run.id, '--expect-revision', String(run.revision),
+  ], { stage: 'F8', decision: { action: 'deliver', confirmed: true } }));
+  const deliveryDraft = writeDraft('real-delivery.md', 'dev/references/delivery-template.md');
+  run = nextRun(artifact([
+    'finalize', '--id', run.id, '--expect-revision', String(run.revision),
+    '--kind', 'delivery', '--draft', deliveryDraft,
+  ], { steps: { F8: { status: 'completed' } } }));
+  run = nextRun(skillRun([
+    'complete', '--id', run.id, '--expect-revision', String(run.revision),
+  ]));
+
+  assert.equal(run.status, 'completed');
+  assert.equal(workflow.runs.get({ branch: BRANCH, id: run.id }).run.status, 'completed');
+  for (const name of ['requirement.md', 'plan.md', 'review.md', 'delivery.md']) {
+    assert.ok(fs.existsSync(path.join(f.root, f.req.dir, name)), name);
+  }
 });

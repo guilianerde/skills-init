@@ -9,7 +9,7 @@ import { once } from 'node:events';
 import { fileURLToPath } from 'node:url';
 import { useLocalDocNexus } from './helpers/docnexus-pkg.mjs';
 import vm from 'node:vm';
-import { bind, reindex, reindexRequirement, which } from '../workflow/scripts/requirement.mjs';
+import { bind, reindex, reindexRequirement, which } from '../workflow/lib/requirements.mjs';
 import { startRun, changeRun, runState, FLOWS } from '../workflow/lib/runs.mjs';
 import { branchView } from '../workflow/scripts/artifacts.mjs';
 import { viewData, renderHtml } from '../workflow/scripts/view.mjs';

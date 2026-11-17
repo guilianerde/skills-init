@@ -29,7 +29,7 @@ import { HOME, setConfig, artifactsConfig, layout } from '../lib/project.mjs';
 import { list, pending } from '../lib/requirements.mjs';
 export { HOME, REQ_DIR, TEMPLATES_DIR, TMP_DIR, IGNORE_LINE, homeDir, homeIsRepo, dirName, profileDir, artifactsConfig, layout, suggestProject, setConfig, ensureIgnore } from '../lib/project.mjs';
 export { requirements, repoRequirements, artifactFiles, find } from '../lib/requirement-read.mjs';
-export { OLD_DIR, reindex, reindexRequirement, which, bind, list, pending } from '../lib/requirements.mjs';
+export { OLD_DIR, list, pending } from '../lib/requirements.mjs';
 export { FILES, parseFile, parseBranch, parseDocnexus } from '../lib/artifact-model.mjs';
 function currentBranch(root) {
   const r = spawnSync('git', ['symbolic-ref', '--short', 'HEAD'], { cwd: root, encoding: 'utf8' });

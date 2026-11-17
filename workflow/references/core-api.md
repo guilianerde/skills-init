@@ -15,6 +15,16 @@ const workflow = createWorkflow({
 
 `root` 必须显式且为绝对路径。构造不读写文件、不启动子进程、不创建运行。`documentPolicy` 只在正式产物收尾时需要；不提供时 `artifacts.finalize` 返回 `INVALID_ARGUMENT`。
 
+Skills 命令脚本保留参数解析和人类可读输出，不转导出底层写函数。例如 `requirement.mjs` 只保留自身 CLI、只读查询与外围配置 helper，不再导出 `bind / which / reindex / reindexRequirement`；调用方必须进入 `createWorkflow` 的 `requirements.bind / which` 或 `maintenance.reindex`。核心实现模块仍供门面和同包测试内部使用，但不构成脚本级旁路。
+
+| 能力 | 归属 | 入口 |
+| --- | --- | --- |
+| `bind` / `which` / `reindex` | 核心生命周期 / 查询 | `createWorkflow` |
+| `list` / `pending` | Skills 外围只读展示 | `requirement.mjs` 与 `workflow/lib/workspace-read.mjs` |
+| 项目配置读取与 `config` | Skills 外围配置 | `requirement.mjs` / `workflow/lib/project.mjs` |
+
+架构测试扫描 `workflow/scripts/**/*.mjs`，禁止从 `workflow/lib/requirements.mjs` 导入或转导出 `bind / reindex / reindexRequirement`。新增旁路会直接使测试失败。
+
 ## 方法
 
 | 分组 | 方法 | 输入 | 结果 |

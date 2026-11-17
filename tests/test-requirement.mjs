@@ -7,7 +7,8 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { useLocalDocNexus } from './helpers/docnexus-pkg.mjs';
-import { dirName, parseFile, which, bind, reindex, reindexRequirement, ensureIgnore, list } from '../workflow/scripts/requirement.mjs';
+import { dirName, parseFile, ensureIgnore, list } from '../workflow/scripts/requirement.mjs';
+import { which, bind, reindex, reindexRequirement } from '../workflow/lib/requirements.mjs';
 import { collect, branchView } from '../workflow/scripts/artifacts.mjs';
 
 useLocalDocNexus();
