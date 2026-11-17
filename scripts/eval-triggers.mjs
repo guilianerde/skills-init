@@ -2,7 +2,7 @@
 // 多 skill 分流评估：在临时项目里装好全部 skill，用 `claude -p` 逐条发送 evals/trigger-cases.json 中的请求，
 // 从流式事件里取「第一个被调用的工具」判断请求被分给了哪个 skill（或没有触发任何本项目 skill）。
 //
-//   node scripts/eval-triggers.mjs [--runs 1] [--concurrency 4] [--model <id>] [--only <skill>]
+//   node scripts/eval-triggers.mjs [--runs 1] [--concurrency 4] [--model <id>] [--require-model <substring>] [--only <skill>]
 //
 // 注意：每条请求会真实调用一次 Claude（按你的 claude CLI 账号计费）；检测到第一个工具调用就终止进程，不会执行任何工具。
 
@@ -21,6 +21,7 @@ const opt = (name, def) => { const i = args.indexOf(name); return i >= 0 ? args[
 const RUNS = Number(opt('--runs', 1));
 const CONC = Number(opt('--concurrency', 4));
 const MODEL = opt('--model', '');
+const REQUIRE_MODEL = opt('--require-model', '');
 const ONLY = opt('--only', '');
 const TIMEOUT = 120_000;
 
@@ -32,6 +33,7 @@ const proj = fs.mkdtempSync(path.join(os.tmpdir(), 'workflow-run-eval-'));
 spawnSync('git', ['init', '-q'], { cwd: proj });
 const inst = spawnSync(process.execPath, [path.join(REPO, 'bin', 'workflow-run.mjs'), '--project-root', proj, '--envs', 'claude', '--yes', '--skip-db'], { encoding: 'utf8' });
 if (inst.status !== 0) { console.error(inst.stdout, inst.stderr); process.exit(1); }
+const actualModels = new Set();
 
 function classify(toolName, input) {
   return classifyTriggerTool(toolName, input, SKILLS);
@@ -58,6 +60,7 @@ function runOne(query) {
         const line = buf.slice(0, i).trim(); buf = buf.slice(i + 1);
         if (!line) continue;
         let ev; try { ev = JSON.parse(line); } catch { continue; }
+        if (ev.type === 'system' && ev.subtype === 'init' && typeof ev.model === 'string' && ev.model) actualModels.add(ev.model);
         // 额度用尽、未登录等调用失败：记为 error，不能当成「没触发 skill」
         if (ev.type === 'result' && (ev.is_error || isApiErrorText(ev.result))) return finish('error');
         if (ev.type !== 'stream_event') continue;
@@ -120,9 +123,19 @@ for (const [c, got] of results) {
 for (const r of rows.filter((r) => !r.ok)) console.log(`✗ 期望 ${r.expect}，实际 ${r.got}\n    ${r.query}`);
 console.log(`\n准确率 ${pass}/${total}（${(100 * pass / total).toFixed(0)}%）`);
 if (errors) console.log(`⚠ ${errors} 次调用失败或超时（额度用尽 / 未登录 / 网络），结果不可信，请恢复后重跑`);
+console.log(`请求模型：${MODEL || 'CLI 默认'}`);
+console.log(`实际模型：${[...actualModels].join(', ') || '未知'}`);
+const modelMismatch = REQUIRE_MODEL && ![...actualModels].some((model) => model.includes(REQUIRE_MODEL));
+if (modelMismatch) console.log(`⚠ 实际模型不包含要求的 ${REQUIRE_MODEL}，结果不能用于该模型的验收`);
 const out = path.join(REPO, 'tmp', 'evals', `trigger-${Date.now()}.json`);
 fs.mkdirSync(path.dirname(out), { recursive: true });
-fs.writeFileSync(out, JSON.stringify(rows, null, 2));
+fs.writeFileSync(out, JSON.stringify({
+  requested_model: MODEL || null,
+  required_model: REQUIRE_MODEL || null,
+  actual_models: [...actualModels],
+  generated_at: new Date().toISOString(),
+  cases: rows,
+}, null, 2));
 console.log(`明细：${path.relative(REPO, out)}`);
 await new Promise((resolve) => setTimeout(resolve, 3000));
 try {
@@ -130,4 +143,4 @@ try {
 } catch (error) {
   console.error(`⚠ 临时项目清理失败，可手动删除：${proj}（${error.message}）`);
 }
-if (errors || rows.some((row) => !row.ok)) process.exitCode = 1;
+if (errors || modelMismatch || rows.some((row) => !row.ok)) process.exitCode = 1;
