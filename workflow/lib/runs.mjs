@@ -33,6 +33,7 @@ export const branchRuns = (root, branch, workspace) => allRuns(root, workspace).
 export function runState(root, branch, workspace = loadWorkspace(root), id = null) {
   const runs = branchRuns(root, branch, workspace);
   const current = id ? runs.find((r) => r.id === id) ?? null : runs.filter((r) => !terminal(r.status)).at(-1) ?? runs.at(-1) ?? null;
+  const pending = current?.pending_finalization ?? null;
   let next = !current ? null : current.pending_finalization ? `先恢复产物收尾：artifact.mjs resume --id ${current.id}` : current.status === 'waiting_user' ? `等待用户：${current.waiting_for}`
     : current.status === 'blocked' ? `处理阻塞：${current.reason}`
       : terminal(current.status) ? `${STATUS_LABELS[current.status]}：${current.kind}（${current.id}）`
@@ -48,7 +49,16 @@ export function runState(root, branch, workspace = loadWorkspace(root), id = nul
       if (!current.pending_finalization) next = `核对证据失败：${e.message}`;
     }
   }
-  return { branch, current, runs, next, ...(freshness ? { freshness } : {}), ...(workspace.diagnostics.length ? { diagnostics: workspace.diagnostics } : {}) };
+  return {
+    branch,
+    current,
+    runRevision: pending?.runRevision ?? current?.revision ?? null,
+    ...(pending ? { pending } : {}),
+    runs,
+    next,
+    ...(freshness ? { freshness } : {}),
+    ...(workspace.diagnostics.length ? { diagnostics: workspace.diagnostics } : {}),
+  };
 }
 
 export function applyCheckpoint(run, patch, at, reopen = true) {
