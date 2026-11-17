@@ -11,6 +11,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { isApiErrorText } from './eval-trigger-utils.mjs';
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const SKILLS = ['workflow', 'dev', 'project-review', 'database-query', 'md-to-wiki', 'create-tech-md-doc', 'create-release-md-doc', 'code-graph', 'nacos-config'];
@@ -51,8 +52,11 @@ function runOne(query) {
     if (MODEL) cmd.push('--model', MODEL);
     const env = { ...process.env }; delete env.CLAUDECODE;
     const p = spawn('claude', cmd, { cwd: proj, env, stdio: ['ignore', 'pipe', 'ignore'] });
-    let buf = '', tool = null, json = '', done = false, streamed = false;
-    const finish = (r) => { if (done) return; done = true; p.kill('SIGKILL'); clearTimeout(t); resolve(r); };
+    let buf = '', tool = null, json = '', text = '', done = false, streamed = false, outcome = null;
+    const finish = (r) => {
+      if (done) return;
+      done = true; outcome = r; clearTimeout(t); p.kill('SIGKILL');
+    };
     const t = setTimeout(() => finish('timeout'), TIMEOUT);
     p.stdout.on('data', (d) => {
       buf += d.toString();
@@ -62,21 +66,28 @@ function runOne(query) {
         if (!line) continue;
         let ev; try { ev = JSON.parse(line); } catch { continue; }
         // 额度用尽、未登录等调用失败：记为 error，不能当成「没触发 skill」
-        if (ev.type === 'result' && ev.is_error) return finish('error');
+        if (ev.type === 'result' && (ev.is_error || isApiErrorText(ev.result))) return finish('error');
         if (ev.type !== 'stream_event') continue;
         streamed = true;
         const se = ev.event || {};
         if (se.type === 'content_block_start' && se.content_block?.type === 'tool_use') {
           tool = se.content_block.name; json = '';
           if (tool !== 'Skill' && tool !== 'Read') return finish('none');
+        } else if (se.type === 'content_block_start' && se.content_block?.type === 'text') {
+          text = '';
         } else if (se.type === 'content_block_delta' && tool && se.delta?.type === 'input_json_delta') {
           json += se.delta.partial_json || '';
+        } else if (se.type === 'content_block_delta' && !tool && se.delta?.type === 'text_delta') {
+          text += se.delta.text || '';
+          // 某些 provider 把 API 错误作为普通 assistant 文本返回，result.is_error 仍为 false。
+          if (isApiErrorText(text)) return finish('error');
         } else if (se.type === 'content_block_stop' && tool) {
           return finish(classify(tool, json));
         }
       }
     });
-    p.on('close', () => finish(streamed ? 'none' : 'error')); // 一个流事件都没有：进程没正常跑起来
+    p.on('error', () => finish('error'));
+    p.on('close', () => resolve(outcome ?? (streamed ? 'none' : 'error'))); // 一个流事件都没有：进程没正常跑起来
   });
 }
 
@@ -114,4 +125,9 @@ const out = path.join(REPO, 'tmp', 'evals', `trigger-${Date.now()}.json`);
 fs.mkdirSync(path.dirname(out), { recursive: true });
 fs.writeFileSync(out, JSON.stringify(rows, null, 2));
 console.log(`明细：${path.relative(REPO, out)}`);
-fs.rmSync(proj, { recursive: true, force: true });
+try {
+  fs.rmSync(proj, { recursive: true, force: true, maxRetries: 10, retryDelay: 500 });
+} catch (error) {
+  console.error(`⚠ 临时项目清理失败，可手动删除：${proj}（${error.message}）`);
+}
+if (errors || rows.some((row) => !row.ok)) process.exitCode = 1;

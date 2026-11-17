@@ -16,6 +16,7 @@
 - 核心 `artifacts.resume/abort` 冻结为 `{ branch, id, expectedRevision, operationId }`：`expectedRevision` 使用 status 的 `runRevision`，pending 基准 revision 由核心核对；旧操作 ID 不能恢复或中止后来创建的事务。`artifact.mjs` 恢复命令自动读取当前待办身份，CLI 用法保持不变。
 - `requirement.mjs` 不再转导出底层 `bind / which / reindex`，Skills 的状态写操作只能经过 `createWorkflow` 门面。
 - 双入口验收改用安装后的 `run.mjs`、`artifact.mjs`、`review-handoff.mjs` 和真实模板策略推进完整 feature run，覆盖真实 lint 失败、pending 恢复与 finalize 成功重放；发布包测试也验证安装后的脚本与内部核心操作同一运行。
+- trigger 评估不再把 provider 以普通文本返回的 API 错误当成“没有触发 skill”，并会对调用失败或分流不符合预期返回非零退出码。
 
 ### 移除
 - 删除 `requirement.mjs path`、`nextPath()`、旧 `sync` 命令及版本 bump 直写链。
