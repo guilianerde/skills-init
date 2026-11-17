@@ -104,6 +104,7 @@ export function createWorkflow({ root, documentPolicy } = {}) {
     maintenance: Object.freeze({
       reindex(options) {
         const { branch = null, all = false } = requireObject(options, 'maintenance.reindex');
+        if (typeof all !== 'boolean') invalid('all 必须是布尔值');
         if (!all) requireBranch(branch);
         return invoke(
           () => reindexRequirements(projectRoot, { branch, all }),

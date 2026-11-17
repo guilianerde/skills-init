@@ -1,6 +1,6 @@
 # Workflow Core 内部接口
 
-状态：第一实施切片。`resume/abort` 已接入核心门面，pending revision 与 operationId 语义见下文；`reindex` 的最终字段约定仍由 [Issue #4](https://github.com/guilianerde/skills-init/issues/4) 跟踪。
+状态：第一阶段内部接口契约已冻结（2026-11-17）。本接口只供同包 Skills 和内部 Node.js 调用，不是第二阶段外部协议。
 
 入口：
 
@@ -44,6 +44,49 @@ Skills 命令脚本保留参数解析和人类可读输出，不转导出底层�
 | artifacts | `abort` | `{ branch, id, expectedRevision, operationId }` | 核对 pending 身份后还原文件并移除待办 |
 | reviews | `prepare` | `{ branch, id, depth?, capabilities?, kind?, text? }` | 审查交接 JSON 文件 |
 
+## reindex 契约
+
+`maintenance.reindex({ branch })` 处理当前绑定需求；`maintenance.reindex({ all: true })` 逐个处理当前项目的全部需求。`all` 必须是布尔值。有 `pending_finalization` 的目录拒绝维护；批量模式按目录加锁、继续处理其他目录，不声称跨目录原子性。
+
+只允许写以下派生字段：
+
+- `artifacts`：当前目录内已识别产物的派生索引。
+- `latest`：每种产物的最新文件，可能包含未登记版本。
+- `indexed_at`：只在 `artifacts` 或 `latest` 变化、或旧数据缺少该字段时更新。
+
+`versions`、`runs`、`branches`、`base`、批准、证据、正文和 `updated` 均保持不变。固定文件名没有权威 `versions` 记录时，索引项持久化为 `version: null, registered: false`，并在 `unregistered` 中返回；reindex 不提升版本、不归档、不生成证据。
+
+单需求结果：
+
+```js
+{
+  ok: true,
+  dir: 'workflow-run/docs/requirements/order/svc',
+  changed: true,
+  artifacts: 2,          // 兼容数量字段
+  artifact_count: 2,
+  latest: {},
+  versions: {},
+  unregistered: [{ kind: 'review', file: 'review.md' }],
+}
+```
+
+`all` 结果：
+
+```js
+{
+  ok: false,
+  results: [
+    { ok: true, dir: '...', changed: false, artifact_count: 1, latest: {}, versions: {}, unregistered: [] },
+    { ok: false, dir: '...', error: '产物收尾尚未完成...', code: 'PENDING_FINALIZATION' },
+  ],
+}
+```
+
+损坏 JSON、branch 未绑定需求等单需求错误直接抛出 `WorkflowError`；批量模式把它们记录在对应结果中。
+
+`list`、`pending` 是 Skills 外围只读查询，`config` 是外围配置入口；它们不进入核心生命周期，也不能写 run、产物索引或证据。
+
 ## 文档策略
 
 `documentPolicy` 是受信任的代码扩展点：
@@ -62,6 +105,8 @@ const documentPolicy = {
 
 Skills 使用 `workflow/integrations/skill-document-policy.mjs` 读取当前模板并执行正文检查。核心不跳过缺失 policy，也不把 policy 扩展成通用插件系统。
 
+输入固定为 `{ kind, text }`，其中 `text` 已包含需要保留的 wiki 页面记录；返回结构固定为 `{ ok, errors, warnings }`，`errors` / `warnings` 均为字符串数组。`ok !== true` 时 finalize 拒绝发布，警告随成功结果返回。policy 抛出的异常按核心错误映射处理，不吞掉后继续写文件。
+
 ## 错误
 
 领域失败抛出 `WorkflowError`：
@@ -74,6 +119,8 @@ Skills 使用 `workflow/integrations/skill-document-policy.mjs` 读取当前模�
   details: {},
 }
 ```
+
+稳定字段是 `name`、`code`、`message`、`details`；发生底层异常时同时保留 `cause`。`details` 始终是对象。调用方按 `code` 分支，不解析中文 `message`。本阶段冻结的错误码集合见下方，新增或删除属于接口变更。
 
 稳定 code 定义在 `workflow/core/errors.mjs`：
 
@@ -92,13 +139,17 @@ Skills 使用 `workflow/integrations/skill-document-policy.mjs` 读取当前模�
 - `PENDING_FINALIZATION`
 - `PENDING_OPERATION_MISMATCH`
 - `STORAGE_ERROR`
-- `NOT_IMPLEMENTED`
+- `NOT_IMPLEMENTED`（保留码；第一阶段已迁移的操作不使用）
 
 CLI 将错误作为 JSON 写到 stderr，并返回非零退出码。底层 I/O 错误保留为 `cause`，路径等安全元信息可放入 `details`。
 
 ## finalize 重放
 
 请求标识使用递归键排序的稳定 JSON，包含 run、原始 `expectedRevision`、产物类型、发布正文摘要、checkpoint、packet 和 result。同一语义请求重复时返回 `alreadyFinalized: true`，不增加 revision、历史或版本；正文或输入变化后不能借旧 revision 绕过冲突检查。
+
+首次成功和成功重放均有 `ok`、`path`、`run`；核心门面把底层 `already_finalized` 原样保留，并增加 camelCase `alreadyFinalized`。首次成功为 `false`，成功重放为 `true`。成功重放不承诺在后续别的 finalize 或正文变化后继续返回旧响应，调用方必须检查 `run.revision` 与正文当前状态。
+
+首次发布还返回 `operationId`、`baseRevision`、`cite`、`previous`、`version`、`lint`；重放只证明请求对应操作的成功结果已经提交，调用方不能据旧 `alreadyFinalized` 声称当前代码证据仍然有效。
 
 ## pending 恢复与中止
 

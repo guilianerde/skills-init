@@ -48,7 +48,7 @@ node <skills>/workflow/scripts/requirement.mjs which
 
 ## 运行状态
 
-完整流程在本文件的 `runs` 中按运行 id 保存进度，关联分支；同一需求可有多次运行。`status: completed` 和 `completed_at` 是本次运行已完成的明确标记，步骤也单独记录 completed。保存／恢复和各 skill 的记录时机见 `runs.md`；快速通道不创建记录。`reindex` 只重建派生索引，不改正文、versions、runs、revision、绑定、批准和证据；`which` 是只读查询，重新 bind 也不会清空历史。元信息采用原子写入与短时写锁，状态更新另有 revision 检查。
+完整流程在本文件的 `runs` 中按运行 id 保存进度，关联分支；同一需求可有多次运行。`status: completed` 和 `completed_at` 是本次运行已完成的明确标记，步骤也单独记录 completed。保存／恢复和各 skill 的记录时机见 `runs.md`；快速通道不创建记录。`reindex` 只允许改 `artifacts`、`latest`、`indexed_at`，不改正文、versions、runs、revision、绑定、批准、证据和 `updated`；未登记固定文件写 `version: null, registered: false`。`which` 是只读查询，重新 bind 也不会清空历史。元信息采用原子写入与短时写锁，状态更新另有 revision 检查。
 
 ## 落盘
 
@@ -76,7 +76,7 @@ npx @rowansenne/workflow-run docs-repo <团队文档仓库地址> [--project <�
 - 布局和随代码提交时一样。绑定需求时 `which` 会列出 `other_projects`（其他服务已有、已拉到本地的需求），用同一个名字 `bind` 就加入了那个需求。
 - DocNexus 也在这个仓库里（`workflow-run/docnexus/`），各服务共用一个知识库。
 - `project`：这个项目在文档仓库里的名字，写在 `workflow/profile.json` 的 `artifacts.project`（随代码提交，团队共用），**只需配置一次**；随代码提交时已经自动写过的就直接沿用。没配时脚本退出码 2（`need_project`）并给出 `suggested_project`（git 远端仓库名）：问用户一次，然后运行 `requirement.mjs config --project <项目名>`，之后一直沿用。
-- 查看或修改配置：`requirement.mjs config [--project <项目名>] [--commit-prompt on|off] [--local]`。
+- 查看或修改配置：`requirement.mjs config [--project <项目名>] [--commit-prompt on|off] [--profile-source <环境|路径|auto>] [--local]`。多环境 `--copy` 的 profile 内容不同时，用 `--profile-source` 选择；选择和候选见 [profile.md](profile.md)。
 - `/workflow view` 在这个模式下显示文档仓库里所有项目的需求，一个需求下按项目区分产物。
 
 ## 文档仓库的提交

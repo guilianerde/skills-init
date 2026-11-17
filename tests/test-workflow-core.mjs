@@ -196,7 +196,12 @@ test('公共核心提供服务与脚本共用 run 的薄门面', (t) => {
   const beforeWhich = fs.readFileSync(metaFile, 'utf8');
   assert.equal(workflow.requirements.which({ branch }).name, '核心门面');
   assert.equal(fs.readFileSync(metaFile, 'utf8'), beforeWhich, 'which 不得刷新或改写元信息');
-  assert.equal(workflow.maintenance.reindex({ branch }).artifacts, 0);
+  const firstIndex = workflow.maintenance.reindex({ branch });
+  assert.equal(firstIndex.artifacts, 0);
+  assert.equal(firstIndex.artifact_count, 0);
+  assert.equal(firstIndex.changed, true);
+  assert.equal(workflow.maintenance.reindex({ branch }).changed, false);
+  expectCode(WORKFLOW_ERROR_CODES.INVALID_ARGUMENT, () => workflow.maintenance.reindex({ branch, all: 'false' }));
 
   const started = workflow.runs.start({
     branch,
@@ -297,6 +302,19 @@ test('正式产物通过核心 finalize，缺少 policy 时明确拒绝', (t) =>
   });
   assert.equal(replay.alreadyFinalized, true);
   assert.equal(replay.run.revision, finalized.run.revision);
+  assert.deepEqual(Object.keys(replay).sort(), ['alreadyFinalized', 'already_finalized', 'ok', 'path', 'run']);
+});
+
+test('WorkflowError 稳定暴露 code、details 与 cause', () => {
+  const cause = new Error('disk');
+  const error = new WorkflowError(WORKFLOW_ERROR_CODES.STORAGE_ERROR, '存储失败', {
+    details: { path: 'meta.json' },
+    cause,
+  });
+  assert.equal(error.name, 'WorkflowError');
+  assert.equal(error.code, 'STORAGE_ERROR');
+  assert.deepEqual(error.details, { path: 'meta.json' });
+  assert.equal(error.cause, cause);
 });
 
 test('resume 以 STATUS.runRevision、operationId 和内部 baseRevision 核对 pending', (t) => {

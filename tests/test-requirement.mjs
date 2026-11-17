@@ -86,6 +86,76 @@ test('reindex：meta.json 汇总产物、wiki 与 DocNexus；只刷新派生索�
   fs.rmSync(root, { recursive: true, force: true });
 });
 
+test('reindex：只写 artifacts / latest / indexed_at，未登记版本持久标记并修复仅 latest 漂移', () => {
+  const { root, put } = repo();
+  const b = 'feature/order-export';
+  const { dir } = bind(root, { name: '订单导出', branch: b });
+  put(`${dir}/delivery.md`, doc('交付', b));
+  const file = path.join(root, dir, 'meta.json');
+  const before = JSON.parse(fs.readFileSync(file, 'utf8'));
+  before.versions = { review: 3 };
+  before.runs = { keep: { id: 'keep', revision: 9, evidence: { digest: 'abc' } } };
+  before.approval = { confirmed: true };
+  before.evidence = { validation: 'keep' };
+  before.custom = { keep: true };
+  before.updated = '2026-10-01T00:00:00.000Z';
+  before.indexed_at = '2026-10-02T00:00:00.000Z';
+  before.artifacts = [];
+  before.latest = { clarification: null, requirement: null, plan: null, delivery: null, review: null, tech: null, release: null };
+  fs.writeFileSync(file, `${JSON.stringify(before, null, 2)}\n`);
+
+  const result = reindexRequirement(root, dir);
+  assert.equal(result.changed, true);
+  assert.deepEqual(result.unregistered.map(({ kind, file, version, registered }) => ({ kind, file, version, registered })), [
+    { kind: 'delivery', file: 'delivery.md', version: null, registered: false },
+  ]);
+  const after = JSON.parse(fs.readFileSync(file, 'utf8'));
+  for (const key of ['versions', 'runs', 'approval', 'evidence', 'custom', 'updated', 'branches', 'base', 'name', 'created']) {
+    assert.deepEqual(after[key], before[key], key);
+  }
+  assert.deepEqual(after.latest, {
+    clarification: null,
+    requirement: null,
+    plan: null,
+    delivery: 'delivery.md',
+    review: null,
+    tech: null,
+    release: null,
+  });
+  assert.notEqual(after.indexed_at, before.indexed_at);
+
+  after.latest.delivery = null;
+  after.indexed_at = '2026-10-02T00:00:00.000Z';
+  fs.writeFileSync(file, `${JSON.stringify(after, null, 2)}\n`);
+  const repaired = reindexRequirement(root, dir);
+  assert.equal(repaired.changed, true);
+  assert.equal(JSON.parse(fs.readFileSync(file, 'utf8')).latest.delivery, 'delivery.md');
+  assert.notEqual(JSON.parse(fs.readFileSync(file, 'utf8')).indexed_at, '2026-10-02T00:00:00.000Z');
+  fs.rmSync(root, { recursive: true, force: true });
+});
+
+test('reindex --all 逐需求处理：pending 项报错，其他需求继续刷新', () => {
+  const { root } = repo();
+  const blocked = bind(root, { name: '阻塞需求', branch: 'feature/blocked' });
+  const healthy = bind(root, { name: '正常需求', branch: 'feature/healthy' });
+  const blockedMeta = path.join(root, blocked.dir, 'meta.json');
+  const meta = JSON.parse(fs.readFileSync(blockedMeta, 'utf8'));
+  meta.pending_finalization = { run_id: 'pending-run', id: 'op-1', kind: 'plan' };
+  fs.writeFileSync(blockedMeta, `${JSON.stringify(meta, null, 2)}\n`);
+
+  const result = reindex(root, { all: true });
+  assert.equal(result.ok, false);
+  assert.equal(result.results.length, 2);
+  const failed = result.results.find((item) => item.dir === blocked.dir);
+  const passed = result.results.find((item) => item.dir === healthy.dir);
+  assert.equal(failed.ok, false);
+  assert.match(failed.error, /收尾尚未完成/);
+  assert.equal(failed.code, 'PENDING_FINALIZATION');
+  assert.equal(passed.ok, true);
+  assert.equal(passed.changed, true);
+  fs.rmSync(root, { recursive: true, force: true });
+});
+
 test('artifacts.mjs 识别需求目录：按分支归组、标出需求、按日期与版本排序', () => {
   const { root, put } = repo();
   const b = 'feature/order-export';

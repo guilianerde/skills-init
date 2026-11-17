@@ -99,7 +99,18 @@ export function updateMeta(file, update, { root = process.cwd(), allowFinalizati
   const tmp = path.join(path.dirname(lock), `${path.basename(file)}.${randomUUID()}.tmp`);
   try {
     const current = readMeta(file);
-    if (current.pending_finalization && !allowFinalization) throw new Error(`产物收尾尚未完成，先运行 artifact.mjs resume --id ${current.pending_finalization.run_id}`);
+    if (current.pending_finalization && !allowFinalization) {
+      throw Object.assign(
+        new Error(`产物收尾尚未完成，先运行 artifact.mjs resume --id ${current.pending_finalization.run_id}`),
+        {
+          code: 'PENDING_FINALIZATION',
+          details: {
+            runId: current.pending_finalization.run_id ?? null,
+            operationId: current.pending_finalization.id ?? null,
+          },
+        },
+      );
+    }
     const next = update(current);
     const text = `${JSON.stringify(next, null, 2)}\n`;
     if (!fs.existsSync(file) || fs.readFileSync(file, 'utf8') !== text) {

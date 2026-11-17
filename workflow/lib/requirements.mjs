@@ -42,22 +42,26 @@ export function indexArtifacts(dir, versions = {}, { requireVersion = false } = 
 export function reindexRequirement(root, dirRel) {
   const dir = path.resolve(root, dirRel);
   const f = path.join(dir, 'meta.json');
+  let changed = false;
   const result = updateMeta(f, (old) => {
     const versions = { ...(old.versions ?? {}) };
     const artifacts = indexArtifacts(dir, versions, { requireVersion: true });
     const latest = Object.fromEntries(Object.keys(FILES).map((k) => [k, artifacts.filter((a) => a.kind === k).at(-1)?.file ?? null]));
-    const changed = JSON.stringify(old.artifacts ?? null) !== JSON.stringify(artifacts);
+    changed = JSON.stringify(old.artifacts ?? null) !== JSON.stringify(artifacts)
+      || JSON.stringify(old.latest ?? null) !== JSON.stringify(latest);
+    const updateIndexTime = changed || !old.indexed_at;
     const meta = {
       ...old,
       latest,
       ...(Object.keys(versions).length ? { versions } : {}),
       artifacts,
-      indexed_at: changed || !old.indexed_at ? now() : old.indexed_at,
+      ...(updateIndexTime ? { indexed_at: now() } : {}),
     };
     return meta;
   }, { root });
   return {
     ...result,
+    changed,
     unregistered: result.artifacts.filter((artifact) => artifact.registered === false),
   };
 }
@@ -74,13 +78,15 @@ export function reindex(root, { branch = null, all = false } = {}) {
         ok: true,
         dir: target.dir,
         artifacts: meta.artifacts.length,
+        artifact_count: meta.artifacts.length,
         latest: meta.latest,
         versions: meta.versions ?? {},
+        changed: meta.changed,
         unregistered: meta.unregistered.map(({ kind, file }) => ({ kind, file })),
       });
     } catch (error) {
       if (!all) throw error;
-      results.push({ ok: false, dir: target.dir, error: error.message });
+      results.push({ ok: false, dir: target.dir, error: error.message, ...(error.code ? { code: error.code } : {}) });
     }
   }
   return all ? { ok: results.every((entry) => entry.ok), results } : results[0];
