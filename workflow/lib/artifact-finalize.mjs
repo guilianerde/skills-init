@@ -21,6 +21,45 @@ const allowed = { feature: ['clarification', 'requirement', 'plan', 'review', 'd
 const relative = (root, file) => path.relative(root, file).split(path.sep).join('/');
 const fileHash = (file) => fs.existsSync(file) ? hash(fs.readFileSync(file)) : null;
 const wikiRecord = (s) => /^<!-- md-to-wiki: [^\n]*-->/.exec(s)?.[0] ?? null;
+const pendingError = (code, message, details) => Object.assign(new Error(message), { code, details });
+
+function assertPendingRequest(meta, { id, expectedRevision, operationId }) {
+  const p = meta.pending_finalization;
+  if (!p || p.run_id !== id) {
+    if (operationId !== undefined) {
+      throw pendingError(
+        'PENDING_OPERATION_MISMATCH',
+        `pending operationId 已消失或被替换：请求 ${operationId}，当前无匹配待办`,
+        { runId: id, requestedOperationId: operationId, currentOperationId: p?.id ?? null },
+      );
+    }
+    throw new Error('没有该运行待处理的产物收尾');
+  }
+  if (operationId !== undefined && p.id !== operationId) {
+    throw pendingError(
+      'PENDING_OPERATION_MISMATCH',
+      `pending operationId 不匹配：请求 ${operationId}，当前为 ${p.id}`,
+      { runId: id, requestedOperationId: operationId, currentOperationId: p.id },
+    );
+  }
+  const runRevision = p.run?.revision ?? p.revision + 1;
+  if (expectedRevision !== undefined && expectedRevision !== runRevision) {
+    throw pendingError(
+      'REVISION_CONFLICT',
+      `运行版本冲突：pending 当前 revision 为 ${runRevision}，请求 ${expectedRevision}`,
+      { runId: id, operationId: p.id, expectedRevision, runRevision, baseRevision: p.revision },
+    );
+  }
+  const persisted = meta.runs?.[id];
+  if (!persisted || persisted.revision !== p.revision) {
+    throw pendingError(
+      'REVISION_CONFLICT',
+      'pending 基准 revision 与已保存运行不一致，停止恢复或中止',
+      { runId: id, operationId: p.id, runRevision, baseRevision: p.revision, storedRevision: persisted?.revision ?? null },
+    );
+  }
+  return p;
+}
 
 export function artifactDraft(req, kind, text) {
   const file = path.join(req.abs, `${FILES[kind]}.md`);
@@ -30,12 +69,11 @@ export function artifactDraft(req, kind, text) {
   return { text: existingWiki && !draftWiki ? `${existingWiki}\n${text}` : text, existingWiki };
 }
 
-export function resumeFinalization(root, { branch, id }) {
+export function resumeFinalization(root, { branch, id, expectedRevision, operationId }) {
   const { req } = readRun(root, branch, id);
   let result;
   updateMeta(path.join(req.abs, 'meta.json'), (meta) => {
-    const p = meta.pending_finalization;
-    if (!p || p.run_id !== id) throw new Error('没有该运行待恢复的产物收尾');
+    const p = assertPendingRequest(meta, { id, expectedRevision, operationId });
     const run = meta.runs[id];
     assertRunVersion(run, branch, p.revision);
     if (isDev(run)) assertWorkingBranch(root, run);
@@ -69,17 +107,17 @@ export function resumeFinalization(root, { branch, id }) {
     const artifacts = indexArtifacts(req.abs, versions);
     const latest = Object.fromEntries(Object.keys(FILES).map((k) => [k, artifacts.filter((a) => a.kind === k).at(-1)?.file ?? null]));
     const { pending_finalization, ...rest } = meta;
-    result = { ok: true, path: relative(root, file), cite: layout(root).ref(file), previous: p.previous, version: p.version, lint: p.run.artifacts[p.kind].lint, run: p.run };
+    result = { ok: true, operationId: p.id, baseRevision: p.revision, path: relative(root, file), cite: layout(root).ref(file), previous: p.previous, version: p.version, lint: p.run.artifacts[p.kind].lint, run: p.run };
     return { ...rest, versions, artifacts, latest, runs: { ...meta.runs, [id]: p.run }, updated: p.run.updated_at };
   }, { root, allowFinalization: true });
   return result;
 }
 
-export function abortFinalization(root, { branch, id }) {
+export function abortFinalization(root, { branch, id, expectedRevision, operationId }) {
   const { req } = readRun(root, branch, id);
+  let abortedOperationId;
   updateMeta(path.join(req.abs, 'meta.json'), (meta) => {
-    const p = meta.pending_finalization;
-    if (!p || p.run_id !== id) throw new Error('没有该运行待取消的产物收尾');
+    const p = assertPendingRequest(meta, { id, expectedRevision, operationId });
     assertRunVersion(meta.runs[id], branch, p.revision);
     const file = path.join(req.abs, `${FILES[p.kind]}.md`);
     const current = fileHash(file);
@@ -94,9 +132,10 @@ export function abortFinalization(root, { branch, id }) {
       }
     }
     const { pending_finalization, ...rest } = meta;
+    abortedOperationId = p.id;
     return rest;
   }, { root, allowFinalization: true });
-  return { ok: true, aborted: true, run_id: id };
+  return { ok: true, aborted: true, run_id: id, operationId: abortedOperationId };
 }
 
 export function finalizeArtifact(root, { branch, id, revision, kind, text, input = {}, packet = null, result = null }, check) {
