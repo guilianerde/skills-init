@@ -163,6 +163,9 @@ workflow.runs.save({
 - 没有匹配成功记录时执行正常 revision 与门禁检查；不同内容或不同操作不能借成功重放绕过旧 revision 检查。成功记录不匹配或产物后来改变时明确返回冲突，不自动刷新 revision 再写入。
 - 同请求对应的 pending 可继续处理既有操作，不能新建一笔。阶段一只保留现有收尾重放能力，不建设持久化的通用幂等请求服务，也不承诺无限期保存历史响应。
 - 每次新建 pending 都生成唯一 `operationId`。`resume/abort` 必须显式提供 `{ branch, id, expectedRevision, operationId }`，在同一需求锁内核对运行、当前 revision、pending 基准 revision 及操作 ID，然后才处理文件。
+- `runs.status()` 对 pending 返回顶层 `runRevision`，并返回 `pending.operationId`、`pending.runId`、`pending.kind`、`pending.baseRevision` 和 `pending.runRevision`。参数 `expectedRevision` 固定等于 `runRevision` / `pending.runRevision`；pending 的 `baseRevision` 只用于内核核对它仍等于已保存运行的 revision，不作为调用方传入值。
+- pending 存在时，`current` 保留 meta 中已提交的运行快照，可能仍是 `baseRevision`；调用方必须读取顶层 `runRevision` 发起 resume/abort。resume 成功后提交 pending 预先计算的目标 revision；abort 不提交该目标运行，保留已保存的 base revision。
+- 示例：`status` 返回 `runRevision: 9`、`pending.baseRevision: 8` 时，调用 `resume({ id, expectedRevision: 9, operationId })`。传 8 返回 `REVISION_CONFLICT`；operationId 不存在或已替换返回 `PENDING_OPERATION_MISMATCH`。
 - 若 pending 已消失或被另一笔替换，返回明确错误，不自动选择“当前那笔”。无论 abort 是否改变 run revision，都不能重复使用已取消操作的 ID。失败返回可包含当前状态，调用方核实后另发请求，不能自动改绑新 operationId。
 - 恢复继续执行已有的正文 hash、文件冲突和领域门禁检查；操作 ID 匹配不能代替证据校验。
 
@@ -294,7 +297,7 @@ npm run eval:triggers
 - [ ] 无复制的 run-gates、快照规则和产物版本逻辑。
 - [ ] 双入口同一 run 的集成场景及失败路径通过。
 - [ ] 两个 root 的配置隔离、不同入口对同一 root 的配置一致性通过。
-- [ ] pending 的 operationId 防误操作与 finalize 成功重放分别验证通过。
+- [x] pending 的 operationId 防误操作与 finalize 成功重放分别验证通过。
 - [ ] path / nextPath / sync bump、旧流程兼容迁移及其生产调用已删除，正式正文发布统一走 finalize。
 - [ ] bind 与受限 reindex 的写入归属、锁及证据失效测试通过，which 为只读查询。
 - [ ] 安装后的 Skills、包内容、流程测试和触发评估通过。
