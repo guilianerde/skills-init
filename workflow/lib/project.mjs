@@ -43,9 +43,16 @@ const candidateDirs = (root) => INSTALL_BASES
   .map((base) => ({ base, dir: path.join(root, base, 'workflow') }))
   .filter(({ dir }) => { try { return fs.statSync(dir).isDirectory(); } catch { return false; } });
 const samePath = (a, b) => path.relative(path.resolve(a), path.resolve(b)) === '';
+const stableJson = (value) => {
+  if (Array.isArray(value)) return value.map(stableJson);
+  if (!value || typeof value !== 'object') return value;
+  return Object.fromEntries(Object.keys(value).sort().map((key) => [key, stableJson(value[key])]));
+};
 const profileFiles = (dir) => ['profile.json', 'profile.local.json'].map((name) => {
   const file = path.join(dir, name);
-  return fs.existsSync(file) ? fs.readFileSync(file) : null;
+  if (!fs.existsSync(file)) return null;
+  const text = fs.readFileSync(file, 'utf8');
+  try { return JSON.stringify(stableJson(JSON.parse(text))); } catch { return `raw:${text}`; }
 });
 // --copy 初次安装的各副本通常完全相同；只有 profile.json / profile.local.json
 // 这两个团队与个人配置都相同时，任选一个才不改变画像语义。
@@ -54,7 +61,7 @@ const equivalentProfiles = (candidates) => {
   const first = profileFiles(candidates[0].dir);
   return candidates.slice(1).every(({ dir }) => {
     const current = profileFiles(dir);
-    return current.every((value, index) => (value === null ? first[index] === null : first[index] !== null && value.equals(first[index])));
+    return current.every((value, index) => value === first[index]);
   });
 };
 const sourceFile = (root) => path.join(root, PROFILE_SOURCE);

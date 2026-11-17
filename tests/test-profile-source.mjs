@@ -56,7 +56,13 @@ const expectAmbiguous = (fn, reason) => assert.throws(fn, (error) => {
 test('--copy 生成相同 profile 时自动视为等价来源', (t) => {
   const f = project(t);
   f.put('.claude/skills/workflow/profile.json', profile('same'));
-  f.put('.qwen/skills/workflow/profile.json', profile('same'));
+  const same = profile('same');
+  f.put('.qwen/skills/workflow/profile.json', JSON.stringify({
+    artifacts: same.artifacts,
+    test: same.test,
+    build: same.build,
+    main_branch: same.main_branch,
+  }));
 
   const resolved = resolveProfileDir(f.root);
   assert.equal(resolved.base, '.claude/skills');
