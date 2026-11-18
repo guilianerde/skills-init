@@ -82,6 +82,7 @@ export function createDocumentHandoff(root, { branch, id, kind, text }) {
     inputs,
     draft: { text: draft.text, hash: draftHash },
     basis: basis ? { path: basis.path, hash: basis.hash, version: basis.version, text: basisText } : null,
+    rules: '按已确认的范围、验收项和技术约束审查。阻塞项须给出具体约束或验收依据及实际影响。架构偏好、可选优化和新增功能作为建议。需要新取舍时说明冲突，交用户决定。复审优先看基线差异、待关闭阻塞项和受影响的验收项；影响不明时扩大范围。',
     result_schema: {
       run_id: id,
       inputs,

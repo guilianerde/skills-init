@@ -228,27 +228,37 @@ for (const kind of ['feature', 'bug']) test(`${kind}：两份文档须先审查�
   const reqStage = kind === 'feature' ? 'F3' : 'B3';
   const planStage = kind === 'feature' ? 'F4' : 'B4';
   let run = f.start(BRANCH, kind, kind === 'feature' ? 'M' : 'L');
-  const reqText = f.text('requirement.md');
+  run = f.save(run, { status: 'waiting_user', waiting_for: '核对需求草稿', context: { draft: 'workflow-run/tmp/requirement.md' } });
+  run = f.save(run, { status: 'running', context: { decisions: ['只做分页，批量导出移出范围'] } });
+  assert.equal(run.artifacts.requirement, undefined);
+  const reqText = f.text('requirement.md') + '支持分页，批量导出移出范围\n';
   const reqReview = f.reviewDraft(run, 'requirement', reqText);
   assert.throws(() => f.finalize(run, 'requirement', done(reqStage), { packet: null }), /需要文档审查/);
   assert.throws(() => f.save(run, { stage: planStage }), /requirement.md/);
   const blocker = { location: 'AC-1', evidence: '缺少预期响应', impact: '无法验收', blocking: true };
   assert.throws(() => f.finalize(run, 'requirement', done(reqStage), {
-    ...reqReview, result: { ...reqReview.result, findings: [blocker] },
+    text: reqText, ...reqReview, result: { ...reqReview.result, findings: [blocker] },
   }), /仍有阻塞项/);
   assert.throws(() => f.finalize(run, 'requirement', done(reqStage), { ...reqReview, text: reqText + '变更' }), /不对应本轮草稿/);
-  run = f.finalize(run, 'requirement', done(reqStage), reqReview);
+  const revisedReqText = reqText + 'AC-1 返回分页数据和总数\n';
+  const followup = f.reviewDraft(run, 'requirement', revisedReqText);
+  const suggestion = { location: '范围', evidence: '用户已将批量导出移出范围', impact: '后续可作为独立需求考虑', blocking: false };
+  run = f.finalize(run, 'requirement', done(reqStage), {
+    text: revisedReqText, ...followup,
+    result: { ...followup.result, summary: '复核 AC-1，已补足预期响应', findings: [suggestion] },
+  });
   assert.equal(run.artifacts.requirement.document_review.mode, 'independent');
+  assert.deepEqual(run.artifacts.requirement.document_review.findings, [suggestion]);
   run = f.save(run, { stage: planStage });
   const planReview = f.reviewDraft(run, 'plan', f.text('plan.md'));
-  assert.equal(planReview.packet.basis.text, reqText);
+  assert.equal(planReview.packet.basis.text, revisedReqText);
   assert.throws(() => f.finalize(run, 'plan', {}, {
     ...planReview, packet: { ...planReview.packet, basis: { ...planReview.packet.basis, text: '过时的需求内容' } },
   }), /不对应本轮草稿或其依据/);
   assert.throws(() => f.finalize(run, 'plan', {}, { packet: null }), /需要文档审查/);
   assert.throws(() => f.implement(run), /尚未完成|plan.md/);
   run = f.save(run, { stage: reqStage });
-  run = f.finalize(run, 'requirement', done(reqStage), { text: reqText + '新增 AC-2\n' });
+  run = f.finalize(run, 'requirement', done(reqStage), { text: revisedReqText + '新增 AC-2\n' });
   run = f.save(run, { stage: planStage });
   assert.throws(() => f.finalize(run, 'plan', {}, planReview), /不对应本轮草稿或其依据/);
   run = f.plan(run);
