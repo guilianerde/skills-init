@@ -4,6 +4,14 @@
 
 ## [Unreleased]
 
+## [0.37.0] - 2026-11-20
+
+### 变更
+
+- 功能开发在 F3 发布正式 `requirement.md` 后等待用户确认。确认绑定需求版本，确认后才进入 F4 起草方案。
+- 需求、方案、代码及适用的复审、分角度查找和发现复核，由用户选择子 agent 审查、当前 agent 审查或跳过。跳过代码审查时记录未审范围，交付仍需明确确认。
+- F6 每轮验证完成后等待用户确认，再进入 F7。用户要求调整代码或方案时，完成 F5 返工后先等待确认，再重新验证。
+
 ## [0.36.1] - 2026-11-18
 
 ### 优化
@@ -490,7 +498,8 @@
 - 安装器改为单一 Node 实现，`init-skills.sh` / `init-skills.ps1` 只是薄封装。
 - `code-review` 改名为 `project-review`，升级时自动清理旧名。
 
-[Unreleased]: https://github.com/guilianerde/skills-init/compare/v0.36.0...HEAD
+[Unreleased]: https://github.com/guilianerde/skills-init/compare/v0.37.0...HEAD
+[0.37.0]: https://github.com/guilianerde/skills-init/compare/v0.36.1...v0.37.0
 [0.36.0]: https://github.com/guilianerde/skills-init/compare/v0.35.0...v0.36.0
 [0.26.0]: https://github.com/guilianerde/skills-init/compare/v0.25.0...v0.26.0
 [0.21.0]: https://github.com/guilianerde/skills-init/compare/v0.20.0...v0.21.0
