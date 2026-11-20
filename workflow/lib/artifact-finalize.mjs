@@ -6,7 +6,7 @@ import { FILES, parseBranch } from './artifact-model.mjs';
 import { canonicalJson, hash, assertWorkingBranch, snapshotReader } from './code-snapshot.mjs';
 import { layout } from './project.mjs';
 import { readRun, assertRunVersion, applyCheckpoint } from './runs.mjs';
-import { isDev, coreSteps, applyDevEvidence, assertRequirement, assertPlanBasis, assertReview, assertDelivery, reviewEvidence, documentReviewBasis } from './run-gates.mjs';
+import { isDev, coreSteps, applyDevEvidence, assertRequirement, assertRequirementApproval, assertPlanBasis, assertReview, assertDelivery, reviewEvidence, documentReviewBasis } from './run-gates.mjs';
 import { documentReviewEvidence, requiresDocumentReview } from './document-review.mjs';
 import { updateMeta } from './meta-store.mjs';
 import { OLD_DIR, indexArtifacts } from './requirements.mjs';
@@ -176,6 +176,7 @@ export function finalizeArtifact(root, { branch, id, revision, kind, text, input
     if (kind === 'plan') {
       requirement = assertRequirement(root, req, run);
       if (run.steps[run.kind === 'feature' ? 'F3' : 'B3'].status !== 'completed') throw new Error('需求文档尚未完成，不能收尾方案');
+      assertRequirementApproval(run, requirement);
     }
     const documentReview = requiresDocumentReview(run, kind)
       ? documentReviewEvidence(run, kind, digest, kind === 'plan' ? requirement : documentReviewBasis(root, req, run, kind), packet, result, at)
@@ -190,6 +191,9 @@ export function finalizeArtifact(root, { branch, id, revision, kind, text, input
       ...(documentReview ? { document_review: documentReview } : {}),
       ...(requirement ? { requirement: { hash: requirement.hash, version: requirement.version } } : {}) } };
     const clarificationChanged = kind === 'clarification' && current.artifacts?.clarification?.hash !== digest;
+    if (clarificationChanged || (kind === 'requirement' && current.artifacts?.requirement?.hash !== digest)) {
+      delete run.requirement_approval;
+    }
     if (clarificationChanged || (kind === 'plan' && (current.artifacts?.plan?.hash !== digest || current.artifacts?.plan?.requirement?.hash !== requirement.hash))
       || (kind === 'requirement' && current.artifacts?.requirement?.hash !== digest)) {
       run.plan_approval = null; run.implementation = null; run.validation = null; run.review = null; run.decision = null;

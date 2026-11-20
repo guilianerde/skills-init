@@ -32,7 +32,7 @@ export function flowFixture(t) {
   const save = (run, input, action = 'save') => changeRun(root, { branch: run.branch, id: run.id, revision: run.revision, input, action }).run;
   const reviewDraft = (run, kind, draft) => {
     const packet = documentHandoff(root, { branch: run.branch, id: run.id, kind, text: draft });
-    return { packet, result: { run_id: run.id, inputs: packet.inputs, mode: 'independent', reviewer: 'test-reviewer', summary: '审查通过', findings: [] } };
+    return { packet, result: { run_id: run.id, inputs: packet.inputs, mode: 'independent', confirmed: true, reviewer: 'test-reviewer', summary: '审查通过', findings: [] } };
   };
   const finalize = (run, kind, input = {}, extra = {}) => {
     const draft = extra.text ?? text(`${kind}.md`, run.branch);
@@ -40,24 +40,32 @@ export function flowFixture(t) {
     return finalizeArtifact(root, { branch: run.branch, id: run.id, revision: run.revision, kind, text: draft, input, ...evidence, ...extra }, () => ({ ok: true })).run;
   };
   const requirement = (run) => finalize(run, 'requirement', { steps: { [run.kind === 'feature' ? 'F3' : 'B3']: { status: 'completed' } } });
+  const enterPlan = (run) => save(run, run.kind === 'feature'
+    ? { stage: 'F4', status: 'running', requirement_approval: { confirmed: true } }
+    : { stage: 'B4' });
   const plan = (run) => {
     if (!run.artifacts.requirement) run = requirement(run);
-    if (run.stage === 'F3' || run.stage === 'B3') run = save(run, { stage: run.kind === 'feature' ? 'F4' : 'B4' });
+    if (run.stage === 'F3' || run.stage === 'B3') run = enterPlan(run);
     return finalize(run, 'plan', run.kind === 'feature' ? { steps: { F4: { status: 'completed' } } } : {});
   };
   const implement = (run) => save(run, { approval: { confirmed: true }, ...(run.kind === 'feature' ? { stage: 'F5' } : { implement: true }) });
   const verify = (run) => {
-    if (run.kind === 'feature') run = save(run, { stage: 'F6', steps: { F5: { status: 'completed' } } });
+    if (run.kind === 'feature') {
+      const steps = { F5: { status: 'completed' } };
+      run = run.history.some((event) => event.stage === 'F6')
+        ? save(save(run, { steps }), { stage: 'F6', advance: { confirmed: true } })
+        : save(run, { stage: 'F6', steps });
+    }
     const snapshot = codeSnapshot(root, run);
     run = save(run, { validation: { snapshot, checks: [{ command: 'node --check app.js', result: 'passed' }] },
       steps: { [run.kind === 'feature' ? 'F6' : 'B4']: { status: 'completed' } } });
-    return save(run, { stage: run.kind === 'feature' ? 'F7' : 'B5' });
+    return save(run, run.kind === 'feature' ? { stage: 'F7', advance: { confirmed: true } } : { stage: 'B5' });
   };
   const review = (run, findings = []) => {
     const packet = handoff(root, { branch: run.branch, id: run.id });
-    const result = { run_id: packet.run_id, code: packet.snapshot.digest, inputs: packet.inputs, findings, coverage: { reviewed: packet.scope.review.map((f) => f.path), uncovered: [] } };
+    const result = { run_id: packet.run_id, code: packet.snapshot.digest, inputs: packet.inputs, mode: 'independent', confirmed: true, findings, coverage: { reviewed: packet.scope.review.map((f) => f.path), uncovered: [] } };
     return finalize(run, 'review', run.kind === 'feature' ? { steps: { F7: { status: 'completed' } } } : {}, { packet, result });
   };
   const ready = (kind = 'feature', findings = []) => review(verify(implement(plan(start(BRANCH, kind)))), findings);
-  return { root, req, file, text, put, start, save, finalize, reviewDraft, requirement, plan, implement, verify, review, ready, git };
+  return { root, req, file, text, put, start, save, finalize, reviewDraft, requirement, enterPlan, plan, implement, verify, review, ready, git };
 }

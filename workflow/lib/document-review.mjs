@@ -5,7 +5,13 @@ const nonempty = (value) => typeof value === 'string' && Boolean(value.trim());
 
 export const documentReviewStage = (run, kind) => stages[run.kind]?.[kind];
 export const requiresDocumentReview = (run, kind) =>
-  run.document_review_policy === 1 && ['M', 'L'].includes(run.size) && Boolean(documentReviewStage(run, kind));
+  [1, 2].includes(run.document_review_policy) && ['M', 'L'].includes(run.size) && Boolean(documentReviewStage(run, kind));
+
+export function assertReviewChoice(result) {
+  if (result?.confirmed !== true || !['independent', 'self', 'skipped'].includes(result.mode)) {
+    throw new Error('请记录用户明确选择的审查方式：independent / self / skipped，confirmed: true');
+  }
+}
 
 export function documentReviewInputs(run, kind, draftHash, basis) {
   return hash(JSON.stringify({
@@ -27,11 +33,15 @@ export function documentReviewEvidence(run, kind, draftHash, basis, packet, resu
       result.run_id !== run.id || result.inputs !== inputs) {
     throw new Error('文档审查不对应本轮草稿或其依据，请重新交接并审查');
   }
-  if (!['independent', 'self'].includes(result.mode) || !nonempty(result.reviewer) || !nonempty(result.summary)) {
-    throw new Error('文档审查结果需要审查方式、审查者和结论');
+  assertReviewChoice(result);
+  if (result.mode === 'skipped') {
+    if (!nonempty(result.summary) || !Array.isArray(result.findings) || result.findings.length) {
+      throw new Error('跳过文档审查须记录说明，findings 必须为空');
+    }
+    return { inputs, mode: 'skipped', confirmed: true, summary: result.summary, findings: [], at };
   }
-  if (result.mode === 'self' && (result.fallback?.confirmed !== true || !nonempty(result.fallback.reason))) {
-    throw new Error('自查降级须有用户明确同意及无法独立审查的原因');
+  if (!nonempty(result.reviewer) || !nonempty(result.summary)) {
+    throw new Error('文档审查结果需要审查者和结论');
   }
   if (!Array.isArray(result.findings) || result.findings.some((finding) =>
     !nonempty(finding?.location) || !nonempty(finding.evidence) || !nonempty(finding.impact) ||
@@ -40,8 +50,7 @@ export function documentReviewEvidence(run, kind, draftHash, basis, packet, resu
   }
   if (result.findings.some((finding) => finding.blocking)) throw new Error('文档审查仍有阻塞项，请修订并复审后再收尾');
   return {
-    inputs, mode: result.mode, reviewer: result.reviewer, summary: result.summary, findings: result.findings, at,
-    ...(result.mode === 'self' ? { fallback: { confirmed: true, reason: result.fallback.reason } } : {}),
+    inputs, mode: result.mode, confirmed: true, reviewer: result.reviewer, summary: result.summary, findings: result.findings, at,
   };
 }
 

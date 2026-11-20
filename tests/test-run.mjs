@@ -68,7 +68,7 @@ test('等待修复 / 交付时不因报告存在而自动前进；修复回退�
   assert.equal(run.steps.F5.status, 'in_progress');
   assert.equal(run.steps.F6.status, 'pending');
   assert.equal(run.steps.F7.status, 'pending');
-  assert.ok(run.history.some((h) => h.status === 'waiting_user' && h.steps.F7.status === 'completed'));
+  assert.ok(run.history.some((h) => h.stage === 'F7' && h.status === 'waiting_user' && h.steps.F7?.status === 'completed'));
   assert.equal(run.waiting_for, null);
 });
 

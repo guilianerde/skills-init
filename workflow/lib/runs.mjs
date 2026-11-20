@@ -63,7 +63,7 @@ export function runState(root, branch, workspace = loadWorkspace(root), id = nul
 
 export function applyCheckpoint(run, patch, at, reopen = true) {
   if (!object(patch)) throw new Error('checkpoint 必须是 JSON 对象');
-  const allowed = ['stage', 'status', 'size', 'waiting_for', 'reason', 'steps', 'context', 'decision', 'approval', 'implement', 'validation', 'scope'];
+  const allowed = ['stage', 'status', 'size', 'waiting_for', 'reason', 'steps', 'context', 'decision', 'requirement_approval', 'approval', 'implement', 'validation', 'advance', 'scope'];
   for (const key of Object.keys(patch)) if (!allowed.includes(key)) throw new Error(`不支持修改字段：${key}`);
   if (patch.status !== undefined && !['running', 'waiting_user', 'blocked'].includes(patch.status)) throw new Error('save 的状态只支持 running / waiting_user / blocked；完成用 complete，取消用 cancel');
   if (patch.size !== undefined) {
@@ -73,7 +73,23 @@ export function applyCheckpoint(run, patch, at, reopen = true) {
   const stages = FLOWS[run.kind];
   const stage = patch.stage ?? run.stage;
   if (!stages.includes(stage)) throw new Error(`无效阶段：${stage}`);
-  const status = patch.status ?? run.status;
+  const feature = run.kind === 'feature';
+  const hasReachedValidation = feature && run.history.some((event) => event.stage === 'F6');
+  const advancingToReview = feature && stage === 'F7' && run.stage !== 'F7';
+  const advancingToRevalidation = hasReachedValidation && stage === 'F6' && stages.indexOf(run.stage) < stages.indexOf('F6');
+  if (advancingToReview && (run.stage !== 'F6' || run.steps.F6.status !== 'completed')) {
+    throw new Error('请先在 F6 完成验证并交给用户确认');
+  }
+  if (advancingToRevalidation && (run.stage !== 'F5' || run.steps.F5.status !== 'completed')) {
+    throw new Error('请先在 F5 完成返工并交给用户确认');
+  }
+  if ((advancingToReview || advancingToRevalidation) && patch.advance?.confirmed !== true) {
+    throw new Error(`进入 ${stage} 前须取得用户明确确认：advance.confirmed`);
+  }
+  if (patch.advance !== undefined && !advancingToReview && !advancingToRevalidation) {
+    throw new Error('advance 仅用于用户确认进入 F7 或返工后进入 F6');
+  }
+  let status = patch.status ?? (patch.advance ? 'running' : run.status);
   // 回到已完成的阶段时，后续完成标记失效；历史 checkpoint 仍保留。
   if (reopen && patch.stage && (stages.indexOf(stage) < stages.indexOf(run.stage) || (status === 'running' && done(run.steps[stage].status)))) {
     for (const name of stages.slice(stages.indexOf(stage))) run.steps[name] = { status: 'pending' };
@@ -108,15 +124,22 @@ export function applyCheckpoint(run, patch, at, reopen = true) {
     if (patch.decision.accepted_risks !== undefined && (!Array.isArray(patch.decision.accepted_risks) || patch.decision.accepted_risks.some((v) => typeof v !== 'string'))) throw new Error('accepted_risks 必须是已明确接受的问题 id 数组');
     run.decision = { ...patch.decision, at };
   }
+  const confirmation = feature && (stage === 'F6' && run.steps.F6.status === 'completed'
+    ? '确认 F6 验证结果并选择是否进入 F7'
+    : stage === 'F5' && hasReachedValidation && run.steps.F5.status === 'completed'
+      ? '确认 F5 返工结果并选择是否进入 F6'
+      : null);
+  if (confirmation) status = 'waiting_user';
   run.stage = stage;
   run.status = status;
-  run.waiting_for = status === 'waiting_user' ? (patch.waiting_for ?? run.waiting_for) : null;
+  run.waiting_for = status === 'waiting_user' ? (confirmation || (patch.waiting_for ?? run.waiting_for)) : null;
   run.reason = status === 'blocked' ? (patch.reason ?? run.reason) : null;
   if (status === 'waiting_user' && !run.waiting_for?.trim()) throw new Error('等待用户时必须填写 waiting_for');
   if (status === 'blocked' && !run.reason?.trim()) throw new Error('阻塞时必须填写 reason');
   if (status === 'running' && run.steps[stage].status === 'pending') run.steps[stage] = { status: 'in_progress', updated_at: at };
   run.updated_at = at;
   run.history.push({ at, stage, status, steps: patch.steps ?? {}, ...(patch.decision ? { decision: run.decision } : {}) });
+  if (patch.advance) run.history.at(-1).advance = { confirmed: true };
   return run;
 }
 
@@ -136,7 +159,7 @@ export function startRun(root, { branch, kind = 'feature', size = null, input = 
       created_at: at, updated_at: at, completed_at: null, steps: Object.fromEntries(FLOWS[kind].map((s) => [s, { status: 'pending' }])),
       scope: { base: meta.base || profile?.main_branch || 'main', exclude: Array.isArray(profile?.review?.exclude) ? profile.review.exclude.filter((v) => typeof v === 'string') : [] },
       artifacts: {}, context: {}, waiting_for: null, reason: null, decision: null, history: [],
-      ...(['feature', 'bug'].includes(kind) ? { document_review_policy: 1 } : {}) }, input, at);
+      ...(['feature', 'bug'].includes(kind) ? { document_review_policy: 2 } : {}) }, input, at);
     applyDevEvidence(root, req, selected, input, at);
     return { ...meta, runs: { ...runs, [id]: selected }, updated: at };
   }, { root });

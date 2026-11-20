@@ -52,6 +52,7 @@ export function createCodeHandoff(root, { branch, id, depth = '标准', capabili
       run_id: id,
       code: snapshot.digest,
       inputs: hash(JSON.stringify(inputs)),
+      ...(isDev(run) ? { mode: 'independent|self|skipped', confirmed: '由主 agent 根据用户实际选择填 true' } : {}),
       findings: [{ id: '唯一编号', severity: 'CRITICAL|HIGH|MEDIUM|LOW', verification: 'confirmed|pending', scope: 'in_scope|outside（范围外发现单列）', file: '真实路径', line: 1, summary: '触发条件与影响' }],
       coverage: { reviewed: ['已审文件'], uncovered: ['未审文件'] },
     },
@@ -86,7 +87,8 @@ export function createDocumentHandoff(root, { branch, id, kind, text }) {
     result_schema: {
       run_id: id,
       inputs,
-      mode: 'independent',
+      mode: 'independent|self|skipped',
+      confirmed: '由主 agent 根据用户实际选择填 true',
       reviewer: '实际子 agent 标识',
       summary: '审查结论与已复核修订',
       findings: [{ location: '章节或验收编号', evidence: '依据及来源', impact: '实际影响', blocking: false }],

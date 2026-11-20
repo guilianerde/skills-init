@@ -21,12 +21,12 @@ description: "Explicitly requested dev workflow for feature development or bug f
 - 生成澄清清单、需求、方案和交付说明时，按 `<skills>/workflow/references/templates.md`「文档模板的两部分」读取生效模板。遵守要求区，只用内容区生成正文。无标记的模板沿用旧格式，边界有误时先修复。
 - 先确定工作分支、已有改动的归属与需求名；切分支重新查询绑定，不替用户丢弃已有改动。
 - 规模由 agent 判定并说明，不询问规模确认；M / L 的需求理解和方案须用户确认后再实现，权限 / 资金至少按 M。
-- M / L 先和用户讨论、确认需求与方案草稿，收到明确反馈直接改稿。启用 `document_review_policy: 1` 的运行各自在确认后做独立审查，按 [文档审查流程](../workflow/references/execution.md#需求与方案审查) 处理阻塞项与差异复核；需要新的取舍才请用户决定。子 agent 不可用时等用户决定是否允许本次自查。
-- F2 先落偏业务场景的 clarification.md，供用户找产品核对；逐轮更新原问题状态、追加新问题和反馈。业务明确并完成现状调研后，再进入 F3 澄清技术约束；最终需求确认后进入 F4。
+- M / L 先和用户讨论需求与方案草稿，收到明确反馈直接改稿。适用的审查按 [审查方式选择](../workflow/references/execution.md#审查方式选择) 和 [文档审查流程](../workflow/references/execution.md#需求与方案审查) 执行。
+- F2 先落偏业务场景的 clarification.md，供用户找产品核对；逐轮更新原问题状态、追加新问题和反馈。业务明确并完成现状调研后，再进入 F3 澄清技术约束；完整流程先落盘 requirement.md，再让用户确认正式版本，之后才进入 F4。
 - S 快速通道须用户明确同意，且 ≤3 文件、无配置 / SQL / 对外接口 / 表结构 / 权限 / 资金变更，且没有 F2 / F3 已确认的业务决定、本次未发布正式清单且未创建完整流程运行；已有清单或运行沿用完整流程，具体资格见 F4。
 - 快速通道仍编译、测试、当前会话审查，但不 bind、不建运行、不落需求 / 方案 / 审查 / 交付文档；超限或用户要求落盘先停，回 F3（bug 回 B3）补需求文档，再进入方案。
-- 完整流程每轮审查落 `review.md`，交报告后等待明确选择修复或交付；选择交付前不创建或更新 `delivery.md`。
-- 修复后必须验证、复审并再次等选择；严重遗留风险须说明并取得明确接受，不能把一般的“交付”当作接受风险。
+- 完整流程先让用户选子 agent 审查、当前 agent 审查或跳过。每轮用 `review.md` 记录结果或跳过决定，交给用户后等待明确选择修复或交付。
+- 功能开发每轮 F6 验证后交结果并停下，用户确认才进入 F7。用户要求修改代码或方案时，完成 F5 返工后先停，用户确认后才重新走 F6。复审方式和交付另由用户选择；严重遗留风险须说明并取得明确接受，不能把一般的“交付”当作接受风险。
 - 交付选择不授权提交、推送、发布或知识写入；没有值得沉淀的知识不询问，有则先取得授权。
 
 ## Step 0 — 前置检查（两种模式共用）
@@ -54,7 +54,7 @@ description: "Explicitly requested dev workflow for feature development or bug f
 
 ### F3 — 需求澄清（偏技术约束）
 
-读 [clarify.md 的 F3](references/clarify.md) 与 [planning.md 的 F3](references/planning.md)；基于已确认业务场景，查清可行性、接口兼容、数据与一致性、权限、依赖及验证条件。事实自己查，需用户取舍的技术约束给推荐并等答复；详细设计留到 F4。发现新业务问题回 F2 更新清单找产品确认。完整流程先确认需求草稿，再完成适用的审查、收尾 requirement.md 并完成 F3，进入 F4。
+读 [clarify.md 的 F3](references/clarify.md) 与 [planning.md 的 F3](references/planning.md)；基于已确认业务场景，查清可行性、接口兼容、数据与一致性、权限、依赖及验证条件。事实自己查，需用户取舍的技术约束给推荐并等答复；详细设计留到 F4。发现新业务问题回 F2 更新清单找产品确认。完整流程完成澄清和适用的审查后，先收尾 requirement.md，发正式文档链接及版本并等待用户明确确认；确认前停在 F3，确认后才进入 F4 起草方案。
 
 ### F4 — 方案（落盘只看是否快速通道，写法按规模）
 
@@ -66,15 +66,15 @@ description: "Explicitly requested dev workflow for feature development or bug f
 
 ### F6 — 验证
 
-读 [implementation.md 的 F6](references/implementation.md)；HTTP 接口或接口行为有变化时，沿用既有框架补充并执行接口层测试，覆盖正常请求、适用的参数错误和权限场景，断言状态码与响应。完整流程执行前用 `run.mjs snapshot --id <id>` 取快照、执行后 save validation；两种通道都执行相关测试、`profile.test` 与 lint，记录“验收项 → 测试或操作 → 结果”，已有失败与未验证项如实保留；缺接口测试环境时附可执行请求与预期结果。
+读 [implementation.md 的 F6](references/implementation.md)；HTTP 接口或接口行为有变化时，沿用既有框架补充并执行接口层测试，覆盖正常请求、适用的参数错误和权限场景，断言状态码与响应。完整流程执行前用 `run.mjs snapshot --id <id>` 取快照、执行后 save validation；两种通道都执行相关测试、`profile.test` 与 lint，记录“验收项 → 测试或操作 → 结果”，已有失败与未验证项如实保留；缺接口测试环境时附可执行请求与预期结果。交付验证摘要后停在 F6，等用户确认才进入 F7。用户要求改代码时回 F5，改方案时先回 F4、再到 F5；F5 返工完成后交变更摘要并等待，只有用户确认向下推进才开始新一轮 F6。S 快速通道在对话中执行相同停点。
 
 ### F7 — 审查、报告与用户选择
 
-先读 [delivery.md 的 F7](references/delivery.md)，完整流程用 `review-handoff.mjs --id <id>` 生成交接材料，按 project-review 第 1～7 步审查；优先独立子 agent，无则当前会话并如实署名。子 agent 返回草稿与结构化结果，主 agent 用 `artifact.mjs finalize --kind review` 收尾，交用户、等修复或交付选择；内部审查不另起运行、不单独沉淀或记反馈。快速通道只在当前会话审查。
+用户确认本轮 F6 验证结果后，先读 [delivery.md 的 F7](references/delivery.md)，完整流程用 `review-handoff.mjs --id <id>` 生成交接材料，按 project-review 第 1～7 步审查；方式由用户明确选择；跳过则登记未审查。审查者提供草稿与结构化结果，主 agent 用 `artifact.mjs finalize --kind review` 收尾，交用户、等修复或交付选择；内部审查不另起运行、不单独沉淀或记反馈。快速通道只在当前会话审查。
 
 ### F8 — 交付
 
-读 [delivery.md 的 F8](references/delivery.md)；完整流程记录绑定本轮代码和报告的交付选择后，用 `artifact.mjs finalize --kind delivery` 收尾 `delivery.md` 并汇总，快速通道仅对话交付。反馈用 `feedback.mjs add`；沉淀分类用 `resolve.mjs category dev`，详细授权、元信息与后续操作按该文执行。
+读 [delivery.md 的 F8](references/delivery.md)；完整流程记录绑定本轮代码和审查记录的交付选择后，用 `artifact.mjs finalize --kind delivery` 收尾 `delivery.md` 并汇总，快速通道仅对话交付。反馈用 `feedback.mjs add`；沉淀分类用 `resolve.mjs category dev`，详细授权、元信息与后续操作按该文执行。
 
 ## 缺陷修复流程（`--bug`）
 

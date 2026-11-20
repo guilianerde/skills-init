@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { FILES, parseBranch } from './artifact-model.mjs';
 import { hash, assertSnapshot, assertWorkingBranch, snapshotReader } from './code-snapshot.mjs';
-import { assertDocumentReview, requiresDocumentReview } from './document-review.mjs';
+import { assertDocumentReview, assertReviewChoice, requiresDocumentReview } from './document-review.mjs';
 
 export const isDev = (run) => ['feature', 'bug'].includes(run.kind);
 export const coreSteps = (run) => run.kind === 'feature' ? ['F3', 'F4', 'F5', 'F6', 'F7', 'F8'] : ['B3', 'B4', 'B5'];
@@ -29,8 +29,19 @@ export function assertRequirement(root, req, run, contents) {
   return requirement;
 }
 
+export function assertRequirementApproval(run, requirement) {
+  if (run.kind !== 'feature') return;
+  // 升级前已经基于当前需求版本完成的方案可以继续。
+  const plannedVersion = run.artifacts?.plan?.requirement;
+  if (run.document_review_policy !== 2 && plannedVersion?.hash === requirement.hash && plannedVersion.version === requirement.version) return;
+  if (run.requirement_approval?.hash !== requirement.hash || run.requirement_approval.version !== requirement.version) {
+    throw new Error('请先让用户明确确认已落盘的当前版本 requirement.md，再进入 F4');
+  }
+}
+
 export function assertPlanBasis(root, req, run, contents) {
   const requirement = assertRequirement(root, req, run, contents);
+  assertRequirementApproval(run, requirement);
   const plan = receipt(root, req, run, 'plan', contents);
   if (plan.requirement?.hash !== requirement.hash || plan.requirement.version !== requirement.version) throw new Error('方案依据的需求版本已变化，请根据当前 requirement.md 重新收尾方案');
   assertDocumentReview(run, 'plan', plan, requirement);
@@ -71,6 +82,15 @@ export function assertDelivery(root, req, run, contents, getSnapshot = snapshotR
 }
 
 export function applyDevEvidence(root, req, run, patch, at, contents = {}, getSnapshot = snapshotReader(root, run)) {
+  if (patch.requirement_approval !== undefined) {
+    if (run.kind !== 'feature' || run.steps.F3.status !== 'completed' || run.stage !== 'F4' ||
+        patch.requirement_approval?.confirmed !== true) {
+      throw new Error('requirement_approval 仅在 F3 正式需求完成且用户明确确认后，随进入 F4 一起保存');
+    }
+    const requirement = assertRequirement(root, req, run, contents);
+    run.requirement_approval = { hash: requirement.hash, version: requirement.version, at };
+    run.history.at(-1).requirement_approval = run.requirement_approval;
+  }
   if (!isDev(run)) return;
   for (const step of coreSteps(run)) if (run.steps[step].status === 'skipped') throw new Error(`完整 dev 核心步骤不能跳过：${step}`);
   if (patch.approval !== undefined) {
@@ -108,8 +128,9 @@ export function applyDevEvidence(root, req, run, patch, at, contents = {}, getSn
   const requirementStep = run.kind === 'feature' ? 'F3' : 'B3';
   if (completed(requirementStep)) assertRequirement(root, req, run, contents);
   if (patch.stage === (run.kind === 'feature' ? 'F4' : 'B4')) {
-    assertRequirement(root, req, run, contents);
+    const requirement = assertRequirement(root, req, run, contents);
     if (run.steps[requirementStep].status !== 'completed') throw new Error('需求文档尚未完成，不能进入方案／修复阶段');
+    assertRequirementApproval(run, requirement);
   }
   if (run.kind === 'feature') {
     if (completed('F4')) assertPlanBasis(root, req, run, contents);
@@ -149,6 +170,10 @@ export function reviewEvidence(root, req, run, packet, result, contents, getSnap
   if (isDev(run)) assertValidation(root, req, run, contents, getSnapshot);
   if (result?.run_id !== run.id || result.code !== snapshot.digest || result.inputs !== packet.inputs) throw new Error('审查结果的运行、代码版本或交接内容不匹配，请返回本轮审查结果');
   if (!Array.isArray(result?.findings) || !Array.isArray(result?.coverage?.reviewed) || !Array.isArray(result?.coverage?.uncovered)) throw new Error('审查结果需要 findings 和 coverage.reviewed / uncovered');
+  if (isDev(run) || result.mode !== undefined) assertReviewChoice(result);
+  if (result.mode === 'skipped' && (result.findings.length || result.coverage.reviewed.length)) {
+    throw new Error('用户选择跳过审查时，findings 和 coverage.reviewed 必须为空');
+  }
   const covered = [...result.coverage.reviewed, ...result.coverage.uncovered];
   const expected = packet.scope.review.map((f) => f.path);
   if (new Set(covered).size !== covered.length || expected.length !== covered.length || expected.some((p) => !covered.includes(p))) throw new Error('审查覆盖范围必须逐文件对应交接材料，未审完的放入 uncovered');

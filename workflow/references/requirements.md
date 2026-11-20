@@ -83,7 +83,7 @@ npx @rowansenne/workflow-run docs-repo <团队文档仓库地址> [--project <�
 
 文档仓库模式下，产物写在另一个 git 仓库里，不会随代码提交。finalize 或 reindex 后运行 pending 时：
 
-**dev F7 审查例外**：审查环节（独立子 agent 或当前会话自查）拿到 `commit` 信息后不询问、不执行文档提交，先交审查报告、等待用户选择修复或交付。选择交付进入 F8 后（完整流程；S 快速通道不落盘，没有待提交产物），再运行 `requirement.mjs pending` 获取当前待提交内容，按下面步骤询问；修复与复审期间继续延后，不改动 `commit_prompt` 配置。
+**dev F7 审查例外**：审查环节（含登记用户选择跳过）拿到 `commit` 信息后不询问、不执行文档提交，先交审查报告、等待用户选择修复或交付。选择交付进入 F8 后（完整流程；S 快速通道不落盘，没有待提交产物），再运行 `requirement.mjs pending` 获取当前待提交内容，按下面步骤询问；修复与复审期间继续延后，不改动 `commit_prompt` 配置。
 
 1. 把 pending 的 `files` 和 `suggested_message` 给用户看，问要不要提交。
 2. 用户确认后，按 pending 的 `commands` 在文档仓库里提交；推送另外问用户，用户同意后再 `git -C workflow-run push`。

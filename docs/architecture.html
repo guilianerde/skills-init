@@ -378,11 +378,11 @@ footer { margin-top: 40px; font-size: 13px; color: var(--muted); }
       <li><span class="code">Step 0</span><div class="name">前置检查</div><div class="what">读画像，先确定工作分支，再问清需求名（给不出就不开始）与工作区里已有的改动归谁，跑一次基线</div></li>
       <li><span class="code">F1</span><div class="name">理解需求</div><div class="what">拉 PRD，召回以往的约定和坑，列初版验收标准</div></li>
       <li class="gate"><span class="code">F2</span><div class="name">业务核对与调研</div><div class="what">先落业务场景清单，与产品逐轮核对；明确后结合场景调研代码与数据<br><span class="art">clarification.md</span></div></li>
-      <li class="gate"><span class="code">F3</span><div class="name">需求澄清</div><div class="what">基于已确认场景澄清可行性、接口兼容、数据与权限等技术约束；确认理解一致后收尾需求文档<br><span class="art">requirement.md</span></div></li>
+      <li class="gate"><span class="code">F3</span><div class="name">需求澄清</div><div class="what">基于已确认场景澄清可行性、接口兼容、数据与权限等技术约束；先收尾需求文档，再请用户确认正式版本；确认后进入 F4<br><span class="art">requirement.md</span></div></li>
       <li class="gate"><span class="code">F4</span><div class="name">方案</div><div class="what">需求明确后引用需求版本，写实现设计、实施和验证计划（S / M 简版）；涉及 HTTP 改动时列接口验证场景，M / L 确认后实现<br><span class="art">plan.md</span></div></li>
       <li><span class="code">F5</span><div class="name">实现</div><div class="what">贴合现有写法，不顺手重构；SQL 只写脚本不执行</div></li>
-      <li><span class="code">F6</span><div class="name">验证</div><div class="what">先相关测试再全量；HTTP 接口改动补接口层测试，覆盖正常、适用的参数错误与权限场景；绑定执行前快照，按 AC 记录结果，缺环境写未验证</div></li>
-      <li class="gate"><span class="code">F7</span><div class="name">审查</div><div class="what">完整流程自动生成交接材料，优先独立子 agent 审查；返回草稿与结构化结果，由主 agent 收尾 review.md，再等用户选择修复或交付<br><span class="art">review.md</span></div></li>
+      <li class="gate"><span class="code">F6</span><div class="name">验证</div><div class="what">先相关测试再全量；HTTP 接口改动补接口层测试，覆盖正常、适用的参数错误与权限场景；绑定执行前快照，按 AC 记录结果，缺环境写未验证；交验证结果并等用户确认，再进 F7。返工时先停在 F5 等确认，再重新验证</div></li>
+      <li class="gate"><span class="code">F7</span><div class="name">审查</div><div class="what">用户选择子 agent 审查、当前 agent 审查或跳过；主 agent 将结果或跳过决定写入 review.md，再等用户选择修复或交付<br><span class="art">review.md</span></div></li>
       <li class="gate"><span class="code">F8</span><div class="name">交付</div><div class="what">用户选择交付后才生成交付说明；提交、PR 先问，沉淀有值得记的内容才问<br><span class="art">delivery.md</span></div></li>
     </ol>
   </div>
@@ -427,7 +427,7 @@ footer { margin-top: 40px; font-size: 13px; color: var(--muted); }
     </div>
     <div>
       <h3>结论要有出处</h3>
-      <p>关于现有代码的结论指向真实文件和行号；审查发现要写出触发条件，严重级别的发现交给独立的子代理复核，减少误报。</p>
+      <p>关于现有代码的结论指向真实文件和行号；审查发现要写出触发条件，严重级别的发现按用户选择独立复核、自行复核或记为待确认。</p>
     </div>
   </div>
 </section>

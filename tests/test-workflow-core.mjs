@@ -455,7 +455,7 @@ test('内部 API 与 run CLI 交替推进同一个 feature 运行（空策略单
   }).run;
 
   run = runScript(f.root, tmp, ['save', '--id', run.id, '--expect-revision', String(run.revision)], {
-    stage: 'F4',
+    stage: 'F4', requirement_approval: { confirmed: true },
   }).run;
   const planText = f.text('plan.md');
   const planReview = f.reviewDraft(run, 'plan', planText);
@@ -487,7 +487,7 @@ test('内部 API 与 run CLI 交替推进同一个 feature 运行（空策略单
     steps: { F6: { status: 'completed' } },
   }).run;
   run = runScript(f.root, tmp, ['save', '--id', run.id, '--expect-revision', String(run.revision)], {
-    stage: 'F7',
+    stage: 'F7', advance: { confirmed: true },
   }).run;
 
   const prepared = workflow.reviews.prepare({ branch: BRANCH, id: run.id, depth: '标准' });
@@ -496,6 +496,7 @@ test('内部 API 与 run CLI 交替推进同一个 feature 运行（空策略单
     run_id: packet.run_id,
     code: packet.snapshot.digest,
     inputs: packet.inputs,
+    mode: 'independent', confirmed: true,
     findings: [],
     coverage: {
       reviewed: packet.scope.review.map((file) => file.path),
@@ -583,7 +584,7 @@ test('安装后的 artifact / run Skills 通过真实模板策略推进同一完
 
   run = nextRun(skillRun([
     'save', '--id', run.id, '--expect-revision', String(run.revision),
-  ], { stage: 'F4' }));
+  ], { stage: 'F4', requirement_approval: { confirmed: true } }));
   const badPlan = writeDraft('bad-plan.md', 'dev/references/plan-template.md');
   fs.appendFileSync(badPlan, '\n{{未填写}}\n');
   const bad = artifact([
@@ -640,7 +641,7 @@ test('安装后的 artifact / run Skills 通过真实模板策略推进同一完
   }));
   run = nextRun(skillRun([
     'save', '--id', run.id, '--expect-revision', String(run.revision),
-  ], { stage: 'F7' }));
+  ], { stage: 'F7', advance: { confirmed: true } }));
 
   const prepared = JSON.parse(invokeScript(f.root, handoffScript, [
     '--id', run.id, '--depth', '标准',
@@ -650,6 +651,7 @@ test('安装后的 artifact / run Skills 通过真实模板策略推进同一完
     run_id: prepared.packet.run_id,
     code: prepared.packet.snapshot.digest,
     inputs: prepared.packet.inputs,
+    mode: 'independent', confirmed: true,
     findings: [],
     coverage: { reviewed: prepared.packet.scope.review.map((file) => file.path), uncovered: [] },
   };

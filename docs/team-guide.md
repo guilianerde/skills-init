@@ -78,7 +78,7 @@ workflow-run/docs/requirements/<需求名>/<项目名>/
 ├── requirement.md   # 需求文档（F3 / B3 收尾：目标、范围、AC 验收与澄清决定）
 ├── plan.md          # 方案（dev，非快速通道都写；S / M 简版；缺陷修复追加修复方案节）
 ├── delivery.md      # 交付说明（dev，完整流程审查后用户选择交付才写；S 快速通道不落盘）
-├── review.md        # 审查报告（独立审查或 dev 完整流程自查；S 快速通道不落盘）；复审也写这个文件，上一版归档到 workflow-run/tmp/old-artifacts/
+├── review.md        # 审查报告（独立审查、自查或用户选择跳过的记录；S 快速通道不落盘）；复审也写这个文件，上一版归档到 workflow-run/tmp/old-artifacts/
 ├── tech-doc.md      # 技术方案
 └── release-doc.md   # 上线方案
 ```
@@ -89,7 +89,7 @@ workflow-run/docs/requirements/<需求名>/<项目名>/
 * 正式文档先写 tmp 草稿，再用 `artifact.mjs finalize` 自检、归档旧版、发布并更新索引与运行证据，输出 path / cite；文件名固定、目录只留最新版。中断后用 resume 恢复，重复命令不会重复升版本；旧版在 tmp/old-artifacts/，不替用户删除，wiki 页面记录自动沿用。旧 path / sync 写入链已删除；只刷新派生索引时使用 `requirement.mjs reindex`，正文、版本和证据仍由 finalize 管理。
 * 需求目录写在项目根的 `.ignore` 里，ripgrep 和 agent 的代码搜索会跳过它，产物多了不会污染搜索结果（找历史决策用 DocNexus）。git 不受影响，建议随代码提交。
 
-完整 dev 的关键阶段由程序校验：M / L 方案确认绑定具体版本，测试证据和审查报告绑定包含未提交改动的代码快照，交付选择绑定本轮报告。相关代码、基线或报告变化后需重新验证／审查和选择。独立审查交接由脚本从需求事实、范围与验证结果生成；需要产品核对清单时，在首版清单前创建运行、等待反馈时保存状态；快速通道仍不创建运行。协议见 [execution.md](../workflow/references/execution.md)。
+完整 dev 的关键阶段由程序校验：F3 正式需求确认与 M / L 方案确认分别绑定具体版本，测试证据和审查报告绑定包含未提交改动的代码快照，交付选择绑定本轮报告。相关代码、基线或报告变化后需重新验证／审查和选择。独立审查交接由脚本从需求事实、范围与验证结果生成；需要产品核对清单时，在首版清单前创建运行、等待反馈时保存状态；快速通道仍不创建运行。协议见 [execution.md](../workflow/references/execution.md)。
 
 **独立文档仓库（可选）**：不想让产物进代码仓库、或一个需求横跨多个服务时，装好 skills 后在项目根运行一条命令：
 

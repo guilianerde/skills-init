@@ -24,7 +24,7 @@ test('无需清单时需求文档是首个正式产物；未收尾不能进入�
   assert.equal(viewData(f.root).requirements[0].stages.requirement, 1);
   assert.equal(buildReport(f.root).counts.requirement, 1);
   assert.match(buildDescription(f.root, BRANCH, 'main').markdown, /需求文档.*requirement.md/);
-  assert.equal(f.save(run, { stage: 'F4' }).stage, 'F4');
+  assert.equal(f.enterPlan(run).stage, 'F4');
 });
 
 test('方案独立更新不修改需求文档，审查交接带上对应需求版本', (t) => {
@@ -47,8 +47,10 @@ test('需求变更归档旧版、清除下游证据，旧方案不能重新批�
   assert.equal(fs.readFileSync(path.join(f.root, run.artifacts.requirement.previous), 'utf8'), f.text('requirement.md'));
   for (const key of ['plan_approval', 'implementation', 'validation', 'review', 'decision']) assert.equal(run[key], null, key);
   assert.equal(run.steps.F4.status, 'pending');
-  assert.throws(() => f.save(run, { approval: { confirmed: true } }), /需求版本已变化/);
+  assert.throws(() => f.save(run, { approval: { confirmed: true } }), /确认已落盘的当前版本/);
   assert.throws(() => f.save(run, { stage: 'F5' }), /F4 尚未完成/);
+  run = f.enterPlan(run);
+  assert.throws(() => f.save(run, { approval: { confirmed: true } }), /需求版本已变化/);
   run = f.plan(run);
   assert.equal(run.artifacts.plan.requirement.version, 2);
   assert.equal(f.implement(run).stage, 'F5');
@@ -72,7 +74,7 @@ test('bug 在 B3 收尾修复目标和验收文档，B4 方案引用该版本', 
 
 test('方案收尾中断后恢复仍核对需求正文，不能发布依据已失效的方案', (t) => {
   const f = flowFixture(t); let run = f.requirement(f.start());
-  run = f.save(run, { stage: 'F4' });
+  run = f.enterPlan(run);
   const rename = fs.renameSync; let commits = 0;
   fs.renameSync = (from, to) => {
     if (to === f.file && ++commits === 2) throw new Error('模拟中断');

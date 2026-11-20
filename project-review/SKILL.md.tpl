@@ -12,10 +12,10 @@ description: "Review source code (any language; Java/Spring, Go, TypeScript, Pyt
 
 - 开工运行 `node <skills>/workflow/scripts/resolve.mjs status`，按 `<skills>/workflow/references/capabilities.md` 复用本轮能力快照；DocNexus 必装，不可用先修复。
 - 审查范围以 `review-scope.mjs` 输出为准；只报本次引入的问题，范围外发现单列，不把没覆盖写成没问题。
-- 每条结论引用真实代码与文件行号，行号由 `locate.mjs` 定位；CRITICAL / HIGH 必须复核，有条件时交独立 agent。
-- dev 完整流程调用：执行第 1～7 步，零发现也落盘；只返回报告草稿与结构化证据，由主 agent finalize，不修代码、不生成 delivery.md、不提交、不另开 review 运行，跳过第 8～9 步。
+- 每条结论引用真实代码与文件行号，行号由 `locate.mjs` 定位；CRITICAL / HIGH 按用户选择复核；跳过复核的发现标为待确认。
+- dev 完整流程调用：执行第 1～7 步，零发现或用户选择跳过也落盘；只返回报告草稿与结构化证据，由主 agent finalize，不修代码、不生成 delivery.md、不提交、不另开 review 运行，跳过第 8～9 步。
 - dev 内部报告写「未询问（由 dev 交付统一处理）」，缺本轮 delivery.md 是正常时序；主 agent 交报告后等用户选修复或交付。S 快速通道仅当前会话审查。
-- 深审大改动的分角度并行查找须用户同意；写入知识库与其他对外动作仍须授权。
+- 深审大改动的分角度查找、严重发现复核均由用户选择子 agent、当前 agent 或跳过；写入知识库与其他对外动作仍须授权。
 
 ## 运行状态
 
@@ -59,7 +59,7 @@ description: "Review source code (any language; Java/Spring, Go, TypeScript, Pyt
 ## Output Template
 
 正式报告使用知识库模板，空节写「无」不删标题，复审逐项对照上次报告；细则见 reporting.md。
-单文件 / 小改动可用灵活模式只在对话列 findings，但证据与严重问题复核不省；dev 完整流程不能用此模式免落盘。
+单文件 / 小改动可用灵活模式只在对话列 findings，仍须给出证据，严重问题按用户选择复核；dev 完整流程不能用此模式免落盘。
 
 ## Artifact Location
 

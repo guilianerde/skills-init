@@ -21,7 +21,7 @@
 
 ## 第 3 步 — 分支对比
 
-基线默认取 `workflow/profile.json` 的 `main_branch`（未配置则 `main`）。规模和分批用第 1 步 `review-scope.mjs` 的输出：`summary.size` 是「全量精读」就一次读完；「分批精读」按 `batches` 的顺序（P0 → P1 → P2）读，P0 不能跳过；「过大」时停下请用户缩小范围。审不到的文件写进报告（读法见 `diff-strategy.md`）。**深审且改动属于「更大」、环境又能派子 agent 时，先问用户要不要分角度并行查找**（`diff-strategy.md`「分角度并行查找」），用户同意才走，第 4 步改由各子 agent 按角度过清单。只审本次改动引入的问题，同时检查改动是否破坏既有调用方。
+基线默认取 `workflow/profile.json` 的 `main_branch`（未配置则 `main`）。规模和分批用第 1 步 `review-scope.mjs` 的输出：`summary.size` 是「全量精读」就一次读完；「分批精读」按 `batches` 的顺序（P0 → P1 → P2）读，P0 不能跳过；「过大」时停下请用户缩小范围。审不到的文件写进报告（读法见 `diff-strategy.md`）。**深审且改动属于「更大」、环境又能派子 agent 时，先让用户选择分角度查找的方式**（`diff-strategy.md`「分角度并行查找」），用户选择子 agent 时，第 4 步由各子 agent 按角度过清单；选择当前 agent 时分批精读，选择跳过时注明未覆盖范围。只审本次改动引入的问题，同时检查改动是否破坏既有调用方。
 
 ## 第 4 步 — 逐项过检查清单
 

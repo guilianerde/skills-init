@@ -55,7 +55,7 @@ test('审查交接与收尾共扫描四次；保存和完成在各自校验阶�
   try {
     const packet = handoff(f.root, { branch: BRANCH, id: run.id });
     assert.equal(scans, 2, '交接前后各扫描一次');
-    const result = { run_id: run.id, code: packet.snapshot.digest, inputs: packet.inputs, findings: [],
+    const result = { run_id: run.id, code: packet.snapshot.digest, inputs: packet.inputs, mode: 'independent', confirmed: true, findings: [],
       coverage: { reviewed: packet.scope.review.map((f) => f.path), uncovered: [] } };
     run = f.finalize(run, 'review', done('F7'), { packet, result });
     assert.equal(scans, 4, '收尾准备和发布阶段各扫描一次');
@@ -86,7 +86,7 @@ test('关键门禁拒绝跳过方案、未确认进入实现、未验证进入�
   run = f.plan(run);
   reject({ stage: 'F5' }, /方案尚未由用户确认/);
   run = f.implement(run);
-  reject({ stage: 'F7', ...done('F5') }, /代码或基线已变化/);
+  reject({ stage: 'F7', ...done('F5') }, /先在 F6 完成验证/);
   run = f.verify(run);
   reject({ stage: 'F8' }, /交付|审查步骤|review.md/);
   reject(done('F7'), /已收尾/);
@@ -115,7 +115,50 @@ test('验证使用执行前快照；期间的未提交修改使登记失败，�
   const fresh = codeSnapshot(f.root, run);
   assert.throws(() => f.save(run, { validation: { snapshot: fresh, checks: [{ command: 'test', result: 'unverified' }] } }), /reason/);
   run = f.save(run, { validation: { snapshot: fresh, checks: [{ command: 'test', result: 'unverified', reason: '没有测试环境' }] }, ...done('F6') });
-  assert.equal(f.save(run, { stage: 'F7' }).stage, 'F7', '允许如实记录未验证，不能伪造通过');
+  assert.equal(f.save(run, { stage: 'F7', advance: { confirmed: true } }).stage, 'F7', '允许如实记录未验证，不能伪造通过');
+});
+
+for (const rework of ['代码', '方案']) test(`F6 验证后等待确认；${rework}返工停在 F5，再经两次确认进入 F7`, (t) => {
+  const f = flowFixture(t);
+  const verify = (run) => f.save(run, {
+    validation: {
+      snapshot: codeSnapshot(f.root, run),
+      checks: [{ command: 'node --check app.js', result: 'passed' }],
+    },
+    ...done('F6'),
+  });
+  let run = f.implement(f.plan(f.start()));
+  run = f.save(run, { stage: 'F6', ...done('F5') });
+  assert.throws(() => f.save(run, { ...done('F6'), stage: 'F7', advance: { confirmed: true } }), /先在 F6 完成验证/);
+  run = verify(run);
+  assert.equal(run.status, 'waiting_user');
+  assert.match(run.waiting_for, /F6 验证结果/);
+  assert.throws(() => f.save(run, { stage: 'F7' }), /用户明确确认/);
+  if (rework === '方案') {
+    run = f.save(run, { stage: 'F4', status: 'running' });
+    run = f.finalize(run, 'plan', done('F4'), { text: f.text('plan.md') + '\n调整方案' });
+    run = f.implement(run);
+  } else {
+    run = f.save(run, { stage: 'F5', status: 'running' });
+  }
+  assert.equal(run.validation, null);
+  changeCode(f);
+  assert.throws(() => f.save(run, { ...done('F5'), stage: 'F6', advance: { confirmed: true } }), /先在 F5 完成返工/);
+  run = f.save(run, done('F5'));
+  assert.equal(run.status, 'waiting_user');
+  assert.match(run.waiting_for, /F5 返工结果/);
+  assert.throws(() => f.save(run, { stage: 'F6', status: 'running' }), /用户明确确认/);
+  run = f.save(run, { stage: 'F6', advance: { confirmed: true } });
+  assert.equal(run.status, 'running');
+  run = verify(run);
+  assert.equal(run.status, 'waiting_user');
+  assert.throws(() => f.save(run, { stage: 'F7' }), /用户明确确认/);
+  changeCode(f, 3);
+  assert.throws(() => f.save(run, { stage: 'F7', advance: { confirmed: true } }), /已变化/);
+  changeCode(f);
+  run = f.save(run, { stage: 'F7', advance: { confirmed: true } });
+  assert.equal(run.stage, 'F7');
+  assert.equal(run.status, 'running');
 });
 
 test('快照覆盖新增、删除、暂存及未暂存内容；排除本工具产物，不因写报告反复失效', (t) => {
@@ -200,7 +243,7 @@ test('交接材料只带需求事实；覆盖必须逐文件登记，旧运行�
   assert.deepEqual(packet.facts.acceptance, ['返回分页结果']);
   assert.equal(JSON.stringify(packet).includes('实现者认为全部正确'), false);
   assert.equal(packet.scope.review[0].path, 'app.js');
-  const result = { run_id: packet.run_id, code: packet.snapshot.digest, inputs: packet.inputs, findings: [], coverage: { reviewed: [], uncovered: [] } };
+  const result = { run_id: packet.run_id, code: packet.snapshot.digest, inputs: packet.inputs, mode: 'independent', confirmed: true, findings: [], coverage: { reviewed: [], uncovered: [] } };
   assert.throws(() => f.finalize(run, 'review', {}, { packet, result }), /覆盖范围/);
   result.coverage.uncovered = ['app.js'];
   assert.throws(() => f.finalize(run, 'review', {}, { packet, result: { ...result, code: '旧代码摘要' } }), /审查结果的运行、代码版本/);
@@ -221,6 +264,23 @@ test('草稿自检、分支或 revision 失败不覆盖正式文件、不推进�
   assert.throws(() => finalizeArtifact(f.root, { ...opts, revision: 1 }, () => ({ ok: true })), /版本冲突/);
   assert.equal(fs.readFileSync(f.file, 'utf8'), before);
   assert.equal(fs.readFileSync(path.join(f.root, f.req.dir, 'plan.md'), 'utf8'), f.text('plan.md'));
+});
+
+test('功能开发必须先发布并取得用户对当前版本需求的确认，才能进入 F4', (t) => {
+  const f = flowFixture(t);
+  let run = f.start(BRANCH, 'feature', 'S');
+  assert.throws(() => f.enterPlan(run), /F3 正式需求完成/);
+  run = f.finalize(run, 'requirement', {
+    ...done('F3'), status: 'waiting_user', waiting_for: '确认正式 requirement.md',
+  });
+  assert.throws(() => f.save(run, { stage: 'F4', status: 'running' }), /确认已落盘的当前版本/);
+  run = f.enterPlan(run);
+  assert.equal(run.requirement_approval.hash, run.artifacts.requirement.hash);
+  assert.equal(run.requirement_approval.version, run.artifacts.requirement.version);
+  run = f.save(run, { stage: 'F3' });
+  run = f.finalize(run, 'requirement', done('F3'), { text: f.text('requirement.md') + '\n新版验收条件' });
+  assert.throws(() => f.save(run, { stage: 'F4' }), /确认已落盘的当前版本/);
+  assert.equal(f.plan(run).steps.F4.status, 'completed');
 });
 
 for (const kind of ['feature', 'bug']) test(`${kind}：两份文档须先审查，改需求后相同的方案草稿也须复审`, (t) => {
@@ -249,7 +309,7 @@ for (const kind of ['feature', 'bug']) test(`${kind}：两份文档须先审查�
   });
   assert.equal(run.artifacts.requirement.document_review.mode, 'independent');
   assert.deepEqual(run.artifacts.requirement.document_review.findings, [suggestion]);
-  run = f.save(run, { stage: planStage });
+  run = f.enterPlan(run);
   const planReview = f.reviewDraft(run, 'plan', f.text('plan.md'));
   assert.equal(planReview.packet.basis.text, revisedReqText);
   assert.throws(() => f.finalize(run, 'plan', {}, {
@@ -259,24 +319,32 @@ for (const kind of ['feature', 'bug']) test(`${kind}：两份文档须先审查�
   assert.throws(() => f.implement(run), /尚未完成|plan.md/);
   run = f.save(run, { stage: reqStage });
   run = f.finalize(run, 'requirement', done(reqStage), { text: revisedReqText + '新增 AC-2\n' });
-  run = f.save(run, { stage: planStage });
+  run = f.enterPlan(run);
   assert.throws(() => f.finalize(run, 'plan', {}, planReview), /不对应本轮草稿或其依据/);
   run = f.plan(run);
   assert.equal(run.artifacts.plan.document_review.mode, 'independent');
   assert.equal(f.verify(f.implement(run)).stage, kind === 'feature' ? 'F7' : 'B5');
 });
 
-test('自查降级必须记录用户同意，S 和升级前的 M 运行仍可按原流程收尾', (t) => {
+test('文档自查和跳过需要明确选择，S 和升级前的 M 运行可免文档审查', (t) => {
   const f = flowFixture(t);
   let run = f.start();
   const { packet, result } = f.reviewDraft(run, 'requirement', f.text('requirement.md'));
-  const self = { ...result, mode: 'self', reviewer: '当前 agent' };
-  assert.throws(() => f.finalize(run, 'requirement', done('F3'), { packet, result: self }), /自查降级须有用户明确同意/);
+  const self = { ...result, mode: 'self', reviewer: '当前 agent', confirmed: undefined };
+  assert.throws(() => f.finalize(run, 'requirement', done('F3'), { packet, result: self }), /用户明确选择的审查方式/);
   run = f.finalize(run, 'requirement', done('F3'), {
-    packet, result: { ...self, fallback: { confirmed: true, reason: '客户端不支持子 agent' } },
+    packet, result: { ...self, confirmed: true },
   });
   assert.equal(run.artifacts.requirement.document_review.mode, 'self');
-  assert.equal(run.artifacts.requirement.document_review.fallback.confirmed, true);
+  assert.equal(run.artifacts.requirement.document_review.confirmed, true);
+  run = f.enterPlan(run);
+  const planReview = f.reviewDraft(run, 'plan', f.text('plan.md'));
+  const skipped = { run_id: run.id, inputs: planReview.packet.inputs, mode: 'skipped', summary: '用户选择跳过审查', findings: [] };
+  assert.throws(() => f.finalize(run, 'plan', done('F4'), { ...planReview, result: skipped }), /明确选择/);
+  run = f.finalize(run, 'plan', done('F4'), { ...planReview, result: { ...skipped, confirmed: true } });
+  assert.equal(run.artifacts.plan.document_review.mode, 'skipped');
+  assert.equal(f.implement(run).stage, 'F5');
+  run = runState(f.root, BRANCH).current;
   f.save(run, { reason: '开始兼容性测试' }, 'cancel');
 
   for (const size of ['S', 'M']) {
@@ -294,6 +362,31 @@ test('自查降级必须记录用户同意，S 和升级前的 M 运行仍可按
     assert.equal(f.implement(run).stage, 'F5');
     f.save(runState(f.root, BRANCH).current, { reason: '结束兼容性测试' }, 'cancel');
   }
+});
+
+test('用户可跳过代码审查，仍需登记全部未审范围并明确选择交付', (t) => {
+  const f = flowFixture(t);
+  let run = f.implement(f.plan(f.start()));
+  changeCode(f);
+  run = f.verify(run);
+  const packet = handoff(f.root, { branch: BRANCH, id: run.id });
+  const result = {
+    run_id: run.id, code: packet.snapshot.digest, inputs: packet.inputs,
+    mode: 'skipped', confirmed: true, findings: [], coverage: { reviewed: [], uncovered: ['app.js'] },
+  };
+  const text = f.text('review.md') + '\n用户选择跳过审查，未审查\n';
+  assert.throws(() => f.finalize(run, 'review', done('F7'), {
+    text, packet, result: { ...result, confirmed: false },
+  }), /明确选择/);
+  assert.throws(() => f.finalize(run, 'review', done('F7'), {
+    text, packet, result: { ...result, coverage: { reviewed: ['app.js'], uncovered: [] } },
+  }), /reviewed 必须为空/);
+  run = f.finalize(run, 'review', done('F7'), { text, packet, result });
+  assert.equal(run.review.result.mode, 'skipped');
+  assert.throws(() => f.save(run, { stage: 'F8' }), /明确选择本轮报告/);
+  run = f.save(run, { stage: 'F8', decision: { action: 'deliver', confirmed: true } });
+  run = f.finalize(run, 'delivery', done('F8'));
+  assert.equal(f.save(run, {}, 'complete').status, 'completed');
 });
 
 test('同一方案更新只升一次版本并保留旧正文与 wiki 页面；重试不重复归档', (t) => {
@@ -316,7 +409,7 @@ test('独立 review 的快照跨进度保存仍有效，代码变化后不能 co
   const f = flowFixture(t); let run = f.start(BRANCH, 'review'); changeCode(f);
   const packet = handoff(f.root, { branch: BRANCH, id: run.id });
   run = f.save(run, { stage: 'R7', steps: Object.fromEntries(['R1', 'R2', 'R3', 'R4', 'R5', 'R6'].map((s) => [s, { status: 'completed' }])) });
-  const result = { run_id: packet.run_id, code: packet.snapshot.digest, inputs: packet.inputs, findings: [], coverage: { reviewed: ['app.js'], uncovered: [] } };
+  const result = { run_id: packet.run_id, code: packet.snapshot.digest, inputs: packet.inputs, mode: 'independent', confirmed: true, findings: [], coverage: { reviewed: ['app.js'], uncovered: [] } };
   run = f.finalize(run, 'review', done('R7'), { packet, result });
   changeCode(f, 3);
   assert.equal(runState(f.root, BRANCH).freshness.review, false);
@@ -389,7 +482,7 @@ test('安装后的新 CLI 使用知识模板检查草稿，并生成审查交接
     const { path: packetPath, packet } = JSON.parse(handoff.stdout);
     assert.equal(packet.draft.text, fs.readFileSync(draft, 'utf8'));
     const result = path.join(f.root, 'workflow-run/tmp/document-review.json');
-    fs.writeFileSync(result, JSON.stringify({ ...packet.result_schema, reviewer: 'test-reviewer', summary: '审查通过', findings: [] }));
+    fs.writeFileSync(result, JSON.stringify({ ...packet.result_schema, mode: 'independent', confirmed: true, reviewer: 'test-reviewer', summary: '审查通过', findings: [] }));
     return ['--packet', packetPath, '--result', result];
   };
   const reqArgs = ['finalize', '--id', run.id, '--expect-revision', String(run.revision), '--kind', 'requirement', '--draft', reqDraft, '--input', reqInput];
@@ -400,7 +493,7 @@ test('安装后的新 CLI 使用知识模板检查草稿，并生成审查交接
   run = JSON.parse(reqResult.stdout).run;
   assert.equal(run.steps.F3.status, 'completed');
   assert.equal(fs.existsSync(path.join(f.root, f.req.dir, 'plan.md')), false);
-  run = f.save(run, { stage: 'F4' });
+  run = f.enterPlan(run);
   const draft = path.join(f.root, 'workflow-run/tmp/plan.md'); fs.mkdirSync(path.dirname(draft), { recursive: true });
   fs.writeFileSync(draft, f.text('plan.md') + '\n{{未填写}}');
   const args = ['finalize', '--id', run.id, '--expect-revision', String(run.revision), '--kind', 'plan', '--draft', draft];

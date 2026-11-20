@@ -98,7 +98,7 @@ test('F3 前在 F2 发布业务清单；多轮更新归档并展示，业务明�
   run = f.requirement(run);
   assert.equal(run.steps.F3.status, 'completed');
   assert.deepEqual(fs.readdirSync(path.dirname(f.file)).sort(), ['clarification.md', 'meta.json', 'requirement.md']);
-  run = f.save(run, { stage: 'F4' });
+  run = f.enterPlan(run);
   assert.throws(() => finalizeArtifact(f.root, { branch: BRANCH, id: run.id, revision: run.revision,
     kind: 'clarification', text: checklist() }, () => ({ ok: true })), /F2 收尾/);
 });
@@ -150,7 +150,7 @@ for (const kind of ['feature', 'bug']) test(`${kind} 回退更新业务清单后
 
   if (kind === 'feature') run = f.save(run, { stage: requirementStep, steps: { F2: { status: 'completed' } } });
   run = f.requirement(run);
-  run = f.save(run, { stage: planStep });
+  run = f.enterPlan(run);
   // 即便重新收尾的需求正文相同，也不能复用旧方案凭据与确认。
   assert.equal(run.artifacts.requirement.hash, previous.requirement.hash);
   assert.throws(() => f.save(run, { approval: { confirmed: true } }), /plan.md/);

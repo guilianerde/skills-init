@@ -49,8 +49,8 @@ description: "Entry point for project workflow commands: /workflow, project prof
 ### 完整链路（从需求到上线）
 
 ```
-dev（确定工作分支 → 定需求名 → 理解与澄清 → 需求文档 → 方案 → 实现 → 测试 → 优先独立子 agent 审查并落盘报告，无则在当前会话自查 → 用户选择修复或交付）
-  ↳ 修复：实现 → 验证 → 复审（无子 agent 时当前会话）→ 再次选择；交付：完整流程生成 delivery.md，S 快速通道只在对话交付、不落盘
+dev（确定工作分支 → 定需求名 → 理解与澄清 → 落盘并确认需求文档 → 方案 → 实现 → 测试并等用户确认 → 由用户选择子 agent 审查、当前 agent 审查或跳过并落盘记录 → 用户选择修复或交付）
+  ↳ 功能修复：实现并等确认 → 验证并等确认 → 询问本轮复审方式 → 再次选择；交付：完整流程生成 delivery.md，S 快速通道只在对话交付、不落盘
   → create-tech-md-doc（M / L 规模）
   → md-to-wiki（发布技术方案，可选）
   → create-release-md-doc（要上线时）

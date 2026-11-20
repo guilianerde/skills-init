@@ -83,7 +83,7 @@ F3 / B3 只能在需求文档 finalize 后完成；requirement.md 是需求事�
 
 前面的 F4～F6 必须已按实际进度保存，不能为凑齐示例而直接标完成。bug 的 B5 同时包含审查与交付，报告完成等待选择时 B5 仍为 in_progress，最后交付才标完成。
 
-- 用户选修复：save `stage: F5`、`status: running`、`decision: {"action":"fix","confirmed":true}`；bug 回 B4。回到前面的阶段会自动重置该阶段及后续的完成标记、清除旧交付选择，旧 checkpoint 保留在 history；修复、验证和复审后再次等待选择。业务场景变化先回 F2 更新清单，再到 F3 重新收尾需求；仅技术约束变化回 F3，规模变化同时写 size。
+- 用户选修复：save `stage: F5`、`status: running`、`decision: {"action":"fix","confirmed":true}`；bug 回 B4。回到前面的阶段会自动重置该阶段及后续的完成标记、清除旧交付选择，旧 checkpoint 保留在 history；功能返工完成 F5 时等待用户确认，进入 F6 用 `advance: {"confirmed":true}`；每轮 F6 完成后再次等待确认，进入 F7 用同样字段。缺陷修复在 B4 验证后回 B5。复审后再次等待交付选择。业务场景变化先回 F2 更新清单，再到 F3 重新收尾需求；仅技术约束变化回 F3，规模变化同时写 size。
 - 用户明确选交付：按 execution.md 核对本轮证据，save `stage: F8`、`status: running`、`decision: {"action":"deliver","confirmed":true}`；bug 留在 B5。只记录用户实际确认的选择，遗留风险写 context。
 - 等需求／方案草稿反馈：`status: waiting_user`，waiting_for 说明待答问题，context 保存 tmp 草稿路径、已确认决定及待确认项。恢复时先核对草稿是否仍对应这些决定，直接落实明确反馈。待决定项解决后按 [execution.md](execution.md#需求与方案审查) 送审和收尾。
 - 环境等阻塞：`status: blocked`、reason 说明原因，保留步骤与 remaining；解除后 save running。
