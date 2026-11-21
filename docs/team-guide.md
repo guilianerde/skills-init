@@ -73,7 +73,7 @@ git status --short --ignored
 
 ```
 workflow-run/docs/requirements/<需求名>/<项目名>/
-├── meta.json        # runs 保存分支运行状态、逐步完成标记与完成时间；另含 需求名、绑定的分支、各产物（版本、日期、wiki 发布记录、DocNexus 沉淀），给以后的可视化用
+├── meta.json        # runs 保存分支运行状态、逐步完成标记与完成时间；另含 需求名、绑定的分支、各产物（版本、日期、DocNexus 沉淀）
 ├── clarification.md # 业务场景清单（F2 / B3，多轮核对产品答复）
 ├── requirement.md   # 需求文档（F3 / B3 收尾：目标、范围、AC 验收与澄清决定）
 ├── plan.md          # 方案（dev，非快速通道都写；S / M 简版；缺陷修复追加修复方案节）

@@ -84,7 +84,7 @@ export function loadWorkspace(root, { allProjects = false, allBranches = false }
         artifacts.push(a);
         const indexed = index.find((i) => i.file === entry.name);
         if ((Array.isArray(req.meta.artifacts) && !indexed) || (indexed && (indexed.branch !== a.branch || indexed.date !== a.date
-          || JSON.stringify(indexed.wiki) !== JSON.stringify(a.wiki) || (indexed.registered !== false && indexed.version !== a.version)
+          || (indexed.registered !== false && indexed.version !== a.version)
           || JSON.stringify(indexed.docnexus ?? []) !== JSON.stringify(a.knowledge)))) {
           diagnostics.push({ code: 'stale_index', path: file, message: '文档与已登记索引不一致，请显式 reindex' });
         }

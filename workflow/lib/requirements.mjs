@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { updateMeta } from './meta-store.mjs';
-import { FILES, LABELS, parseFile, parseBranch, parseWiki, parseDocnexus, headerDate } from './artifact-model.mjs';
+import { FILES, LABELS, parseFile, parseBranch, parseDocnexus, headerDate } from './artifact-model.mjs';
 import { HOME, REQ_DIR, TMP_DIR, dirName, profileDir, layout, setConfig } from './project.mjs';
 import { requirements, repoRequirements, find } from './requirement-read.mjs';
 import { loadWorkspace } from './workspace-read.mjs';
@@ -31,7 +31,6 @@ export function indexArtifacts(dir, versions = {}, { requireVersion = false } = 
       file: name,
       branch: parseBranch(text),
       date: headerDate(text),
-      wiki: parseWiki(text),
       docnexus: parseDocnexus(text),
       ...(requireVersion && !registered ? { registered: false } : {}),
     };

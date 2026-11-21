@@ -59,7 +59,7 @@ test('没绑定时给出建议名；bind 后返回同一需求目录，同名需
   fs.rmSync(root, { recursive: true, force: true });
 });
 
-test('reindex：meta.json 汇总产物、wiki 与 DocNexus；只刷新派生索引', () => {
+test('reindex：meta.json 汇总本地产物与 DocNexus', () => {
   const { root, put } = repo();
   const b = 'feature/order-export';
   const { dir } = bind(root, { name: '订单导出', branch: b });
@@ -71,7 +71,7 @@ test('reindex：meta.json 汇总产物、wiki 与 DocNexus；只刷新派生索�
   const m = reindexRequirement(root, dir);
   assert.deepEqual(m.latest, { clarification: null, requirement: null, plan: null, delivery: 'delivery.md', review: 'review_v2.md', tech: 'tech-doc.md', release: null });
   assert.equal(m.artifacts.length, 4, 'notes.md 不是产物');
-  assert.deepEqual(m.artifacts.find((a) => a.kind === 'tech').wiki, { pageId: '42', version: 3, url: 'https://wiki/x', at: null });
+  assert.equal(Object.hasOwn(m.artifacts.find((a) => a.kind === 'tech'), 'wiki'), false);
   assert.deepEqual(m.artifacts.find((a) => a.kind === 'delivery').docnexus, ['docnexus/library/dev/order.md']);
   assert.equal(m.artifacts[0].date, '2026-10-15');
   assert.deepEqual(m.unregistered.map(({ kind }) => kind).sort(), ['delivery', 'review', 'tech']);

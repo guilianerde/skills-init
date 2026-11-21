@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // 产物按需求归档：方案、交付说明、审查报告、技术方案、上线方案按需求放在一起，meta.json 汇总需求名、绑定的分支、各产物、
-// wiki 发布记录与 DocNexus 沉淀，供 /workflow view 等直接读取。
+// DocNexus 沉淀。/workflow view 等从 Markdown 读取 Wiki 发布记录。
 // 本工具的产出都在项目根的 workflow-run/ 里（需求产物 docs/requirements/、DocNexus 工作区 docnexus/、项目模板 templates/、临时文件 tmp/），
 // 不往项目的其他地方写。两种用法：
 // 两种用法的目录结构完全一样：产物都在 workflow-run/docs/requirements/<需求名>/<项目名>/，一个需求横跨多个服务时各项目各占一个子目录，

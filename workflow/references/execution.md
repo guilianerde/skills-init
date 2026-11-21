@@ -127,7 +127,7 @@ feature 可在 checkpoint 标 F7 completed；bug 的 B5 此时仍 in_progress。
 
 finalize 先用知识库当前模板 lint 精确的草稿内容，再校验运行 revision、阶段、分支和证据；通过后归档旧版、发布正式文件、更新版本／索引、登记运行证据。checkpoint 只能更新当前产物所属步骤、等待状态和上下文，不能夹带下游阶段或用户确认。输出正式 path、cite、previous、version、lint、run；自检警告和待填写项要告知用户，引用用 cite，归档遵循 requirements.md，不能替用户删除。
 
-正式文档先写 tmp 草稿；旧 `requirement.mjs path` 入口已删除，不能通过直接覆盖正式文件绕过收尾中断保护。tech / release 分别在 T4 / L4 用 kind tech / release 收尾，使用各自的知识模板；wiki／沉淀后只更新发布或知识元信息仍可显式 reindex，但 reindex 不修复正文 hash 或旧证据。
+正式文档先写 tmp 草稿；旧 `requirement.mjs path` 入口已删除，不能通过直接覆盖正式文件绕过收尾中断保护。tech / release 分别在 T4 / L4 用 kind tech / release 收尾，使用各自的知识模板。Wiki 发布记录直接从 Markdown 读取。更新知识沉淀元信息后显式 reindex，仅刷新派生索引。
 
 技术方案将生成时间、对比分支、diff 概览、PRD 参考和模板来源放在文件头的 `<!-- workflow-run: … -->` 多行注释中（格式见 create-tech-md-doc，整个块在前 20 行内），不要求正文显示元信息引用块。分支校验仍读取注释中的 `对比分支：`，索引日期读取其中的 `生成时间：`；旧文档的可见元信息继续兼容。注释随正式文件一起归档并参与 hash 校验，Wiki 转换时移除；`meta.json` 仍按现有逻辑记录绑定、索引和运行，不自动接收全部注释字段。
 

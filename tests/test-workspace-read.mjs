@@ -13,6 +13,7 @@ import { collect, branchView } from '../workflow/scripts/artifacts.mjs';
 import { buildReport } from '../workflow/scripts/report.mjs';
 import { viewData } from '../workflow/scripts/view.mjs';
 import { buildDescription } from '../workflow/scripts/pr-desc.mjs';
+import { writeTarget } from '../md-to-wiki/scripts/upload.mjs';
 
 const REPO = fileURLToPath(new URL('..', import.meta.url));
 const BRANCH = 'feature/export';
@@ -86,6 +87,38 @@ test('list 纯读取；未索引正文也能显示，reindex 保留 runs、扩�
   const original = fs.readFileSync(f.meta, 'utf8');
   reindexRequirement(f.root, f.req.dir);
   assert.equal(fs.readFileSync(f.meta, 'utf8'), original);
+});
+
+test('首次发布和再次发布直接读取 Markdown，旧 Wiki 索引字段不触发 stale_index', (t) => {
+  const f = fixture(t);
+  const file = `${f.req.dir}/release-doc.md`;
+  const original = doc('上线方案');
+  f.put(file, original);
+  const meta = reindexRequirement(f.root, f.req.dir);
+  meta.artifacts[0].wiki = null;
+  fs.writeFileSync(f.meta, JSON.stringify(meta));
+  assert.ok(buildReport(f.root).branches[0].unpublished.includes(file));
+
+  const first = { pageId: '42', version: 2, url: 'https://wiki.example.invalid/pages/42', at: '2026-10-25T00:00:00Z' };
+  const published = writeTarget(original, first);
+  f.put(file, published);
+  const initialReport = buildReport(f.root);
+  assert.deepEqual(initialReport.branches[0].unpublished, []);
+  assert.equal(initialReport.diagnostics, undefined);
+
+  meta.artifacts[0].wiki = first;
+  const legacy = JSON.stringify(meta);
+  fs.writeFileSync(f.meta, legacy);
+  const second = { ...first, version: 3, at: '2026-10-26T00:00:00Z' };
+  const republished = writeTarget(published, second);
+  f.put(file, republished);
+  const workspace = loadWorkspace(f.root);
+  assert.deepEqual(workspace.artifacts[0].wiki, second);
+  assert.deepEqual(workspace.diagnostics, []);
+  assert.equal(fs.readFileSync(f.meta, 'utf8'), legacy);
+
+  f.put(file, republished.replace(BRANCH, 'feature/changed'));
+  assert.ok(loadWorkspace(f.root).diagnostics.some(d => d.code === 'stale_index' && d.path === file));
 });
 
 test('损坏元信息隔离诊断；正文仍可展示，写入拒绝覆盖，缺失产物有明确提示', (t) => {

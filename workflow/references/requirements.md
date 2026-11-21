@@ -6,7 +6,7 @@
 
 ```
 workflow-run/docs/requirements/<需求名>/<项目名>/
-├── meta.json          # 运行记录 runs（阶段、步骤完成标记、等待决定、上下文、完成时间）及 需求名、绑定的分支、各产物（种类、版本、日期、wiki 发布记录、DocNexus 沉淀）
+├── meta.json          # 运行记录 runs（阶段、步骤完成标记、等待决定、上下文、完成时间）及 需求名、绑定的分支、各产物（种类、版本、日期、DocNexus 沉淀）
 ├── clarification.md   # 业务场景清单（F2 / B3，多轮场景核对、产品答复与追加问题）
 ├── requirement.md     # 需求文档（F3 / B3 收尾；目标、范围、AC 验收与澄清决定）
 ├── plan.md            # 方案（dev，非快速通道都写；S / M 简版；缺陷修复追加修复方案节）
@@ -59,7 +59,7 @@ node <skills>/workflow/scripts/requirement.mjs which
 - 原文第一行的 md-to-wiki 页面记录自动保留，新版仍发布同一页；不能在普通文档收尾中替换页面归属。
 - 文件发布与元信息不能跨文件一次原子提交。待完成收尾保存在同一 meta.json；中断先 `artifact.mjs resume --id <id>`，不能继续 reindex / save 越过待办。代码或正文冲突时停止，取消和恢复规则见 execution.md。
 - 旧 `requirement.mjs path` 和 `sync` 写入命令已删除。查询已有产物用 artifacts / list，正式写入与 cite 用 finalize 输出。
-- wiki 发布或知识沉淀更新文档元信息后显式 `requirement.mjs reindex`。它只重建派生索引并保留 runs、versions 和证据；需求绑定只由 bind 修改，不根据文档头隐式新增。
+- Wiki 发布记录直接从 Markdown 读取，写回后即可在状态、报告和视图中看到。知识沉淀更新文档元信息后显式运行 `requirement.mjs reindex`，只重建派生索引。需求绑定由 bind 修改。
 - 文档／索引不一致、元信息损坏或引用缺失进入只读诊断；文件存在不代表运行完成。确认正文后显式 reindex，损坏的 meta 先人工核对修复。已有旧运行缺少新证据时回到对应阶段重新收尾／验证，不自动补用户确认。
 - 独立文档仓库在允许提示提交的阶段运行 `requirement.mjs pending`，沿用下节规则；dev 内部审查延后到 F8。
 
